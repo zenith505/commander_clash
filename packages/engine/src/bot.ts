@@ -480,7 +480,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
   let v = 0;
-  for (const inner of allEffects(e.effects)) {
+  // "You may discard a card. If you do, draw a card": what follows counts too.
+  const then = r.body.effects[r.next + 1];
+  const follows = then?.type === "if" && then.cond.kind === "youDid" ? then.effects : [];
+  for (const inner of allEffects([...e.effects, ...follows])) {
     if (inner.type === "may") continue;
     const i = targetIndexOf(inner);
     if (i !== undefined) {

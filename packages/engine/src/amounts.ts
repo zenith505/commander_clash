@@ -9,7 +9,7 @@ import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { characteristics, type Characteristics } from "./layers";
 import { manaValue, parseManaCost } from "./mana";
-import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId } from "./types";
+import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
 
 export interface AmountCtx {
   controller: PlayerId;
@@ -26,6 +26,8 @@ export interface AmountCtx {
   sacrificed?: LastKnown[];
   /** The creature type or color chosen ("for each creature of the chosen type"). */
   chosen?: Chosen;
+  /** For a triggered ability, what its event was about ("that much"). */
+  event?: TriggerEventInfo;
   /** How the resolving ability finds the objects and players it names. Static abilities only name themselves and "you". */
   objects?: (ref: ObjRef) => GameObject[];
   players?: (ref: PlayerRef) => PlayerId[];
@@ -70,6 +72,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
   switch (c.kind) {
     case "x":
       return ctx.x ?? 0;
+    case "eventAmount":
+      return ctx.event?.amount ?? 0;
     case "permanents": {
       let n = 0;
       const filter = bindChosen(c.filter, ctx.chosen);

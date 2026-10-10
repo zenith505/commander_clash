@@ -62,7 +62,9 @@ export type Count =
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */
-  | { kind: "wasKicked"; which?: number };
+  | { kind: "wasKicked"; which?: number }
+  /** "That much", "that many" in a triggered ability: the damage its event dealt. */
+  | { kind: "eventAmount" };
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
@@ -178,7 +180,9 @@ export type PlayerRef =
   | { ref: "target"; index: number }
   | { ref: "eachOpponent" }
   | { ref: "eachPlayer" }
-  | { ref: "targetController"; index: number }; // "its controller"
+  | { ref: "targetController"; index: number } // "its controller"
+  /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
+  | { ref: "eventPlayer" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -285,7 +289,8 @@ export type Effect =
   | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[] }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
-  | { type: "loseLife"; who: PlayerRef; n: Amount }
+  /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
+  | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
   | { type: "destroy"; what: ObjRef; noRegen?: boolean } // "It can't be regenerated."
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | { type: "regenerate"; what: ObjRef }
@@ -392,7 +397,10 @@ export type ChoiceKind = "creatureType" | "color";
 export type EntersOption = "riot" | "unleash";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
-export type SpellCondition = { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string };
+export type SpellCondition =
+  | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
+  /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
+  | { kind: "youDid" };
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
@@ -417,6 +425,9 @@ export type TriggerEvent =
   | "selfBecomesTarget" // "When this becomes the target of a spell or ability"
   | "selfAttacks" // Whenever this attacks
   | "selfDealsCombatDamageToPlayer"
+  /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
+  | "selfDealsDamage"
+  | "selfDealsCombatDamage"
   | "monarchEndStep" // the monarch's inherent abilities (CR 725.2): no source, fired by the game
   | "monarchDamaged"
   | "anotherCreatureYouControlEnters"
@@ -607,6 +618,8 @@ export interface CompiledCard {
   bloodthirst?: number;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
+  /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
+  noMaxHandSize?: boolean;
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */
@@ -618,6 +631,8 @@ export interface CompiledCard {
   costLess?: Amount[];
   /** "This spell costs {2} less to cast if you control a Wizard": the reduction while the condition holds. */
   costLessIf?: { n: number; cond: StaticCondition }[];
+  /** "This spell costs {3} less to cast if it targets a tapped creature" (CR 601.2f). */
+  costLessIfTargets?: { n: number; filter: TargetSpec }[];
   /**
    * A permanent's static abilities that make spells cost more or less: "Creature spells you cast cost
    * {1} less to cast", "Noncreature spells cost {1} more to cast" (CR 601.2f).

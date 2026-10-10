@@ -143,7 +143,7 @@ export function planCast(
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
-  let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, choices);
+  let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets });
   if (choices.delve?.length) {
     // Cards exiled for delve pay generic mana (CR 702.66a).
     const reduced = payGenericWith(cost, extra, choices.delve.length);
@@ -164,7 +164,10 @@ export function planCast(
     const imp = improvise ? autoImprovise(s, pid, reduced, 0, convoke) : null;
     return imp ? cast(imp.taps, convoke, imp.artifacts) : null;
   }
-  let taps = planMana(s, pid, cost, extra, undefined, sacrificedTargets(s, targets));
+  // "Costs {3} less if it targets a tapped creature" is worked out before mana abilities (CR 601.2f-g):
+  // tapping the target for mana first mustn't make it count.
+  const targetIds = compileCard(d).costLessIfTargets ? (targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])) : [];
+  let taps = planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
   // So when the cost depends on the board, don't sacrifice permanents for its mana.

@@ -26,6 +26,7 @@ export const SUPPORTED_KEYWORDS = [
   "Mountainwalk",
   "Plainswalk",
   "Horsemanship", // CR 702.31b: can't be blocked except by creatures with horsemanship
+  "Skulk", // CR 702.118b: can't be blocked by creatures with greater power
   // Targeting and damage (CR 702.18 shroud, 702.16 protection, 702.90 infect, 702.80 wither).
   // Protection is modeled for the five colors only; "Toxic N" is a keyword with a number, see toxicValue.
   "Shroud",
@@ -36,6 +37,10 @@ export const SUPPORTED_KEYWORDS = [
   "Protection from green",
   "Infect",
   "Wither",
+  // On an Aura: "If enchanted permanent would be destroyed, instead remove all damage marked on it and destroy
+  // this Aura" (CR 702.89a; "totem armor" is the old name, 702.89b). See destroyPermanent.
+  "Umbra armor",
+  "Totem armor",
   // Characteristic-defining / no in-game effect: Devoid's colorlessness is already in the
   // card data (CR 702.114a); Changeling gives every creature type (CR 702.73a); Partner only
   // matters for deck building (CR 702.124).

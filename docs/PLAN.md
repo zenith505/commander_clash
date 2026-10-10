@@ -741,6 +741,29 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **9,699 cards are fully supported.** Rules tests: `test/granted-abilities.test.ts`.
 
+### Umbra armor, "If you do", extort, damage triggers (added 2026-10-10)
+
+- **Skulk** (CR 702.118b): can't be blocked by creatures with greater power.
+- **Umbra armor** (totem armor, CR 702.89a): if the enchanted creature would be destroyed, its damage is
+  removed and the Aura is destroyed instead. A regeneration shield is used first (CR 616.1).
+- **"You have no maximum hand size"** (Reliquary Tower, CR 402.2): no cleanup discard.
+- **"You may discard a card. If you do, draw two cards"** (CR 608.2c): the draw happens only if you
+  actually discarded, so with an empty hand nothing happens. Same for "you may draw a card. If you do,
+  discard a card" and "you may sacrifice it. If you do, ...".
+- **Extort** (CR 702.101a): whenever you cast a spell, you may pay {W/B}; each opponent loses 1 life and
+  you gain the total lost. "You gain life equal to the life lost this way" (Gray Merchant,
+  Exsanguinate) works the same way.
+- **Damage triggers**: "Whenever this creature deals damage, you gain that much life", "deals combat
+  damage", and "deals combat damage to a player, that player discards a card" / "draw that many
+  cards". One source dealing damage to several things at once is one event, so it triggers once with
+  the total (CR 603.2c).
+- **Statics for attacking or blocking creatures**: "Attacking creatures you control have double strike".
+- **"This spell costs {3} less to cast if it targets a tapped creature"**: the target is chosen before
+  the cost is worked out (CR 601.2c, 601.2f), and autopay won't tap the target for mana.
+- Not yet: battles, "can't attack unless", "becomes tapped" triggers.
+
+**9,850 cards are fully supported.** Rules tests: `test/umbra-extort-damage.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

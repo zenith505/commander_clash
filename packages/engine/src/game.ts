@@ -606,6 +606,16 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
     log(s, `${name} regenerates.`);
     return false;
   }
+  // Umbra armor (CR 702.89a) replaces the destruction even when it can't be regenerated. With a regeneration
+  // shield too, the controller could pick either (CR 616.1); the shield is used first, which keeps the Aura.
+  const umbra = s.battlefield.map((id) => obj(s, id)).find((a) => a.attachedTo === o.id && (objHasKeyword(s, a, "Umbra armor") || objHasKeyword(s, a, "Totem armor")));
+  if (umbra) {
+    o.damage = 0;
+    o.deathtouchDamage = false;
+    log(s, `${defOf(s, umbra).name}'s umbra armor saves ${name}.`);
+    destroyPermanent(s, umbra, `${defOf(s, umbra).name} is destroyed instead.`);
+    return false;
+  }
   log(s, message);
   moveObject(s, o.id, "graveyard");
   return true;
@@ -723,7 +733,7 @@ function beginStep(s: GameState, step: Step) {
     case "cleanup": {
       for (const o of attackersAndBlockers(s)) clearCombat(o);
       const p = player(s, ap);
-      if (p.hand.length > MAX_HAND_SIZE) {
+      if (p.hand.length > MAX_HAND_SIZE && !hasNoMaxHandSize(s, ap)) {
         s.pending = { kind: "discardToHandSize", player: ap, count: p.hand.length - MAX_HAND_SIZE };
         return;
       }
@@ -733,6 +743,10 @@ function beginStep(s: GameState, step: Step) {
   }
   runStateBasedActions(s);
 }
+
+/** "You have no maximum hand size" on a permanent the player controls (CR 402.2, 514.1). */
+export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
+  s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).noMaxHandSize);
 
 function finishCleanup(s: GameState) {
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
@@ -885,7 +899,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   }
   for (const m of adds) p.manaPool[m]++;
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
-  if (ab.selfDamage) dealDamage(s, src, { player: p.id }, ab.selfDamage);
+  if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
 }
 
 export function commanderTax(p: Player, o: GameObject) {
@@ -971,7 +985,7 @@ export function castProblem(
   if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices);
   if (ap) return ap;
-  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, choices);
+  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
   if (typeof cost === "string") return cost;
   if (!payFromPool(cost.cost, p.manaPool, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
@@ -981,7 +995,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown"> = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown"> & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -1002,6 +1016,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
   for (const c of compileCard(d).costLessIf ?? []) if (staticConditionNow(s, c.cond, o.id, pid)) less += c.n;
+  // "Costs {3} less to cast if it targets a tapped creature": the targets are chosen before the cost is (CR 601.2c, 601.2f).
+  for (const c of compileCard(d).costLessIfTargets ?? [])
+    if (how.targets?.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false))) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
   return { cost: total.cost, extra: Math.max(0, total.extra + mods.more - less) };
 }
@@ -1038,7 +1055,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
  */
-function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices = {}): { cost: ParsedCost; extra: number } | string {
+function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } | string {
   const d = defOf(s, o);
   let { cost, extra } = spellCost(s, pid, o, x, kicks, how);
   if (convoke?.length) {
@@ -1148,7 +1165,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const fromCommand = o.zone === "command";
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
-  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, choices) as { cost: ParsedCost; extra: number };
+  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets }) as { cost: ParsedCost; extra: number };
   const paid = payFromPool(cost.cost, p.manaPool, cost.extra, p.life)!;
   p.manaPool = paid.pool;
   p.life -= paid.lifePaid;
@@ -1745,6 +1762,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (protectedFrom(a.keywords, b.colors)) return `${a.name} has protection from ${b.name}'s color`; // CR 702.16f
   if (b.blocksOnlyFlyers && !has(a, "Flying")) return `${b.name} can block only creatures with flying`; // CR 509.1b
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
+  if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
@@ -1801,14 +1819,20 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
   const sources = new Map(hits.map((h) => [h.source.id, objectSource(s, h.source)]));
   // Each source's lifelink is one life-gain event however many things it damaged (CR 119.10).
   const lifelink = new Map<ObjectId, { n: number }>(hits.map((h) => [h.source.id, { n: 0 }]));
+  const dealt = new Map<ObjectId, number>();
   for (const h of hits) {
     const src = sources.get(h.source.id)!;
     const opts = { combat: true, lifelink: lifelink.get(h.source.id)! };
+    let n = 0;
     if (h.toPlayer !== undefined) {
-      if (dealDamage(s, src, { player: h.toPlayer }, h.amount, opts)) fireEvent(s, { type: "combatDamageToPlayer", id: h.source.id, player: h.toPlayer });
-    } else if (h.toObject) dealDamage(s, src, { object: h.toObject }, h.amount, opts);
+      n = dealDamage(s, src, { player: h.toPlayer }, h.amount, opts);
+      if (n) fireEvent(s, { type: "combatDamageToPlayer", id: h.source.id, player: h.toPlayer, amount: n });
+    } else if (h.toObject) n = dealDamage(s, src, { object: h.toObject }, h.amount, opts);
+    dealt.set(h.source.id, (dealt.get(h.source.id) ?? 0) + n);
   }
   for (const [id, gained] of lifelink) gainLife(s, sources.get(id)!.controller, gained.n);
+  // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
+  for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
 }
 
 // ---------------------------------------------------------------------------

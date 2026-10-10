@@ -18,6 +18,8 @@ export interface DamageSource {
   keywords: string[];
   /** A commander dealing combat damage counts toward commander damage (CR 903.10a). */
   commanderId?: ObjectId;
+  /** The permanent dealing it, for "whenever ~ deals damage" (not set for a spell). */
+  id?: ObjectId;
 }
 
 /**
@@ -26,7 +28,7 @@ export interface DamageSource {
  */
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, keywords: c.keywords, ...(o.isCommander ? { commanderId: o.id } : {}) };
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, keywords: c.keywords, id: o.id, ...(o.isCommander ? { commanderId: o.id } : {}) };
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */

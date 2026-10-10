@@ -14,7 +14,7 @@ import { compileCard, compileGranted, MONARCH } from "./oracle";
 import { CREATURE_TYPES } from "./keywords";
 import { describeAmount, evalAmount, type AmountCtx } from "./amounts";
 import { cardSource, dealDamage, objectSource, protectedFrom, type DamageSource } from "./damage";
-import type { CardDef, Chosen, Color, DelayedTrigger, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem } from "./types";
+import type { CardDef, Chosen, Color, DelayedTrigger, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo } from "./types";
 
 // ---------------------------------------------------------------------------
 // Targets (CR 115)
@@ -273,6 +273,7 @@ interface ResolveCtx {
   lki?: LastKnown;
   /** The announced X (CR 107.3a). */
   x?: number;
+  event?: TriggerEventInfo;
   /** Kicker costs paid for it (CR 702.33d). */
   kicked?: number[];
   /** What was sacrificed to cast it, as it last existed. */
@@ -333,6 +334,7 @@ export function continueResolution(s: GameState): Resolution {
     subject: item.subject,
     lki: item.lki,
     x: item.x,
+    event: item.event,
     kicked: item.kicked,
     sacrificed: item.sacrificed,
   };
@@ -466,6 +468,8 @@ function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId[] {
       const t = ctx.targets[ref.index];
       return ctx.legal[ref.index] && t?.kind === "player" ? [t.id] : [];
     }
+    case "eventPlayer":
+      return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
     case "subjectController": {
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
       if (!o) return [];
@@ -509,6 +513,7 @@ const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   sourceId: ctx.sourceId,
   sourceZc: ctx.sourceZc,
   x: ctx.x,
+  event: ctx.event,
   lki: ctx.lki,
   kicked: ctx.kicked,
   sacrificed: ctx.sacrificed,
@@ -553,9 +558,11 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       const from = ctxSource(s, ctx);
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
-      for (const o of objs) dealDamage(s, from, { object: o }, amount, { lifelink });
-      for (const pid of pids) dealDamage(s, from, { player: pid }, amount, { lifelink });
+      let dealt = 0;
+      for (const o of objs) dealt += dealDamage(s, from, { object: o }, amount, { lifelink });
+      for (const pid of pids) dealt += dealDamage(s, from, { player: pid }, amount, { lifelink });
       gainLife(s, from.controller, lifelink.n);
+      if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
       return;
     }
     case "preventNext": {
@@ -642,14 +649,21 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         log(s, `${player(s, pid).name} gains ${n} life.`);
       }
       return;
-    case "loseLife":
+    case "loseLife": {
+      let total = 0;
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);
-        if (!n) continue;
+        if (n <= 0) continue;
         player(s, pid).life -= n;
+        total += n;
         log(s, `${player(s, pid).name} loses ${n} life.`);
       }
+      if (e.drain && total > 0) {
+        gainLife(s, ctx.controller, total);
+        log(s, `${player(s, ctx.controller).name} gains ${total} life.`);
+      }
       return;
+    }
     case "destroy":
       for (const o of objects(s, e.what, ctx)) destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen);
       return;
@@ -939,8 +953,14 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       // Noncombat damage from the creatures themselves: their own deathtouch, lifelink, infect apply.
       const pa = power(s, a);
       const pbs = bs.map((b) => power(s, b));
-      for (const b of bs) dealDamage(s, objectSource(s, a), { object: b }, pa);
-      if (e.type === "fight") dealDamage(s, objectSource(s, bs[0]!), { object: a }, pbs[0]!); // a creature fighting itself takes twice its power (CR 701.14c)
+      // Fighting: each creature deals damage at the same time, so each is one event per source.
+      const fromA = objectSource(s, a);
+      const fromB = e.type === "fight" ? objectSource(s, bs[0]!) : undefined;
+      let byA = 0;
+      for (const b of bs) byA += dealDamage(s, fromA, { object: b }, pa);
+      const byB = fromB ? dealDamage(s, fromB, { object: a }, pbs[0]!) : 0; // a creature fighting itself takes twice its power (CR 701.14c)
+      if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
+      if (byB) fireEvent(s, { type: "dealtDamage", id: bs[0]!.id, amount: byB, combat: false });
       return;
     }
     case "may": {
@@ -952,6 +972,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         const onSelf = e.effects.every((x) => "what" in x && x.what.ref === "self");
         if (e.otherwise && onSelf && !objects(s, { ref: "self" }, ctx).length) sc.may = false;
         else if (e.pay && !canPayNow(s, ctx.controller, e.pay)) sc.may = false; // can't pay, so can't do it
+        else if (!canDoNow(s, e.effects, ctx)) sc.may = false; // nothing to discard: "if you do" can't happen
         // Paying to untap what's already untapped gets nothing: not worth asking.
         else if (e.pay && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
         else {
@@ -959,6 +980,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
           return "paused";
         }
       }
+      r.did = sc.may;
       if (!sc.may) {
         for (const inner of e.otherwise ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
         return;
@@ -1039,7 +1061,8 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
     }
     case "if": {
       // How it was cast doesn't change while it resolves, so this can be checked again on resuming.
-      const branch = kickedMatches(ctx.kicked, e.cond) ? e.effects : (e.otherwise ?? []);
+      const holds = e.cond.kind === "youDid" ? !!s.resolving!.did : kickedMatches(ctx.kicked, e.cond);
+      const branch = holds ? e.effects : (e.otherwise ?? []);
       for (const inner of branch) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
     }
@@ -1185,8 +1208,22 @@ export function describePay(pay: PayCost): string {
   return [pay.mana, pay.life ? `${pay.life} life` : "", pay.energy ? "{E}".repeat(pay.energy) : ""].filter(Boolean).join(" and ");
 }
 
+/**
+ * Can "you may [do this]" be done right now? A player can't discard from an empty hand, draw from an empty
+ * library (CR 121.4) or sacrifice what's gone, and then "If you do" doesn't happen either.
+ */
+function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
+  for (const e of effects) {
+    if (e.type === "discard" && e.who.ref === "you" && !player(s, ctx.controller).hand.length) return false;
+    if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
+    if (e.type === "sacrifice" && !objects(s, e.what, ctx).length) return false;
+  }
+  return true;
+}
+
 /** Was it kicked (CR 702.33d), with that kicker cost if the condition names one (702.33f)? */
 export function kickedMatches(kicked: number[] | undefined, cond: SpellCondition): boolean {
+  if (cond.kind !== "kicked") return false;
   return cond.which === undefined ? !!kicked?.length : !!kicked?.includes(cond.which);
 }
 
@@ -1312,7 +1349,9 @@ export type TriggerSourceEvent =
   | { type: "turnedFaceUp"; id: ObjectId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
   | { type: "attacksAlone"; id: ObjectId }
-  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId }
+  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
+  | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
   | { type: "step"; step: "upkeep" | "end"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef }
@@ -1348,6 +1387,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     lki?: LastKnown,
     x?: number,
     kicked?: number[],
+    event?: TriggerEventInfo,
   ) => {
     const printed = compileCard(defOf(s, o)).triggers;
     triggers.forEach((t, index) => {
@@ -1365,6 +1405,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ...(lki ? { lki } : {}),
           ...(x ? { x } : {}),
           ...(kicked ? { kicked } : {}),
+          ...(event ? { event } : {}),
         });
     });
   };
@@ -1448,9 +1489,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const you = controllerOf(s, attacker);
     for (const id of s.battlefield)
       if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "creatureYouControlAttacksAlone", undefined, undefined, attacker);
+  } else if (ev.type === "dealtDamage") {
+    // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield")
+      add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned));
+    const info = { player: ev.player, amount: ev.amount };
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);
   } else if (ev.type === "cast") {
@@ -1583,6 +1630,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoi
     ...(t.lki ? { lki: t.lki } : {}),
     ...(t.x ? { x: t.x } : {}),
     ...(t.kicked ? { kicked: t.kicked } : {}),
+    ...(t.event ? { event: t.event } : {}),
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });

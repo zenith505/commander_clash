@@ -373,6 +373,10 @@ function compile(d: CardDef): CompiledCard {
       out.entersTappedChoice = choice;
       continue;
     }
+    if (/^You have no maximum hand size\.$/.test(line)) {
+      out.noMaxHandSize = true;
+      continue;
+    }
     if (/^~ can't be countered\.$/.test(line)) {
       out.cantBeCountered = true;
       continue;
@@ -412,6 +416,7 @@ function compile(d: CardDef): CompiledCard {
       if (cost === "fail") out.unsupported.push(raw);
       else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod];
       else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
+      else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
       continue;
     }
@@ -733,6 +738,15 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
         cast: { by: "you", spell: { kind: "spell", notTypes: ["Creature"], text: "noncreature spell" } },
         body: { targets: [], effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: 1, toughness: 1 }], duration: "endOfTurn" }], text: "Prowess: ~ gets +1/+1 until end of turn." },
       });
+    } else if (/^extort$/i.test(p)) {
+      // CR 702.101a: "Whenever you cast a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you
+      // gain life equal to the total life lost this way." Each instance triggers separately (702.101b).
+      const drain: Effect = { type: "loseLife", who: { ref: "eachOpponent" }, n: 1, drain: true };
+      out.triggers.push({
+        event: "castSpell",
+        cast: { by: "you", spell: { kind: "spell", text: "spell" } },
+        body: { targets: [], effects: [{ type: "may", effects: [drain], pay: { mana: "{W/B}" }, text: "pay {W/B}. If you do, each opponent loses 1 life and you gain that much life" }], text: "Extort: you may pay {W/B}. If you do, each opponent loses 1 life and you gain life equal to the total life lost this way." },
+      });
     } else if (/^convoke$/i.test(p)) out.convoke = true;
     else if (/^improvise$/i.test(p)) out.improvise = true;
     else if (/^cascade$/i.test(p)) {
@@ -988,7 +1002,7 @@ function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | "fail" | null {
+function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | "fail" | null {
   const text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
@@ -998,6 +1012,10 @@ function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } 
   if ((m = /^~ costs \{X\} less to cast, where X is (.+)$/.exec(text))) {
     const c = parseCount(m[1]!, null);
     return c ? { less: c } : "fail";
+  }
+  if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
+    const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
+    return filter?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
   }
   const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
   if ((m = /^~ costs \{(\d+)\} less to cast if (.+)$/.exec(text)) || (m = /^If (.+), ~ costs \{(\d+)\} less to cast$/.exec(text))) {
@@ -1076,6 +1094,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Battle cards aren't supported, so nothing can attack one and "a player or battle" is just a player.
   // Revisit when battles are (CR 310).
   [/^Whenever ~ deals combat damage to a player(?: or battle)?, (.+)$/, "selfDealsCombatDamageToPlayer"],
+  [/^Whenever ~ deals combat damage, (.+)$/, "selfDealsCombatDamage"],
+  [/^Whenever ~ deals damage, (.+)$/, "selfDealsDamage"],
   [/^Whenever another creature you control enters, (.+)$/, "anotherCreatureYouControlEnters"],
   [/^Whenever another creature enters the battlefield under your control, (.+)$/, "anotherCreatureYouControlEnters"],
   // Landfall
@@ -1092,6 +1112,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
+  "selfDealsDamage", "selfDealsCombatDamage",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
 ];
 
@@ -1161,11 +1182,19 @@ function parseTrigger(raw: string) {
         ifKicked = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}) };
         body0 = kicked[2]!;
       }
-      const text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
+      let text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
+      // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt.
+      const damage = event === "selfDealsDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer";
+      const thatMuch = damage && /\bthat (?:much|many)\b/.test(text);
+      if (thatMuch) {
+        if (/\bX\b/.test(text)) return "fail" as const;
+        text = text.replace(/\bthat (?:much|many)\b/g, "X");
+      }
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard";
-      const body = parseBody(text, { selfIt: self && !left, selfCard: left });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" });
+      if (body && thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
     }
   }
@@ -1268,16 +1297,20 @@ function parseAffected(subject: string): Affects | null {
     const words = m[2]!.trim().split(/\s+/).filter(Boolean);
     const colors: Color[] = [];
     const subtypes: string[] = [];
+    let combat: "attacking" | "blocking" | undefined;
     for (const w of words) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
       else if (CREATURE_TYPES.has(w)) subtypes.push(w);
-      else return null; // "Enchanted creatures", "attacking creatures", ...: not supported yet
+      // "Attacking creatures you control get +1/+0": whichever are attacking right now (CR 611.3a).
+      else if ((w.toLowerCase() === "attacking" || w.toLowerCase() === "blocking") && !combat) combat = w.toLowerCase() as "attacking" | "blocking";
+      else return null; // "Enchanted creatures", ...: not supported yet
     }
     return {
       kind: "filter",
       types: ["Creature"],
       subtypes: subtypes.length ? subtypes : undefined,
       colors: colors.length ? colors : undefined,
+      ...(combat ? { spec: { kind: "object" as const, combat, text: `${combat} creature` } } : {}),
       controller: m[3]!.toLowerCase() === "you control" ? "you" : "opponent",
       other: !!m[1],
     };
@@ -1423,10 +1456,16 @@ interface Ctx {
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
   castSpell?: boolean;
+  /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
+  eventPlayer?: boolean;
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
 const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "may", "explore", "search", "choose"]);
+
+/** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
+const checkableMay = (e: Effect) =>
+  (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) || (e.type === "draw" && e.who.ref === "you") || (e.type === "sacrifice" && e.what.ref === "self");
 
 /** Split text into sentences, keeping a quoted ability ('gains "Sacrifice ~. Draw a card."') whole. */
 function splitSentences(text: string): string[] {
@@ -1445,7 +1484,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) return parseModal(modal[1]!, modal[2]!, text.trim(), opts.spell);
   if (text.includes("•")) return null; // modes with text before them, or a kind of choice we don't support
@@ -1457,6 +1496,7 @@ export function parseBody(text: string, opts: { subject?: boolean; selfIt?: bool
     ...(opts.activated ? { activated: true } : {}),
     ...(opts.spell ? { spell: true } : {}),
     ...(opts.castSpell ? { castSpell: true } : {}),
+    ...(opts.eventPlayer ? { eventPlayer: true } : {}),
   };
   const effects: Effect[] = [];
   const sentences = splitSentences(text.trim())
@@ -1511,6 +1551,17 @@ export function parseBody(text: string, opts: { subject?: boolean; selfIt?: bool
       effects.splice(before, effects.length - before, ...replaceX(effects.slice(before), def));
       return true;
     };
+    // "You may discard a card. If you do, draw a card." (CR 608.2c): what follows depends on whether it was
+    // done. Only for things the engine can tell weren't possible (discarding with no cards in hand, ...).
+    const ifDid = /^If you (do|don't), (.+)$/.exec(s);
+    if (ifDid) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay)) return null;
+      const inner = parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
+      if (!inner) return null;
+      effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      continue;
+    }
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
     const may = /^[Yy]ou may (.+)$/.exec(s);
     if (may) {
@@ -1525,6 +1576,13 @@ export function parseBody(text: string, opts: { subject?: boolean; selfIt?: bool
     }
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".
     if (/^Until end of turn, /.test(s)) s = `${s.replace(/^Until end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
+    // "Each opponent loses 2 life. You gain life equal to the life lost this way."
+    if (/^You gain life equal to the (?:total )?life lost this way$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "loseLife") return null;
+      last.drain = true;
+      continue;
+    }
     // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c).
     if (/^(It|They) can't be regenerated$/i.test(s)) {
       const last = effects[effects.length - 1];
@@ -2307,6 +2365,8 @@ function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "you") return { ref: "you" };
   if (x === "each opponent") return { ref: "eachOpponent" };
   if (x === "each player") return { ref: "eachPlayer" };
+  // "Whenever ~ deals combat damage to a player, that player discards a card."
+  if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   if (x === "its controller" || x === "that creature's controller") {
     const i = ctx.lastObjectTarget;
     return i !== undefined ? { ref: "targetController", index: i } : null;

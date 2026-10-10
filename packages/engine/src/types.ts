@@ -174,6 +174,8 @@ export interface StackItem {
   x?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
+  /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
+  event?: TriggerEventInfo;
   /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
   sacrificed?: LastKnown[];
 }
@@ -209,6 +211,8 @@ export interface PendingTrigger {
   /** For an enters trigger of a permanent that was a spell with X: that X (CR 107.3m). */
   x?: number;
   kicked?: number[];
+  /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
+  event?: TriggerEventInfo;
   /** A delayed trigger's own ability (its source card has no such printed ability). */
   body?: AbilityBody;
 }
@@ -384,6 +388,12 @@ export interface Chosen {
   color?: Color;
 }
 
+/** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
+export interface TriggerEventInfo {
+  amount?: number;
+  player?: PlayerId;
+}
+
 export interface Resolving {
   item: StackItem;
   body: AbilityBody;
@@ -397,6 +407,8 @@ export interface Resolving {
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   next: number;
+  /** Whether the last "you may ..." was done, for a following "If you do, ..." (CR 608.2c). */
+  did?: boolean;
   scratch?: {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard

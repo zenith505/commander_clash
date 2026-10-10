@@ -2,7 +2,7 @@
 // triggered-ability queue.
 
 import { allEffects, refCovers } from "./abilities";
-import type { AbilityBody, Amount, ChosenTarget, ChoiceKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
+import type { AbilityBody, Amount, ChosenTarget, ChoiceKind, CounterKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
 import { manaValue, parseManaCost, payFromPool } from "./mana";
 import { planMana } from "./autopay";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
@@ -356,10 +356,12 @@ export function continueResolution(s: GameState): Resolution {
   };
   Object.defineProperty(ctx, "chosen", { get: () => r.chosen ?? sourceChosen(s, ctx), enumerable: true });
   while (r.next < r.body.effects.length) {
+    if (!r.scratch) s.leftTogether = undefined; // a new instruction, not one resuming after a choice
     if (runEffect(s, r.body.effects[r.next]!, ctx) === "paused") return "paused";
     r.next++;
     r.scratch = undefined;
   }
+  s.leftTogether = undefined;
   s.resolving = null;
   if (item.kind === "spell" && item.objectId && s.objects[item.objectId]?.zone === "stack") finishSpell(s, item.objectId);
   return "done";
@@ -369,6 +371,48 @@ export function continueResolution(s: GameState): Resolution {
 function sourceChosen(s: GameState, ctx: { sourceId?: ObjectId; sourceZc?: number }): Chosen | undefined {
   const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
   return o && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc) ? o.chosen : undefined;
+}
+
+/** Put an exiled card onto the battlefield; an Aura needs something to enchant, or it stays in exile (CR 303.4f-g). */
+function returnFromExile(s: GameState, c: GameObject, controller: PlayerId, src: string, counter?: CounterKind) {
+  const d = defOf(s, c);
+  if (!isPermanentCard(d)) return;
+  let attachTo: ObjectId | undefined;
+  if (d.subtypes.includes("Aura")) {
+    attachTo = auraHostFor(s, c, controller);
+    if (!attachTo) return;
+  }
+  log(s, `${src} returns ${d.name} to the battlefield.`);
+  moveObject(s, c.id, "battlefield", { controller, ...(attachTo ? { attachTo } : {}), ...(counter ? { counters: { [counter]: 1 } } : {}) });
+}
+
+/**
+ * Proliferate (CR 701.27a): choose any number of permanents and players with counters; each gets another of
+ * each kind it has. Chosen for the player: their own permanents' helpful counters, opponents' permanents'
+ * -1/-1 and stun counters, their own energy and experience, and opponents' poison.
+ */
+function proliferate(s: GameState, you: PlayerId, src: string) {
+  const helpful = (k: string) => k !== "-1/-1" && k !== "stun" && k !== "age" && k !== "time" && k !== "fade";
+  const names: string[] = [];
+  invalidateCharacteristics(s);
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const mine = controllerOf(s, o) === you;
+    let added = false;
+    for (const [k, n] of Object.entries(o.counters)) {
+      if (!n || (mine ? !helpful(k) : !harmfulCounter(k))) continue;
+      o.counters[k] = n + 1;
+      added = true;
+    }
+    if (added) names.push(defOf(s, o).name);
+  }
+  for (const p of s.players) {
+    if (p.lost) continue;
+    if (p.id === you) {
+      if (p.energy) (p.energy += 1), names.push(`${p.name} (energy)`);
+    } else if (p.poison) (p.poison += 1), names.push(`${p.name} (poison)`);
+  }
+  log(s, `${src}: ${player(s, you).name} proliferates${names.length ? ` (${names.join(", ")})` : ""}.`);
 }
 
 /** Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d). */
@@ -446,6 +490,10 @@ function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     return o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : [];
+  }
+  if (ref.ref === "subjectCard") {
+    const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    return o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
   }
   if (ref.ref === "damagedThisWay") return (s.resolving?.damagedThisWay ?? []).map((id) => obj(s, id)).filter((o) => o.zone === "battlefield");
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
@@ -789,6 +837,45 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         else untapPermanent(s, o);
       }
       return;
+    case "proliferate":
+      return proliferate(s, ctx.controller, src);
+    case "amass": {
+      // CR 701.47a: with no Army, create a 0/0 black [subtype] Army first; then counters on an Army you control,
+      // which becomes that subtype too. With several Armies, the one with the most counters is chosen.
+      const n = amountNow(s, e.n, ctx);
+      const armies = () => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === ctx.controller && characteristics(s, o).subtypes.includes("Army") && objIsType(s, o, "Creature"));
+      if (!armies().length) createToken(s, ctx.controller, { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] });
+      const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
+      if (!army) return;
+      invalidateCharacteristics(s);
+      if (n > 0) army.counters["+1/+1"] = (army.counters["+1/+1"] ?? 0) + n;
+      log(s, `${player(s, ctx.controller).name} amasses ${e.subtype} ${n}.`);
+      if (!characteristics(s, army).subtypes.includes(e.subtype))
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [army.id], mods: [{ kind: "addTypes", types: [], subtypes: [e.subtype] }] });
+      return;
+    }
+    case "flicker":
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield") continue;
+        const d = defOf(s, o);
+        log(s, `${src} exiles ${d.name}${e.at ? "" : " and returns it"}.`);
+        moveObject(s, o.id, "exile");
+        if (o.isToken) continue; // a token that left the battlefield doesn't come back (CR 111.7)
+        if (e.at)
+          addDelayed(s, "nextEndStep", ctx.controller, o, {
+            targets: [],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}) }],
+            text: `Return ${d.name} to the battlefield under ${e.under === "owner" ? "its owner's" : "your"} control.`,
+          });
+        else returnFromExile(s, o, e.under === "owner" ? o.owner : ctx.controller, src, e.counter);
+      }
+      return;
+    case "returnExiled": {
+      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
+      returnFromExile(s, o, e.under === "owner" ? o.owner : ctx.controller, src, e.counter);
+      return;
+    }
     case "exileIfDies":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfDiesTurn = s.turn;
       return;
@@ -1456,7 +1543,7 @@ export type TriggerSourceEvent =
   | { type: "enters"; id: ObjectId; x?: number }
   /** `counters`: the counters it had on the battlefield (last known information, for persist and undying). */
   /** It left the battlefield for `to` (only a graveyard makes it "die"). */
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.10). */
@@ -1490,6 +1577,24 @@ export function echoDue(s: GameState, o: GameObject, you: PlayerId): boolean {
 export function evolves(s: GameState, o: GameObject, stats: LastKnown): boolean {
   if (!objIsType(s, o, "Creature")) return false; // CR 702.100c
   return (stats.power ?? 0) > power(s, o) || (stats.toughness ?? 0) > toughness(s, o);
+}
+
+/** Does this death set off a "whenever another creature dies" ability of `srcId` (which may have died with it)? */
+function diesMatches(
+  s: GameState,
+  d: NonNullable<TriggeredAbility["dies"]>,
+  srcId: ObjectId,
+  attachedTo: ObjectId | undefined,
+  dying: { o: GameObject; c: Characteristics },
+  you: PlayerId,
+): boolean {
+  if (d.attached) return attachedTo === dying.o.id && dying.c.types.includes("Creature");
+  if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
+  if (srcId === dying.o.id) {
+    if (d.orSelf) return true;
+    if (d.other) return false;
+  }
+  return objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c);
 }
 
 /** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */
@@ -1591,6 +1696,24 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       undefined,
       { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) },
     );
+    // "Whenever another creature dies", "a creature you control", "equipped creature": abilities of permanents
+    // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
+    if (ev.to === "graveyard" && ev.snapshot && ev.chars) {
+      const lki = { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const dying = { o: ev.snapshot, c: ev.chars };
+      const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
+        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);
+      for (const id of s.battlefield) {
+        const src = obj(s, id);
+        consider(src, controllerOf(s, src), ev.attachments?.includes(id) ? ev.id : src.attachedTo);
+      }
+      for (const left of s.leftTogether ?? []) {
+        const src = s.objects[left.id];
+        if (!src) continue;
+        if (src.zone === "battlefield") continue; // it already came back as a new object
+        consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+      }
+    }
   } else if (ev.type === "blocksDeclared") {
     // "Blocks" and "becomes blocked" trigger once each; "blocks a creature" / "becomes blocked by a creature"
     // once for each such creature, which is the trigger's subject (CR 509.3c-d).
@@ -1653,6 +1776,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you)) return false;
         return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
       }, undefined, ev.stackId); // "counter it unless that player pays" acts on the spell cast
+    }
+    // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.
+    const targeted = new Set((item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
+    for (const id of targeted) {
+      const o = s.objects[id];
+      if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e) => e === "selfTargetedByYourSpell", undefined, ev.stackId);
     }
   } else if (ev.type === "targeted") {
     // Each permanent becomes the target once, however many of the item's targets name it.

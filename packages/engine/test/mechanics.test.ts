@@ -404,8 +404,9 @@ describe("prowess and 'whenever you cast' (CR 702.108, 601.2i)", () => {
     expect(isFullySupported(d)).toBe(true);
   });
 
-  it("'Whenever you cast a spell that targets' isn't supported", () => {
+  it("'Whenever you cast a spell that targets ~' is heroic, not a 'whenever you cast' trigger", () => {
     const d = bear({ oracleText: "Whenever you cast a spell that targets this creature, draw a card." });
-    expect(isFullySupported(d)).toBe(false);
+    expect(isFullySupported(d)).toBe(true);
+    expect(compileCard(d).triggers[0]?.event).toBe("selfTargetedByYourSpell");
   });
 });

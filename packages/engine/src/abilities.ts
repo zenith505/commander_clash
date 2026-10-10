@@ -167,7 +167,9 @@ export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
   | { ref: "target"; index: number; n?: number }
   | { ref: "self" } // the source permanent ("this creature")
-  | { ref: "damagedThisWay" } // "a creature dealt damage this way": what this ability's damage hit
+  | { ref: "damagedThisWay" }
+  /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
+  | { ref: "subjectCard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your hand"). */
   | { ref: "selfCard" }
@@ -339,6 +341,17 @@ export type Effect =
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
+  /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
+  | { type: "proliferate" }
+  /** Amass [subtype] N (CR 701.47): an Army gets N +1/+1 counters, made first if you have none. */
+  | { type: "amass"; subtype: string; n: Amount }
+  /**
+   * "Exile target creature you control, then return it to the battlefield under its owner's control"
+   * (blink); with `at`, it comes back at the beginning of the next end step (a delayed trigger, CR 603.7).
+   */
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind }
+  /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
@@ -458,6 +471,8 @@ export type TriggerEvent =
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
   /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
   | "permanentEnters"
+  /** "Whenever another creature dies", "a creature you control", "equipped creature": see TriggeredAbility.dies. */
+  | "permanentDies"
   | "selfBecomesTarget" // "When this becomes the target of a spell or ability"
   | "selfAttacks" // Whenever this attacks
   | "selfDealsCombatDamageToPlayer"
@@ -486,7 +501,9 @@ export type TriggerEvent =
   | "selfBlocksOrBlockedByCreature"
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.10)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
-  | "playerDraws";
+  | "playerDraws"
+  | "selfTargetedByYourSpell"; // heroic: "Whenever you cast a spell that targets ~"
+
 
 export interface TriggeredAbility {
   event: TriggerEvent;
@@ -505,6 +522,11 @@ export interface TriggeredAbility {
    * either, it sees itself enter if it matches (CR 603.6a).
    */
   enters?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
+  /**
+   * For "permanentDies": what has to die, as it last existed. `attached`: the creature this Aura or
+   * Equipment is attached to; `damagedBySelf`: "a creature dealt damage by ~ this turn".
+   */
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information. */
   ifNoCounter?: "+1/+1" | "-1/-1";
   /**

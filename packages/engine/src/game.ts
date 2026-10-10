@@ -426,11 +426,15 @@ export function moveObject(
   const wasCreature = last.types.includes("Creature");
   // A face-down permanent has no abilities of its own (CR 708.2), so nothing of the card's triggers as it leaves.
   const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
+  // The permanent as it last existed, for "whenever a creature you control with a +1/+1 counter dies".
+  const snapshot: GameObject | undefined = fromZone === "battlefield" ? { ...o, counters: lastCounters } : undefined;
   if (fromZone === "battlefield") {
+    (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}) };
   }
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
+  const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
   o.exiledUntilLeaves = undefined;
   const from = zoneList(s, o);
   if (from) {
@@ -452,6 +456,7 @@ export function moveObject(
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.tapped = false;
   o.damage = 0;
+  o.damagedBy = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -472,7 +477,11 @@ export function moveObject(
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
     for (const e of s.effects) e.affected = e.affected.filter((x) => x !== id);
     s.effects = s.effects.filter((e) => e.affected.length);
-    for (const other of s.battlefield) if (s.objects[other]!.attachedTo === id) s.objects[other]!.attachedTo = undefined;
+    for (const other of s.battlefield)
+      if (s.objects[other]!.attachedTo === id) {
+        s.objects[other]!.attachedTo = undefined;
+        attachments.push(other);
+      }
   }
   if (to === "battlefield") o.controlledSinceTurn = s.turn;
   invalidateCharacteristics(s);
@@ -505,7 +514,7 @@ export function moveObject(
   // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
   // triggers say "put into a graveyard" or "leaves the battlefield".
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
 
@@ -799,6 +808,7 @@ function finishCleanup(s: GameState) {
   for (const id of s.battlefield) {
     const o = obj(s, id);
     o.damage = 0; // CR 514.2
+    o.damagedBy = undefined;
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
     o.preventNext = undefined;
@@ -1957,6 +1967,7 @@ export function runStateBasedActions(s: GameState) {
   if (s.resolving) return; // not while a spell or ability is partway through resolving (CR 704.3)
   if (!s.pending && askEntersChoice(s)) return;
   for (let guard = 0; guard < 100; guard++) {
+    s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
     invalidateCharacteristics(s);
     syncControl(s);
     let changed = false;
@@ -2032,6 +2043,7 @@ export function runStateBasedActions(s: GameState) {
     }
     if (!changed) break;
   }
+  s.leftTogether = undefined;
   checkGameOver(s);
   // Then waiting triggered abilities go on the stack before anyone gets priority (CR 117.5).
   if (!s.over && processTriggerQueue(s, turnOrderFrom(s, s.activePlayer))) s.passedInSuccession = [];

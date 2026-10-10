@@ -825,6 +825,29 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **10,659 cards are fully supported.** Rules tests: `test/enters-leaves-counters.test.ts`.
 
+### "Whenever another creature dies", heroic, proliferate, amass, blink (added 2026-10-10)
+
+- **"Whenever a creature dies"** and its variants: "another creature", "a creature you control", "an
+  opponent controls", "a nontoken creature", "~ or another Zombie you control", "a creature you control
+  with a +1/+1 counter on it", "a creature dealt damage by ~ this turn", "equipped (enchanted) creature".
+  These look back in time (CR 603.10a): the creature is checked as it last existed, and permanents that
+  leave at the same time (a board wipe, one pass of state-based actions) see each other die, so Blood
+  Artist sees every creature a wrath kills, itself included. "It" and "that card" are the card in the
+  graveyard; "its power" is as it last existed.
+- **Heroic**: "Whenever you cast a spell that targets ~", once per spell.
+- **Proliferate** (CR 701.27): the choice is made for the player: their own permanents' counters (other
+  than -1/-1, stun, age, time and fade), opponents' permanents' -1/-1 and stun counters, their own
+  energy, and opponents' poison.
+- **Amass** (CR 701.47): a 0/0 black Army token if you have none, then +1/+1 counters on your Army,
+  which also becomes the amassed type.
+- **Blink**: "Exile target creature you control, then return it to the battlefield under its owner's
+  control" (a new object, so its enters abilities trigger again) and "Return that card ... at the
+  beginning of the next end step" (with a +1/+1 counter, or under your control). Tokens don't come back.
+- Not yet: choosing what to proliferate yourself, "can block an additional creature", "one or more
+  creatures die", and dies triggers that work from the graveyard ("while ~ is in your graveyard").
+
+**10,949 cards are fully supported.** Rules tests: `test/dies-heroic-proliferate.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

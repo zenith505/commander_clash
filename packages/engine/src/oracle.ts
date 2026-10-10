@@ -1154,11 +1154,13 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
+  // Heroic (an ability word): "Whenever you cast a spell that targets ~".
+  [/^Whenever you cast a spell that targets ~, (.+)$/, "selfTargetedByYourSpell"],
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
-  "selfDealsDamage", "selfDealsCombatDamage",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
 ];
 
@@ -1231,6 +1233,39 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   };
 }
 
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) dies, (.+)$/;
+
+/**
+ * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
+ * you control dies", "Whenever a creature dealt damage by ~ this turn dies", "Whenever equipped creature
+ * dies": "it" and "that card" are the card in the graveyard, "its power" as it last existed (CR 603.10a).
+ */
+function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
+  const attached = /^Whenever (equipped|enchanted) creature dies, (.+)$/.exec(line);
+  const m = attached ? null : DIES_TRIGGER.exec(line);
+  if (!attached && !m) return null;
+  const bodyText = attached ? attached[2]! : m![3]!;
+  const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true });
+  if (!body) return "fail";
+  if (attached) return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
+  let phrase = m![2]!;
+  const damaged = / dealt damage by ~ this turn$/.exec(phrase);
+  if (damaged) phrase = phrase.slice(0, damaged.index);
+  const filter = parseTargetPhrase(phrase);
+  if (!filter || filter.kind !== "object") return "fail";
+  const kind = m![1]!.toLowerCase();
+  return {
+    event: "permanentDies",
+    dies: {
+      filter: { ...filter, text: phrase },
+      ...(kind === "another" ? { other: true } : {}),
+      ...(kind === "~ or another" ? { orSelf: true } : {}),
+      ...(damaged ? { damagedBySelf: true } : {}),
+    },
+    body,
+  };
+}
+
 /**
  * "Whenever you draw a card", "whenever an opponent draws a card", "whenever a player draws a card",
  * "whenever you draw your second card each turn" (the count includes cards drawn before the source
@@ -1260,6 +1295,12 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${intervening[1]}, ${intervening[3]}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
   }
+  // Heroic before the other "whenever you cast" triggers.
+  const heroic = /^Whenever you cast a spell that targets ~, (.+)$/.exec(line);
+  if (heroic) {
+    const body = parseBody(heroic[1]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
+    return body ? { event: "selfTargetedByYourSpell", body } : "fail";
+  }
   const cast = parseCastTrigger(line);
   if (cast) return cast;
   const block = parseBlockTrigger(line);
@@ -1268,6 +1309,8 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (enters) return enters;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
+  const dies = parseDiesTrigger(line);
+  if (dies) return dies;
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);
     if (m) {
@@ -1573,6 +1616,8 @@ interface Ctx {
   castSpell?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
+  /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
+  subjectLeft?: boolean;
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
@@ -1599,7 +1644,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) return parseModal(modal[1]!, modal[2]!, text.trim(), opts.spell);
   if (text.includes("•")) return null; // modes with text before them, or a kind of choice we don't support
@@ -1607,6 +1652,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     targets: [],
     ...(opts.subject ? { subject: true } : {}),
     ...(opts.subjectIt ? { subject: true, subjectIt: true } : {}),
+    ...(opts.subjectLeft ? { subjectLeft: true } : {}),
     ...(opts.selfIt ? { selfIt: true } : {}),
     ...(opts.selfCard ? { selfCard: true } : {}),
     ...(opts.activated ? { activated: true } : {}),
@@ -1669,6 +1715,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     };
     // "You may discard a card. If you do, draw a card." (CR 608.2c): what follows depends on whether it was
     // done. Only for things the engine can tell weren't possible (discarding with no cards in hand, ...).
+    // "Exile target creature. Return that card to the battlefield under its owner's control at the beginning of
+    // the next end step": the exile becomes a blink that comes back with a delayed trigger (CR 603.7).
+    const later =
+      /^(?:At the beginning of the next end step, return (?:it|that card|the exiled card) to the battlefield under (its owner's|your) control|Return (?:it|that card|the exiled card) to the battlefield under (its owner's|your) control at the beginning of the next end step)(?: with an? (\+1\/\+1) counter on it)?$/i.exec(s);
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/.exec(s);
+    if (now && effects[effects.length - 1]?.type === "exile") {
+      const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
+      if (prev.until || prev.linked || isGroup(prev.what)) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[1] === "your" ? "you" : "owner" };
+      continue;
+    }
+    if (later) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || prev.until || prev.linked || isGroup(prev.what) || effects.length - 1 < 0) return null;
+      const under = (later[1] ?? later[2]) === "your" ? "you" : "owner";
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under, at: "nextEndStep", ...(later[3] ? { counter: "+1/+1" as const } : {}) };
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -2250,7 +2314,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?|~|it|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands)$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?|~|it|that card|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;
   }
@@ -2291,6 +2355,14 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const token = PREDEFINED_TOKENS[m[3]!.charAt(0).toUpperCase() + m[3]!.slice(1).toLowerCase()];
     return who && token ? [{ type: "createToken", who, n: amt(m[2]!), token }] : null;
+  }
+  // Proliferate (CR 701.27), amass (CR 701.47).
+  if (/^Proliferate$/i.test(s)) return [{ type: "proliferate" }];
+  if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
+  // Blink: "Exile target creature you control, then return it to the battlefield under its owner's control".
+  if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "flicker", what, under: m[2] === "your" ? "you" : "owner" }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
   if ((m = /^Investigate( twice)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
@@ -2547,6 +2619,12 @@ function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
  * "tap" make no sense for one.
  */
 function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
+  if (ctx.subjectLeft && /^that card$/i.test(p.trim()) && ctx.lastObjectTarget === undefined) return { ref: "subjectCard" };
+  const ref = parseObjectNow(p, ctx, cards);
+  return ref?.ref === "subject" && ctx.subjectLeft ? { ref: "subjectCard" } : ref;
+}
+
+function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".

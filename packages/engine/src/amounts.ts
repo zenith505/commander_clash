@@ -107,7 +107,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) {
         // Gone: as it last existed on the battlefield (CR 608.2h).
-        if (c.of.ref === "self" && c.kind !== "manaValue") return Math.max(0, ctx.lki?.[c.kind] ?? 0);
+        // A trigger's subject that died ("whenever another creature dies, ... its power") too.
+        if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind !== "manaValue") return Math.max(0, ctx.lki?.[c.kind] ?? 0);
         return 0;
       }
       if (c.kind === "manaValue") return manaValue(parseManaCost(defOf(s, o).manaCost));

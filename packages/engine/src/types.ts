@@ -73,6 +73,8 @@ export interface GameObject {
   renowned?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
   skipNextUntap?: boolean;
+  /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */
+  damagedBy?: ObjectId[];
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
   /** Attack/block bookkeeping, cleared at end of combat. */
@@ -326,6 +328,11 @@ export interface GameEvent {
 }
 
 export interface GameState {
+  /**
+   * Permanents that left the battlefield in the current event (one effect, or one pass of state-based
+   * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).
+   */
+  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
   seed: number;

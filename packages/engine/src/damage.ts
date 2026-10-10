@@ -88,6 +88,7 @@ export function dealDamage(
       log(s, `${src.name} deals ${n} damage to ${c.name}.`);
     }
     if (has(src, "Deathtouch")) o.deathtouchDamage = true;
+    if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {

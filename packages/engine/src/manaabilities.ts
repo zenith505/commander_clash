@@ -7,7 +7,7 @@ import { objectMatches } from "./effects";
 import { isSummoningSick, obj, player } from "./game";
 import { characteristics, controllerOf } from "./layers";
 import { parseManaCost, payFromPool } from "./mana";
-import { compileCard } from "./oracle";
+import { compileCard, compileGranted } from "./oracle";
 import { COLORS, type Action, type GameObject, type GameState, type ManaType, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
@@ -21,6 +21,7 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   const c = characteristics(s, o);
   const out = c.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null);
   if (c.hasPrintedAbilities) out.push(...compileCard(defOf(s, o)).mana);
+  for (const t of c.grantedAbilities) out.push(...compileGranted(t).mana); // 'Enchanted land has "{T}: Add ..."'
   return out;
 }
 

@@ -719,6 +719,28 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **9,493 cards are fully supported.** Rules tests: `test/cost-changes.test.ts`.
 
+### Abilities given to other permanents, backup (added 2026-10-10)
+
+- **Quoted abilities in layer 6** (CR 613.1f): 'Enchanted creature has "{T}: This creature deals 1 damage
+  to any target."', 'Creatures you control have "{T}: Add one mana of any color."', 'All Slivers have
+  "Sacrifice this permanent: ..."', 'Until end of turn, target creature gains "When this creature dies,
+  ..."'. "This creature" in the quote is whatever has the ability. Losing all abilities removes the ones
+  given earlier, not later (CR 613.7). A "{T}" ability given to a creature still needs it to have been
+  under your control since your turn began (CR 302.6).
+- **Dies abilities given until end of turn still trigger**: leaving the battlefield looks back in time
+  (CR 603.10a), so the creature's last known abilities count.
+- **Backup N** (CR 702.165): N +1/+1 counters on target creature, and if it's another creature, the
+  abilities printed below backup until end of turn. Two backups trigger separately.
+- **On the table:** a permanent that gained abilities shows a "+1 ability" chip; hover for the text. Its
+  menu lists the ability like its own.
+- **Bots** put an Aura that gives an upkeep edict or life loss ("At the beginning of your upkeep,
+  sacrifice a creature") on an opponent's creature, and don't pay for an ability with the token it targets.
+- Not yet: static abilities given this way ('has "This creature can't block"'), quotes that name the
+  granting card (CR 201.5a: that name means the card, not the creature), and battles ("a player or
+  battle" is read as a player, since nothing can attack a battle yet).
+
+**9,699 cards are fully supported.** Rules tests: `test/granted-abilities.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

@@ -222,14 +222,26 @@ function parseManaProduced(text: string): ManaProduce | null {
   return null;
 }
 
+const QUOTED_SOURCE_NAME = "\u27easource\u27eb";
+
 /** Replace every way a card refers to itself with "~". */
 export function normalizeSelf(d: CardDef): string {
   let t = stripReminder(d.oracleText);
   const full = d.name.split(" // ")[0]!;
   const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  t = t.replace(new RegExp(esc(full), "g"), "~");
+  // In a quoted ability the card gives something else, its name still means the card (CR 201.5a), not the
+  // object with the ability, which is "~" there: mark it so that text isn't compiled as "~".
+  if (full) {
+    t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
+    t = t.replace(new RegExp(esc(full), "g"), "~");
+  }
   const short = full.split(",")[0]!;
-  if (short !== full) t = t.replace(new RegExp(`\\b${esc(short)}\\b`, "g"), "~");
+  if (short && short !== full) {
+    t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`\\b${esc(short)}\\b`, "g"), QUOTED_SOURCE_NAME));
+    t = t.replace(new RegExp(`\\b${esc(short)}\\b`, "g"), "~");
+  }
+  // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
+  t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
   t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Aura)\b/g, "~");
   return t;
 }
@@ -238,12 +250,21 @@ function compile(d: CardDef): CompiledCard {
   const out: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
-  for (const raw of joinModes(normalizeSelf(d).split("\n"))) {
+  const lines = joinModes(normalizeSelf(d).split("\n"));
+  for (const [li, raw] of lines.entries()) {
     const line = raw.trim();
     if (!line) continue;
     const manaAb = parseManaAbility(line);
     if (manaAb) {
       out.mana.push(manaAb);
+      continue;
+    }
+    const backup = /^Backup (\d+)((?:, backup \d+)*)$/.exec(line);
+    if (backup) {
+      const ns = [backup[1]!, ...[...backup[2]!.matchAll(/\d+/g)].map((x) => x[0])].map(Number);
+      const tr = backupTriggers(ns, lines.slice(li + 1));
+      if (tr) out.triggers.push(...tr);
+      else out.unsupported.push(raw);
       continue;
     }
     const yard = parseGraveyardKeyword(line, d);
@@ -1052,7 +1073,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget"],
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
   [/^Whenever ~ attacks, (.+)$/, "selfAttacks"],
-  [/^Whenever ~ deals combat damage to a player, (.+)$/, "selfDealsCombatDamageToPlayer"],
+  // Battle cards aren't supported, so nothing can attack one and "a player or battle" is just a player.
+  // Revisit when battles are (CR 310).
+  [/^Whenever ~ deals combat damage to a player(?: or battle)?, (.+)$/, "selfDealsCombatDamageToPlayer"],
   [/^Whenever another creature you control enters, (.+)$/, "anotherCreatureYouControlEnters"],
   [/^Whenever another creature enters the battlefield under your control, (.+)$/, "anotherCreatureYouControlEnters"],
   // Landfall
@@ -1274,16 +1297,13 @@ function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^gets? ${PT}/${PT}(?: and (?:has|have) (.+))?$`).exec(rest))) {
     const mods: Modification[] = [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }];
     if (m[3]) {
-      const kws = parseKeywordList(m[3]);
-      if (!kws) return null;
-      mods.push({ kind: "addKeywords", keywords: kws });
+      const grants = parseGrants(m[3]);
+      if (!grants) return null;
+      mods.push(...grants);
     }
     return mods;
   }
-  if ((m = /^(?:has|have) (.+)$/.exec(rest))) {
-    const kws = parseKeywordList(m[1]!);
-    return kws ? [{ kind: "addKeywords", keywords: kws }] : null;
-  }
+  if ((m = /^(?:has|have) (.+)$/.exec(rest))) return parseGrants(m[1]!);
   if (/^can't attack or block$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }];
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
@@ -1408,6 +1428,23 @@ interface Ctx {
 /** Effects that can stop a resolution to wait for a player's choice. */
 const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "may", "explore", "search", "choose"]);
 
+/** Split text into sentences, keeping a quoted ability ('gains "Sacrifice ~. Draw a card."') whole. */
+function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  let start = 0;
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '"') quoted = !quoted;
+    else if (!quoted && /\s/.test(text[i]!) && (text[i - 1] === "." || (text[i - 1] === '"' && text[i - 2] === "."))) {
+      if (text.slice(start, i).trim()) out.push(text.slice(start, i));
+      while (i + 1 < text.length && /\s/.test(text[i + 1]!)) i++;
+      start = i + 1;
+    }
+  }
+  if (text.slice(start).trim()) out.push(text.slice(start));
+  return out;
+}
+
 export function parseBody(text: string, opts: { subject?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) return parseModal(modal[1]!, modal[2]!, text.trim(), opts.spell);
@@ -1422,9 +1459,7 @@ export function parseBody(text: string, opts: { subject?: boolean; selfIt?: bool
     ...(opts.castSpell ? { castSpell: true } : {}),
   };
   const effects: Effect[] = [];
-  const sentences = text
-    .trim()
-    .split(/(?<=\.)\s+/)
+  const sentences = splitSentences(text.trim())
     .map((x) => x.replace(/\.$/, "").trim())
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
@@ -2108,9 +2143,9 @@ function parseChanges(text: string): Modification[] | null {
     let m: RegExpExecArray | null;
     if ((m = new RegExp(`^gets? ${PT}/${PT}$`, "i").exec(p))) out.push({ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) });
     else if ((m = /^gains? (.+)$/i.exec(p))) {
-      const k = parseKeywordList(m[1]!);
+      const k = parseGrants(m[1]!);
       if (!k) return null;
-      out.push({ kind: "addKeywords", keywords: k });
+      out.push(...k);
     } else if (/^loses? all abilities$/i.test(p)) out.push({ kind: "loseAllAbilities" });
     else if ((m = /^loses? (.+)$/i.exec(p))) {
       const k = parseKeywordList(m[1]!);
@@ -2579,6 +2614,88 @@ const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
 function compileQuoted(text: string): boolean {
   const c = compile({ name: "Quoted Ability Source", oracleText: text, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", oracleId: "" } as unknown as CardDef);
   return c.unsupported.length === 0;
+}
+
+const grantedCache = new Map<string, CompiledCard>();
+/** The compiled form of an ability an effect gave an object (`addAbility`): "~" in it is that object. */
+export function compileGranted(text: string): CompiledCard {
+  let hit = grantedCache.get(text);
+  if (!hit) {
+    hit = compile({ name: "", oracleText: text, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
+    grantedCache.set(text, hit);
+  }
+  return hit;
+}
+
+/**
+ * Can an effect give this quoted ability to an object? It has to be one triggered, activated or mana
+ * ability that we can run. Static abilities given this way aren't modeled: their effects would have to
+ * come out of the same layer calculation that grants them.
+ */
+function grantable(text: string): boolean {
+  if (text.includes(QUOTED_SOURCE_NAME)) return false;
+  const c = compileGranted(text);
+  const n = c.triggers.length + c.activated.length + c.mana.length;
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, ...rest } = c;
+  return n === 1 && !statics.length && !entersTapped && !unsupported.length && !textKeywords.length && Object.keys(rest).length === 0;
+}
+
+/**
+ * Backup N (CR 702.165a): "When this creature enters, put N +1/+1 counters on target creature. If that's
+ * another creature, it also gains the non-backup abilities of this creature printed below this one until
+ * end of turn." Those are fixed by the card (CR 702.165c-d). Each backup ability triggers separately.
+ */
+function backupTriggers(ns: number[], below: string[]): TriggeredAbility[] | null {
+  const mods: Modification[] = [];
+  const kws: string[] = [];
+  for (const raw of below) {
+    const line = raw.trim();
+    if (!line) continue;
+    const k = isKeywordLine(line) ? parseKeywordList(line) : null;
+    if (k) kws.push(...k);
+    else if (grantable(line)) mods.push({ kind: "addAbility", text: line });
+    else return null;
+  }
+  if (kws.length) mods.unshift({ kind: "addKeywords", keywords: kws });
+  if (!mods.length) return null;
+  return ns.map((n) => ({
+    event: "selfEnters",
+    body: {
+      targets: [{ kind: "object", types: ["Creature"], text: "target creature" }],
+      effects: [
+        { type: "counters", what: { ref: "target", index: 0 }, counter: "+1/+1", n },
+        { type: "continuous", what: { ref: "target", index: 0 }, mods, duration: "endOfTurn", notSource: true },
+      ],
+      text: `Backup ${n}: put ${n === 1 ? "a +1/+1 counter" : `${n} +1/+1 counters`} on target creature. If that's another creature, it gains ${describeGrants(kws, mods)} until end of turn.`,
+    },
+  }));
+}
+
+const describeGrants = (kws: string[], mods: Modification[]) =>
+  [...kws.map((k) => k.toLowerCase()), ...mods.flatMap((m) => (m.kind === "addAbility" ? [`"${m.text.replace(/~/g, "this creature")}"`] : []))].join(" and ");
+
+/**
+ * What follows "has", "have" or "gains": keywords, quoted abilities, or both ('flying and "{T}: ..."').
+ * Layer 6 either way.
+ */
+function parseGrants(text: string): Modification[] | null {
+  const out: Modification[] = [];
+  const quoted = [...text.matchAll(/"([^"]+)"/g)].map((q) => q[1]!);
+  const words = text.replace(/"[^"]+"/g, "\u0000").split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean);
+  const kws: string[] = [];
+  for (const w of words) {
+    if (w === "\u0000") continue;
+    const k = parseKeywordList(w);
+    if (!k) return null;
+    kws.push(...k);
+  }
+  if (words.filter((w) => w === "\u0000").length !== quoted.length) return null;
+  if (kws.length) out.push({ kind: "addKeywords", keywords: kws });
+  for (const q of quoted) {
+    if (!grantable(q)) return null;
+    out.push({ kind: "addAbility", text: q });
+  }
+  return out.length ? out : null;
 }
 
 function parseToken(power: number, toughness: number, desc: string, withText?: string): TokenSpec | null {

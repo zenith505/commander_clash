@@ -212,6 +212,12 @@ export type Modification =
   | { kind: "addKeywords"; keywords: string[] } // layer 6
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
+  /**
+   * Layer 6: 'has "{T}: Add one mana of any color."', 'gains "When ~ dies, ..." until end of turn'. The text
+   * is a triggered, activated or mana ability in which "~" ("this creature") is the object that has it.
+   * Text naming the granting card by name is about that card (CR 201.5a), so it isn't compiled.
+   */
+  | { kind: "addAbility"; text: string }
   | { kind: "setPT"; power: Amount; toughness: Amount } // layer 7b
   /** A characteristic-defining ability (CR 604.3): "~'s power and toughness are each equal to ...", layer 7a. */
   | { kind: "definePT"; power?: Amount; toughness?: Amount }
@@ -316,7 +322,8 @@ export type Effect =
   | { type: "cascade" }
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
   | { type: "evolve" }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" }
+  /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game"; notSource?: boolean }
   | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
   | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec }
   | { type: "mill"; who: PlayerRef; n: Amount }

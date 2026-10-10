@@ -1,6 +1,6 @@
 import type { CompiledCard, ManaAbility } from "./abilities";
 import { characteristics, printedKeywords, type PTPart } from "./layers";
-import { compileCard } from "./oracle";
+import { compileCard, compileGranted } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType } from "./types";
 import { parseManaCost } from "./mana";
 
@@ -72,11 +72,36 @@ export function objHasKeyword(s: GameState, o: GameObject, k: SupportedKeyword |
   return characteristics(s, o).keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 }
 
-const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
+export const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
 
-/** The abilities an object has right now: its card's, unless an effect removed them (CR 613.1f). */
+/**
+ * The abilities an object has right now: its card's, unless an effect removed them, then the ones effects
+ * gave it (CR 613.1f).
+ */
 export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
-  return characteristics(s, o).hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES;
+  const c = characteristics(s, o);
+  return withGranted(c.hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, c.grantedAbilities);
+}
+
+const merged = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+/** A card's abilities plus granted ones (`grantedAbilities` texts), after them in that order. */
+export function withGranted(base: CompiledCard, granted: readonly string[]): CompiledCard {
+  if (!granted.length) return base;
+  const key = granted.join("\u0000");
+  let byKey = merged.get(base);
+  if (!byKey) merged.set(base, (byKey = new Map()));
+  let hit = byKey.get(key);
+  if (!hit) {
+    const extra = granted.map(compileGranted);
+    hit = {
+      ...base,
+      triggers: [...base.triggers, ...extra.flatMap((x) => x.triggers)],
+      activated: [...base.activated, ...extra.flatMap((x) => x.activated)],
+      mana: [...base.mana, ...extra.flatMap((x) => x.mana)],
+    };
+    byKey.set(key, hit);
+  }
+  return hit;
 }
 
 /** How a permanent differs from its printed card right now, for display. */
@@ -98,6 +123,8 @@ export interface Modifications {
   grantedKeywords: string[];
   /** Printed keywords it no longer has. */
   lostKeywords: string[];
+  /** Quoted abilities effects gave it ("~" is this permanent). */
+  grantedAbilities: string[];
   lostAllAbilities: boolean;
 }
 
@@ -118,6 +145,7 @@ export function modifications(s: GameState, o: GameObject): Modifications {
     pt: c.pt,
     grantedKeywords: c.keywords.filter((k) => !has(printedKeywords(d), k)),
     lostKeywords: printedKeywords(d).filter((k) => SUPPORTED_KEYWORDS.some((x) => x.toLowerCase() === k.toLowerCase()) && !has(c.keywords, k)),
+    grantedAbilities: c.grantedAbilities,
     lostAllAbilities: !c.hasPrintedAbilities,
   };
 }

@@ -40,6 +40,7 @@ export function layerOf(m: Modification): Layer {
     case "addKeywords":
     case "removeKeywords":
     case "loseAllAbilities":
+    case "addAbility":
       return "6";
     case "definePT":
       return "7a";
@@ -74,6 +75,8 @@ export interface Characteristics {
   keywords: string[];
   /** False once an effect made it lose all abilities: none of its printed abilities work. */
   hasPrintedAbilities: boolean;
+  /** Triggered, activated and mana abilities effects gave it, as text ("~" is this object), in layer 6 order. */
+  grantedAbilities: string[];
   controller: PlayerId;
   power: number;
   toughness: number;
@@ -116,6 +119,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     colors: [...d.colors],
     keywords: printedKeywords(d),
     hasPrintedAbilities: true,
+    grantedAbilities: [],
     controller: o.controller,
     power: basePower(d),
     toughness: baseToughness(d),
@@ -140,6 +144,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   subtypes: [...c.subtypes],
   colors: [...c.colors],
   keywords: [...c.keywords],
+  grantedAbilities: [...c.grantedAbilities],
   pt: [...c.pt],
   cantBeBlockedBy: [...c.cantBeBlockedBy],
 });
@@ -347,8 +352,13 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k)));
       return;
     case "loseAllAbilities":
+      // Abilities granted before this (earlier timestamps) go too; later ones stay (CR 613.7).
       c.keywords = [];
       c.hasPrintedAbilities = false;
+      c.grantedAbilities = [];
+      return;
+    case "addAbility":
+      c.grantedAbilities.push(m.text);
       return;
     case "definePT":
       if (m.power !== undefined) c.power = num(m.power);

@@ -1,7 +1,7 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice } from "./abilities";
 import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { addDelayed, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
+import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -489,7 +489,7 @@ export function moveObject(
     if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
   }
   // "Dies" is a creature put into a graveyard from the battlefield (CR 700.4); other triggers say "put into a graveyard".
-  if (fromZone === "battlefield" && to === "graveyard") fireEvent(s, { type: "dies", id, controller: lastController, hadAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness });
+  if (fromZone === "battlefield" && to === "graveyard") fireEvent(s, { type: "dies", id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness });
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
 
@@ -527,7 +527,7 @@ function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): ObjectId | 
   const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura).colors));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
-    m.kind === "addKeywords" || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
+    m.kind === "addKeywords" || (m.kind === "addAbility" && !modsAreHarmful([m])) || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
   const statics = compileCard(defOf(s, aura)).statics;
   const helps = statics.length > 0 && statics.every((st) => st.mods.every(good));
   return (helps ? legal.find(mine) : legal.find((id) => !mine(id))) ?? legal[0];

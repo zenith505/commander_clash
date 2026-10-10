@@ -164,13 +164,13 @@ export function planCast(
     const imp = improvise ? autoImprovise(s, pid, reduced, 0, convoke) : null;
     return imp ? cast(imp.taps, convoke, imp.artifacts) : null;
   }
-  let taps = planMana(s, pid, cost, extra);
+  let taps = planMana(s, pid, cost, extra, undefined, sacrificedTargets(s, targets));
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
   // So when the cost depends on the board, don't sacrifice permanents for its mana.
   if (taps && costDependsOnBoard(s, d)) {
     const sacs = taps.flatMap((a) => (a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf ? [a.objectId] : []));
-    if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, sacs);
+    if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, [...sacs, ...sacrificedTargets(s, targets)]);
   }
   if (taps) return cast(taps);
   if (convoke !== "auto") return null;
@@ -261,6 +261,14 @@ export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: nu
   return best ? best.map((c) => c.id) : null;
 }
 
+/**
+ * Targets that would be sacrificed for mana ("Sacrifice this token: Add {C}."): not used to pay, or the
+ * spell or ability would lose its target while being paid for (equipping the Eldrazi Spawn you sacrificed).
+ */
+function sacrificedTargets(s: GameState, targets: TargetChoice[] | undefined): ObjectId[] {
+  return (targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && manaAbilitiesOn(s, obj(s, t.id)).some((ab) => ab.sacrificeSelf) ? [t.id] : []));
+}
+
 /** Like planCast, for an activated ability. A crew ability needs the creatures to tap (`tapCreatures`). */
 export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): Action[] | null {
   const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x, costs);
@@ -269,7 +277,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const cost = parseManaCost(ab.manaCost);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
-  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? [])]);
+  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...sacrificedTargets(s, targets)]);
   if (!taps) return null;
   return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}) }];
 }

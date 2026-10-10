@@ -1217,7 +1217,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
   const stolen = c.controller !== o.owner;
   return (
     <>
-      {(m.grantedKeywords.length > 0 || m.lostKeywords.length > 0 || m.lostAllAbilities) && (
+      {(m.grantedKeywords.length > 0 || m.grantedAbilities.length > 0 || m.lostKeywords.length > 0 || m.lostAllAbilities) && (
         <span className="kw-overlay">
           {m.lostAllAbilities && <span className="kw none">No abilities</span>}
           {m.grantedKeywords.map((k) => (
@@ -1225,6 +1225,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
               {k}
             </span>
           ))}
+          {m.grantedAbilities.length > 0 && (
+            <span className="kw" title={m.grantedAbilities.map((t) => `Has "${t.replace(/~/g, c.name)}"`).join("\n")}>
+              +{m.grantedAbilities.length} {m.grantedAbilities.length === 1 ? "ability" : "abilities"}
+            </span>
+          )}
           {!m.lostAllAbilities &&
             m.lostKeywords.map((k) => (
               <span key={k} className="kw lost" title={`Lost ${k.toLowerCase()}`}>

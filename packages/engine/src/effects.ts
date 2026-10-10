@@ -5,12 +5,12 @@ import { allEffects, refCovers } from "./abilities";
 import type { AbilityBody, Amount, ChosenTarget, ChoiceKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
 import { manaValue, parseManaCost, payFromPool } from "./mana";
 import { planMana } from "./autopay";
-import { abilitiesOf, cardIdOf, defOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { nextRandom, shuffle } from "./rng";
 import { castProblem, describeTargets, destroyPermanent, draw, gainLife, livingPlayers, log, moveObject, newObject, obj, opponents, player } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics, type Characteristics } from "./layers";
 import { modeCountProblem, withModes } from "./modes";
-import { compileCard, MONARCH } from "./oracle";
+import { compileCard, compileGranted, MONARCH } from "./oracle";
 import { CREATURE_TYPES } from "./keywords";
 import { describeAmount, evalAmount, type AmountCtx } from "./amounts";
 import { cardSource, dealDamage, objectSource, protectedFrom, type DamageSource } from "./damage";
@@ -817,7 +817,8 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
     }
     case "continuous": {
       // The affected set is locked in now (CR 611.2c).
-      const affected = objects(s, e.what, ctx).map((o) => o.id);
+      // Backup: "If that's another creature, it gains ..." (CR 702.165a).
+      const affected = objects(s, e.what, ctx).map((o) => o.id).filter((id) => !(e.notSource && id === ctx.sourceId));
       if (!affected.length) return;
       const mods = fixMods(s, e.mods, ctx);
       s.effects.push({
@@ -1220,6 +1221,7 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
     else if (m.kind === "setPT") parts.push(`has base power and toughness ${describeAmount(m.power)}/${describeAmount(m.toughness)}`);
     else if (m.kind === "switchPT") parts.push("has its power and toughness switched");
     else if (m.kind === "addKeywords") parts.push(`gains ${m.keywords.join(", ").toLowerCase()}`);
+    else if (m.kind === "addAbility") parts.push(`gains "${m.text.replace(/~/g, "this creature")}"`);
     else if (m.kind === "removeKeywords") parts.push(`loses ${m.keywords.join(", ").toLowerCase()}`);
     else if (m.kind === "loseAllAbilities") parts.push("loses all abilities");
     else if (m.kind === "control") parts.push(`comes under ${player(s, controller).name}'s control`);
@@ -1300,7 +1302,7 @@ function createToken(s: GameState, pid: PlayerId, t: TokenSpec) {
 export type TriggerSourceEvent =
   | { type: "enters"; id: ObjectId; x?: number }
   /** `counters`: the counters it had on the battlefield (last known information, for persist and undying). */
-  | { type: "dies"; id: ObjectId; controller: PlayerId; hadAbilities: boolean; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number }
+  | { type: "dies"; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.10). */
@@ -1347,9 +1349,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     x?: number,
     kicked?: number[],
   ) => {
+    const printed = compileCard(defOf(s, o)).triggers;
     triggers.forEach((t, index) => {
       if (pred(t.event, t))
         s.triggerQueue.push({
+          // An ability an effect gave it isn't on its card, so the trigger carries what it does.
+          ...(printed[index] !== t ? { body: t.body } : {}),
           sourceId: o.id,
           sourceCardId: cardIdOf(o),
           controller,
@@ -1401,7 +1406,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       o,
       ev.controller,
       (e, t) => ((e === "selfDies" && ev.wasCreature) || e === "selfToGraveyard") && !(t.ifNoCounter && (ev.counters[t.ifNoCounter] ?? 0) > 0),
-      ev.hadAbilities ? compileCard(defOf(s, o)).triggers : [],
+      withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers,
       undefined,
       undefined,
       { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) },
@@ -1623,10 +1628,28 @@ export function modsAreHarmful(mods: Modification[]): boolean {
   let pt = 0;
   for (const m of mods) {
     if (m.kind === "modifyPT") pt += estimate(m.power) + estimate(m.toughness);
+    if (m.kind === "addAbility") pt -= grantCost(m.text);
     if (["control", "loseAllAbilities", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes"].includes(m.kind)) return true;
     if (m.kind === "setPT" && estimate(m.power) + estimate(m.toughness) <= 2) return true;
   }
   return pt < 0;
+}
+
+/**
+ * How much a granted triggered ability hurts the permanent's controller, in power/toughness points: an
+ * upkeep edict ('Enchanted creature has "At the beginning of your upkeep, sacrifice a creature."') or life
+ * loss makes the Aura one to put on an opponent's creature.
+ */
+function grantCost(text: string): number {
+  let n = 0;
+  for (const t of compileGranted(text).triggers)
+    for (const e of allEffects(t.body.effects)) {
+      if (e.type === "sacrifice" || e.type === "pick" || e.type === "cumulativeUpkeep") n += 10;
+      else if (e.type === "loseLife" && e.who.ref === "you") n += 4;
+      else if (e.type === "discard" && e.who.ref === "you") n += 4;
+      else if ((e.type === "tap" && e.what.ref === "self") || (e.type === "counters" && e.counter === "-1/-1" && e.what.ref === "self")) n += 4;
+    }
+  return n;
 }
 
 /** How much damage an effect body deals to target `i`, for picking what to kill. */

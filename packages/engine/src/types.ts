@@ -77,6 +77,11 @@ export interface GameObject {
   damagedBy?: ObjectId[];
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
+  /**
+   * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
+   * while it's still the same object (`zc`), until the end of this turn or of their next turn.
+   */
+  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn"; turn: number };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
   blocking?: ObjectId;

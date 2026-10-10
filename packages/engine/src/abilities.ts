@@ -374,6 +374,8 @@ export type Effect =
   /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */
   /** "Draw a card at the beginning of the next turn's upkeep": a delayed trigger made as this resolves (CR 603.7a). */
   | { type: "delayed"; when: "nextTurnUpkeep"; effects: Effect[]; text: string }
+  /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
@@ -520,7 +522,11 @@ export type TriggerEvent =
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
-  | "selfLastTimeCounterRemoved"; // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
+  | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
+  /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
+  | "creaturesYouControlAttack"
+  /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
+  | "creaturesYouControlDealCombatDamageToPlayer";
 
 
 export interface TriggeredAbility {
@@ -553,6 +559,8 @@ export interface TriggeredAbility {
    * again as it resolves (CR 603.4).
    */
   ifEvolves?: boolean;
+  /** For the "one or more" events: what has to be among them ("one or more Rogues you control"). */
+  group?: TargetSpec;
   /** Dethrone (CR 702.105a): "attacks the player with the most life or tied for most life", as it attacks. */
   attacksMostLife?: boolean;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
@@ -716,6 +724,8 @@ export interface CompiledCard {
   cantBeCountered?: boolean;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
+  extraLands?: number;
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */

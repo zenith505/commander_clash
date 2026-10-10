@@ -399,6 +399,11 @@ function compile(d: CardDef): CompiledCard {
       out.entersTappedChoice = choice;
       continue;
     }
+    const extraLand = new RegExp(`^You may play ${NUM} additional lands? on each of your turns\\.$`).exec(line);
+    if (extraLand) {
+      out.extraLands = (out.extraLands ?? 0) + num(extraLand[1]!);
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;
@@ -1358,6 +1363,45 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
  * "whenever you draw your second card each turn" (the count includes cards drawn before the source
  * was on the battlefield). "That player" is whoever drew.
  */
+/**
+ * "Whenever one or more creatures you control attack", "Whenever you attack", "Whenever you attack with one or
+ * more Elves", "Whenever one or more Ninja you control deal combat damage to a player" (once per player dealt
+ * damage; "that player" is that player, "that much" what the matching creatures dealt).
+ */
+function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
+  let m: RegExpExecArray | null;
+  let event: TriggerEvent;
+  let phrase: string | undefined;
+  let bodyText: string;
+  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with one or more (.+?)|you attack)(?: a player)?, (.+)$/.exec(line))) {
+    event = "creaturesYouControlAttack";
+    phrase = m[1] ?? m[2];
+    bodyText = m[3]!;
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (?:a player|an opponent|one or more players), (.+)$/.exec(line))) {
+    event = "creaturesYouControlDealCombatDamageToPlayer";
+    phrase = m[1];
+    bodyText = m[2]!;
+    // Combat damage to a player always goes to an opponent here: attacks only go to opponents.
+  } else return null;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText) && !/that player/.test(bodyText)) return "fail"; // the attackers as a group aren't modeled
+  let group: TargetSpec | undefined;
+  if (phrase && !/^creatures$/.test(phrase)) {
+    const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
+    if (!spec || spec.kind !== "object") return "fail";
+    group = { ...spec, text: phrase };
+  }
+  let text = bodyText;
+  const thatMuch = event === "creaturesYouControlDealCombatDamageToPlayer" && /\bthat (?:much|many)\b/.test(text);
+  if (thatMuch) {
+    if (/\bX\b/.test(text)) return "fail";
+    text = text.replace(/\bthat (?:much|many)\b/g, "X");
+  }
+  let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" });
+  if (!body) return "fail";
+  if (thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
+  return { event, body, ...(group ? { group } : {}) };
+}
+
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (you|an opponent|a player) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
   if (!m) return null;
@@ -1398,6 +1442,8 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (draws) return draws;
   const dies = parseDiesTrigger(line);
   if (dies) return dies;
+  const group = parseGroupTrigger(line);
+  if (group) return group;
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);
     if (m) {
@@ -1770,9 +1816,18 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   let payFirst: { pay: PayCost; text: string } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
-  for (let s of sentences) {
-    s = s.replace(/^Then,? /, "");
+  for (let si = 0; si < sentences.length; si++) {
+    let s = sentences[si]!.replace(/^Then,? /, "");
     [prevStart, curStart] = [curStart, effects.length];
+    // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
+    const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(s);
+    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them) (this turn|until the end of your next turn))$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
+    if (exTop && playIt) {
+      const when = (playIt[1] ?? playIt[2])!.toLowerCase();
+      effects.push({ type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: /next turn/.test(when) ? "nextTurn" : "thisTurn" });
+      si++;
+      continue;
+    }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
     if (look && !dig) {
       dig = { type: "dig", n: amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };

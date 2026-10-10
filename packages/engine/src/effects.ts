@@ -948,6 +948,19 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       if (o) addDelayed(s, e.when, ctx.controller, o, { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." });
       return;
     }
+    case "impulse": {
+      // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
+      const p = player(s, ctx.controller);
+      const ids = p.library.slice(0, amountNow(s, e.n, ctx));
+      for (const id of ids) {
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+      }
+      if (ids.length)
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"} ${e.until === "thisTurn" ? "this turn" : "until the end of their next turn"}.`);
+      return;
+    }
     case "removeSelfCounter": {
       // Fading (CR 702.32a): "remove a fade counter from this permanent. If you can't, sacrifice the permanent."
       // Vanishing (CR 702.63a): removing the last time counter triggers its sacrifice ability.
@@ -1617,6 +1630,10 @@ export type TriggerSourceEvent =
   /** A player gained life (one life-gain event, CR 119.10). */
   | { type: "lifeGained"; player: PlayerId }
   | { type: "attacks"; id: ObjectId }
+  /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
+  | { type: "groupAttack"; controller: PlayerId; ids: ObjectId[] }
+  /** In one combat damage step, these creatures of `controller` dealt `player` combat damage. */
+  | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
@@ -1829,6 +1846,22 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e, t) => e === "selfAttacks" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.training || trains(s, o)));
+  } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
+    const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) !== ev.controller) continue;
+      // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
+      const fits = (t: TriggeredAbility) => ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)));
+      for (const t of abilitiesOf(s, o).triggers) {
+        if (t.event !== want) continue;
+        const hit = fits(t);
+        if (!hit.length) continue;
+        const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group);
+        add(o, ev.controller, (_, tt) => same(tt), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount } : undefined);
+      }
+    }
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");

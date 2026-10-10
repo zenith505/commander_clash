@@ -23,6 +23,7 @@ import {
   delveRoom,
   spellTargets,
   availableMana,
+  exilePlayable,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
@@ -143,7 +144,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     const p = player(s, pid);
     const fromYard = p.graveyard.filter((id) => compileCard(defOf(s, obj(s, id))).fromGraveyard?.length);
-    const options = [...p.command, ...p.hand, ...fromYard]
+    // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
+    const options = [...exilePlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
       .map((id) => {
         const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
@@ -151,6 +153,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
       .sort((a, b) => b.mv - a.mv);
+    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile"));
+    if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
     // Unearth a creature to attack with this turn (CR 702.84a).
     if (s.step === "main1") {

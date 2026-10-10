@@ -884,6 +884,23 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **11,323 cards are fully supported.** Rules tests: `test/named-counters.test.ts`.
 
+### Playing exiled cards, extra land drops, "whenever you attack" (added 2026-10-10)
+
+- **Impulse draw**: "Exile the top two cards of your library. Until the end of your next turn (until end
+  of turn), you may play those cards." The cards are exiled face up; you may cast them (paying their
+  costs, with normal timing) or play a land among them as your land for the turn. The permission is for
+  that object only (CR 400.7) and ends with the turn it names. Exile glows (✦) when you can play
+  something there; click it to choose. Bots play these cards before the ones in hand.
+- **"You may play an additional land on each of your turns"** (CR 305.2a).
+- **"Whenever you attack" / "Whenever one or more creatures (Elves, nontoken Vampires) you control
+  attack"**: once per declaration, however many attack.
+- **"Whenever one or more creatures (Rogues) you control deal combat damage to a player"**: once for each
+  player dealt damage that step (per the rulings), "that player" being that player.
+- Not yet: effects on "they"/"those creatures" (the attackers as a group), impulse draw from an
+  opponent's library, "play lands from your graveyard / the top of your library".
+
+**11,381 cards are fully supported.** Rules tests: `test/impulse.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

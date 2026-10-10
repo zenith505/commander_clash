@@ -9,6 +9,7 @@ import {
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
+  mayPlayFromExile,
   commanderTax,
   abilitiesOf,
   controllerOf,
@@ -846,7 +847,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           view={viewing}
           onClose={() => setViewing(null)}
           onHover={setHover}
-          canPick={(id) => viewing.pid === HUMAN && viewing.zone === "graveyard" && !pending && graveyardOptions(s, id)}
+          canPick={(id) => !pending && (viewing.zone === "graveyard" ? viewing.pid === HUMAN && graveyardOptions(s, id) : exileOptions(s, id))}
           onPick={(id) => {
             setViewing(null);
             setMenu(id);
@@ -879,6 +880,12 @@ function describeExtraCost(c: AdditionalCost): string {
 function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKind) {
   const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { via });
   return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { via }) !== null);
+}
+
+/** A card exiled with "you may play it until ..." that you could play now. */
+function exileOptions(s: GameState, id: string): boolean {
+  if (!mayPlayFromExile(s, s.objects[id]!, HUMAN)) return false;
+  return isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id);
 }
 
 /** Does this card in your graveyard have something you could do with it now (flashback, unearth, ...)? */
@@ -1386,6 +1393,7 @@ function Seat({
 }) {
   const p = s.players[pid]!;
   const yardPlayable = pid === HUMAN && !s.pending && p.graveyard.some((id) => graveyardOptions(s, id));
+  const exilePlayableHere = !s.pending && p.exile.some((id) => exileOptions(s, id));
   // Auras and Equipment sit with whatever they're attached to, even in another player's area.
   const onField = new Set(s.battlefield);
   const mine = s.battlefield
@@ -1464,8 +1472,12 @@ function Seat({
             <div className="zone-title">Graveyard{yardPlayable ? " ✦" : ""}</div>
             <ZoneTop s={s} o={topOf(p.graveyard)} count={p.graveyard.length} onHover={cardProps.onHover} />
           </div>
-          <div className="zone clickable-zone" onClick={() => onViewZone("exile")} title="Exile (formerly 'removed from the game'). Click to see all.">
-            <div className="zone-title">Exile</div>
+          <div
+            className={`zone clickable-zone${exilePlayableHere ? " has-options" : ""}`}
+            onClick={() => onViewZone("exile")}
+            title={exilePlayableHere ? "Exile: you may play a card here for now. Click to see them." : "Exile (formerly 'removed from the game'). Click to see all."}
+          >
+            <div className="zone-title">Exile{exilePlayableHere ? " ✦" : ""}</div>
             <ZoneTop s={s} o={topOf(p.exile)} count={p.exile.length} onHover={cardProps.onHover} />
           </div>
         </div>
@@ -1525,7 +1537,7 @@ function ZoneViewer({
               <div
                 key={id}
                 className={`card big${pickable ? " playable" : ""}`}
-                title={pickable ? "Click to cast or use it from your graveyard" : undefined}
+                title={pickable ? `Click to ${view.zone === "exile" ? "play" : "cast or use"} it from your ${view.zone}` : view.zone === "exile" && s.objects[id]!.mayPlay?.player === HUMAN ? "You may play this card for now" : undefined}
                 onClick={pickable ? () => onPick(id) : undefined}
                 {...hoverProps(d, onHover)}
               >
@@ -1975,7 +1987,8 @@ function AbilityMenu({
 }) {
   const o = s.objects[objectId]!;
   const d = seenCardOf(s, objectId);
-  const inHand = o.zone === "hand";
+  // A card you may play from exile for now works like one in your hand (impulse draw).
+  const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const upCost = o.zone === "battlefield" ? faceUpCost(s, o) : undefined;
   const inYard = o.zone === "graveyard";
@@ -2346,7 +2359,7 @@ function GameLog({ s }: { s: GameState }) {
 
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
-  if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand)\b/, " your $1");
+  if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand|next turn)\b/g, " your $1");
   return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses)\b/g, (_, pre: string, v: string) =>
     `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v === "amasses" ? "amass" : v.slice(0, -1)}`,
   );

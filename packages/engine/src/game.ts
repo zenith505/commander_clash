@@ -820,6 +820,12 @@ function finishCleanup(s: GameState) {
   }
   for (const p of s.players) p.preventNext = undefined;
   s.preventCombatDamage = undefined;
+  // "You may play that card this turn" / "until the end of your next turn" ends now.
+  for (const q of s.players)
+    for (const id of q.exile) {
+      const m = obj(s, id).mayPlay;
+      if (m && (m.until === "thisTurn" || (s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
+    }
   advanceStep(s);
 }
 
@@ -913,13 +919,25 @@ export function canActAtSorcerySpeed(s: GameState, pid: PlayerId) {
   return !s.pending && s.activePlayer === pid && s.priority === pid && isMainPhase(s) && s.stack.length === 0;
 }
 
+/** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
+export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  return o.zone === "exile" && o.mayPlay?.player === pid && o.mayPlay.zc === (o.zoneChanges ?? 0);
+}
+
+/** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
+export function landsAllowed(s: GameState, pid: PlayerId): number {
+  let n = 1;
+  if (s.activePlayer === pid) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === pid) n += abilitiesOf(s, obj(s, id)).extraLands ?? 0;
+  return n;
+}
+
 function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
   const o = obj(s, id);
   const d = defOf(s, o);
-  if (o.zone !== "hand" || o.owner !== p.id) throw new RulesError("land must be in your hand");
+  if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id))) throw new RulesError("land must be in your hand");
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
   if (!canActAtSorcerySpeed(s, p.id)) throw new RulesError("lands can only be played at sorcery speed");
-  if (p.landsPlayedThisTurn >= 1) throw new RulesError("already played a land this turn"); // CR 305.2
+  if (p.landsPlayedThisTurn >= landsAllowed(s, p.id)) throw new RulesError("already played a land this turn"); // CR 305.2
   const choice = compileCard(d).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
@@ -931,8 +949,9 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
+  const fromExile = o.zone === "exile";
   moveObject(s, id, "battlefield", { untapped });
-  log(s, `${p.name} plays ${d.name}${obj(s, id).tapped ? " (tapped)" : ""}.`);
+  log(s, `${p.name} plays ${d.name}${fromExile ? " from exile" : ""}${obj(s, id).tapped ? " (tapped)" : ""}.`);
 }
 
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
@@ -1020,7 +1039,7 @@ export function castProblem(
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
-  if (!free && !via && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
+  if (!free && !via && !mayPlayFromExile(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && compileCard(d).fromGraveyard?.length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
@@ -1794,6 +1813,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
   for (const a of attacks) fireEvent(s, { type: "attacks", id: a.attacker }); // CR 508.3a
+  if (attacks.length) fireEvent(s, { type: "groupAttack", controller: p.id, ids: attacks.map((a) => a.attacker) });
   if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]!.attacker }); // CR 506.5
   s.pending = null;
   if (attacks.length === 0) {
@@ -1956,6 +1976,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
   // Each source's lifelink is one life-gain event however many things it damaged (CR 119.10).
   const lifelink = new Map<ObjectId, { n: number }>(hits.map((h) => [h.source.id, { n: 0 }]));
   const dealt = new Map<ObjectId, number>();
+  const hitDealt: number[] = [];
   for (const h of hits) {
     const src = sources.get(h.source.id)!;
     const opts = { combat: true, lifelink: lifelink.get(h.source.id)! };
@@ -1965,10 +1986,22 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
       if (n) fireEvent(s, { type: "combatDamageToPlayer", id: h.source.id, player: h.toPlayer, amount: n });
     } else if (h.toObject) n = dealDamage(s, src, { object: h.toObject }, h.amount, opts);
     dealt.set(h.source.id, (dealt.get(h.source.id) ?? 0) + n);
+    hitDealt.push(n);
+  }
+  // "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage.
+  const groups = new Map<string, { controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }>();
+  for (const [i, h] of hits.entries()) {
+    if (h.toPlayer === undefined || !hitDealt[i]) continue;
+    const controller = sources.get(h.source.id)!.controller;
+    const g = groups.get(`${controller}|${h.toPlayer}`) ?? { controller, player: h.toPlayer, ids: [], amounts: [] };
+    g.ids.push(h.source.id);
+    g.amounts.push(hitDealt[i]!);
+    groups.set(`${controller}|${h.toPlayer}`, g);
   }
   for (const [id, gained] of lifelink) gainLife(s, sources.get(id)!.controller, gained.n);
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
   for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
+  for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
 }
 
 // ---------------------------------------------------------------------------
@@ -2194,15 +2227,20 @@ function checkGameOver(s: GameState) {
  * Simple actions available to `pid` right now. Combat declarations, and spells or abilities
  * that need targets, are built by the caller (see castProblem / abilityProblem).
  */
+/** Cards in exile `pid` may play right now (impulse draw), whoever owns them. */
+export function exilePlayable(s: GameState, pid: PlayerId): ObjectId[] {
+  return s.players.flatMap((q) => q.exile).filter((id) => mayPlayFromExile(s, obj(s, id), pid));
+}
+
 export function legalActions(s: GameState, pid: PlayerId): Action[] {
   if (waitingOn(s) !== pid) return [];
   if (s.pending) return [];
   const p = player(s, pid);
   const out: Action[] = [{ type: "passPriority", player: pid }];
-  for (const id of p.hand) {
+  for (const id of [...p.hand, ...exilePlayable(s, pid)]) {
     const d = defOf(s, obj(s, id));
     if (isType(d, "Land")) {
-      if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < 1) out.push({ type: "playLand", player: pid, objectId: id });
+      if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid)) out.push({ type: "playLand", player: pid, objectId: id });
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
   }
   for (const id of p.command) if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });

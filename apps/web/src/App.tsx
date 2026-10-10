@@ -4,6 +4,9 @@ import {
   abilityProblem,
   canCast,
   castProblem,
+  planTurnFaceUp,
+  faceUpCost,
+  turnFaceUpProblem,
   delveRoom,
   graveyardCast,
   commanderTax,
@@ -61,7 +64,7 @@ import {
   type TargetSpec,
   COLOR_NAMES,
 } from "@cc/engine";
-import { HUMAN, STOPPABLE, cardOf, isCreature, isLand, newGame, useGame, type DeckBundle, type PriorityMode } from "./useGame";
+import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, newGame, useGame, type DeckBundle, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
 import { ManaCost, ManaPoolView, RulesText } from "./Mana";
 
@@ -476,7 +479,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
-    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length)) return setMenu(o.id);
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast)) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && compileCard(cardOf(s, o.id)).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
@@ -485,7 +488,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const mana = usableManaOptions(s, o);
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
-      if (abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0)) return setMenu(o.id);
+      if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0)) return setMenu(o.id);
       const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana);
       if (plan) dispatch(plan);
     }
@@ -652,6 +655,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCastAlt={(alt) => {
                 setMenu(null);
                 startCast(menu, undefined, undefined, alt);
+              }}
+              onCastFaceDown={() => {
+                setMenu(null);
+                dispatch(planCast(s, HUMAN, menu, undefined, undefined, "auto", undefined, { faceDown: true }) ?? [{ type: "castSpell", player: HUMAN, objectId: menu, faceDown: true }]);
+              }}
+              onTurnFaceUp={() => {
+                setMenu(null);
+                dispatch(planTurnFaceUp(s, HUMAN, menu) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu }]);
               }}
               onClose={() => setMenu(null)}
             />
@@ -1084,6 +1095,7 @@ function CardView(props: CardProps & { o: GameObject; playable?: boolean }) {
 
 function SingleCard({ o, s, onClick, onHover, attacks, blocks, blocker, discards, playable, targetable, ready }: CardProps & { o: GameObject; playable?: boolean }) {
   const d = cardOf(s, o.id);
+  const seen = seenCardOf(s, o.id);
   const classes = ["card"];
   if (o.tapped) classes.push("tapped");
   if (o.zone === "battlefield" && targetable(o.id)) classes.push("targetable");
@@ -1095,8 +1107,8 @@ function SingleCard({ o, s, onClick, onHover, attacks, blocks, blocker, discards
   const onField = o.zone === "battlefield";
   return (
     <div className={`slot ${o.tapped ? "slot-tapped" : ""}`}>
-      <div className={classes.join(" ")} data-obj={o.id} onClick={() => onClick(o)} {...hoverProps(d, onHover)}>
-        <CardFace d={d} />
+      <div className={classes.join(" ")} data-obj={o.id} onClick={() => onClick(o)} {...hoverProps(seen, onHover)}>
+        <CardFace d={d} peek={seen !== d ? seen : undefined} />
         {onField && <Modified s={s} o={o} />}
         {o.attacking !== undefined && <span className="badge attack-badge">→ {s.players[o.attacking]!.name}</span>}
       </div>
@@ -1194,8 +1206,16 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
 }
 
 /** The card image, or a text frame when there's no image or it fails to load (offline). */
-function CardFace({ d }: { d: CardDef }) {
+function CardFace({ d, peek }: { d: CardDef; /** Your own face-down card: what it really is (CR 708.5). */ peek?: CardDef }) {
   const [failed, setFailed] = useState(false);
+  if (d.oracleId.startsWith("face-down"))
+    return (
+      <div className="card-text face-down-face" title={peek ? `Face down: ${peek.name}. Only you can see this.` : "A face-down 2/2 creature (morph or disguise)"}>
+        <div className="ct-name">Face-down</div>
+        <div className="ct-type">2/2 creature{d.keywords.includes("Ward") ? ", ward {2}" : ""}</div>
+        {peek && <div className="ct-peek">{peek.name}</div>}
+      </div>
+    );
   if (d.imageUrl && !failed) return <img src={d.imageUrl} alt={d.name} loading="lazy" draggable={false} onError={() => setFailed(true)} />;
   return (
     <div className="card-text">
@@ -1823,6 +1843,8 @@ function AbilityMenu({
   onPlay,
   onCastVia,
   onCastAlt,
+  onCastFaceDown,
+  onTurnFaceUp,
   onClose,
 }: {
   s: GameState;
@@ -1835,11 +1857,17 @@ function AbilityMenu({
   onCastVia: (via: CastFromGraveyardKind) => void;
   /** For a card in hand: cast it for its evoke or dash cost. */
   onCastAlt: (alt: AltCostKind) => void;
+  /** For a card in hand with morph or disguise: cast it face down for {3}. */
+  onCastFaceDown: () => void;
+  /** For your face-down permanent: turn it face up. */
+  onTurnFaceUp: () => void;
   onClose: () => void;
 }) {
   const o = s.objects[objectId]!;
-  const d = cardOf(s, objectId);
+  const d = seenCardOf(s, objectId);
   const inHand = o.zone === "hand";
+  const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
+  const upCost = o.zone === "battlefield" ? faceUpCost(s, o) : undefined;
   const inYard = o.zone === "graveyard";
   const land = isLand(s, objectId);
   const playable = inHand && (land ? canPlayLand(s, objectId) : canCastWithTaps(s, objectId));
@@ -1868,6 +1896,20 @@ function AbilityMenu({
             </button>
           );
         })}
+      {faceDownCast && (
+        <button
+          disabled={!planCast(s, HUMAN, objectId, undefined, undefined, "auto", undefined, { faceDown: true })}
+          title={castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { faceDown: true }) ?? `A 2/2 that only you can see. Turn it face up later for ${faceDownCast.cost}.`}
+          onClick={onCastFaceDown}
+        >
+          Cast face down <ManaCost cost="{3}" size="sm" /> ({faceDownCast.kind})
+        </button>
+      )}
+      {upCost && (
+        <button disabled={!planTurnFaceUp(s, HUMAN, objectId)} title={turnFaceUpProblem(s, HUMAN, objectId) ?? "A special action: it doesn't use the stack."} onClick={onTurnFaceUp}>
+          Turn face up: {upCost.kind} <ManaCost cost={upCost.cost} size="sm" />
+        </button>
+      )}
       {inYard &&
         (compileCard(d).fromGraveyard ?? []).map((g) => {
           const ok = canCastFromGraveyard(s, objectId, g.kind);
@@ -2150,8 +2192,8 @@ function GameLog({ s }: { s: GameState }) {
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
   if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand)\b/, " your $1");
-  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts)\b/g, (_, pre: string, v: string) =>
-    `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v.slice(0, -1)}`,
+  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes)\b/g, (_, pre: string, v: string) =>
+    `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v.slice(0, -1)}`,
   );
 }
 
@@ -2276,6 +2318,7 @@ function StackCard({
   onHover: (d: CardDef | null) => void;
 }) {
   const d = it.objectId ? cardOf(s, it.objectId) : it.sourceCardId ? s.cards[it.sourceCardId] : undefined;
+  const seen = it.objectId ? seenCardOf(s, it.objectId) : d;
   const who = s.players[it.controller]!;
   const targets = describeTargets(s, it.targets).replace(/^ targeting /, "");
   return (
@@ -2284,8 +2327,8 @@ function StackCard({
       style={{ ["--who" as string]: playerColor(it.controller) }}
       onClick={onPick}
     >
-      <div className={`card ${it.kind === "ability" ? "ability" : ""}`} data-stack={it.id} {...(d ? hoverProps(d, onHover) : {})}>
-        {d ? <CardFace d={d} /> : <div className="card-text">{it.description}</div>}
+      <div className={`card ${it.kind === "ability" ? "ability" : ""}`} data-stack={it.id} {...(seen ? hoverProps(seen, onHover) : {})}>
+        {d ? <CardFace d={d} peek={seen !== d ? seen : undefined} /> : <div className="card-text">{it.description}</div>}
         {it.kind === "ability" && <span className="ability-banner">Ability</span>}
       </div>
       <div className="stack-info">
@@ -2478,7 +2521,7 @@ function Hand({ s, ids, cardProps, tucked, onToggle }: { s: GameState; ids: stri
                 className="fan-slot"
                 style={{ ["--rot" as string]: `${off * step}deg`, ["--drop" as string]: (off / Math.max(1, mid)) ** 2 * 0.06 }}
               >
-                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind))} />
+                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null)} />
               </div>
             );
           })}

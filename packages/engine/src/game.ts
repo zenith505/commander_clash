@@ -1,5 +1,5 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, TargetChoice } from "./abilities";
-import { abilitiesOf, defOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { addDelayed, becomeMonarch, triggerBody, canChooseModes, choiceOptions, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
@@ -14,6 +14,7 @@ import {
   type Action,
   type CardDef,
   type CostChoices,
+  type FaceDownKind,
   type GameObject,
   type GameState,
   type LastKnown,
@@ -53,7 +54,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     turnOrder: setup.map((_, i) => i),
     players: [],
     objects: {},
-    cards: {},
+    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD },
     battlefield: [],
     stack: [],
     triggerQueue: [],
@@ -296,6 +297,10 @@ export function applyAction(state: GameState, action: Action): GameState {
     case "bottomCards":
       bottomCards(s, p, action.objectIds);
       break;
+    case "turnFaceUp":
+      requireNoPending(s);
+      turnFaceUp(s, p, action.objectId);
+      break;
   }
   afterAction(s);
   return s;
@@ -404,7 +409,8 @@ export function moveObject(
   const lastCounters = { ...o.counters };
   const lastController = last.controller;
   const wasCreature = last.types.includes("Creature");
-  const hadAbilities = last.hasPrintedAbilities;
+  // A face-down permanent has no abilities of its own (CR 708.2), so nothing of the card's triggers as it leaves.
+  const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
   if (fromZone === "battlefield") (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller };
   const from = zoneList(s, o);
   if (from) {
@@ -416,6 +422,11 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
+    // A face-down spell becomes a face-down permanent (CR 708.4); anywhere else, it's revealed (CR 708.9).
+    if (o.faceDown) {
+      o.faceDown = undefined;
+      log(s, `(The face-down creature was ${realDefOf(s, o).name}.)`);
+    }
   }
   o.zone = to;
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
@@ -847,9 +858,24 @@ export function castProblem(
   const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
+  if (choices?.faceDown && !o.faceDown) {
+    // Cast face down (CR 702.37c, 708.4): it's turned face down first, so the checks see a 2/2 creature spell.
+    const fd = compileCard(defOf(s, o)).faceDownCast;
+    if (!fd) return `${defOf(s, o).name} can't be cast face down`;
+    if (o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be cast face down";
+    o.faceDown = fd.kind;
+    try {
+      return castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices);
+    } finally {
+      o.faceDown = undefined;
+    }
+  }
+  if (o.faceDown && !choices?.faceDown) return "a face-down card can't be cast";
   const d = defOf(s, o);
   const fromCommand = o.zone === "command";
   const free = freeCastOf(s, pid) === id;
+  // Casting it face down is an alternative cost: no other one can go with it (CR 118.9a).
+  if (choices?.faceDown && (free || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   const via = graveyardCast(d, choices?.via);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
@@ -902,8 +928,9 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt"> = {}): { cost: ParsedCost; extra: number } {
-  const d = defOf(s, o);
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown"> = {}): { cost: ParsedCost; extra: number } {
+  // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
+  const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
   const kicker = compileCard(d).kicker;
   const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "");
@@ -913,7 +940,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
   // So do evoke and dash (CR 702.74a, 702.109a).
-  const base = graveyardCast(d, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost;
+  const base = how.faceDown ? "{3}" : (graveyardCast(d, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost);
   const mana = parseManaCost(base + kickCost);
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = 0;
@@ -1019,6 +1046,11 @@ export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, o
 
 function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice[], modes?: number[], convoke?: ObjectId[], improvise?: ObjectId[], x?: number, choices: CostChoices = {}) {
   const o = obj(s, id);
+  if (choices.faceDown && !o.faceDown) {
+    const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
+    if (problem) throw new RulesError(problem);
+    o.faceDown = compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
+  }
   const d = defOf(s, o);
   const spell = compileCard(d).spell;
   // Modes first (CR 601.2b), then the targets they need (601.2c).
@@ -1077,7 +1109,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (choices.alt ? ` for its ${choices.alt} cost` : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
-  log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
+  else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const sacrificed = payAdditionalCosts(s, p, d, choices, via?.costs ?? []);
@@ -1092,7 +1125,7 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
   return via ? compileCard(d).fromGraveyard?.find((g) => g.kind === via) : undefined;
 }
 
-export function describeVia(via: CastFromGraveyardKind): string {
+export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
   return via === "jumpStart" ? "jump-start" : via;
 }
 
@@ -1284,7 +1317,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     id: stackId,
     kind: "ability",
     sourceId: id,
-    sourceCardId: o.cardId,
+    sourceCardId: cardIdOf(o),
     sourceZc,
     controller: p.id,
     description: describeAbility(d, body.text),
@@ -1893,6 +1926,42 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     });
   }
   return out;
+}
+
+/**
+ * Why `pid` can't turn this permanent face up right now, or null (with the mana in their pool). It's
+ * a special action, any time they have priority (CR 116.2b), paying the morph or disguise cost the
+ * card would have face up (CR 702.37e, 702.168d).
+ */
+export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const o = s.objects[id];
+  if (!o || o.zone !== "battlefield" || !o.faceDown) return "that isn't a face-down permanent";
+  if (controllerOf(s, o) !== pid) return "you don't control that permanent";
+  if (s.priority !== pid || s.pending) return "you don't have priority";
+  const fd = compileCard(realDefOf(s, o)).faceDownCast;
+  if (!fd) return "it has no morph or disguise cost"; // CR 702.37e
+  if (!payFromPool(parseManaCost(fd.cost), player(s, pid).manaPool)) return `not enough mana to turn it face up (${fd.cost})`;
+  return null;
+}
+
+/** The cost of turning a face-down permanent face up, if it has one. */
+export const faceUpCost = (s: GameState, o: GameObject) => (o.faceDown ? compileCard(realDefOf(s, o)).faceDownCast : undefined);
+
+function turnFaceUp(s: GameState, p: Player, id: ObjectId) {
+  const problem = turnFaceUpProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const o = obj(s, id);
+  const fd = compileCard(realDefOf(s, o)).faceDownCast!;
+  p.manaPool = payFromPool(parseManaCost(fd.cost), p.manaPool)!.pool;
+  // Its copiable values go back to the card's (CR 708.8); it's the same permanent, so nothing "enters".
+  o.faceDown = undefined;
+  invalidateCharacteristics(s);
+  const d = defOf(s, o);
+  log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${describeVia(fd.kind)} ${fd.cost}).`);
+  // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
+  if (fd.kind === "megamorph") o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + 1;
+  fireEvent(s, { type: "turnedFaceUp", id });
+  s.passedInSuccession = [];
 }
 
 /** Could `pid` cast this card right now with the mana in their pool? */

@@ -32,6 +32,9 @@ export interface CardDef {
   artUrl?: string;
 }
 
+/** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */
+export type FaceDownKind = "morph" | "megamorph" | "disguise";
+
 export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command";
 
 /** A game object (card or token) in some zone. CR 109 */
@@ -90,6 +93,11 @@ export interface GameObject {
   buyback?: boolean;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
   castAlt?: AltCostKind;
+  /**
+   * Face down (CR 708): a 2/2 creature with no name, text, subtypes or mana cost (with ward {2} for
+   * disguise). Only its controller may look at it (CR 708.5).
+   */
+  faceDown?: FaceDownKind;
   /** A replacement effect: if it would leave this zone, it's exiled instead (flashback, CR 702.34a; unearth, 702.84a). */
   exileIfLeaves?: ZoneName;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
@@ -222,6 +230,8 @@ export interface CostChoices {
   alt?: AltCostKind;
   /** Delve (CR 702.66a): cards exiled from your graveyard, each paying for {1}. */
   delve?: ObjectId[];
+  /** Cast it face down for {3} with its morph or disguise ability (CR 702.37c, 702.168b). */
+  faceDown?: boolean;
   /** Permanents to sacrifice, cards to discard, cards to exile from your graveyard. */
   sacrifice?: ObjectId[];
   discard?: ObjectId[];
@@ -419,6 +429,8 @@ export type Action =
   | { type: "mulligan"; player: PlayerId; keep: boolean }
   /** Answer to bottomCards: these cards go on the bottom of the library, the first one lowest. */
   | { type: "bottomCards"; player: PlayerId; objectIds: ObjectId[] }
+  /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
+  | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */
   | { type: "payUnless"; player: PlayerId; pay: boolean }
   | { type: "concede"; player: PlayerId };

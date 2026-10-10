@@ -590,6 +590,31 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **7,998 cards are fully supported.** Rules tests: `test/upkeep-alt-costs.test.ts`.
 
+### Morph, megamorph, disguise: face-down creatures (added 2026-10-10)
+
+- **Casting face down** (CR 702.37, 708): from your hand, for {3}, as a nameless, colorless 2/2
+  creature spell with no abilities, types or mana cost. The log says "casts a face-down creature
+  spell" without naming it, and other players see a blank striped card. You still see what it is
+  (hover it, or look at the small label on the card).
+- **Turning it face up** (CR 702.37e, 116.2b): a special action. Any time you have priority, pay
+  its morph cost and it becomes the real card at once. It doesn't use the stack, so it can't be
+  responded to. Abilities that say "when ~ is turned face up" trigger. It didn't just enter, so
+  "when ~ enters" abilities don't (CR 708.8). Counters, damage, Auras and effects already on it
+  stay.
+- **Megamorph** (CR 702.37b): the same, plus a +1/+1 counter as it's turned face up.
+- **Disguise** (CR 702.168): the same, but while face down it also has ward {2}.
+- **Leaving play** (CR 708.9): a face-down permanent or spell is revealed when it goes anywhere
+  else, and the log names it. Its own "when ~ dies" abilities don't trigger, because face down it
+  had none. A countered face-down spell goes to the graveyard face up.
+- Only mana costs for now; "Morph—Reveal a white card" and similar aren't modeled. Manifest and
+  cloak (cards put onto the battlefield face down by other effects) are not done yet.
+- **On the table:** clicking a morph card in your hand gives "Cast it" and "Cast face down {3}".
+  Clicking your face-down creature gives "Turn face up" with its cost.
+- **Bots** cast morph creatures face down when they can't afford the real cost, then turn them
+  face up as soon as they can pay.
+
+**8,103 cards are fully supported.** Rules tests: `test/face-down.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).
@@ -606,7 +631,7 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
    costs~~ done. ~~"all"/"each" groups, choosing a creature type or color~~ done. ~~"counter unless
    they pay", energy, the monarch, "you may pay ... If you do"~~ done. ~~flashback, jump-start,
    retrace, escape, buyback, rebound, unearth, delayed triggers~~ done. ~~echo, cumulative upkeep,
-   evoke, dash, delve, living weapon, scavenge~~ done. Next by
+   evoke, dash, delve, living weapon, scavenge~~ done. ~~morph, megamorph, disguise~~ done. Next by
    count: see `npx tsx tools/coverage.ts`.
    Hand-written overrides for cards that don't fit a template.
 3. ~~Layers and continuous effects~~ (CR 613, done except layers 1 and 3), replacement

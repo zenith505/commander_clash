@@ -13,6 +13,8 @@ import {
   createGame,
   defOf,
   doesNothingNow,
+  realDefOf,
+  planTurnFaceUp,
   isType,
   obj,
   waitingOn,
@@ -97,6 +99,11 @@ function hasInstantPlay(s: GameState): boolean {
     if (abilities.some((ab, i) => ab.zone === "hand" && planActivate(s, HUMAN, id, i))) return true;
     if (!(isType(d, "Instant") || d.keywords.includes("Flash"))) continue;
     if (planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
+  }
+  // Turning a face-down permanent face up is a special action, any time you have priority (CR 702.37e).
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (o.faceDown && controllerOf(s, o) === HUMAN && planTurnFaceUp(s, HUMAN, id)) return true;
   }
   // Flashback and the like work from your graveyard, at instant speed for an instant (CR 702.34a).
   for (const id of me.graveyard) {
@@ -283,6 +290,11 @@ export function useGame(initial: GameState | null) {
 }
 
 export const cardOf = (s: GameState, id: string) => defOf(s, obj(s, id));
+/** What you see of a card: your own face-down spells and permanents show what they really are (CR 708.5). */
+export const seenCardOf = (s: GameState, id: string) => {
+  const o = obj(s, id);
+  return o.faceDown && controllerOf(s, o) === HUMAN ? realDefOf(s, o) : defOf(s, o);
+};
 /** Card type right now: on the battlefield effects can change it (layer 4), elsewhere it's the printed type. */
 export const isCreature = (s: GameState, id: string) => objIsType(s, obj(s, id), "Creature");
 export const isLand = (s: GameState, id: string) => objIsType(s, obj(s, id), "Land");

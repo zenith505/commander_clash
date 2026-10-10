@@ -9,11 +9,42 @@ import { SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keyw
 
 const BASIC_LAND_MANA: Record<string, Color> = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" };
 
+/**
+ * What a face-down spell or permanent is (CR 708.2a): a 2/2 creature with no text, no name, no
+ * subtypes and no mana cost; with disguise, also ward {2} (CR 702.168a). Colorless, mana value 0.
+ * These are its copiable values (CR 613.2b): everything else still applies on top.
+ */
+const faceDownCard = (oracleId: string, ward: boolean): CardDef => ({
+  oracleId,
+  name: "Face-down creature",
+  manaCost: "",
+  cmc: 0,
+  typeLine: "Creature",
+  supertypes: [],
+  types: ["Creature"],
+  subtypes: [],
+  oracleText: ward ? "Ward {2}" : "",
+  power: "2",
+  toughness: "2",
+  colors: [],
+  colorIdentity: [],
+  keywords: ward ? ["Ward"] : [],
+});
+export const FACE_DOWN = faceDownCard("face-down", false);
+export const FACE_DOWN_WARD = faceDownCard("face-down-ward", true);
+
+/** The card definition an object uses right now: its own, or a face-down one (CR 708.2). */
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? (o.faceDown === "disguise" ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : o.cardId);
+
 export const defOf = (s: GameState, o: GameObject): CardDef => {
+  if (o.faceDown) return o.faceDown === "disguise" ? FACE_DOWN_WARD : FACE_DOWN;
   const d = s.cards[o.cardId];
   if (!d) throw new Error(`missing card def ${o.cardId}`);
   return d;
 };
+
+/** The card itself, face up: what its owner (or controller, while it's face down, CR 708.5) sees. */
+export const realDefOf = (s: GameState, o: GameObject): CardDef => s.cards[o.cardId]!;
 
 export const isType = (d: CardDef, t: string) => d.types.includes(t);
 

@@ -434,3 +434,14 @@ button.ghost { background: var(--panel-2); color: var(--text); }
 .type-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
 .type-list button { padding: 4px 10px; }
 .controls.color-pick button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Face-down spells and permanents (CR 708): a card back with what it is; yours show their name. */
+.card-text.face-down-face {
+  background: repeating-linear-gradient(135deg, #3a2a1a 0 8px, #2e2014 8px 16px);
+  border-radius: inherit;
+  justify-content: center;
+  text-align: center;
+}
+.card-text.face-down-face .ct-name { color: #e8d6b0; }
+.card-text.face-down-face .ct-type { color: #c9b48a; }
+.card-text.face-down-face .ct-peek { margin-top: 6px; font-size: 0.72em; color: #fff; background: rgba(0, 0, 0, 0.45); border-radius: 4px; padding: 1px 4px; }

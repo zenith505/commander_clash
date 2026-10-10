@@ -2,7 +2,7 @@
 // serializable structures, and the engine executes them (see effects.ts). Everything
 // here is data, so abilities can sit on the stack inside GameState.
 
-import type { Color, ManaType, ObjectId, PlayerId } from "./types";
+import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId } from "./types";
 
 /**
  * A number an effect uses: fixed, or worked out from the game. A spell or ability works out
@@ -355,6 +355,7 @@ export type TriggerEvent =
   | "yourUpkeep" // At the beginning of your upkeep
   | "yourEndStep" // At the beginning of your end step
   | "eachEndStep" // At the beginning of the end step (every turn's)
+  | "selfTurnedFaceUp" // "When ~ is turned face up" (CR 708.8: it doesn't enter again)
   | "selfCast" // "When you cast this spell": cascade (CR 702.85a), triggering from the stack
   | "castSpell" // Whenever you cast a noncreature spell (see `cast`), prowess (CR 702.108a)
   | "becomesTargetOfOpponent" // ward (CR 702.21a)
@@ -539,6 +540,8 @@ export interface CompiledCard {
   altCosts?: { kind: AltCostKind; mana: string }[];
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
+  /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */
+  faceDownCast?: { kind: FaceDownKind; cost: string };
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */
   textKeywords: string[];
   /** Lines the compiler couldn't turn into rules. Empty means the card is fully supported. */

@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
-import { autoCrew, planActivate, planCast, planMana } from "./autopay";
+import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
 import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sourceColors, COLOR_NAMES } from "./effects";
@@ -125,6 +125,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
     if (land) return [land];
+    // Turn face-down creatures face up when we can pay for it (CR 702.37e).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (!o.faceDown || controllerOf(s, o) !== pid) continue;
+      const plan = planTurnFaceUp(s, pid, id);
+      if (plan) return plan;
+    }
     const p = player(s, pid);
     const fromYard = p.graveyard.filter((id) => compileCard(defOf(s, obj(s, id))).fromGraveyard?.length);
     const options = [...p.command, ...p.hand, ...fromYard]
@@ -304,6 +311,11 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
  */
 function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   const c = compileCard(defOf(s, obj(s, id)));
+  // Morph and disguise: a 2/2 for {3} now, turned face up later (CR 702.37c).
+  if (c.faceDownCast) {
+    const plan = planCast(s, pid, id, undefined, undefined, "auto", undefined, { faceDown: true });
+    if (plan) return plan;
+  }
   for (const a of c.altCosts ?? []) {
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
     const plan = castPlan(s, pid, id, false, undefined, a.kind);

@@ -1,7 +1,7 @@
-import { abilitiesOf, defOf, objIsType, power } from "./cards";
+import { abilitiesOf, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, castProblem, crewCandidates, crewPower, isSummoningSick, obj, player, spellCost } from "./game";
+import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import type { TargetChoice } from "./abilities";
 import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, xCount, type ManaPool, type ParsedCost } from "./mana";
@@ -140,7 +140,7 @@ export function planCast(
   choices: CostChoices = {},
 ): Action[] | null {
   const o = obj(s, objectId);
-  const d = defOf(s, o);
+  const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, choices);
@@ -307,4 +307,15 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
   const ab = manaAbilitiesOn(s, o)[ability]!;
   const taps = ab.manaCost ? planMana(s, pid, parseManaCost(ab.manaCost), 0, objectId) : [];
   return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability }] : null;
+}
+
+/** Tap what's needed and turn a face-down permanent face up (CR 702.37e), or null if that can't be done now. */
+export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const o = s.objects[id];
+  const fd = o && faceUpCost(s, o);
+  if (!fd) return null;
+  const problem = turnFaceUpProblem(s, pid, id);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem ? planMana(s, pid, parseManaCost(fd.cost)) : [];
+  return taps ? [...taps, { type: "turnFaceUp", player: pid, objectId: id }] : null;
 }

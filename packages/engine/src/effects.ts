@@ -5,7 +5,7 @@ import { allEffects } from "./abilities";
 import type { AbilityBody, Amount, ChoiceKind, DamageRecipient, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
 import { manaValue, parseManaCost, payFromPool } from "./mana";
 import { planMana } from "./autopay";
-import { abilitiesOf, defOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { nextRandom, shuffle } from "./rng";
 import { castProblem, describeTargets, destroyPermanent, draw, gainLife, livingPlayers, log, moveObject, newObject, obj, opponents, player } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics, type Characteristics } from "./layers";
@@ -246,7 +246,7 @@ export type Resolution = "fizzled" | "done" | "paused";
  */
 export function beginResolution(s: GameState, item: StackItem, body: AbilityBody): Resolution {
   const targets = item.targets ?? [];
-  const src = item.kind === "spell" ? sourceColors(s, undefined, s.objects[item.objectId!]?.cardId) : sourceColors(s, item.sourceId, item.sourceCardId);
+  const src = item.kind === "spell" ? sourceColors(s, undefined, (s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined)) : sourceColors(s, item.sourceId, item.sourceCardId);
   const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, spec, targets[i]!, item.controller, src));
   if (body.targets.length && !legal.some(Boolean)) return "fizzled";
   const spellControllers = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.controller ?? null) : null));
@@ -1015,7 +1015,7 @@ function finishSpell(s: GameState, id: ObjectId) {
 
 /** "At the beginning of the next end step" / "your next upkeep", about this object as it is now (CR 603.7). */
 export function addDelayed(s: GameState, when: DelayedTrigger["when"], controller: PlayerId, o: GameObject, body: AbilityBody) {
-  (s.delayed ??= []).push({ when, controller, sourceCardId: o.cardId, subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step });
+  (s.delayed ??= []).push({ when, controller, sourceCardId: cardIdOf(o), subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step });
 }
 
 /** A player becomes the monarch, and whoever was stops being it (CR 725.3). */
@@ -1166,6 +1166,8 @@ export type TriggerSourceEvent =
   /** A player gained life (one life-gain event, CR 119.10). */
   | { type: "lifeGained"; player: PlayerId }
   | { type: "attacks"; id: ObjectId }
+  /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
+  | { type: "turnedFaceUp"; id: ObjectId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
   | { type: "attacksAlone"; id: ObjectId }
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId }
@@ -1209,7 +1211,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (pred(t.event, t))
         s.triggerQueue.push({
           sourceId: o.id,
-          sourceCardId: o.cardId,
+          sourceCardId: cardIdOf(o),
           controller,
           index,
           sourceZc: o.zoneChanges ?? 0,
@@ -1289,6 +1291,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife");
     }
+  } else if (ev.type === "turnedFaceUp") {
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfAttacks");

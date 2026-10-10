@@ -41,7 +41,7 @@ import { CREATURE_TYPES, SUPPORTED_KEYWORDS, stripReminder } from "./keywords";
 import { parseManaCost } from "./mana";
 import { substituteX } from "./amounts";
 import { withModes } from "./modes";
-import type { CardDef, Color, ManaType } from "./types";
+import type { CardDef, Color, FaceDownKind, ManaType } from "./types";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -259,6 +259,10 @@ function compile(d: CardDef): CompiledCard {
       else {
         if (costKw.alt) (out.altCosts ??= []).push(costKw.alt);
         if (costKw.delve) out.delve = true;
+        if (costKw.faceDown) {
+          if (out.faceDownCast) out.unsupported.push(raw); // two ways to turn it face up: not modeled
+          else out.faceDownCast = costKw.faceDown;
+        }
         // Evoke's sacrifice trigger goes first, so the card's own enters abilities can resolve before it (rulings).
         if (costKw.trigger) costKw.alt?.kind === "evoke" ? out.triggers.unshift(costKw.trigger) : out.triggers.push(costKw.trigger);
         if (costKw.activated) out.activated.push(costKw.activated);
@@ -509,8 +513,14 @@ const sacrificeSelf: Effect = { type: "sacrifice", what: { ref: "self" } };
 function parseCostKeyword(
   line: string,
   d: CardDef,
-): { alt?: { kind: AltCostKind; mana: string }; trigger?: TriggeredAbility; activated?: ActivatedAbility; delve?: true } | "fail" | null {
+): { alt?: { kind: AltCostKind; mana: string }; trigger?: TriggeredAbility; activated?: ActivatedAbility; delve?: true; faceDown?: { kind: FaceDownKind; cost: string } } | "fail" | null {
   let m: RegExpExecArray | null;
+  // Morph, megamorph, disguise (CR 702.37, 702.168): costs other than mana ("Reveal a blue card") aren't modeled.
+  if ((m = /^(Morph|Megamorph|Disguise)(?: |—)(.+?)\.?$/.exec(line))) {
+    const cost = m[2]!;
+    if (!/^(\{[^}]+\})+$/.test(cost) || !plainMana(cost)) return "fail";
+    return { faceDown: { kind: m[1]!.toLowerCase() as FaceDownKind, cost } };
+  }
   if ((m = /^Echo(?: |—)(.+?)\.?$/.exec(line))) {
     const cost = m[1]!;
     if (!/^(\{[^}]+\})+$/.test(cost) || !plainMana(cost)) return "fail"; // "Echo—Discard a card." isn't modeled
@@ -934,10 +944,11 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
+  [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer",
+  "selfEnters", "selfDies", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
 ];
 

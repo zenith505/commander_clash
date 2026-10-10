@@ -20,7 +20,7 @@ import type { Affects, Amount, Modification, StaticAbility, StaticCondition, Tar
 import { evalAmount } from "./amounts";
 import { bindChosen, objectMatches } from "./effects";
 import { basePower, baseToughness, defOf } from "./cards";
-import { subtypeSet } from "./keywords";
+import { bindChosenKeywords, subtypeSet } from "./keywords";
 import { compileCard } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -95,6 +95,13 @@ export interface Characteristics {
   cantBeBlockedBy: TargetSpec[];
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   maxOneBlocker: boolean;
+  /** "Can't attack unless defending player controls ...": what the defending player has to control. */
+  attackUnless: TargetSpec[];
+  cantBeBlockedByLesserPower: boolean;
+  cantAttackAlone: boolean;
+  cantBlockAlone: boolean;
+  mustBeBlocked: boolean;
+  allMustBlock: boolean;
 }
 
 /**
@@ -134,6 +141,12 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attacksIfAble: false,
     cantBeBlockedBy: [],
     maxOneBlocker: false,
+    attackUnless: [],
+    cantBeBlockedByLesserPower: false,
+    cantAttackAlone: false,
+    cantBlockAlone: false,
+    mustBeBlocked: false,
+    allMustBlock: false,
   };
 }
 
@@ -147,6 +160,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   grantedAbilities: [...c.grantedAbilities],
   pt: [...c.pt],
   cantBeBlockedBy: [...c.cantBeBlockedBy],
+  attackUnless: [...c.attackUnless],
 });
 
 type CharMap = Map<ObjectId, Characteristics>;
@@ -346,7 +360,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.colors = [...m.colors];
       return;
     case "addKeywords":
-      for (const k of m.keywords) if (!c.keywords.some((x) => sameCI(x, k))) c.keywords.push(k);
+      // "Has protection from the chosen color": the color chosen as the source entered.
+      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined)) if (!c.keywords.some((x) => sameCI(x, k))) c.keywords.push(k);
       return;
     case "removeKeywords":
       c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k)));
@@ -406,6 +421,16 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "maxOneBlocker":
       c.maxOneBlocker = true;
+      return;
+    case "cantAttackUnless":
+      c.attackUnless.push(m.defenderControls);
+      return;
+    case "cantBeBlockedByLesserPower":
+    case "cantAttackAlone":
+    case "cantBlockAlone":
+    case "mustBeBlocked":
+    case "allMustBlock":
+      c[m.kind] = true;
       return;
   }
 }

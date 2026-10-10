@@ -6,7 +6,7 @@
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
 import { gainLife, log, player } from "./game";
-import { protectionColors, toxicValue } from "./keywords";
+import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -15,6 +15,9 @@ export interface DamageSource {
   name: string;
   controller: PlayerId;
   colors: Color[];
+  /** Card types and subtypes, for protection from artifacts, creatures, Goblins (CR 702.16a). */
+  types: readonly string[];
+  subtypes: readonly string[];
   keywords: string[];
   /** A commander dealing combat damage counts toward commander damage (CR 903.10a). */
   commanderId?: ObjectId;
@@ -28,16 +31,15 @@ export interface DamageSource {
  */
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, keywords: c.keywords, id: o.id, ...(o.isCommander ? { commanderId: o.id } : {}) };
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, id: o.id, ...(o.isCommander ? { commanderId: o.id } : {}) };
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */
-export const cardSource = (d: CardDef, controller: PlayerId): DamageSource => ({ name: d.name, controller, colors: d.colors, keywords: d.keywords });
+export const cardSource = (d: CardDef, controller: PlayerId): DamageSource => ({ name: d.name, controller, colors: d.colors, types: d.types, subtypes: d.subtypes, keywords: d.keywords });
 
 const has = (src: DamageSource, k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 
-/** Would damage from `src` to this permanent be prevented by protection (CR 702.16e)? */
-export const protectedFrom = (keywords: readonly string[], colors: readonly Color[]) => protectionColors(keywords).some((c) => colors.includes(c));
+export { protectedFrom };
 
 /**
  * Deal `n` damage from `src` to a permanent or player. Returns how much was dealt (0 if it
@@ -60,7 +62,7 @@ export function dealDamage(
   if (opts.combat && s.preventCombatDamage) return 0;
   const shielded = "object" in to ? to.object : player(s, to.player);
   const targetName = "object" in to ? characteristics(s, to.object).name : player(s, to.player).name;
-  if ("object" in to && protectedFrom(characteristics(s, to.object).keywords, src.colors)) {
+  if ("object" in to && protectedFrom(characteristics(s, to.object).keywords, src)) {
     log(s, `Damage from ${src.name} to ${targetName} is prevented (protection).`);
     return 0;
   }

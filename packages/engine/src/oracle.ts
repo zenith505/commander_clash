@@ -40,7 +40,7 @@ import type {
   AltCostKind,
   EntersOption,
 } from "./abilities";
-import { CREATURE_TYPES, SUPPORTED_KEYWORDS, stripReminder } from "./keywords";
+import { canonicalKeyword, CHOSEN_PROTECTION, CREATURE_TYPES, stripReminder } from "./keywords";
 import { parseManaCost } from "./mana";
 import { substituteX } from "./amounts";
 import { withModes } from "./modes";
@@ -161,7 +161,11 @@ const TYPE_WORDS: Record<string, string> = {
   creature: "Creature", artifact: "Artifact", enchantment: "Enchantment", land: "Land",
   planeswalker: "Planeswalker", battle: "Battle", instant: "Instant", sorcery: "Sorcery",
 };
-const KEYWORDS_LOWER = new Map(SUPPORTED_KEYWORDS.map((k) => [k.toLowerCase(), k]));
+/** A keyword the engine implements, spelled its way; "protection from the chosen color" only where a choice fills it in. */
+const keywordOf = (p: string, chosen = false) => {
+  const k = canonicalKeyword(p);
+  return k === CHOSEN_PROTECTION && !chosen ? undefined : k;
+};
 
 const ALL_COLORS: ManaType[] = ["W", "U", "B", "R", "G"];
 
@@ -477,6 +481,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : needs.add("creatureType"));
     if (o.kind === "chosenColor") needs.add("color");
+    if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PROTECTION)) needs.add("color");
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     Object.values(o).forEach(visit);
   };
@@ -730,7 +735,7 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
   for (const raw of line.split(/,\s*/)) {
     const p = raw.trim();
     let m: RegExpExecArray | null;
-    if (KEYWORDS_LOWER.has(p.toLowerCase())) continue;
+    if (keywordOf(p)) continue;
     if (/^prowess$/i.test(p)) {
       // CR 702.108a: "Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn."
       out.triggers.push({
@@ -837,6 +842,16 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
         event: "selfAttacks",
         body: { targets: [], effects: [{ type: "continuous", what: { ref: "allCreatures", other: true, attacking: true }, mods: [{ kind: "modifyPT", power: 1, toughness: 0 }], duration: "endOfTurn" }], text: "Battle cry: each other attacking creature gets +1/+0 until end of turn." },
       });
+    } else if (/^mentor$/i.test(p)) {
+      // CR 702.134a: "Whenever this creature attacks, put a +1/+1 counter on target attacking creature with lesser power."
+      out.triggers.push({
+        event: "selfAttacks",
+        body: {
+          targets: [{ kind: "object", types: ["Creature"], combat: "attacking", lesserPowerThanSource: true, text: "target attacking creature with lesser power" }],
+          effects: [{ type: "counters", what: { ref: "target", index: 0 }, counter: "+1/+1", n: 1 }],
+          text: "Mentor: put a +1/+1 counter on target attacking creature with lesser power.",
+        },
+      });
     } else if (/^riot$/i.test(p)) out.entersOptions.push("riot"); // CR 702.136a; each instance works separately (702.136b)
     else if (/^unleash$/i.test(p)) {
       // CR 702.98a: "You may have this permanent enter with an additional +1/+1 counter on it" and "This
@@ -932,7 +947,7 @@ function textKeywords(line: string): string[] {
   const out: string[] = [];
   for (const raw of line.split(/,\s*/)) {
     const p = raw.trim();
-    if (/^protection from /i.test(p) && KEYWORDS_LOWER.has(p.toLowerCase())) out.push(KEYWORDS_LOWER.get(p.toLowerCase())!);
+    if (/^protection from /i.test(p) && keywordOf(p)) out.push(keywordOf(p)!);
     const tox = /^toxic (\d+)$/i.exec(p);
     if (tox) out.push(`Toxic ${tox[1]}`);
   }
@@ -1081,7 +1096,7 @@ function parseStaticCondition(text: string, st: StaticAbility): StaticCondition 
 function isKeywordLine(line: string): boolean {
   return line
     .split(/,\s*/)
-    .every((p) => KEYWORDS_LOWER.has(p.trim().toLowerCase()));
+    .every((p) => !!keywordOf(p));
 }
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
@@ -1338,6 +1353,16 @@ function parseStaticMods(rest: string): Modification[] | null {
   }
   if ((m = /^(?:has|have) (.+)$/.exec(rest))) return parseGrants(m[1]!);
   if (/^can't attack or block$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }];
+  // CR 506.5: alone means the only creature declared as an attacker (or blocker) that combat.
+  if (/^can't attack or block alone$/.test(rest)) return [{ kind: "cantAttackAlone" }, { kind: "cantBlockAlone" }];
+  if (/^can't attack alone$/.test(rest)) return [{ kind: "cantAttackAlone" }];
+  if (/^can't block alone$/.test(rest)) return [{ kind: "cantBlockAlone" }];
+  if (/^must be blocked if able$/.test(rest)) return [{ kind: "mustBeBlocked" }];
+  // "Can't attack unless defending player controls an Island" (Sea Serpent), "... a Swamp", "... a blue permanent".
+  if ((m = /^can't attack unless defending player controls (an? .+)$/.exec(rest))) {
+    const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
+  }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
   if (/^can't be blocked$/.test(rest)) return [{ kind: "cantBeBlocked" }];
@@ -1365,7 +1390,10 @@ function parseStatic(line: string): StaticAbility | null {
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };
   const where = /^(.+), where X is (.+)$/.exec(text);
   if (where) text = where[1]!;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block only .+|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
+  // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
+  if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
+  if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block only .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;
@@ -1576,6 +1604,12 @@ export function parseBody(text: string, opts: { subject?: boolean; selfIt?: bool
     }
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".
     if (/^Until end of turn, /.test(s)) s = `${s.replace(/^Until end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
+    // "Target creature you control gains protection from the color of your choice until end of turn": the
+    // color is chosen as it resolves (CR 608.2d), after the target was chosen on casting.
+    if (/ gains? protection from the color of your choice\b/.test(s)) {
+      effects.push({ type: "choose", choice: "color" });
+      s = s.replace("the color of your choice", "the chosen color");
+    }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."
     if (/^You gain life equal to the (?:total )?life lost this way$/.test(s)) {
       const last = effects[effects.length - 1];
@@ -2048,6 +2082,11 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
+  // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
+  if ((m = /^Put (target .+?|~) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
+    const what = parseObject(m[1]!, ctx);
+    return what && (what.ref === "target" || what.ref === "self") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
+  }
   // "Exile target creature an opponent controls until ~ leaves the battlefield" (CR 610.3).
   if ((m = /^Exile (target .+|up to one target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);
@@ -2058,10 +2097,12 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "attach", what }] : null;
   }
-  // "Target creature can't block this turn", "~ can't attack or block this turn": until the turn ends.
-  if ((m = /^(.+?) can't (block|attack|attack or block) this turn$/i.exec(s))) {
+  // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
+  // turn": until the turn ends.
+  if ((m = /^(.+?) can't (block|attack|attack or block|be blocked) this turn$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    const mods: Modification[] = m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
+    const mods: Modification[] =
+      m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : m[2] === "be blocked" ? [{ kind: "cantBeBlocked" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
     return what ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }
   // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
@@ -2328,6 +2369,9 @@ function parseSearchFilter(phrase: string): TargetSpec | undefined | null {
 
 function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
+  // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
+  const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
+  if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
   // "any other target", "another target": not one of the targets before it, or with none, not the
   // source (CR 115.4). "Each of two targets", "each of up to two targets" (CR 115.3, 115.6).
   if (/^(any other target|another target)$/i.test(p)) {
@@ -2490,7 +2534,9 @@ function parseGroup(phrase: string, bare = false): { filter: TargetSpec; other: 
   const other = /^other /i.test(p);
   if (other) p = p.slice(6);
   const whose = / (you control|your opponents control|an opponent controls|you don't control)\b/i;
-  if (!all && !whose.test(p) && !bare) return null;
+  // "Attacking creatures get +1/+1 until end of turn": whichever are attacking as it resolves (CR 611.2c).
+  const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p);
+  if (!all && !whose.test(p) && !bare && !combat) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
@@ -2653,10 +2699,12 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
 }
 
 function parseKeywordList(text: string): string[] | null {
+  // "Protection from black and from red" is two protection abilities (CR 702.16g).
+  text = text.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2");
   const parts = text.split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
   const out: string[] = [];
   for (const p of parts) {
-    const k = KEYWORDS_LOWER.get(p);
+    const k = keywordOf(p, true);
     if (!k) return null;
     out.push(k);
   }
@@ -2741,7 +2789,8 @@ const describeGrants = (kws: string[], mods: Modification[]) =>
 function parseGrants(text: string): Modification[] | null {
   const out: Modification[] = [];
   const quoted = [...text.matchAll(/"([^"]+)"/g)].map((q) => q[1]!);
-  const words = text.replace(/"[^"]+"/g, "\u0000").split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean);
+  // "Protection from black and from red" is two protection abilities (CR 702.16g).
+  const words = text.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2").replace(/"[^"]+"/g, "\u0000").split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean);
   const kws: string[] = [];
   for (const w of words) {
     if (w === "\u0000") continue;

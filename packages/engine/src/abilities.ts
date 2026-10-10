@@ -96,6 +96,8 @@ export interface TargetSpec {
   toughness?: Range;
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
   combat?: "attacking" | "blocking" | "attackingOrBlocking";
+  /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
+  lesserPowerThanSource?: boolean;
   controller?: "you" | "opponent";
   /** For players: only opponents. */
   opponent?: boolean;
@@ -237,7 +239,17 @@ export type Modification =
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
-  | { kind: "maxOneBlocker" };
+  | { kind: "maxOneBlocker" }
+  /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
+  | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
+  /** "Creatures with power less than ~'s power can't block it" (CR 509.1b). */
+  | { kind: "cantBeBlockedByLesserPower" }
+  /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */
+  | { kind: "cantAttackAlone" }
+  | { kind: "cantBlockAlone" }
+  /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
+  | { kind: "mustBeBlocked" }
+  | { kind: "allMustBlock" };
 
 /** What a static ability's effect applies to. */
 export type Affects =

@@ -2,10 +2,11 @@ import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget,
 import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
-import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceColors, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
   abilityProblem,
+  attackProblem,
   blockProblem,
   canEnterUntapped,
   conditionHolds,
@@ -28,6 +29,7 @@ import { characteristics, controllerOf } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PlayerId } from "./types";
 import { evalAmount } from "./amounts";
+import { CHOSEN_PROTECTION } from "./keywords";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -127,7 +129,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseProtection(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -265,7 +267,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
     const spec = body.targets[i]!;
     // The source's colors matter for protection (CR 702.16b): a spell's card, or the ability's source.
     // Bots never pick the same thing twice, which also keeps "another target" apart.
-    const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceColors(s, sourceId) : undefined).filter(
+    const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
       (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
     );
     // Reanimating takes the best creature from any graveyard it may.
@@ -504,7 +506,7 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
 export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string): { modes: number[] } | null {
   const m = body.modal;
   if (!m) return { modes: [] };
-  const legal = legalModes(s, body, pid, sourceId ? sourceColors(s, sourceId) : undefined);
+  const legal = legalModes(s, body, pid, sourceId ? sourceQuality(s, sourceId) : undefined);
   const scored = m.modes
     .map((mode, i) => {
       if (!legal[i]) return null;
@@ -607,10 +609,16 @@ function guessChosen(s: GameState, pid: PlayerId, card: CardDef): Chosen | undef
  */
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   const c = card ? compileCard(card) : undefined;
-  const hurts = c ? choiceHurts(c) : false;
+  // Protection from the chosen color is against what opponents have, above all the spell or ability
+  // that's about to resolve against us.
+  const protects = !!c && what === "color" && JSON.stringify(c).includes(CHOSEN_PROTECTION);
+  const hurts = protects || (c ? choiceHurts(c) : false);
   const tally = new Map<string, number>();
   const count = (name: string, n = 1) => options.includes(name) && tally.set(name, (tally.get(name) ?? 0) + n);
   const theirs = (o: GameObject) => (hurts ? controllerOf(s, o) !== pid : controllerOf(s, o) === pid);
+  if (protects)
+    for (const item of s.stack)
+      if (item.controller !== pid) sourceQuality(s, item.sourceId ?? item.objectId, item.sourceCardId).colors.forEach((col) => count(COLOR_NAMES[col as Color], 10));
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (!theirs(o)) continue;
@@ -870,6 +878,46 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 /**
+ * Answer an opponent's colored spell or ability aimed at one of our creatures by giving it protection
+ * from the color of our choice (CR 702.16b: the spell then has an illegal target): Gods Willing, Mother
+ * of Runes. The color is chosen as that resolves (see chooseOption).
+ */
+function chooseProtection(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  if (!top || top.controller === pid) return null;
+  const colors = sourceQuality(s, top.sourceId ?? top.objectId, top.sourceCardId).colors;
+  const aimed = (top.targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, obj(s, t.id)) === pid && objIsType(s, obj(s, t.id), "Creature") ? [t.id] : []));
+  if (!colors.length || !aimed.length) return null;
+  const protects = (body: AbilityBody) => JSON.stringify(body.effects).includes(CHOSEN_PROTECTION);
+  const targetsFor = (body: AbilityBody, sourceId: ObjectId): TargetChoice[] | null => {
+    if (body.targets.length === 0) return aimed.includes(sourceId) ? [] : null;
+    if (body.targets.length !== 1) return null;
+    const ok = legalTargets(s, body.targets[0]!, pid, undefined, sourceQuality(s, sourceId), sourceId).find((t) => t.kind === "object" && aimed.includes(t.id));
+    return ok ? [ok] : null;
+  };
+  for (const id of player(s, pid).hand) {
+    const body = compileCard(defOf(s, obj(s, id))).spell;
+    if (!body || !protects(body)) continue;
+    const targets = targetsFor(body, id);
+    const plan = targets && planCast(s, pid, id, targets);
+    if (plan) return plan;
+  }
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      if (!protects(abilities[i]!.body)) continue;
+      const targets = targetsFor(abilities[i]!.body, id);
+      const costs = targets && abilityCosts(s, pid, o, abilities[i]!, targets);
+      const plan = targets && costs !== null && planActivate(s, pid, id, i, targets, undefined, undefined, undefined, costs ?? undefined);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
  * Crew a Vehicle (CR 702.122a) when it's worth it: the creatures tapped for it give up less
  * attacking power than the Vehicle has, counting summoning-sick ones as free.
  */
@@ -946,13 +994,19 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
     .map((id) => obj(s, id))
     .filter((o) => controllerOf(s, o) === target && !o.tapped && objIsType(s, o, "Creature"));
   const biggestBlocker = Math.max(0, ...theirBlockers.map((o) => power(s, o)));
-  const ready = potentialAttackers(s, pid).filter((o) => power(s, o) > 0);
+  const ready = potentialAttackers(s, pid).filter((o) => power(s, o) > 0 && !attackProblem(s, o, target));
   // Swing with everything when we outnumber their untapped blockers; otherwise only with creatures that survive a block.
   const allIn = ready.length > theirBlockers.length;
-  // Creatures that attack each combat if able have to (CR 508.1d), whatever their power.
+  // Creatures that attack each combat if able have to (CR 508.1d), whatever their power, at whoever they can.
   const must = potentialAttackers(s, pid).filter((o) => characteristics(s, o).attacksIfAble && !ready.includes(o));
-  const attacks = [...ready.filter((o) => allIn || characteristics(s, o).attacksIfAble || toughness(s, o) > biggestBlocker || theirBlockers.every((b) => blockProblem(s, b, o, target))), ...must]
-    .map((o) => ({ attacker: o.id, defender: target }));
+  let attacks = [
+    ...ready
+      .filter((o) => allIn || characteristics(s, o).attacksIfAble || toughness(s, o) > biggestBlocker || theirBlockers.every((b) => blockProblem(s, b, o, target)))
+      .map((o) => ({ attacker: o.id, defender: target })),
+    ...must.map((o) => ({ attacker: o.id, defender: attackProblem(s, o, target) ? opps.find((d) => !attackProblem(s, o, d))! : target })),
+  ];
+  // One that can't attack alone stays home rather than attack by itself (CR 506.5).
+  if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   return { type: "declareAttackers", player: pid, attacks };
 }
 
@@ -966,7 +1020,27 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const blocks: { blocker: string; attacker: string }[] = [];
   const totalIncoming = incoming.reduce((n, a) => n + power(s, a), 0);
   const desperate = totalIncoming >= me.life;
+  // Requirements first (CR 509.1c): every creature able to block a lure blocks one, and a creature that
+  // must be blocked if able gets our sturdiest blocker (two against menace).
+  for (const at of incoming.filter((a) => characteristics(s, a).allMustBlock && !characteristics(s, a).maxOneBlocker)) {
+    const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
+    if (able.length < (objHasKeyword(s, at, "Menace") ? 2 : 1)) continue;
+    for (const b of able) {
+      used.add(b.id);
+      blocks.push({ blocker: b.id, attacker: at.id });
+    }
+  }
+  for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {
+    const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at)).sort((a, b) => toughness(s, b) - toughness(s, a));
+    const n = objHasKeyword(s, at, "Menace") ? 2 : 1;
+    if (able.length < n) continue;
+    for (const b of able.slice(0, n)) {
+      used.add(b.id);
+      blocks.push({ blocker: b.id, attacker: at.id });
+    }
+  }
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
+    if (blocks.some((b) => b.attacker === at.id)) continue;
     if (objHasKeyword(s, at, "Menace") || characteristics(s, at).cantBeBlocked) continue;
     const canBlock = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
     const good = canBlock.find((b) => toughness(s, b) > power(s, at) && !objHasKeyword(s, at, "Deathtouch"));
@@ -977,5 +1051,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
       blocks.push({ blocker: pick.id, attacker: at.id });
     }
   }
+  // One that can't block alone doesn't block by itself (CR 506.5).
+  const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
+  if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks.length = 0;
   return { type: "declareBlockers", player: pid, blocks };
 }

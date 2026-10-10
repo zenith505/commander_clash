@@ -1,7 +1,7 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice } from "./abilities";
 import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
+import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -401,6 +401,12 @@ export function moveObject(
   // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
   o.exileIfLeaves = undefined;
+  // A commander that would be put into its owner's library goes to the command zone instead, if its owner
+  // wants (CR 903.9b); owners always do. Into a hand it stays: it can be cast from there without tax.
+  if (o.isCommander && to === "library" && fromZone !== "library") {
+    to = "command";
+    log(s, `${defOf(s, o).name} goes to the command zone instead.`);
+  }
   const escaped = fromZone === "stack" && to === "battlefield" && o.castVia === "escape";
   if (fromZone === "stack") {
     o.castFrom = undefined;
@@ -524,7 +530,7 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number }[], 
 function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): ObjectId | undefined {
   const enchant = compileCard(defOf(s, aura)).enchant;
   if (!enchant) return undefined;
-  const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura).colors));
+  const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
     m.kind === "addKeywords" || (m.kind === "addAbility" && !modsAreHarmful([m])) || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
@@ -802,7 +808,7 @@ function resolveTop(s: GameState) {
     if (enchant) {
       // An Aura spell's target is checked on resolution like any other (CR 608.2b); it enters attached to it (CR 303.4f).
       const t = item.targets?.[0];
-      if (!t || t.kind !== "object" || !isLegalTarget(s, enchant, t, item.controller, d.colors)) {
+      if (!t || t.kind !== "object" || !isLegalTarget(s, enchant, t, item.controller, d)) {
         log(s, `${d.name} does nothing (its target is gone).`);
         moveObject(s, o.id, "graveyard");
         return;
@@ -963,16 +969,16 @@ export function castProblem(
   const spell = compileCard(d).spell;
   if (spell?.modal) {
     if (modes === undefined) {
-      if (!canChooseModes(s, spell, pid, d.colors)) return `${d.name} has no mode that can be chosen`;
+      if (!canChooseModes(s, spell, pid, d)) return `${d.name} has no mode that can be chosen`;
     } else {
-      const mp = modesProblem(s, spell, modes, pid, d.colors);
+      const mp = modesProblem(s, spell, modes, pid, d);
       if (mp) return mp;
     }
   }
   const specs = spellTargetSpecs(d, modes);
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color).
-    const tp = targets ? targetProblem(s, specs, targets, pid, d.colors) : hasLegalTargetsFor(s, specs, pid, d.colors) ? null : `${d.name} has no legal targets`;
+    const tp = targets ? targetProblem(s, specs, targets, pid, d) : hasLegalTargetsFor(s, specs, pid, d) ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
   const tax = fromCommand ? commanderTax(p, o) : 0;
@@ -1363,12 +1369,12 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (cp) return cp;
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
-    const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceColors(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceColors(s, id));
+    const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
     if (mp) return mp;
   }
   const body = withModes(ab.body, modes);
   if (body.targets.length) {
-    const src = sourceColors(s, id);
+    const src = sourceQuality(s, id);
     const tp = targets ? targetProblem(s, body.targets, targets, pid, src, id) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
@@ -1476,7 +1482,7 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   const pend = s.pending;
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
   const t = s.triggerQueue[0]!;
-  const problem = targetProblem(s, pend.specs, targets, p.id, sourceColors(s, t.sourceId, t.sourceCardId), t.sourceId);
+  const problem = targetProblem(s, pend.specs, targets, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);
   s.pending = null;
   pushTrigger(s, t, targets);
@@ -1658,9 +1664,27 @@ const creaturesOf = (s: GameState, pid: PlayerId) =>
   s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid && objIsType(s, o, "Creature"));
 
 export function potentialAttackers(s: GameState, pid: PlayerId) {
+  const opps = opponents(s, pid);
   return creaturesOf(s, pid).filter(
-    (o) => !o.tapped && !isSummoningSick(s, o) && !objHasKeyword(s, o, "Defender") && !characteristics(s, o).cantAttack,
+    (o) =>
+      !o.tapped &&
+      !isSummoningSick(s, o) &&
+      !objHasKeyword(s, o, "Defender") &&
+      !characteristics(s, o).cantAttack &&
+      (!characteristics(s, o).attackUnless.length || opps.some((d) => !attackProblem(s, o, d))),
   );
+}
+
+/**
+ * Why `o` can't attack `defender` in particular, or null: "can't attack unless defending player controls
+ * an Island" (CR 508.1c). Each attacking creature has its own defending player (CR 506.2).
+ */
+export function attackProblem(s: GameState, o: GameObject, defender: PlayerId): string | null {
+  const c = characteristics(s, o);
+  for (const f of c.attackUnless)
+    if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
+      return `${c.name} can't attack unless defending player controls ${f.text}`;
+  return null;
 }
 export const attackers = (s: GameState) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking !== undefined);
 const attackersAndBlockers = (s: GameState) =>
@@ -1682,11 +1706,17 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   for (const a of attacks) {
     if (!legal.has(a.attacker) || seen.has(a.attacker)) throw new RulesError(`${nameOf(s, a.attacker)} can't attack`);
     if (!opps.includes(a.defender)) throw new RulesError("must attack a living opponent");
+    const why = attackProblem(s, obj(s, a.attacker), a.defender);
+    if (why) throw new RulesError(why);
     seen.add(a.attacker);
   }
-  // Requirements (CR 508.1d): nothing else restricts attacks here, so every creature that
-  // "attacks each combat if able" and can attack has to.
-  const shirking = potentialAttackers(s, p.id).find((o) => characteristics(s, o).attacksIfAble && !seen.has(o.id));
+  // "Can't attack alone": the only creature declared as an attacker attacks alone (CR 506.5).
+  if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) throw new RulesError(`${nameOf(s, attacks[0]!.attacker)} can't attack alone`);
+  // Requirements (CR 508.1d): every creature that "attacks each combat if able" and can attack has to,
+  // unless that would break a restriction: one that can't attack alone needn't attack by itself.
+  const shirking = potentialAttackers(s, p.id).find(
+    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0),
+  );
   if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
   for (const a of attacks) {
     const o = obj(s, a.attacker);
@@ -1726,6 +1756,11 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     if (n < 2 && objHasKeyword(s, obj(s, atId), "Menace")) throw new RulesError(`${nameOf(s, atId)} has menace`); // CR 702.111b
     if (n > 1 && characteristics(s, obj(s, atId)).maxOneBlocker) throw new RulesError(`${nameOf(s, atId)} can't be blocked by more than one creature`); // CR 509.1b
   }
+  // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
+  const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
+  if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
+  const req = blockRequirementProblem(s, p.id, blocks);
+  if (req) throw new RulesError(req);
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
     const at = obj(s, b.attacker);
@@ -1740,6 +1775,37 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     fireEvent(s, { type: "blocksDeclared" });
     runStateBasedActions(s);
   }
+}
+
+/**
+ * Whether these blocks obey as many blocking requirements as they can (CR 509.1c): every creature able
+ * to block a creature with "all creatures able to block it do so" blocks one such creature, and a creature
+ * that "must be blocked if able" is blocked when some creature not already obeying a requirement could
+ * block it. Restrictions come first: menace needs two creatures able to block (CR 702.111b).
+ */
+export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
+  const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
+  const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked);
+  if (!demanding.length) return null;
+  const blocking = new Map(blocks.map((b) => [b.blocker, b.attacker]));
+  const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
+  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !characteristics(s, o).cantBlock && !(characteristics(s, o).cantBlockAlone && !earlier && blocks.length <= 1 && !blocking.has(o.id)));
+  const obeys = (b: GameObject) => {
+    const at = blocking.get(b.id);
+    return at !== undefined && demanding.some((a) => a.id === at);
+  };
+  for (const at of demanding) {
+    const ac = characteristics(s, at);
+    const could = mine.filter((b) => !blockProblem(s, b, at));
+    if (could.length < (objHasKeyword(s, at, "Menace") ? 2 : 1)) continue;
+    if (ac.allMustBlock && !ac.maxOneBlocker) {
+      const shirk = could.find((b) => !obeys(b));
+      if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (all creatures able to block it do so)`;
+    }
+    const blocked = blocks.some((b) => b.attacker === at.id);
+    if (!blocked && could.some((b) => !obeys(b))) return `${ac.name} must be blocked if able`;
+  }
+  return null;
 }
 
 const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Island", Forestwalk: "Forest", Mountainwalk: "Mountain", Plainswalk: "Plains" };
@@ -1759,10 +1825,11 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Shadow") !== has(b, "Shadow")) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
   if (has(a, "Fear") && !b.types.includes("Artifact") && !b.colors.includes("B")) return `${a.name} has fear`; // CR 702.36b
   if (has(a, "Intimidate") && !b.types.includes("Artifact") && !b.colors.some((c) => a.colors.includes(c))) return `${a.name} has intimidate`; // CR 702.13b
-  if (protectedFrom(a.keywords, b.colors)) return `${a.name} has protection from ${b.name}'s color`; // CR 702.16f
+  if (protectedFrom(a.keywords, b)) return `${a.name} has protection from ${b.name}`; // CR 702.16f
   if (b.blocksOnlyFlyers && !has(a, "Flying")) return `${b.name} can block only creatures with flying`; // CR 509.1b
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
+  if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
@@ -1940,7 +2007,7 @@ function attachmentSBAs(s: GameState): boolean {
     if (c.subtypes.includes("Aura")) {
       const enchant = compileCard(defOf(s, o)).enchant;
       // Protection from the Aura's color makes it illegal too (CR 702.16c).
-      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false, c.colors);
+      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false, c);
       if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to anything it can enchant).`);
         moveObject(s, id, "graveyard");
@@ -1949,7 +2016,7 @@ function attachmentSBAs(s: GameState): boolean {
     } else if (c.subtypes.includes("Equipment") && o.attachedTo) {
       // Unattached from anything but a creature, and when it becomes a creature itself (CR 301.5c, 704.5n, 704.5p).
       // Also when the creature has protection from the Equipment's color (CR 702.16d).
-      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, c.colors)) {
+      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, c)) {
         o.attachedTo = undefined;
         invalidateCharacteristics(s);
         log(s, `${c.name} becomes unattached.`);

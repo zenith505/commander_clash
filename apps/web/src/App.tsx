@@ -30,7 +30,9 @@ import {
   planManaAbility,
   type ManaOption,
   doesNothingNow,
+  attackProblem,
   blockProblem,
+  blockRequirementProblem,
   legalTargets,
   characteristics,
   modifications,
@@ -513,7 +515,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         delete next[o.id];
         setAttacks(next);
         setAim(null);
-      } else if (opps.length === 1) setAttacks({ ...attacks, [o.id]: opps[0]! });
+      } else if (opps.length === 1) setAttacks({ ...attacks, [o.id]: opps[0]! }); // potentialAttackers checked it can attack them
       else setAim(aim === o.id ? null : o.id);
       return;
     }
@@ -613,10 +615,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             s={s}
             pid={pid}
             waiting={waiting === pid}
-            targetable={canTarget({ kind: "player", id: pid }) || (!!aim && opps.includes(pid))}
+            targetable={canTarget({ kind: "player", id: pid }) || (!!aim && opps.includes(pid) && !attackProblem(s, s.objects[aim]!, pid))}
             onSelect={() => {
               if (targeting) return pickTarget({ kind: "player", id: pid });
-              if (aim && opps.includes(pid)) {
+              if (aim && opps.includes(pid) && !attackProblem(s, s.objects[aim]!, pid)) {
                 setAttacks({ ...attacks, [aim]: pid });
                 setAim(null);
               }
@@ -2080,10 +2082,15 @@ function Controls({
   if (pending?.kind === "declareAttackers") {
     // Creatures that attack each combat if able have to be declared (CR 508.1d).
     const must = potentialAttackers(s, HUMAN).filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks));
+    // "Can't attack alone" (CR 506.5).
+    const ids = Object.keys(attacks);
+    const alone = ids.length === 1 && characteristics(s, s.objects[ids[0]!]!).cantAttackAlone ? `${cardOf(s, ids[0]!).name} can't attack alone.` : null;
     return (
       <div className="controls">
         <span>
-          {must.length && !aim
+          {alone && !aim
+            ? alone
+            : must.length && !aim
             ? `${must.map((o) => cardOf(s, o.id).name).join(" and ")} attack${must.length === 1 ? "s" : ""} each combat if able: click ${must.length === 1 ? "it" : "them"}, then a player.`
             : aim
             ? `Now click the player ${cardOf(s, aim).name} attacks.`
@@ -2092,7 +2099,7 @@ function Controls({
               : "Click a creature, then the player it attacks. Click an attacker again to take it back."}
         </span>
         <button
-          disabled={must.length > 0}
+          disabled={must.length > 0 || !!alone}
           onClick={() =>
             dispatch([
               {
@@ -2108,11 +2115,23 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "declareBlockers")
+  if (pending?.kind === "declareBlockers") {
+    // Blocking requirements and "can't block alone" (CR 509.1c, 506.5): say what's still needed.
+    const list = Object.entries(blocks).map(([b, attacker]) => ({ blocker: b, attacker }));
+    const earlier = s.battlefield.some((id) => s.objects[id]!.blocking !== undefined);
+    const alone = list.length === 1 && !earlier && characteristics(s, s.objects[list[0]!.blocker]!).cantBlockAlone ? `${cardOf(s, list[0]!.blocker).name} can't block alone.` : null;
+    const needed = alone ?? blockRequirementProblem(s, HUMAN, list);
     return (
       <div className="controls">
-        <span>{blocker ? `Now click the attacker ${cardOf(s, blocker).name} blocks.` : "Click one of your untapped creatures, then the attacker it blocks."}</span>
+        <span>
+          {blocker
+            ? `Now click the attacker ${cardOf(s, blocker).name} blocks.`
+            : needed
+              ? `${needed.charAt(0).toUpperCase()}${needed.slice(1)}.`
+              : "Click one of your untapped creatures, then the attacker it blocks."}
+        </span>
         <button
+          disabled={!!needed}
           onClick={() =>
             dispatch([
               {
@@ -2127,6 +2146,7 @@ function Controls({
         </button>
       </div>
     );
+  }
   if (pending?.kind === "chooseOption" && (pending.what === "riot" || pending.what === "unleash") && pending.player === HUMAN)
     return (
       <div className="controls">

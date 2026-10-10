@@ -764,6 +764,34 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **9,850 cards are fully supported.** Rules tests: `test/umbra-extort-damage.test.ts`.
 
+### Protection from anything, attack and block rules, mentor (added 2026-10-10)
+
+- **Protection from qualities other than colors** (CR 702.16a): from artifacts, creatures, enchantments,
+  instants, lands, planeswalkers, a creature type ("from Goblins", "from Demons and from Dragons"),
+  multicolored, monocolored, colorless, each color, and everything. As before, protection stops
+  targeting, damage, blocking, and being enchanted or equipped.
+- **"Gains protection from the color of your choice until end of turn"** (Mother of Runes, Gods Willing):
+  the color is chosen as it resolves. "As ~ enters, choose a color. ~ has protection from the chosen
+  color" works too. Bots use these to answer a colored spell or ability aimed at their creature, and pick
+  that color.
+- **Attack restrictions**: "can't attack unless defending player controls an Island" is checked for each
+  player you attack (CR 506.2, 508.1c), and "can't attack alone" (CR 506.5). On the table, you can only
+  aim such a creature at a player it may attack.
+- **Block restrictions and requirements**: "can't block alone", "creatures with power less than ~'s
+  power can't block it", "must be blocked if able" and "all creatures able to block ~ do so" (Lure). The
+  blocks you declare have to obey as many requirements as they can without breaking a restriction
+  (CR 509.1c); the block bar says what's still needed.
+- **"Target creature can't be blocked this turn"**, and "~ can't be blocked this turn".
+- **Mentor** (CR 702.134a): a +1/+1 counter on target attacking creature with lesser power.
+- **"Target player or planeswalker"** (Lava Axe), "target opponent or planeswalker".
+- **"Put target creature on top of (the bottom of) its owner's library"**. A commander put into its
+  owner's library goes to the command zone instead (CR 903.9b).
+- **"Attacking creatures get +1/+1 until end of turn"**: whichever are attacking as it resolves.
+- Not yet: Auras whose protection "doesn't remove" themselves, "can block an additional creature",
+  and protection from a player.
+
+**10,163 cards are fully supported.** Rules tests: `test/protection-combat-mentor.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

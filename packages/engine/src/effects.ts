@@ -11,7 +11,7 @@ import { castProblem, describeTargets, destroyPermanent, draw, gainLife, livingP
 import { characteristics, controllerOf, invalidateCharacteristics, type Characteristics } from "./layers";
 import { modeCountProblem, withModes } from "./modes";
 import { compileCard, compileGranted, MONARCH } from "./oracle";
-import { CREATURE_TYPES } from "./keywords";
+import { bindChosenKeywords, CHOSEN_PROTECTION, CREATURE_TYPES, type SourceQuality } from "./keywords";
 import { describeAmount, evalAmount, type AmountCtx } from "./amounts";
 import { cardSource, dealDamage, objectSource, protectedFrom, type DamageSource } from "./damage";
 import type { CardDef, Chosen, Color, DelayedTrigger, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo } from "./types";
@@ -24,7 +24,7 @@ import type { CardDef, Chosen, Color, DelayedTrigger, GameObject, GameState, Las
  * characteristics? Hexproof only matters for targeting (CR 702.11b), not for what an Aura
  * can stay attached to (CR 303.4d), hence `targeting`.
  */
-export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: readonly Color[], chars?: Characteristics): boolean {
+export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics): boolean {
   if (o.zone !== "battlefield") return false;
   const c = chars ?? characteristics(s, o);
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t))) return false;
@@ -96,14 +96,15 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
 }
 
 /**
- * The colors of whatever is doing the targeting or attaching, for protection (CR 702.16b):
+ * The colors and types of whatever is doing the targeting or attaching, for protection (CR 702.16b):
  * a permanent's current colors, or for a card elsewhere (a spell, a source that has left
  * the battlefield) its printed ones.
  */
-export function sourceColors(s: GameState, id?: ObjectId, cardId?: string): Color[] {
+export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): SourceQuality {
   const o = id ? s.objects[id] : undefined;
-  if (o) return characteristics(s, o).colors;
-  return (cardId ? s.cards[cardId]?.colors : undefined) ?? [];
+  if (o) return characteristics(s, o);
+  const d = cardId ? s.cards[cardId] : undefined;
+  return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes } : { colors: [] };
 }
 
 /** Filters checked against a card's printed characteristics, for spells and cards in graveyards. */
@@ -134,12 +135,12 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
 
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
 
-export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, controller: PlayerId, src?: readonly Color[]): boolean {
+export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, controller: PlayerId, src?: SourceQuality): boolean {
   if (t.kind === "none") return false;
   if (t.kind === "player") {
     const p = s.players[t.id];
     if (!p || p.lost) return false;
-    if (spec.kind === "any") return true;
+    if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
     return !spec.opponent || t.id !== controller;
   }
@@ -162,19 +163,21 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     return printedMatches(spec, defOf(s, o));
   }
   if (spec.kind === "any") {
-    return o.zone === "battlefield" && (objIsType(s, o, "Creature") || objIsType(s, o, "Planeswalker")) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
+    // Any target is a creature, planeswalker or player (CR 115.4); "player or planeswalker" narrows the objects.
+    const kinds = spec.types?.length ? spec.types : ["Creature", "Planeswalker"];
+    return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
   return spec.kind === "object" && objectMatches(s, spec, o, controller, true, src);
 }
 
-export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerId, excludeStackId?: string, src?: readonly Color[]): ChosenTarget[] {
+export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerId, excludeStackId?: string, src?: SourceQuality, sourceId?: ObjectId): ChosenTarget[] {
   const out: ChosenTarget[] = [];
   if (spec.kind === "player" || spec.kind === "any")
     for (const pid of livingPlayers(s)) out.push({ kind: "player", id: pid });
   if (spec.kind === "object" || spec.kind === "any") for (const id of s.battlefield) out.push({ kind: "object", id });
   if (spec.kind === "spell") for (const item of s.stack) if (item.id !== excludeStackId) out.push({ kind: "stack", id: item.id });
   if (spec.kind === "card") for (const pid of livingPlayers(s)) for (const id of player(s, pid).graveyard) out.push({ kind: "object", id });
-  return out.filter((t) => isLegalTarget(s, spec, t, controller, src));
+  return out.filter((t) => isLegalTarget(s, spec, t, controller, src) && lesserPowerOk(s, spec, t, sourceId));
 }
 
 export const sameTarget = (a: TargetChoice | undefined, b: TargetChoice) => !!a && a.kind !== "none" && b.kind !== "none" && a.kind === b.kind && a.id === b.id;
@@ -184,16 +187,29 @@ export const sameTarget = (a: TargetChoice | undefined, b: TargetChoice) => !!a 
  * left unchosen (CR 115.6); "another target" can't be the source, or one of the targets before it;
  * and one "two target creatures" can't pick the same creature twice (CR 115.3).
  */
-export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], i: number, t: TargetChoice, controller: PlayerId, src?: readonly Color[], sourceId?: ObjectId): boolean {
+export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], i: number, t: TargetChoice, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   const spec = specs[i]!;
   if (t.kind === "none") return !!spec.optional;
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
+  if (!lesserPowerOk(s, spec, t, sourceId)) return false;
   return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t));
 }
 
+/**
+ * "Target attacking creature with lesser power" (mentor): less than the source's power, its last known
+ * power once it has left the battlefield (CR 702.134a, 608.2h).
+ */
+function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined): boolean {
+  if (!spec.lesserPowerThanSource || t.kind !== "object" || !sourceId) return true; // without the source, checked later
+  const me = s.objects[sourceId];
+  const mine = me?.zone === "battlefield" ? power(s, me) : s.lastKnown?.[sourceId]?.power;
+  const o = s.objects[t.id];
+  return mine !== undefined && !!o && power(s, o) < mine;
+}
+
 /** Throws a message if `targets` isn't a legal, complete choice for `specs`. CR 601.2c */
-export function targetProblem(s: GameState, specs: TargetSpec[], targets: TargetChoice[] | undefined, controller: PlayerId, src?: readonly Color[], sourceId?: ObjectId): string | null {
+export function targetProblem(s: GameState, specs: TargetSpec[], targets: TargetChoice[] | undefined, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): string | null {
   const t = targets ?? [];
   if (t.length !== specs.length) return `choose ${specs.length} target(s): ${specs.map((x) => x.text).join(", ")}`;
   for (let i = 0; i < specs.length; i++) if (!canChooseTarget(s, specs, t, i, t[i]!, controller, src, sourceId)) return `illegal target for ${specs[i]!.text}`;
@@ -208,7 +224,7 @@ export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined):
  * Could legal targets be chosen for all of `specs` (CR 601.2c, 603.3d)? "Up to" targets can be left
  * out, so only the others need something, each different where they must be.
  */
-export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: readonly Color[], sourceId?: ObjectId): boolean {
+export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   const options = specs.map((spec, i) => (spec.optional ? [] : legalTargets(s, spec, controller, undefined, src).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !specs[i]!.optional && !o.length)) return false;
   if (!specs.some((spec) => spec.distinctFrom?.length)) return true;
@@ -234,17 +250,17 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
 // Modes (CR 700.2)
 
 /** Which modes of a modal body can be chosen right now: one that needs targets needs legal ones (CR 700.2a). */
-export const legalModes = (s: GameState, body: AbilityBody, controller: PlayerId, src?: readonly Color[]): boolean[] =>
+export const legalModes = (s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality): boolean[] =>
   body.modal ? body.modal.modes.map((m) => hasLegalTargets(s, m.targets, controller, src)) : [];
 
 /** Is there a valid choice of modes? Spells and activated abilities need at least one mode. */
-export function canChooseModes(s: GameState, body: AbilityBody, controller: PlayerId, src?: readonly Color[]): boolean {
+export function canChooseModes(s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality): boolean {
   if (!body.modal) return true;
   return legalModes(s, body, controller, src).filter(Boolean).length >= Math.max(1, body.modal.min);
 }
 
 /** Why these modes can't be chosen, or null. */
-export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | undefined, controller: PlayerId, src?: readonly Color[]): string | null {
+export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | undefined, controller: PlayerId, src?: SourceQuality): string | null {
   if (!body.modal) return modes?.length ? "this isn't modal" : null;
   if (!modes) return "choose a mode";
   const count = modeCountProblem(body, modes);
@@ -292,8 +308,8 @@ export type Resolution = "fizzled" | "done" | "paused";
  */
 export function beginResolution(s: GameState, item: StackItem, body: AbilityBody): Resolution {
   const targets = item.targets ?? [];
-  const src = item.kind === "spell" ? sourceColors(s, undefined, (s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined)) : sourceColors(s, item.sourceId, item.sourceCardId);
-  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, spec, targets[i]!, item.controller, src));
+  const src = item.kind === "spell" ? sourceQuality(s, undefined, (s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, spec, targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId));
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
   const chose = targets.some((t) => t.kind !== "none");
@@ -543,7 +559,12 @@ function subjectEvenIfGone(s: GameState, ctx: ResolveCtx): GameObject[] {
 function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Modification[] {
   const c = amountCtx(s, ctx);
   return mods.map((m) =>
-    m.kind === "modifyPT" || m.kind === "setPT" ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) } : m,
+    m.kind === "modifyPT" || m.kind === "setPT"
+      ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
+      : // "Gains protection from the color of your choice": the color chosen as it resolved.
+        m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PROTECTION)
+        ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
+        : m,
   );
 }
 
@@ -859,8 +880,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       // what it can enchant (CR 303.4d), neither to something with protection from it (CR 702.16c-d).
       const enchant = compileCard(defOf(s, me)).enchant;
       const meChars = characteristics(s, me);
-      const meColors = meChars.colors;
-      if (meChars.subtypes.includes("Aura") ? !enchant || !objectMatches(s, enchant, host, ctx.controller, false, meColors) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, ctx.controller, false, meColors)) return;
+      if (meChars.subtypes.includes("Aura") ? !enchant || !objectMatches(s, enchant, host, ctx.controller, false, meChars) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, ctx.controller, false, meChars)) return;
       me.attachedTo = host.id;
       me.timestamp = s.nextTimestamp++;
       log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
@@ -1250,6 +1270,10 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       parts.push(`can't ${m.kind === "cantBlock" ? "block" : "attack"}`);
       continue;
     }
+    if (m.kind === "cantBeBlocked") {
+      parts.push("can't be blocked");
+      continue;
+    }
     if (m.kind === "doesntUntap") {
       parts.push(plural ? "don't untap" : "doesn't untap");
       continue;
@@ -1570,7 +1594,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     const printed = triggerBody(s, t);
     if (printed.modal && !t.modes) {
       // Modes are chosen as it's put on the stack; a mode without legal targets can't be (CR 603.3c).
-      const legal = legalModes(s, printed, t.controller, sourceColors(s, t.sourceId, t.sourceCardId));
+      const legal = legalModes(s, printed, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId));
       const n = legal.filter(Boolean).length;
       if (n === 0 || n < printed.modal.min) {
         log(s, `${def.name}'s ability has no mode that can be chosen and is removed.`);
@@ -1591,7 +1615,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     }
     const body = withModes(printed, t.modes);
     if (body.targets.length) {
-      if (!hasLegalTargets(s, body.targets, t.controller, sourceColors(s, t.sourceId, t.sourceCardId), t.sourceId)) {
+      if (!hasLegalTargets(s, body.targets, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId)) {
         log(s, `${def.name}'s ability has no legal targets and is removed.`);
         s.triggerQueue.shift();
         continue;

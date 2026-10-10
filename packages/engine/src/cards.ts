@@ -5,7 +5,7 @@ import { COLORS, type CardDef, type Color, type GameObject, type GameState, type
 import { parseManaCost } from "./mana";
 
 export { SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keywords";
-import { SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keywords";
+import { canonicalKeyword, SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keywords";
 
 const BASIC_LAND_MANA: Record<string, Color> = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" };
 
@@ -144,7 +144,7 @@ export function modifications(s: GameState, o: GameObject): Modifications {
     setOrSwitched: c.pt.some((p) => p.kind === "set" || p.kind === "switch"),
     pt: c.pt,
     grantedKeywords: c.keywords.filter((k) => !has(printedKeywords(d), k)),
-    lostKeywords: printedKeywords(d).filter((k) => SUPPORTED_KEYWORDS.some((x) => x.toLowerCase() === k.toLowerCase()) && !has(c.keywords, k)),
+    lostKeywords: printedKeywords(d).filter((k) => !!canonicalKeyword(k) && !has(c.keywords, k)),
     grantedAbilities: c.grantedAbilities,
     lostAllAbilities: !c.hasPrintedAbilities,
   };

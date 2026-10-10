@@ -51,6 +51,50 @@ export const SUPPORTED_KEYWORDS = [
 export type SupportedKeyword = (typeof SUPPORTED_KEYWORDS)[number];
 
 const PROTECTION_COLOR: Record<string, "W" | "U" | "B" | "R" | "G"> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
+const PROTECTION_TYPES: Record<string, string> = {
+  artifacts: "Artifact", creatures: "Creature", enchantments: "Enchantment", instants: "Instant", sorceries: "Sorcery",
+  planeswalkers: "Planeswalker", lands: "Land",
+};
+
+/** What protection looks at in a source (CR 702.16a): its colors, card types and subtypes. */
+export interface SourceQuality {
+  colors: readonly string[];
+  types?: readonly string[];
+  subtypes?: readonly string[];
+}
+
+/** "Goblins" -> "Goblin", "Elves" -> "Elf", "Sphinxes" -> "Sphinx": a creature type's plural, as protection names it. */
+function creatureTypeOfPlural(w: string): string | undefined {
+  const cap = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  for (const c of [cap, cap.replace(/ves$/, "f"), cap.replace(/es$/, ""), cap.replace(/s$/, ""), cap.replace(/ies$/, "y"), cap === "Dwarves" ? "Dwarf" : ""])
+    if (c && CREATURE_TYPES.has(c)) return c;
+  return undefined;
+}
+
+/**
+ * The keyword as the engine spells it, for the keywords it implements, or undefined: "flying" ->
+ * "Flying", "protection from artifacts" -> "Protection from artifacts", "protection from goblins" ->
+ * "Protection from Goblins" (CR 702.16a: protection from a quality).
+ */
+export function canonicalKeyword(text: string): string | undefined {
+  const p = text.trim().toLowerCase();
+  const k = SUPPORTED_LOWER.get(p);
+  if (k) return k;
+  const m = /^protection from (.+)$/.exec(p);
+  if (!m) return undefined;
+  const q = m[1]!;
+  if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
+  if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
+  const st = creatureTypeOfPlural(q);
+  return st ? `Protection from ${text.trim().slice(-q.length).replace(/^./, (c) => c.toUpperCase())}` : undefined;
+}
+/** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
+export const CHOSEN_PROTECTION = "Protection from the chosen color";
+const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
+/** Keywords with "the chosen color" filled in; without a choice, that protection is dropped. */
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined) =>
+  keywords.flatMap((k) => (k === CHOSEN_PROTECTION ? (color && COLOR_WORD[color] ? [`Protection from ${COLOR_WORD[color]}`] : []) : [k]));
+const SUPPORTED_LOWER = new Map<string, string>(SUPPORTED_KEYWORDS.map((k) => [k.toLowerCase(), k]));
 
 /** The colors a permanent with these keywords has protection from (CR 702.16). */
 export function protectionColors(keywords: readonly string[]): ("W" | "U" | "B" | "R" | "G")[] {
@@ -58,8 +102,32 @@ export function protectionColors(keywords: readonly string[]): ("W" | "U" | "B" 
   for (const k of keywords) {
     const m = /^protection from (white|blue|black|red|green)$/i.exec(k);
     if (m) out.push(PROTECTION_COLOR[m[1]!.toLowerCase()]!);
+    if (/^protection from (each color|all colors|everything)$/i.test(k)) out.push("W", "U", "B", "R", "G");
   }
-  return out;
+  return [...new Set(out)];
+}
+
+/**
+ * Does one of these protection abilities cover the source (CR 702.16a)? "From everything" covers
+ * anything (702.16j), "from multicolored" a source with two or more colors, "from artifacts" an
+ * artifact source, "from Goblins" a Goblin source.
+ */
+export function protectedFrom(keywords: readonly string[], src: SourceQuality): boolean {
+  for (const k of keywords) {
+    const m = /^protection from (.+)$/i.exec(k);
+    if (!m) continue;
+    const q = m[1]!.toLowerCase();
+    if (PROTECTION_COLOR[q] && src.colors.includes(PROTECTION_COLOR[q])) return true;
+    if (q === "everything") return true;
+    if ((q === "each color" || q === "all colors") && src.colors.length > 0) return true;
+    if (q === "multicolored" && src.colors.length > 1) return true;
+    if (q === "monocolored" && src.colors.length === 1) return true;
+    if (q === "colorless" && src.colors.length === 0) return true;
+    if (PROTECTION_TYPES[q] && src.types?.includes(PROTECTION_TYPES[q])) return true;
+    const st = creatureTypeOfPlural(q);
+    if (st && src.subtypes?.includes(st)) return true;
+  }
+  return false;
 }
 
 /** A creature's total toxic value: the sum of its "Toxic N" abilities (CR 702.164b). */

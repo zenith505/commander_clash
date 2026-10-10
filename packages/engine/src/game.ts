@@ -1277,10 +1277,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
 
 export function describeTargets(s: GameState, targets?: TargetChoice[]): string {
   if (!targets?.length) return "";
-  const names = targets.map((t) =>
-    t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell"),
+  const names = targets.flatMap((t) =>
+    t.kind === "none" ? [] : t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell"),
   );
-  return ` targeting ${names.join(", ")}`;
+  return names.length ? ` targeting ${names.join(", ")}` : "";
 }
 
 /**
@@ -1319,7 +1319,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const body = withModes(ab.body, modes);
   if (body.targets.length) {
     const src = sourceColors(s, id);
-    const tp = targets ? targetProblem(s, body.targets, targets, pid, src) : hasLegalTargetsFor(s, body.targets, pid, src) ? null : "no legal targets";
+    const tp = targets ? targetProblem(s, body.targets, targets, pid, src, id) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
   if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length) {
@@ -1426,7 +1426,7 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   const pend = s.pending;
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
   const t = s.triggerQueue[0]!;
-  const problem = targetProblem(s, pend.specs, targets, p.id, sourceColors(s, t.sourceId, t.sourceCardId));
+  const problem = targetProblem(s, pend.specs, targets, p.id, sourceColors(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);
   s.pending = null;
   pushTrigger(s, t, targets);

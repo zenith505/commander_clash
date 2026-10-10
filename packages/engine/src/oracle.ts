@@ -1337,6 +1337,8 @@ interface Ctx {
   selfCard?: boolean;
   /** Index of the most recent object target, for "it" / "its controller". */
   lastObjectTarget?: number;
+  /** The most recent "up to two target creatures", for "they" / "those creatures". */
+  lastTargets?: { index: number; n?: number };
   /** Index of the most recent player target, for "that player's hand". */
   lastPlayerTarget?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */
@@ -1800,6 +1802,8 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
 }
 
 const isGroup = (r: ObjRef) => r.ref === "allCreatures" || r.ref === "each";
+/** Several targets: "up to two target creatures". */
+const isSeveral = (r: ObjRef) => r.ref === "target" && (r.n ?? 1) > 1;
 
 function addTarget(ctx: Ctx, spec: TargetSpec): number {
   ctx.targets.push(spec);
@@ -1836,6 +1840,12 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return to ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
   }
   if (/^Prevent all combat damage that would be dealt this turn$/i.test(s)) return [{ type: "preventCombatDamage" }];
+  // "~ deals 2 damage to any target and 1 damage to any other target" (Arc Trail): both at once.
+  if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+?) and ${NUMX} damage to (.+)$`, "i").exec(s))) {
+    const a = parseDamageRecipient(m[2]!, ctx);
+    const b = a && parseDamageRecipient(m[4]!, ctx);
+    return a && b ? [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b }] : null;
+  }
   // Damage: "~ deals 3 damage to any target"
   if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+)$`, "i").exec(s))) {
     // "to each creature and each player": dealt to all of them at once (CR 120.3).
@@ -1866,15 +1876,15 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
       w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
-  if ((m = /^Exile (target .+ graveyard)$/i.exec(s))) {
+  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+ graveyard)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx, true);
     return what ? [{ type: "exile", what }] : null;
   }
-  if ((m = /^Return (target .+ graveyard) to (your|its owner's) hand$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+ graveyard) to (your|its owner's) hand$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^(Return|Put) (target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?$/i.exec(s))) {
+  if ((m = /^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?$/i.exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control.
     const underYou = !!m[4];
@@ -1887,7 +1897,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     if (!what || !spec || !spec.types?.length || spec.types.some((ty) => ty === "Enchantment" || !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}) }];
   }
-  if ((m = /^Put (target .+ graveyard) on (top|the bottom) of (your|its owner's) library$/i.exec(s))) {
+  if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+ graveyard) on (top|the bottom) of (your|its owner's) library$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
@@ -1919,11 +1929,16 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return who && filter && [{ type: "pick", who, filter, n: amt(m[2]!), action: "sacrifice" }];
   }
   // Removal and tapping
-  if ((m = /^(Destroy|Exile|Tap|Untap) (target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
+  if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     if (!what) return null;
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy"];
     return [{ type, what }];
+  }
+  // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
+  if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "skipUntap", what }] : null;
   }
   // Regeneration (CR 701.19a)
   if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
@@ -1934,7 +1949,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^Return (target .+?|~|it|enchanted creature|equipped creature) to its owner's hand$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?|~|it|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;
   }
@@ -1945,7 +1960,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return what && counter ? [{ type: "counters", what, counter, n: amt(m[1]!) }] : null;
   }
   // Gaining control (layer 2). "Gain control of target creature until end of turn."
-  if ((m = /^Gain control of (target .+?)( until end of turn)?$/i.exec(s))) {
+  if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?)( until end of turn)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
@@ -1999,7 +2014,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if ((m = /^(.+?) fights (.+)$/i.exec(s))) {
     const a = parseObject(m[1]!, ctx);
     const b = a && parseObject(m[2]!, ctx);
-    return a && b && !isGroup(a) && !isGroup(b) ? [{ type: "fight", a, b }] : null;
+    return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) && !isSeveral(b) ? [{ type: "fight", a, b }] : null;
   }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
@@ -2010,7 +2025,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     }
     const a = parseObject(m[1]!, ctx);
     const b = a && parseObject(m[2]!, ctx);
-    return a && b && !isGroup(a) && !isGroup(b) ? [{ type: "bite", a, b }] : null;
+    return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) ? [{ type: "bite", a, b }] : null;
   }
   // Counterspells, maybe "unless its controller pays {2}" (CR 118.12)
   if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
@@ -2166,6 +2181,22 @@ function parseSearchFilter(phrase: string): TargetSpec | undefined | null {
 
 function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
+  // "any other target", "another target": not one of the targets before it, or with none, not the
+  // source (CR 115.4). "Each of two targets", "each of up to two targets" (CR 115.3, 115.6).
+  if (/^(any other target|another target)$/i.test(p)) {
+    const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "player" ? [i] : []));
+    if (!before.length && ctx.spell) return null;
+    const spec: TargetSpec = { kind: "any", text: "any other target", ...(before.length ? { distinctFrom: before } : { notSource: true }) };
+    return { ref: "anyTarget", index: addTarget(ctx, spec) };
+  }
+  let several: RegExpExecArray | null;
+  if ((several = /^each of (up to )?(two|three|four|one or two) targets$/i.exec(p))) {
+    const [required, n] = several[2] === "one or two" ? [1, 2] : several[1] ? [0, num(several[2]!)] : [num(several[2]!), num(several[2]!)];
+    const first = ctx.targets.length;
+    for (let k = 0; k < n; k++)
+      addTarget(ctx, { kind: "any", text: "any target", ...(k >= required ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    return { ref: "anyTarget", index: first, n };
+  }
   const player = parsePlayer(p, ctx);
   if (player) return player;
   return parseObject(p, ctx);
@@ -2205,7 +2236,12 @@ function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
  * "tap" make no sense for one.
  */
 function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
-  const x = p.trim();
+  // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
+  const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
+  // "They", "those creatures": the targets of an earlier "up to two target creatures".
+  if (/^(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : null;
+  const several = SEVERAL_TARGETS.exec(x);
+  if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
@@ -2230,6 +2266,52 @@ function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const spec = parseTargetPhrase(m[1]!);
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards) return null;
   return { ref: "target", index: addTarget(ctx, spec) };
+}
+
+const SEVERAL_TARGETS = /^(?:(up to )?(one|two|three|four|five|six|\d+) (other )?|(another) |(one or two|one, two, or three) )target (.+)$/i;
+
+/**
+ * "Up to two target creatures", "two target artifacts", "one or two target creatures", "another target
+ * creature", "up to one other target permanent you control" (CR 115.3, 115.6, 601.2c). Each is a
+ * target of its own, in a row; "up to" ones may be left unchosen, and none can be the same as another
+ * of them. "Another" or "other" means other than the targets before it, or with none before it, other
+ * than the ability's source.
+ */
+function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjRef | null {
+  const [, upTo, count, other, another, range, phrase] = m;
+  const [required, n] = range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
+  if (n < 1 || n > 6) return null;
+  const spec = parseTargetPhrase(n > 1 ? singularPhrase(phrase!) : phrase!);
+  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards) return null;
+  const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "card" ? [i] : []));
+  let notSource = false;
+  if (other || another) {
+    if (!before.length && ctx.spell) return null; // a spell has no source on the battlefield to be other than
+    notSource = !before.length;
+  }
+  const first = ctx.targets.length;
+  for (let k = 0; k < n; k++) {
+    const distinct = [...(other || another ? before : []), ...Array.from({ length: k }, (_, j) => first + j)];
+    addTarget(ctx, { ...spec, ...(k >= required ? { optional: true } : {}), ...(notSource ? { notSource } : {}), ...(distinct.length ? { distinctFrom: distinct } : {}) });
+  }
+  // "It" can't mean one of several; "they" / "those creatures" means all of them.
+  if (n > 1) ctx.lastObjectTarget = undefined;
+  ctx.lastTargets = { index: first, ...(n > 1 ? { n } : {}) };
+  return { ref: "target", index: first, ...(n > 1 ? { n } : {}) };
+}
+
+/** "creatures you control" -> "creature you control", "creature cards from your graveyard" -> "creature card from your graveyard". */
+function singularPhrase(p: string): string {
+  const words = p.trim().split(" ");
+  const i = words.findIndex((w) => /^(creatures|cards|permanents|artifacts|enchantments|lands|planeswalkers|battles)$/i.test(w));
+  if (i >= 0) words[i] = singular(words[i]!);
+  else {
+    // A creature type: "two target Goblins", "up to two target Elves you control".
+    const j = words.findIndex((w) => /^[A-Z]/.test(w) && CREATURE_TYPES.has(singular(w)) && w !== singular(w));
+    if (j < 0) return p;
+    words[j] = singular(words[j]!);
+  }
+  return words.join(" ").replace(/ your opponents control$/, " an opponent controls").replace(/ from graveyards$/, " from a graveyard");
 }
 
 const PERMANENT_TYPES = ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"];

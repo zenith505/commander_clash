@@ -14,7 +14,7 @@ import {
   controllerOf,
   describeTargets,
   describeCount,
-  isLegalTarget,
+  canChooseTarget,
   legalModes,
   spellModes,
   withModes,
@@ -202,6 +202,13 @@ type XPick =
   | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[] };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
+/** How many "up to" targets in a row start at `i`. */
+const optionalLeft = (specs: TargetSpec[], i: number) => {
+  let n = 0;
+  while (specs[i + n]?.optional) n++;
+  return n;
+};
+
 function maxX(plan: (x: number) => unknown): number {
   if (!plan(0)) return 0;
   let lo = 0;
@@ -293,12 +300,26 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const handTucked = handMinimized && !pickingFromHand && pending?.kind !== "mulligan";
 
   const nextSpec = targeting ? targeting.specs[targeting.chosen.length] : undefined;
-  const canTarget = (c: TargetChoice) => !!s && !!nextSpec && isLegalTarget(s, nextSpec, c, HUMAN);
+  // "Another target creature" on a permanent's ability can't be that permanent.
+  const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : undefined;
+  const canTarget = (c: TargetChoice) => !!s && !!targeting && !!nextSpec && canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, undefined, targetSource);
 
   function pickTarget(c: TargetChoice) {
     if (!s || !targeting || !nextSpec) return;
     if (!canTarget(c)) return;
-    const chosen = [...targeting.chosen, c];
+    finishTargets([...targeting.chosen, c]);
+  }
+
+  /** "Up to two target creatures": leave the rest of them unchosen (CR 115.6). */
+  function skipTargets() {
+    if (!targeting) return;
+    const chosen = [...targeting.chosen];
+    while (chosen.length < targeting.specs.length && targeting.specs[chosen.length]!.optional) chosen.push({ kind: "none" });
+    finishTargets(chosen);
+  }
+
+  function finishTargets(chosen: TargetChoice[]) {
+    if (!targeting) return;
     if (chosen.length < targeting.specs.length) return setTargeting({ ...targeting, chosen });
     setTargeting(null);
     if (targeting.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
@@ -631,8 +652,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {targeting && (
             <div className="targeting">
               <span>
-                <strong>{targeting.label}</strong>: choose {nextSpec?.text} ({targeting.chosen.length + 1}/{targeting.specs.length})
+                <strong>{targeting.label}</strong>: choose {nextSpec?.text}{" "}
+                {nextSpec?.optional ? `(optional, up to ${optionalLeft(targeting.specs, targeting.chosen.length)} more)` : `(${targeting.chosen.length + 1}/${targeting.specs.length})`}
               </span>
+              {nextSpec?.optional && <button onClick={skipTargets}>{targeting.chosen.some((c) => c.kind !== "none") ? "Done" : "Choose none"}</button>}
               {targeting.mode !== "trigger" && <button onClick={() => setTargeting(null)}>Cancel</button>}
             </div>
           )}
@@ -641,6 +664,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               s={s}
               label={targeting.label}
               spec={nextSpec}
+              allowed={(id) => canTarget({ kind: "object", id })}
+              onSkip={nextSpec.optional ? skipTargets : undefined}
               onHover={setHover}
               onPick={(id) => pickTarget({ kind: "object", id })}
               onCancel={targeting.mode === "trigger" ? undefined : () => setTargeting(null)}
@@ -1515,6 +1540,8 @@ function GraveyardPicker({
   s,
   label,
   spec,
+  allowed,
+  onSkip,
   onHover,
   onPick,
   onCancel,
@@ -1522,18 +1549,29 @@ function GraveyardPicker({
   s: GameState;
   label: string;
   spec: TargetSpec;
+  /** Also left out: one already chosen for another of the same targets. */
+  allowed: (id: string) => boolean;
+  /** For an "up to" target: choose no more. */
+  onSkip?: () => void;
   onHover: (d: CardDef | null) => void;
   onPick: (id: string) => void;
   onCancel?: () => void;
 }) {
-  const legal = legalTargets(s, spec, HUMAN).map((t) => t.id as string);
+  const legal = legalTargets(s, spec, HUMAN)
+    .map((t) => t.id as string)
+    .filter(allowed);
   const owners = [...new Set(legal.map((id) => s.objects[id]!.owner))];
   return (
     <div className="modal-backdrop">
       <div className="modal">
         <header>
           <strong>{label}</strong>
-          <span className="muted"> choose {spec.text}</span>
+          <span className="muted">
+            {" "}
+            choose {spec.text}
+            {spec.optional ? " (optional)" : ""}
+          </span>
+          {onSkip && <button onClick={onSkip}>Done</button>}
           {onCancel && <button onClick={onCancel}>Cancel</button>}
         </header>
         {owners.length === 0 && <span className="muted">No legal targets.</span>}

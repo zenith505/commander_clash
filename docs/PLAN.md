@@ -678,11 +678,32 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **9,019 cards are fully supported.** Rules tests: `test/activation-costs.test.ts`, `test/as-long-as.test.ts`.
 
+### Several targets, "up to" targets, "another target" (added 2026-10-10)
+
+- **"Up to two target creatures", "two target artifacts", "one or two target creatures"**: each is a
+  target of its own. One instance of "target" can't pick the same thing twice (CR 115.3). "Up to"
+  targets may be left unchosen, even all of them; a spell with none chosen isn't targeted and still
+  resolves (CR 115.6). With some chosen, it doesn't resolve only when every chosen one is illegal
+  (CR 608.2b), and illegal ones are just skipped.
+- **"Another target creature"**: different from the targets before it ("Target creature gets +2/+2.
+  Another target creature gets -2/-2"), or, on a permanent's ability with no target before it, not that
+  permanent ("{T}: Untap another target permanent", Junk Diver can't return itself).
+- **Damage**: "any other target" (Arc Trail), "each of two targets", "deals damage equal to its power to
+  each of two other target creatures".
+- **"That creature doesn't untap during its controller's next untap step"**, and "those creatures".
+- **On the table:** an "up to" target shows Choose none (or Done once you've picked one), and says how
+  many more you may choose. Things you've already picked for the same spell aren't offered again.
+- **Bots** only fill "up to" targets with things they want to hit or help, and don't cast a spell
+  whose targets would all be empty.
+- Not yet: "divided as you choose among" (dividing damage or counters), "up to X target", and targets
+  that must share something ("two target creatures that share a creature type", "from a single graveyard").
+
+**9,380 cards are fully supported.** Rules tests: `test/targets.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).
-2. **More templates, by frequency** (`npm run coverage`): "up to N targets" and "another target",
-   abilities that work from the graveyard ("Return ~ from your graveyard"), "if you do",
+2. **More templates, by frequency** (`npm run coverage`): "divided as you choose", abilities that work from the graveyard ("Return ~ from your graveyard"), "if you do",
    split/adventure/double-faced cards. ~~Auras and Equipment~~, ~~enters with
    counters~~, ~~modal spells~~, ~~scry/surveil, discard, fight, graveyard targets,
    Treasure/Food/Clue~~, ~~cycling, crew, convoke, ward, prowess and "whenever you
@@ -695,7 +716,7 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
    they pay", energy, the monarch, "you may pay ... If you do"~~ done. ~~flashback, jump-start,
    retrace, escape, buyback, rebound, unearth, delayed triggers~~ done. ~~echo, cumulative upkeep,
    evoke, dash, delve, living weapon, scavenge~~ done. ~~morph, megamorph, disguise~~ done. ~~"enchanted creature" abilities, edicts, bounce lands, "exile until ~
-   leaves", riot, unleash, afterlife~~ done. ~~sacrifice/discard costs on abilities, "as long as"~~ done. Next by
+   leaves", riot, unleash, afterlife~~ done. ~~sacrifice/discard costs on abilities, "as long as"~~ done. ~~"up to N targets", "another target"~~ done. Next by
    count: see `npx tsx tools/coverage.ts`.
    Hand-written overrides for cards that don't fit a template.
 3. ~~Layers and continuous effects~~ (CR 613, done except layers 1 and 3), replacement

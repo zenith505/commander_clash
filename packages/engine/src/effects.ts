@@ -1,8 +1,8 @@
 // Executes the effect language: legal targets, resolving ability bodies, and the
 // triggered-ability queue.
 
-import { allEffects } from "./abilities";
-import type { AbilityBody, Amount, ChoiceKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
+import { allEffects, refCovers } from "./abilities";
+import type { AbilityBody, Amount, ChosenTarget, ChoiceKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
 import { manaValue, parseManaCost, payFromPool } from "./mana";
 import { planMana } from "./autopay";
 import { abilitiesOf, cardIdOf, defOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
@@ -135,6 +135,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
 
 export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, controller: PlayerId, src?: readonly Color[]): boolean {
+  if (t.kind === "none") return false;
   if (t.kind === "player") {
     const p = s.players[t.id];
     if (!p || p.lost) return false;
@@ -166,8 +167,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   return spec.kind === "object" && objectMatches(s, spec, o, controller, true, src);
 }
 
-export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerId, excludeStackId?: string, src?: readonly Color[]): TargetChoice[] {
-  const out: TargetChoice[] = [];
+export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerId, excludeStackId?: string, src?: readonly Color[]): ChosenTarget[] {
+  const out: ChosenTarget[] = [];
   if (spec.kind === "player" || spec.kind === "any")
     for (const pid of livingPlayers(s)) out.push({ kind: "player", id: pid });
   if (spec.kind === "object" || spec.kind === "any") for (const id of s.battlefield) out.push({ kind: "object", id });
@@ -176,11 +177,26 @@ export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerI
   return out.filter((t) => isLegalTarget(s, spec, t, controller, src));
 }
 
+export const sameTarget = (a: TargetChoice | undefined, b: TargetChoice) => !!a && a.kind !== "none" && b.kind !== "none" && a.kind === b.kind && a.id === b.id;
+
+/**
+ * Can `t` be chosen for target `i`, after `chosen` for the ones before it? An "up to" target may be
+ * left unchosen (CR 115.6); "another target" can't be the source, or one of the targets before it;
+ * and one "two target creatures" can't pick the same creature twice (CR 115.3).
+ */
+export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], i: number, t: TargetChoice, controller: PlayerId, src?: readonly Color[], sourceId?: ObjectId): boolean {
+  const spec = specs[i]!;
+  if (t.kind === "none") return !!spec.optional;
+  if (!isLegalTarget(s, spec, t, controller, src)) return false;
+  if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
+  return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t));
+}
+
 /** Throws a message if `targets` isn't a legal, complete choice for `specs`. CR 601.2c */
-export function targetProblem(s: GameState, specs: TargetSpec[], targets: TargetChoice[] | undefined, controller: PlayerId, src?: readonly Color[]): string | null {
+export function targetProblem(s: GameState, specs: TargetSpec[], targets: TargetChoice[] | undefined, controller: PlayerId, src?: readonly Color[], sourceId?: ObjectId): string | null {
   const t = targets ?? [];
   if (t.length !== specs.length) return `choose ${specs.length} target(s): ${specs.map((x) => x.text).join(", ")}`;
-  for (let i = 0; i < specs.length; i++) if (!isLegalTarget(s, specs[i]!, t[i]!, controller, src)) return `illegal target for ${specs[i]!.text}`;
+  for (let i = 0; i < specs.length; i++) if (!canChooseTarget(s, specs, t, i, t[i]!, controller, src, sourceId)) return `illegal target for ${specs[i]!.text}`;
   return null;
 }
 
@@ -188,8 +204,31 @@ export function targetProblem(s: GameState, specs: TargetSpec[], targets: Target
 export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined): TargetChoice[] | undefined =>
   targets?.map((t) => (t.kind === "object" ? { kind: "object", id: t.id, zc: s.objects[t.id]?.zoneChanges ?? 0 } : t));
 
-export const hasLegalTargets = (s: GameState, specs: TargetSpec[], controller: PlayerId, src?: readonly Color[]) =>
-  specs.every((spec) => legalTargets(s, spec, controller, undefined, src).length > 0);
+/**
+ * Could legal targets be chosen for all of `specs` (CR 601.2c, 603.3d)? "Up to" targets can be left
+ * out, so only the others need something, each different where they must be.
+ */
+export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: readonly Color[], sourceId?: ObjectId): boolean {
+  const options = specs.map((spec, i) => (spec.optional ? [] : legalTargets(s, spec, controller, undefined, src).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
+  if (options.some((o, i) => !specs[i]!.optional && !o.length)) return false;
+  if (!specs.some((spec) => spec.distinctFrom?.length)) return true;
+  // Some targets must differ from each other: look for one way to choose them all.
+  const chosen: TargetChoice[] = [];
+  const fill = (i: number): boolean => {
+    if (i === specs.length) return true;
+    if (specs[i]!.optional) {
+      chosen[i] = { kind: "none" };
+      return fill(i + 1);
+    }
+    for (const t of options[i]!) {
+      if ((specs[i]!.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t))) continue;
+      chosen[i] = t;
+      if (fill(i + 1)) return true;
+    }
+    return false;
+  };
+  return fill(0);
+}
 
 // ---------------------------------------------------------------------------
 // Modes (CR 700.2)
@@ -254,7 +293,10 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   const targets = item.targets ?? [];
   const src = item.kind === "spell" ? sourceColors(s, undefined, (s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined)) : sourceColors(s, item.sourceId, item.sourceCardId);
   const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, spec, targets[i]!, item.controller, src));
-  if (body.targets.length && !legal.some(Boolean)) return "fizzled";
+  // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
+  // "up to" targets isn't targeted at all, and resolves (CR 115.6).
+  const chose = targets.some((t) => t.kind !== "none");
+  if (body.targets.length && chose && !legal.some(Boolean)) return "fizzled";
   const spellControllers = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.controller ?? null) : null));
   const spellObjects = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? null) : null));
   s.resolving = {
@@ -363,9 +405,12 @@ function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
     return [o];
   }
   if (ref.ref === "target") {
-    const t = ctx.targets[ref.index];
-    if (!ctx.legal[ref.index] || !t || t.kind !== "object") return [];
-    return [obj(s, t.id)];
+    const out: GameObject[] = [];
+    for (let i = ref.index; i < ref.index + (ref.n ?? 1); i++) {
+      const t = ctx.targets[i];
+      if (ctx.legal[i] && t?.kind === "object") out.push(obj(s, t.id));
+    }
+    return out;
   }
   if (ref.ref === "selfCard") {
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
@@ -664,6 +709,10 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
     case "untap":
       for (const o of objects(s, e.what, ctx)) o.tapped = e.type === "tap";
       return;
+    case "skipUntap":
+      // Its controller's next untap step skips it, then it untaps as usual (CR 502.3).
+      for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
+      return;
     case "counters": {
       const base = amountNow(s, e.n, ctx);
       const n = e.perLastKnownCounter ? base * (ctx.lki?.counters?.[e.perLastKnownCounter] ?? 0) : base;
@@ -782,7 +831,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         mods,
       });
       const names = affected.map((id) => defOf(s, obj(s, id)).name);
-      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller)}${e.duration === "endOfTurn" ? " until end of turn" : ""}.`);
+      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : ""}.`);
       return;
     }
     case "attach": {
@@ -880,15 +929,17 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
     case "bite": {
       // CR 701.14b: if either creature is gone, isn't a creature, or is an illegal target, no damage is dealt.
       const a = objects(s, e.a, ctx)[0];
-      const b = objects(s, e.b, ctx)[0];
-      if (!a || !b || !objIsType(s, a, "Creature") || !objIsType(s, b, "Creature")) {
+      // "Deals damage equal to its power to each of two other target creatures": each one that's still a creature.
+      const bs = (e.type === "bite" ? objects(s, e.b, ctx) : objects(s, e.b, ctx).slice(0, 1)).filter((b) => objIsType(s, b, "Creature"));
+      if (!a || !bs.length || !objIsType(s, a, "Creature")) {
         log(s, `${src}: no damage is dealt.`);
         return;
       }
       // Noncombat damage from the creatures themselves: their own deathtouch, lifelink, infect apply.
-      const [pa, pb, srcA, srcB] = [power(s, a), power(s, b), objectSource(s, a), objectSource(s, b)];
-      dealDamage(s, srcA, { object: b }, pa);
-      if (e.type === "fight") dealDamage(s, srcB, { object: a }, pb); // a creature fighting itself takes twice its power (CR 701.14c)
+      const pa = power(s, a);
+      const pbs = bs.map((b) => power(s, b));
+      for (const b of bs) dealDamage(s, objectSource(s, a), { object: b }, pa);
+      if (e.type === "fight") dealDamage(s, objectSource(s, bs[0]!), { object: a }, pbs[0]!); // a creature fighting itself takes twice its power (CR 701.14c)
       return;
     }
     case "may": {
@@ -1154,9 +1205,17 @@ export function describeDest(d: SearchDest): string {
 const sign = (n: Amount) => (typeof n !== "number" ? describeAmount(n) : n >= 0 ? `+${n}` : `${n}`);
 
 /** "gets +2/+2 and gains flying", for the log. */
-export function describeMods(s: GameState, mods: Modification[], controller: PlayerId): string {
+export function describeMods(s: GameState, mods: Modification[], controller: PlayerId, plural = false): string {
   const parts: string[] = [];
   for (const m of mods) {
+    if (m.kind === "cantBlock" || m.kind === "cantAttack") {
+      parts.push(`can't ${m.kind === "cantBlock" ? "block" : "attack"}`);
+      continue;
+    }
+    if (m.kind === "doesntUntap") {
+      parts.push(plural ? "don't untap" : "doesn't untap");
+      continue;
+    }
     if (m.kind === "modifyPT") parts.push(`gets ${sign(m.power)}/${sign(m.toughness)}`);
     else if (m.kind === "setPT") parts.push(`has base power and toughness ${describeAmount(m.power)}/${describeAmount(m.toughness)}`);
     else if (m.kind === "switchPT") parts.push("has its power and toughness switched");
@@ -1169,16 +1228,23 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       parts.push(`becomes ${[...("types" in m ? m.types : []), ...m.subtypes].join(" ")}`.trim());
     else parts.push(m.kind.replace(/([A-Z])/g, " $1").toLowerCase());
   }
-  return parts.join(" and ");
+  const out = parts.join(" and ");
+  // "Arcbound Worker and Germ get +1/+1 and gain flying"
+  return plural ? out.replace(/\b(gets|gains|loses|comes|becomes|has)\b/g, (w) => ({ gets: "get", gains: "gain", loses: "lose", comes: "come", becomes: "become", has: "have" })[w]!).replace("have its power and toughness switched", "have their power and toughness switched") : out;
 }
 
 function damageRecipients(s: GameState, to: DamageRecipient, ctx: ResolveCtx): { objs: GameObject[]; pids: PlayerId[] } {
   if (to.ref === "anyTarget") {
-    const t = ctx.targets[to.index];
-    if (!ctx.legal[to.index] || !t) return { objs: [], pids: [] };
-    return t.kind === "player" ? { objs: [], pids: [t.id] } : t.kind === "object" ? { objs: [obj(s, t.id)], pids: [] } : { objs: [], pids: [] };
+    const out: { objs: GameObject[]; pids: PlayerId[] } = { objs: [], pids: [] };
+    for (let i = to.index; i < to.index + (to.n ?? 1); i++) {
+      const t = ctx.targets[i];
+      if (!ctx.legal[i] || !t) continue;
+      if (t.kind === "player") out.pids.push(t.id);
+      else if (t.kind === "object") out.objs.push(obj(s, t.id));
+    }
+    return out;
   }
-  if (to.ref === "self" || to.ref === "subject" || to.ref === "allCreatures" || to.ref === "each" || (to.ref === "target" && isObjectTarget(ctx, to.index)))
+  if (to.ref === "self" || to.ref === "subject" || to.ref === "allCreatures" || to.ref === "each" || (to.ref === "target" && (("n" in to && !!to.n) || isObjectTarget(ctx, to.index))))
     return { objs: objects(s, to as ObjRef, ctx), pids: [] };
   return { objs: [], pids: players(s, to as PlayerRef, ctx) };
 }
@@ -1473,7 +1539,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     }
     const body = withModes(printed, t.modes);
     if (body.targets.length) {
-      if (!hasLegalTargets(s, body.targets, t.controller, sourceColors(s, t.sourceId, t.sourceCardId))) {
+      if (!hasLegalTargets(s, body.targets, t.controller, sourceColors(s, t.sourceId, t.sourceCardId), t.sourceId)) {
         log(s, `${def.name}'s ability has no legal targets and is removed.`);
         s.triggerQueue.shift();
         continue;
@@ -1531,14 +1597,16 @@ export function doesNothingNow(s: GameState, sourceId: ObjectId, body: AbilityBo
 /** Which targets of a body are aimed at something bad for the target (damage, removal, shrink)? Used by bots and the UI. */
 export function harmfulTargets(body: AbilityBody): boolean[] {
   const harm = body.targets.map(() => false);
-  const mark = (i: number) => (harm[i] = true);
+  const mark = (i: number, n = 1) => {
+    for (let j = i; j < i + n; j++) harm[j] = true;
+  };
   for (const e of allEffects(body.effects)) {
-    if (e.type === "damage" && "index" in e.to) mark(e.to.index);
+    if (e.type === "damage" && "index" in e.to) mark(e.to.index, "n" in e.to ? e.to.n : 1);
     // Returning a card from a graveyard to its owner's hand helps its owner.
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
-    if (["destroy", "exile", "bounce", "tap"].includes(e.type) && "what" in e && e.what.ref === "target") mark(e.what.index);
-    if (e.type === "counters" && e.counter === "-1/-1" && e.what.ref === "target") mark(e.what.index);
-    if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index);
+    if (["destroy", "exile", "bounce", "tap", "skipUntap"].includes(e.type) && "what" in e && e.what.ref === "target") mark(e.what.index, e.what.n);
+    if (e.type === "counters" && e.counter === "-1/-1" && e.what.ref === "target") mark(e.what.index, e.what.n);
+    if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
     if ((e.type === "loseLife" || e.type === "mill") && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);
     if (e.type === "discard" && e.who.ref === "target") mark(e.who.index);
@@ -1564,7 +1632,7 @@ export function modsAreHarmful(mods: Modification[]): boolean {
 /** How much damage an effect body deals to target `i`, for picking what to kill. */
 export function damageTo(body: AbilityBody, i: number, x = 0): number {
   let n = 0;
-  for (const e of allEffects(body.effects)) if (e.type === "damage" && "index" in e.to && e.to.index === i) n += estimate(e.amount, x);
+  for (const e of allEffects(body.effects)) if (e.type === "damage" && refCovers(e.to, i)) n += estimate(e.amount, x);
   return n;
 }
 

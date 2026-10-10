@@ -39,7 +39,7 @@ export function withModes(body: AbilityBody, modes: number[] | undefined): Abili
   for (const i of chosen) {
     const mode = body.modal.modes[i]!;
     const offset = out.targets.length;
-    out.targets.push(...mode.targets);
+    out.targets.push(...mode.targets.map((spec) => (spec.distinctFrom ? { ...spec, distinctFrom: spec.distinctFrom.map((j) => j + offset) } : spec)));
     out.effects.push(...mode.effects.map((e) => shiftTargets(e, offset)));
     texts.push(mode.text);
   }

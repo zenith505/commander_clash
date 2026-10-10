@@ -97,6 +97,15 @@ export interface TargetSpec {
   controller?: "you" | "opponent";
   /** For players: only opponents. */
   opponent?: boolean;
+  /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
+  optional?: boolean;
+  /** "Another target creature" on a permanent's ability: not the source itself. */
+  notSource?: boolean;
+  /**
+   * Targets this one can't be the same as: the others of the same "two target creatures" (CR 115.3),
+   * or the earlier ones for "another target".
+   */
+  distinctFrom?: number[];
   /** true: tapped; false: untapped. */
   tapped?: boolean;
   /** true: a token; false: "nontoken". */
@@ -133,11 +142,20 @@ export interface Range {
  * A chosen target. For objects, `zc` is its zoneChanges when chosen: if it has changed zones
  * since, it's a new object and no longer the target (CR 400.7, 608.2b).
  */
-export type TargetChoice = { kind: "object"; id: ObjectId; zc?: number } | { kind: "player"; id: PlayerId } | { kind: "stack"; id: string };
+export type TargetChoice =
+  | { kind: "object"; id: ObjectId; zc?: number }
+  | { kind: "player"; id: PlayerId }
+  | { kind: "stack"; id: string }
+  /** An "up to N" target left unchosen (CR 115.6, 601.2c). */
+  | { kind: "none" };
+
+/** A target that was actually chosen. */
+export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 
 /** Which object(s) an effect touches. */
 export type ObjRef =
-  | { ref: "target"; index: number }
+  /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
+  | { ref: "target"; index: number; n?: number }
   | { ref: "self" } // the source permanent ("this creature")
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your hand"). */
@@ -162,7 +180,11 @@ export type PlayerRef =
   | { ref: "eachPlayer" }
   | { ref: "targetController"; index: number }; // "its controller"
 
-export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number };
+export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
+
+/** Does this reference cover target `i`? ("up to two target creatures" covers two in a row.) */
+export const refCovers = (r: object, i: number): boolean =>
+  "index" in r && typeof r.index === "number" && i >= r.index && i < r.index + ("n" in r && typeof r.n === "number" ? r.n : 1);
 
 export interface TokenSpec {
   name: string;
@@ -280,6 +302,8 @@ export type Effect =
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
+  /** "That creature doesn't untap during its controller's next untap step." */
+  | { type: "skipUntap"; what: ObjRef }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   | { type: "counters"; what: ObjRef; counter: "+1/+1" | "-1/-1"; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1" }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */

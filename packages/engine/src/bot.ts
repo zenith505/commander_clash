@@ -1,8 +1,8 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
-import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sourceColors, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceColors, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
   abilityProblem,
@@ -262,21 +262,31 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
     return n;
   };
   for (let i = 0; i < body.targets.length; i++) {
+    const spec = body.targets[i]!;
     // The source's colors matter for protection (CR 702.16b): a spell's card, or the ability's source.
-    const all = legalTargets(s, body.targets[i]!, pid, undefined, sourceId ? sourceColors(s, sourceId) : undefined).filter((t) => !out.some((o) => o.kind === t.kind && o.id === t.id));
-    if (!all.length) return null;
+    // Bots never pick the same thing twice, which also keeps "another target" apart.
+    const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceColors(s, sourceId) : undefined).filter(
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
+    );
     // Reanimating takes the best creature from any graveyard it may.
-    const reanimate = allEffects(body.effects).some((e) => e.type === "putOntoBattlefield" && e.what.ref === "target" && e.what.index === i);
+    const reanimate = allEffects(body.effects).some((e) => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
     const preferred = reanimate ? all : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)));
-    const pool = preferred.length ? preferred : forced ? all : [];
-    if (!pool.length) return null;
+    // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
+    const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
+    if (!pool.length) {
+      if (!spec.optional) return null;
+      out.push({ kind: "none" });
+      continue;
+    }
     out.push(best(s, pid, pool, harm[i]!, damageTo(body, i, x) + fightDamage(i)));
   }
+  // Only "up to" targets, none of them worth choosing: not worth doing.
+  if (!forced && out.length && out.every((t) => t.kind === "none")) return null;
   return out;
 }
 
 /** Is this target ours: our permanent or spell, a card we own, or us? */
-function isMine(s: GameState, pid: PlayerId, t: TargetChoice): boolean {
+function isMine(s: GameState, pid: PlayerId, t: ChosenTarget): boolean {
   if (t.kind === "player") return t.id === pid;
   if (t.kind === "stack") return s.stack.find((x) => x.id === t.id)?.controller === pid;
   const o = obj(s, t.id);
@@ -410,7 +420,7 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): nu
  */
 function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind): CostChoices | null {
   const out: CostChoices = {};
-  const targeted = new Set(targets.map((t) => t.id));
+  const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
   for (const c of [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, via)?.costs ?? [])]) {
     if (c.kind === "payLife") {
@@ -475,7 +485,7 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const i = targetIndexOf(inner);
     if (i !== undefined) {
       const t = targets[i];
-      if (!t || !r.legal[i]) continue;
+      if (!t || t.kind === "none" || !r.legal[i]) continue;
       v += harm[i] !== isMine(s, pid, t) ? 1 : -1;
     } else if ((inner.type === "loseLife" || inner.type === "discard") && "who" in inner && inner.who.ref === "you") v -= 1;
     else v += 1;
@@ -709,8 +719,8 @@ function wantOnTop(s: GameState, pid: PlayerId, id: string): boolean {
   return isType(defOf(s, obj(s, id)), "Land") ? lands < 6 : mv(s, id) <= lands + 2;
 }
 
-function best(s: GameState, pid: PlayerId, pool: TargetChoice[], harmful: boolean, damage: number): TargetChoice {
-  const threat = (t: TargetChoice) => {
+function best(s: GameState, pid: PlayerId, pool: ChosenTarget[], harmful: boolean, damage: number): ChosenTarget {
+  const threat = (t: ChosenTarget) => {
     if (t.kind === "player") return harmful ? 100 - player(s, t.id).life : player(s, t.id).life === 0 ? 0 : 1;
     if (t.kind === "stack") return 50;
     const o = obj(s, t.id);
@@ -798,7 +808,7 @@ function chooseUnearth(s: GameState, pid: PlayerId): Action[] | null {
 function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null | undefined {
   if (!ab.costs?.length) return undefined;
   const out: CostChoices = {};
-  const targeted = new Set(targets.map((t) => t.id));
+  const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   for (const c of ab.costs) {
     if (c.kind === "sacrifice") {
       const pool = s.battlefield

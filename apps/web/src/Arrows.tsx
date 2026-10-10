@@ -21,6 +21,7 @@ export function targetSelectors(t: TargetChoice): string[] {
   // In an open picker window first (that's where you're looking), else on the table.
   if (t.kind === "object") return [`[data-pick="${t.id}"]`, `[data-obj="${t.id}"]`];
   if (t.kind === "player") return [`[data-player="${t.id}"]`];
+  if (t.kind === "none") return []; // an "up to" target left unchosen
   return [`[data-stack="${t.id}"]`, "[data-stack-tab]"];
 }
 

@@ -1,8 +1,8 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
-import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
   abilityProblem,
@@ -76,7 +76,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
-    if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action) }];
+    if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
       // Riot: haste when it can still attack this turn, the counter otherwise. Unleash: the counter, unless we need blockers.
       const haste = pend.what === "riot" && s.activePlayer === pid && s.step === "main1";
@@ -458,8 +458,10 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
  * Which of our permanents to sacrifice or return to hand: the least valuable. Returning a land, a
  * tapped one that's already been used this turn, and not the one that asked for it if we can help it.
  */
-function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: "sacrifice" | "bounce"): ObjectId[] {
+function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
+  // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
+  if (action === "counters" && (counter === "+1/+1" || counter === "shield")) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   const cost = (id: ObjectId) => {
     const o = obj(s, id);
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);
@@ -561,7 +563,7 @@ function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, card?: CardD
     const objs = group(e.what);
     if (e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "tap" || e.type === "putInLibrary") add(objs, true);
     else if (e.type === "untap") add(objs.filter((o) => o.tapped), false, () => 0.5);
-    else if (e.type === "counters") add(objs, e.counter === "-1/-1", () => estimate(e.n) / 2);
+    else if (e.type === "counters") add(objs, harmfulCounter(e.counter), () => estimate(e.n) / 2);
     else if (e.type === "continuous") add(objs, modsAreHarmful(e.mods), () => 0.5);
     else v = v ?? 0;
   }
@@ -580,7 +582,7 @@ function choiceHurts(c: CompiledCard): boolean {
     if (o.chosen === "notType" || o.chosen === "notColor") own = true;
     else if (typeof o.chosen === "string") ((harmful && o.controller !== "you") || o.controller === "opponent" ? (hurts = true) : (own = true));
     let h = harmful;
-    if (typeof o.type === "string") h = ["destroy", "exile", "bounce", "tap", "damage", "putInLibrary"].includes(o.type) || (o.type === "counters" && o.counter === "-1/-1") || (o.type === "continuous" && modsAreHarmful(o.mods as never));
+    if (typeof o.type === "string") h = ["destroy", "exile", "bounce", "tap", "damage", "putInLibrary"].includes(o.type) || (o.type === "counters" && harmfulCounter(o.counter as string)) || (o.type === "continuous" && modsAreHarmful(o.mods as never));
     if (Array.isArray(o.mods) && "affects" in o) h = modsAreHarmful(o.mods as never);
     for (const [k, x] of Object.entries(o)) if (k !== "chosen") visit(x, h);
   };

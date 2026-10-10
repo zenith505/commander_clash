@@ -255,6 +255,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (src.counters[cond.counter] ?? 0) > 0;
     case "yourTurn":
       return s.activePlayer === you;
+    case "attackedThisTurn":
+      return s.players[you]?.attackedTurn === s.turn;
     case "self": {
       if (cond.is === "attacking") return src.attacking !== undefined;
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));

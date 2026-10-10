@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, CastFromGraveyardKind, ChoiceKind, EntersOption, Modification, PayCost, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
@@ -73,6 +73,8 @@ export interface GameObject {
   renowned?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
   skipNextUntap?: boolean;
+  /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
+  exileIfDiesTurn?: number;
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
   blocking?: ObjectId;
@@ -133,6 +135,10 @@ export interface Player {
   lost: boolean;
   lossReason?: string;
   drewFromEmptyLibrary: boolean;
+  /** Cards drawn in turn `turn`, for "whenever you draw your second card each turn". */
+  draws?: { turn: number; n: number };
+  /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
+  attackedTurn?: number;
   isBot: boolean;
 }
 
@@ -178,6 +184,8 @@ export interface StackItem {
   event?: TriggerEventInfo;
   /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
   sacrificed?: LastKnown[];
+  /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
+  ifCond?: StaticCondition;
 }
 
 /**
@@ -215,6 +223,8 @@ export interface PendingTrigger {
   event?: TriggerEventInfo;
   /** A delayed trigger's own ability (its source card has no such printed ability). */
   body?: AbilityBody;
+  /** Its intervening "if" (CR 603.4), checked again as it resolves. */
+  ifCond?: StaticCondition;
 }
 
 export interface LastKnown {
@@ -304,7 +314,7 @@ export type PendingDecision =
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: "sacrifice" | "bounce"; what: string; options: ObjectId[]; count: number }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind }
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
   | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] };
@@ -316,6 +326,8 @@ export interface GameEvent {
 }
 
 export interface GameState {
+  /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
+  linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
   seed: number;
   rngState: number;
   turn: number;
@@ -404,6 +416,8 @@ export interface Resolving {
   spellObjects?: (ObjectId | null)[];
   /** The tokens its last "create" made, for "put a counter on it". */
   created?: ObjectId[];
+  /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
+  damagedThisWay?: ObjectId[];
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   next: number;
@@ -419,6 +433,7 @@ export interface Resolving {
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     found?: ObjectId[]; // the cards a library search found
+    connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
   };
 }
 

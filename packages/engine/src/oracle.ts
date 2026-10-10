@@ -6,9 +6,11 @@
 // reports every line it can't compile, so we always know which cards fully work.
 // Anything it can't handle can later get a hand-written override keyed by oracle id.
 
+import { allEffects } from "./abilities";
 import type {
   AbilityBody,
   Amount,
+  CounterKind,
   AmountExpr,
   Count,
   ActivatedAbility,
@@ -150,6 +152,9 @@ const NUM = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\\d+)";
 const num = (s: string) => NUMBER_WORDS[s.toLowerCase()] ?? Number(s);
 /** Like NUM, but X too (CR 107.3). */
 const NUMX = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\\d+|X)";
+/** Counter kinds effects can put on permanents (see CounterKind). */
+const COUNTER = "([+-]1/[+-]1|stun|shield)";
+const counterKind = (t: string): CounterKind => (t === "-1/-1" || t === "stun" || t === "shield" ? t : "+1/+1");
 const X: AmountExpr = { count: { kind: "x" } };
 const amt = (s: string): Amount => (s === "X" ? X : num(s));
 /** A power/toughness change: "+2", "-1", "+X", "-X". */
@@ -385,14 +390,19 @@ function compile(d: CardDef): CompiledCard {
       out.cantBeCountered = true;
       continue;
     }
-    const ewc = new RegExp(`^~ enters(?: the battlefield)? with ${NUMX} ([+-]1/[+-]1) counters? on it(?: for each (.+?)|, where X is (.+?))?\\.$`).exec(line);
+    const ewc = new RegExp(`^(?:Raid — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (you attacked this turn))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
-      const per = ewc[3] ? parseCount(ewc[3], null, true) : null;
-      const def = ewc[4] ? parseCount(ewc[4], null) : null;
-      const n = per ? scaleAmount(amt(ewc[1]!), per) : def ? substituteX(amt(ewc[1]!), def) : amt(ewc[1]!);
-      if ((ewc[3] && !per) || (ewc[4] && !def) || !n) out.unsupported.push(raw);
-      else out.entersWithCounters = { counter: ewc[2] === "-1/-1" ? "-1/-1" : "+1/+1", n };
+      // "~ enters tapped with three stun counters on it."
+      const [, tapped, count, kind, each, where, raid] = ewc;
+      const per = each ? parseCount(each, null, true) : null;
+      const def = where ? parseCount(where, null) : null;
+      const n = per ? scaleAmount(amt(count!), per) : def ? substituteX(amt(count!), def) : amt(count!);
+      if ((each && !per) || (where && !def) || !n || out.entersWithCounters) out.unsupported.push(raw);
+      else {
+        out.entersWithCounters = { counter: counterKind(kind!), n, ...(raid ? { if: { kind: "attackedThisTurn" as const } } : {}) };
+        if (tapped) out.entersTapped = true;
+      }
       continue;
     }
     const enchant = /^Enchant (.+)$/.exec(line);
@@ -455,7 +465,26 @@ function compile(d: CardDef): CompiledCard {
   if (out.fromGraveyard?.some((g) => kinds(g.costs).some((k) => kinds(out.additionalCosts).includes(k)))) out.unsupported.push("graveyard cast with a cost like its additional cost");
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
+  linkExile(out);
   return out;
+}
+
+/**
+ * "When ~ enters, exile target creature an opponent controls. When ~ leaves the battlefield, return the
+ * exiled card to the battlefield under its owner's control": the two abilities are linked (CR 607.2a), so
+ * the return gives back only what this object's own exile ability took. Needs exactly one exile to link to.
+ */
+function linkExile(out: CompiledCard) {
+  const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"));
+  if (!returns.length) return;
+  const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]
+    .flatMap((b) => allEffects(b.effects))
+    .filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+  if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
+    out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
+    return;
+  }
+  exiles[0]!.linked = true;
 }
 
 /**
@@ -1068,11 +1097,12 @@ function parseStaticCondition(text: string, st: StaticAbility): StaticCondition 
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
   // "It" is the source only when the ability is about the source itself.
   const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" };
-  if ((m = /^(?:~|it) has an? ([+-]1\/[+-]1) counter on it$/.exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
-    return { kind: "selfCounter", counter: m[1] === "+1/+1" ? "+1/+1" : "-1/-1" };
+  if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
+    return { kind: "selfCounter", counter: counterKind(m[1]!) };
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     const who = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "defending";
     // Each attacking creature has its own defending player (CR 506.2), so only the source's own is modeled.
@@ -1102,6 +1132,7 @@ function isKeywordLine(line: string): boolean {
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
   [/^When(?:ever)? ~ dies, (.+)$/, "selfDies"],
+  [/^When(?:ever)? ~ leaves the battlefield, (.+)$/, "selfLeaves"],
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
   [/^When(?:ever)? ~ becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget"],
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
@@ -1126,7 +1157,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
+  "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
 ];
@@ -1175,14 +1206,68 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` } }, body };
 }
 
-function parseTrigger(raw: string) {
+/**
+ * "Whenever a creature you control enters", "Whenever another nontoken creature you control with power 2 or
+ * less enters", "Whenever ~ or another Ally you control enters", "When a creature with mana value 5 or
+ * greater enters": the entering permanent is the subject ("that creature", "it", "its power"). "One or
+ * more" (one trigger for several entering at once) isn't modeled.
+ */
+const ENTERS_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) enters(?: the battlefield)?( under your control| under an opponent's control)?, (.+)$/;
+
+function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = ENTERS_TRIGGER.exec(line);
+  if (!m) return null;
+  let phrase = m[2]!;
+  if (m[3]) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
+  const filter = parseTargetPhrase(phrase);
+  if (!filter || filter.kind !== "object") return "fail";
+  const body = parseBody(m[4]!, { subjectIt: true });
+  if (!body) return "fail";
+  const kind = m[1]!.toLowerCase();
+  return {
+    event: "permanentEnters",
+    enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
+    body,
+  };
+}
+
+/**
+ * "Whenever you draw a card", "whenever an opponent draws a card", "whenever a player draws a card",
+ * "whenever you draw your second card each turn" (the count includes cards drawn before the source
+ * was on the battlefield). "That player" is whoever drew.
+ */
+function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (you|an opponent|a player) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
+  if (!m) return null;
+  const body = parseBody(m[4]!, { eventPlayer: true });
+  if (!body) return "fail";
+  const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
+  const nth = m[3] ? { first: 1, second: 2, third: 3 }[m[3] as "first"] : undefined;
+  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}) }, body };
+}
+
+function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
+  // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
+  const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
+  // "If it's attacking" is about the source only in an ability about the source itself.
+  const aboutIt = intervening && /^(it|~)\b/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!);
+  const ifCond = intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  if (intervening && ifCond) {
+    const t = parseTrigger(`${intervening[1]}, ${intervening[3]}`);
+    return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
+  }
   const cast = parseCastTrigger(line);
   if (cast) return cast;
   const block = parseBlockTrigger(line);
   if (block) return block;
+  const enters = parseEntersTrigger(line);
+  if (enters) return enters;
+  const draws = parseDrawTrigger(line);
+  if (draws) return draws;
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);
     if (m) {
@@ -1207,7 +1292,7 @@ function parseTrigger(raw: string) {
       }
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
-      const left = event === "selfDies" || event === "selfToGraveyard";
+      const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" });
       if (body && thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
@@ -1466,6 +1551,8 @@ interface Ctx {
   targets: TargetSpec[];
   /** In a trigger about another object ("blocks a creature"), "that creature" is that object. */
   subject?: boolean;
+  /** "Whenever a creature you control enters": "it", "its power", "that land" are the entering permanent too. */
+  subjectIt?: boolean;
   /** In a trigger about the permanent itself, "it" (with no target before it) is that permanent. */
   selfIt?: boolean;
   /** After it left the battlefield ("When ~ dies, return it to its owner's hand"), "it" is the card in its new zone. */
@@ -1489,7 +1576,7 @@ interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "may", "explore", "search", "choose"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "may", "explore", "search", "choose", "connive", "pick"]);
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
@@ -1512,13 +1599,14 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) return parseModal(modal[1]!, modal[2]!, text.trim(), opts.spell);
   if (text.includes("•")) return null; // modes with text before them, or a kind of choice we don't support
   const ctx: Ctx = {
     targets: [],
     ...(opts.subject ? { subject: true } : {}),
+    ...(opts.subjectIt ? { subject: true, subjectIt: true } : {}),
     ...(opts.selfIt ? { selfIt: true } : {}),
     ...(opts.selfCard ? { selfCard: true } : {}),
     ...(opts.activated ? { activated: true } : {}),
@@ -1588,6 +1676,16 @@ export function parseBody(text: string, opts: { subject?: boolean; selfIt?: bool
       const inner = parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
       if (!inner) return null;
       effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      continue;
+    }
+    // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
+    const ifState = /^If ([^,]+), (.+)$/.exec(s);
+    const stateCond = ifState && !/^(it|~)\b/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    if (ifState && stateCond) {
+      const inner = parseOne(ifState[2]!.charAt(0).toUpperCase() + ifState[2]!.slice(1), ctx);
+      // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
+      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: stateCond }, effects: inner });
       continue;
     }
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
@@ -1936,7 +2034,7 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (!ctx) return x === "its" ? { ref: "self" } : null;
   if (x === "its" || x === "that creature's" || x === "that permanent's") {
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
-    if (x === "that creature's" && ctx.subject) return { ref: "subject" };
+    if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };
     // The permanent itself; after it left the battlefield, as it last existed (CR 608.2h).
     if (x === "its" && (ctx.selfIt || ctx.selfCard || ctx.activated)) return { ref: "self" };
   }
@@ -2087,6 +2185,10 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
+  // "When ~ leaves the battlefield, return the exiled card to the battlefield under its owner's control" (Fiend
+  // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
+  if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
+    return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand" }];
   // "Exile target creature an opponent controls until ~ leaves the battlefield" (CR 610.3).
   if ((m = /^Exile (target .+|up to one target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);
@@ -2123,6 +2225,17 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy"];
     return [{ type, what }];
   }
+  // Connive (CR 701.50): "~ connives", "it connives", "target creature you control connives", "connives X".
+  if ((m = new RegExp(`^(.+?) connives?(?: ${NUMX})?$`, "i").exec(s))) {
+    const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
+    return what && !isGroup(what) ? [{ type: "connive", what, n: m[2] ? amt(m[2]) : 1 }] : null;
+  }
+  // "If that creature would die this turn, exile it instead" (CR 614.1a), for what an earlier sentence targeted
+  // or damaged: "If a creature dealt damage this way would die this turn, exile it instead".
+  if ((m = /^If (that creature|that permanent|that creature or planeswalker|that planeswalker|an? (?:creature|permanent) dealt damage this way) would die this turn, exile it instead$/i.exec(s))) {
+    const what: ObjRef | null = / this way$/.test(m[1]!) ? { ref: "damagedThisWay" } : parseObject(m[1]!.startsWith("that creature") ? "that creature" : "that permanent", ctx);
+    return what ? [{ type: "exileIfDies", what }] : null;
+  }
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
   if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -2142,10 +2255,14 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return what ? [{ type: "bounce", what }] : null;
   }
   // Counters
-  if ((m = new RegExp(`^Put ${NUMX} ([+-]1/[+-]1) counters? on (.+)$`, "i").exec(s))) {
+  // "Put a +1/+1 counter on a creature you control": picked as it resolves, not targeted.
+  if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {
+    const filter = pickFilter(m[3]!.replace(/^an? /i, ""));
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: counterKind(m[2]!), n: amt(m[1]!) } }];
+  }
+  if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
-    const counter = m[2] === "+1/+1" ? "+1/+1" : m[2] === "-1/-1" ? "-1/-1" : null;
-    return what && counter ? [{ type: "counters", what, counter, n: amt(m[1]!) }] : null;
+    return what ? [{ type: "counters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
   }
   // Gaining control (layer 2). "Gain control of target creature until end of turn."
   if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?)( until end of turn)?$/i.exec(s))) {
@@ -2411,8 +2528,9 @@ function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "each player") return { ref: "eachPlayer" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
-  if (x === "its controller" || x === "that creature's controller") {
+  if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
+    if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
     return i !== undefined ? { ref: "targetController", index: i } : null;
   }
   if (x === "target player" || x === "target opponent") {
@@ -2432,14 +2550,16 @@ function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
-  if (/^(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : null;
+  if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : null;
   const several = SEVERAL_TARGETS.exec(x);
   if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
+  if (ctx.subjectIt && /^that (land|artifact|enchantment|token|[A-Z][a-z]+)$/.test(x) && ctx.lastObjectTarget === undefined) return { ref: "subject" };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && /^it$/i.test(x)) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
+    if (ctx.subjectIt) return { ref: "subject" };
     if (ctx.selfIt && /^it$/i.test(x)) return { ref: "self" };
     if (ctx.selfCard && /^it$/i.test(x)) return { ref: "selfCard" };
     return ctx.subject && /^that creature$/i.test(x) ? { ref: "subject" } : null;

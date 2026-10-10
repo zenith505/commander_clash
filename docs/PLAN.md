@@ -792,6 +792,39 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **10,163 cards are fully supported.** Rules tests: `test/protection-combat-mentor.test.ts`.
 
+### Enters and leaves triggers, stun and shield counters, raid, connive (added 2026-10-10)
+
+- **"Whenever a creature enters"**, "another Ally you control", "~ or another enchantment you control",
+  "a creature enters under an opponent's control": "it" and "that creature" mean the one that entered.
+- **"When ~ leaves the battlefield"**, whatever zone it goes to (CR 603.6c), looking back in time.
+- **Linked exile** (Fiend Hunter, Banisher Priest style, CR 607.2a): "When ~ enters, exile target
+  creature" and "When ~ leaves the battlefield, return the exiled card to the battlefield under its
+  owner's control" only return what that ability exiled.
+- **Stun counters** (CR 122.1d): untapping one removes a counter instead, in the untap step or from an
+  effect. "Tap target creature and put a stun counter on it", "~ enters tapped with three stun
+  counters on it". Shown as a chip on the card.
+- **Shield counters** (CR 122.1c): damage or destruction removes a counter instead, even damage that
+  can't be prevented. "~ has trample as long as it has a shield counter on it".
+- **"Put a +1/+1 (shield, stun) counter on a creature you control"**: chosen as it resolves, not
+  targeted.
+- **Draw triggers**: "whenever you draw a card", "whenever an opponent (a player) draws a card" (with
+  "that player"), and "whenever you draw your second card each turn", counting every card drawn that
+  turn (CR 121.2).
+- **Raid and intervening "if"** (CR 603.4): "When ~ enters, if you attacked this turn, ...", "At the
+  beginning of your upkeep, if you control three or more artifacts, ...". The ability only triggers if
+  it's true, and does nothing if it's no longer true as it resolves. "~ enters with a +1/+1 counter
+  on it if you attacked this turn", and a spell's "If you attacked this turn (you control a Wizard),
+  ..." checked as it resolves.
+- **Connive** (CR 701.50): draw, discard, and a +1/+1 counter for each nonland card discarded. It still
+  draws and discards if the creature already left.
+- **"If that creature would die this turn, exile it instead"** and "If a creature dealt damage this way
+  would die this turn, exile it instead" (Anger of the Gods): a replacement for the rest of the turn,
+  so its dies triggers don't happen.
+- Not yet: "one or more creatures enter" (once per batch), "whenever ~ connives", "if a creature would
+  die this turn" for every creature, and "you may have it connive".
+
+**10,659 cards are fully supported.** Rules tests: `test/enters-leaves-counters.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

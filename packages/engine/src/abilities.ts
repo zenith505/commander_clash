@@ -10,6 +10,12 @@ import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId } from "./types"
  */
 export type Amount = number | AmountExpr;
 
+/** Counter kinds effects can put on permanents. Stun and shield are keyword counters (CR 122.1c-d). */
+export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield";
+
+/** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
+export type PickAction = "sacrifice" | "bounce" | "counters";
+
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
  * as it resolves ("{X}", "{1} for each card in your hand"), plus life ("{2} and 2 life").
@@ -161,6 +167,7 @@ export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
   | { ref: "target"; index: number; n?: number }
   | { ref: "self" } // the source permanent ("this creature")
+  | { ref: "damagedThisWay" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your hand"). */
   | { ref: "selfCard" }
@@ -286,10 +293,12 @@ export type StaticCondition =
   | { kind: "graveyardTypes"; n: number }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
   | { kind: "graveyardPermanents"; n: number }
-  | { kind: "selfCounter"; counter: "+1/+1" | "-1/-1" }
+  | { kind: "selfCounter"; counter: CounterKind }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9). */
   | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" }
   | { kind: "yourTurn" }
+  /** Raid: "if you attacked this turn" (with one or more creatures). */
+  | { kind: "attackedThisTurn" }
   /**
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
@@ -310,13 +319,19 @@ export type Effect =
    * `until`: "exile target creature until ~ leaves the battlefield" (CR 610.3): it comes back under its
    * owner's control right after the source leaves, and isn't exiled at all if the source left first.
    */
-  | { type: "exile"; what: ObjRef; until?: "sourceLeaves" }
+  /**
+   * `linked`: the card's "return the exiled card" ability (CR 607.2a) returns what this exiled, see
+   * returnLinked. `until`: it comes back right after the source leaves, without a trigger (CR 610.3).
+   */
+  | { type: "exile"; what: ObjRef; until?: "sourceLeaves"; linked?: boolean }
+  /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
+  | { type: "returnLinked"; dest: "battlefield" | "hand" }
   /**
    * "Sacrifice a creature", "each opponent sacrifices a creature of their choice", "return a land you
    * control to its owner's hand": each player picks n of their own permanents that match, in APNAP order,
    * then they're all sacrificed or returned at once (CR 101.4, 701.21). Not targeted.
    */
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: "sacrifice" | "bounce" }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount } }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean }
@@ -324,11 +339,15 @@ export type Effect =
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
+  /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
+  | { type: "connive"; what: ObjRef; n: Amount }
+  /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
+  | { type: "exileIfDies"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
-  | { type: "counters"; what: ObjRef; counter: "+1/+1" | "-1/-1"; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1" }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1" }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   | { type: "sacrifice"; what: ObjRef }
   /** The source explores (CR 701.44a): a land on top goes to hand; otherwise a +1/+1 counter, and the card may be milled. */
@@ -412,7 +431,9 @@ export type EntersOption = "riot" | "unleash";
 export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
-  | { kind: "youDid" };
+  | { kind: "youDid" }
+  /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
+  | { kind: "state"; cond: StaticCondition };
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
@@ -434,6 +455,9 @@ export type TriggerEvent =
   | "selfEnters" // When this enters
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
+  | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
+  /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
+  | "permanentEnters"
   | "selfBecomesTarget" // "When this becomes the target of a spell or ability"
   | "selfAttacks" // Whenever this attacks
   | "selfDealsCombatDamageToPlayer"
@@ -460,15 +484,27 @@ export type TriggerEvent =
   | "selfBlocksCreature"
   | "selfBlockedByCreature" // flanking (CR 702.25a)
   | "selfBlocksOrBlockedByCreature"
-  | "youGainLife"; // "Whenever you gain life": once per source that makes you gain life (CR 119.10)
+  | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.10)
+  /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
+  | "playerDraws";
 
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
   cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec };
+  /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
+  ifCond?: StaticCondition;
+  /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
+  draws?: { by: "you" | "opponent" | "any"; nth?: number };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
+  /**
+   * For "permanentEnters": what has to enter (the subject, "that creature"), relative to this permanent's
+   * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without
+   * either, it sees itself enter if it matches (CR 603.6a).
+   */
+  enters?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information. */
   ifNoCounter?: "+1/+1" | "-1/-1";
   /**
@@ -625,7 +661,7 @@ export interface CompiledCard {
    */
   entersOptions?: EntersOption[];
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: "+1/+1" | "-1/-1"; n: Amount };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /** "~ can't be countered." CR 101.2 */

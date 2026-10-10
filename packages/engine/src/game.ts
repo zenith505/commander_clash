@@ -401,6 +401,12 @@ export function moveObject(
   // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
   o.exileIfLeaves = undefined;
+  // "If that creature would die this turn, exile it instead" (CR 614.1a).
+  if (fromZone === "battlefield" && to === "graveyard" && o.exileIfDiesTurn === s.turn) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of dying.`);
+  }
+  o.exileIfDiesTurn = undefined;
   // A commander that would be put into its owner's library goes to the command zone instead, if its owner
   // wants (CR 903.9b); owners always do. Into a hand it stays: it can be cast from there without tax.
   if (o.isCommander && to === "library" && fromZone !== "library") {
@@ -471,7 +477,9 @@ export function moveObject(
   if (to === "battlefield") o.controlledSinceTurn = s.turn;
   invalidateCharacteristics(s);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
-  const withCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
+  const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
+  // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
+  const withCounters = printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller) ? undefined : printedCounters;
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
@@ -494,8 +502,10 @@ export function moveObject(
     options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
     if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
   }
-  // "Dies" is a creature put into a graveyard from the battlefield (CR 700.4); other triggers say "put into a graveyard".
-  if (fromZone === "battlefield" && to === "graveyard") fireEvent(s, { type: "dies", id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness });
+  // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
+  // triggers say "put into a graveyard" or "leaves the battlefield".
+  if (fromZone === "battlefield")
+    fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness });
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
 
@@ -527,7 +537,7 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number }[], 
  * ability allows (it isn't targeted, so hexproof doesn't stop it). The player picks: one of their own
  * if the Aura only helps what it enchants, an opponent's otherwise.
  */
-function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): ObjectId | undefined {
+export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): ObjectId | undefined {
   const enchant = compileCard(defOf(s, aura)).enchant;
   if (!enchant) return undefined;
   const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
@@ -593,12 +603,38 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
 }
 
 /**
+ * Untap a permanent. A stun counter replaces that: one is removed instead (CR 122.1d). Untapping
+ * an untapped permanent isn't an untap, so the counter stays.
+ */
+export function untapPermanent(s: GameState, o: GameObject) {
+  if (!o.tapped) return;
+  if ((o.counters.stun ?? 0) > 0) {
+    o.counters.stun! -= 1;
+    log(s, `A stun counter is removed from ${defOf(s, o).name} instead of untapping it.`);
+    return;
+  }
+  o.tapped = false;
+}
+
+/**
+ * Remove a shield counter if `o` has one (CR 122.1c): it replaces the damage or destruction that
+ * was about to happen. Returns true when it did.
+ */
+export function useShieldCounter(s: GameState, o: GameObject, what: string): boolean {
+  if ((o.counters.shield ?? 0) <= 0) return false;
+  o.counters.shield! -= 1;
+  log(s, `A shield counter is removed from ${defOf(s, o).name} instead of ${what}.`);
+  return true;
+}
+
+/**
  * Destroy a permanent (CR 701.8): indestructible ones aren't (CR 702.12b), and a
  * regeneration shield replaces it (CR 701.19a): damage is removed, it's tapped, and it
  * leaves combat. Returns true if it went to the graveyard.
  */
 export function destroyPermanent(s: GameState, o: GameObject, message: string, noRegen = false): boolean {
   if (objHasKeyword(s, o, "Indestructible")) return false;
+  if (useShieldCounter(s, o, "it being destroyed")) return false;
   const name = defOf(s, o).name;
   if (!noRegen && (o.regenShields ?? 0) > 0) {
     o.regenShields! -= 1;
@@ -644,6 +680,9 @@ export function draw(s: GameState, pid: PlayerId, n = 1) {
       return;
     }
     moveObject(s, top, "hand");
+    // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
+    p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
+    fireEvent(s, { type: "draw", player: pid, nth: p.draws.n });
   }
 }
 
@@ -698,7 +737,7 @@ function beginStep(s: GameState, step: Step) {
         const o = obj(s, id);
         if (controllerOf(s, o) !== ap) continue;
         if (o.skipNextUntap) o.skipNextUntap = undefined;
-        else if (!characteristics(s, o).doesntUntap) o.tapped = false; // CR 502.3
+        else if (!characteristics(s, o).doesntUntap) untapPermanent(s, o); // CR 502.3
       }
       return advanceStep(s); // no priority in untap (CR 502.4)
     case "upkeep": {
@@ -797,6 +836,10 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
+    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller)) {
+      log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
+      return;
+    }
     if (item.body && beginResolution(s, item, item.body) === "fizzled") log(s, `${def.name}'s ability does nothing (its targets are gone).`);
     return;
   }
@@ -1724,6 +1767,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if (!objHasKeyword(s, o, "Vigilance")) o.tapped = true; // CR 508.1f
     log(s, `${defOf(s, o).name} attacks ${player(s, a.defender).name}.`);
   }
+  if (attacks.length) p.attackedTurn = s.turn; // raid
   for (const a of attacks) fireEvent(s, { type: "attacks", id: a.attacker }); // CR 508.3a
   if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]!.attacker }); // CR 506.5
   s.pending = null;

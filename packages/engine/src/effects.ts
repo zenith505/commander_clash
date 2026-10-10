@@ -7,14 +7,14 @@ import { manaValue, parseManaCost, payFromPool } from "./mana";
 import { planMana } from "./autopay";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { nextRandom, shuffle } from "./rng";
-import { castProblem, describeTargets, destroyPermanent, draw, gainLife, livingPlayers, log, moveObject, newObject, obj, opponents, player } from "./game";
-import { characteristics, controllerOf, invalidateCharacteristics, type Characteristics } from "./layers";
+import { auraHostFor, castProblem, describeTargets, destroyPermanent, draw, gainLife, livingPlayers, log, moveObject, newObject, obj, opponents, player, untapPermanent } from "./game";
+import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
 import { modeCountProblem, withModes } from "./modes";
 import { compileCard, compileGranted, MONARCH } from "./oracle";
 import { bindChosenKeywords, CHOSEN_PROTECTION, CREATURE_TYPES, type SourceQuality } from "./keywords";
 import { describeAmount, evalAmount, type AmountCtx } from "./amounts";
 import { cardSource, dealDamage, objectSource, protectedFrom, type DamageSource } from "./damage";
-import type { CardDef, Chosen, Color, DelayedTrigger, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo } from "./types";
+import type { CardDef, Chosen, Color, DelayedTrigger, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneName } from "./types";
 
 // ---------------------------------------------------------------------------
 // Targets (CR 115)
@@ -371,6 +371,9 @@ function sourceChosen(s: GameState, ctx: { sourceId?: ObjectId; sourceZc?: numbe
   return o && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc) ? o.chosen : undefined;
 }
 
+/** Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d). */
+export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun";
+
 /**
  * Each player picks their own permanents, in APNAP order, then they're all sacrificed or returned to
  * their owners' hands at once (CR 101.4, 701.21a). With no more than they have to pick, there's no choice.
@@ -388,7 +391,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     const pid = sc.queue[0]!;
     const options = pickOptions(s, e, pid);
     if (options.length > n) {
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: n };
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}) };
       return "paused";
     }
     sc.chosen![pid] = options;
@@ -398,6 +401,15 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     for (const id of sc.chosen![pid] ?? []) {
       const o = s.objects[id];
       if (o?.zone !== "battlefield") continue;
+      if (e.action === "counters") {
+        const k = e.counter!.kind;
+        const c = amountNow(s, e.counter!.n, ctx);
+        if (c <= 0) continue;
+        invalidateCharacteristics(s);
+        o.counters[k] = (o.counters[k] ?? 0) + c;
+        log(s, `${player(s, pid).name} puts ${c} ${k} counter${c > 1 ? "s" : ""} on ${defOf(s, o).name}.`);
+        continue;
+      }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand");
     }
@@ -435,6 +447,7 @@ function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     return o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : [];
   }
+  if (ref.ref === "damagedThisWay") return (s.resolving?.damagedThisWay ?? []).map((id) => obj(s, id)).filter((o) => o.zone === "battlefield");
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
   if (ref.ref === "attached") {
@@ -580,7 +593,11 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
       let dealt = 0;
-      for (const o of objs) dealt += dealDamage(s, from, { object: o }, amount, { lifelink });
+      for (const o of objs) {
+        const n = dealDamage(s, from, { object: o }, amount, { lifelink });
+        dealt += n;
+        if (n > 0 && s.resolving) (s.resolving.damagedThisWay ??= []).push(o.id);
+      }
       for (const pid of pids) dealt += dealDamage(s, from, { player: pid }, amount, { lifelink });
       gainLife(s, from.controller, lifelink.n);
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
@@ -705,6 +722,31 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         log(s, `${src} exiles ${defOf(s, o).name}${e.until ? ` until ${src} leaves the battlefield` : ""}.`);
         moveObject(s, o.id, "exile");
         if (me && o.zone === "exile") (me.exiledUntilLeaves ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
+        // Linked to the source as it was when the ability triggered: if that object has already left, its
+        // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
+        if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
+      }
+      return;
+    }
+    case "returnLinked": {
+      // The leaves ability triggered after the source moved, so the object it links to is the one before (CR 400.7).
+      const key = `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
+      const cards = (s.linkedExile?.[key] ?? []).map((l) => s.objects[l.id]).filter((c, i): c is GameObject => !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === s.linkedExile![key]![i]!.zc && !c.isToken);
+      delete s.linkedExile?.[key];
+      for (const c of cards) {
+        const d = defOf(s, c);
+        if (e.dest === "hand") {
+          log(s, `${src} returns ${d.name} to its owner's hand.`);
+          moveObject(s, c.id, "hand");
+          continue;
+        }
+        let attachTo: ObjectId | undefined;
+        if (d.subtypes.includes("Aura")) {
+          attachTo = auraHostFor(s, c, c.owner);
+          if (!attachTo) continue; // nothing it can enchant: it stays in exile (CR 303.4g)
+        }
+        log(s, `${src} returns ${d.name} to the battlefield.`);
+        moveObject(s, c.id, "battlefield", { controller: c.owner, ...(attachTo ? { attachTo } : {}) });
       }
       return;
     }
@@ -742,8 +784,53 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       return;
     case "tap":
     case "untap":
-      for (const o of objects(s, e.what, ctx)) o.tapped = e.type === "tap";
+      for (const o of objects(s, e.what, ctx)) {
+        if (e.type === "tap") o.tapped = true;
+        else untapPermanent(s, o);
+      }
       return;
+    case "exileIfDies":
+      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfDiesTurn = s.turn;
+      return;
+    case "connive": {
+      // CR 701.50a: its controller draws, then discards; each nonland card discarded is a +1/+1 counter on it.
+      // If it already left the battlefield, its controller as it last existed still draws and discards (CR 701.50c).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.connive) {
+        const o = objects(s, e.what, ctx)[0];
+        const pid = o ? controllerOf(s, o) : ctx.controller;
+        const n = (sc.n = amountNow(s, e.n, ctx));
+        sc.connive = { pid, ...(o ? { id: o.id, zc: o.zoneChanges ?? 0 } : {}) };
+        if (n <= 0) return;
+        log(s, `${o ? defOf(s, o).name : src} connives${n > 1 ? ` ${n}` : ""}.`);
+        draw(s, pid, n);
+        sc.queue = [pid];
+        sc.chosen = {};
+      }
+      const { pid, id, zc } = sc.connive;
+      const n = sc.n ?? 0;
+      if (n <= 0) return;
+      if (sc.queue!.length) {
+        const hand = player(s, pid).hand;
+        if (hand.length > n) {
+          s.pending = { kind: "discard", player: pid, count: n, source: src };
+          return "paused";
+        }
+        sc.chosen![pid] = [...hand];
+        sc.queue!.shift();
+      }
+      const ids = sc.chosen![pid] ?? [];
+      const nonland = ids.filter((x) => !defOf(s, obj(s, x)).types.includes("Land")).length;
+      discardCards(s, pid, ids);
+      const o = id ? s.objects[id] : undefined;
+      if (nonland && o?.zone === "battlefield" && (o.zoneChanges ?? 0) === zc) {
+        invalidateCharacteristics(s);
+        o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + nonland;
+        log(s, `${defOf(s, o).name} gets ${nonland} +1/+1 counter${nonland > 1 ? "s" : ""}.`);
+      }
+      return;
+    }
     case "skipUntap":
       // Its controller's next untap step skips it, then it untaps as usual (CR 502.3).
       for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
@@ -1081,7 +1168,12 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
     }
     case "if": {
       // How it was cast doesn't change while it resolves, so this can be checked again on resuming.
-      const holds = e.cond.kind === "youDid" ? !!s.resolving!.did : kickedMatches(ctx.kicked, e.cond);
+      const holds =
+        e.cond.kind === "youDid"
+          ? !!s.resolving!.did
+          : e.cond.kind === "state"
+            ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)
+            : kickedMatches(ctx.kicked, e.cond);
       const branch = holds ? e.effects : (e.otherwise ?? []);
       for (const inner of branch) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
@@ -1363,7 +1455,8 @@ function createToken(s: GameState, pid: PlayerId, t: TokenSpec) {
 export type TriggerSourceEvent =
   | { type: "enters"; id: ObjectId; x?: number }
   /** `counters`: the counters it had on the battlefield (last known information, for persist and undying). */
-  | { type: "dies"; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number }
+  /** It left the battlefield for `to` (only a graveyard makes it "die"). */
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.10). */
@@ -1380,7 +1473,9 @@ export type TriggerSourceEvent =
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
-  | { type: "targeted"; stackId: string };
+  | { type: "targeted"; stackId: string }
+  /** A player drew a card, their `nth` this turn (CR 121.2). */
+  | { type: "draw"; player: PlayerId; nth: number };
 
 /**
  * Echo (CR 702.30a): "if this permanent came under your control since the beginning of your last
@@ -1395,6 +1490,15 @@ export function echoDue(s: GameState, o: GameObject, you: PlayerId): boolean {
 export function evolves(s: GameState, o: GameObject, stats: LastKnown): boolean {
   if (!objIsType(s, o, "Creature")) return false; // CR 702.100c
   return (stats.power ?? 0) > power(s, o) || (stats.toughness ?? 0) > toughness(s, o);
+}
+
+/** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */
+function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>, o: GameObject, entering: GameObject, you: PlayerId): boolean {
+  if (o.id === entering.id) {
+    if (en.orSelf) return true;
+    if (en.other) return false;
+  }
+  return objectMatches(s, en.filter, entering, you, false);
 }
 
 /** Record every triggered ability that `ev` triggers. They go on the stack the next time a player would get priority. */
@@ -1415,8 +1519,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   ) => {
     const printed = compileCard(defOf(s, o)).triggers;
     triggers.forEach((t, index) => {
-      if (pred(t.event, t))
+      // An intervening "if" has to be true for it to trigger at all (CR 603.4).
+      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller)))
         s.triggerQueue.push({
+          ...(t.ifCond ? { ifCond: t.ifCond } : {}),
           // An ability an effect gave it isn't on its card, so the trigger carries what it does.
           ...(printed[index] !== t ? { body: t.body } : {}),
           sourceId: o.id,
@@ -1464,13 +1570,22 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Landfall. The land itself sees itself enter too (CR 603.6a).
     if (objIsType(s, entering, "Land"))
       for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "landYouControlEnters");
+    // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
+    // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const ctrl = controllerOf(s, o);
+      add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering);
+    }
   } else if (ev.type === "dies") {
     const o = obj(s, ev.id);
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
     add(
       o,
       ev.controller,
-      (e, t) => ((e === "selfDies" && ev.wasCreature) || e === "selfToGraveyard") && !(t.ifNoCounter && (ev.counters[t.ifNoCounter] ?? 0) > 0),
+      (e, t) =>
+        (((e === "selfDies" && ev.wasCreature) || e === "selfToGraveyard") && ev.to === "graveyard" && !(t.ifNoCounter && (ev.counters[t.ifNoCounter] ?? 0) > 0)) ||
+        e === "selfLeaves",
       withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers,
       undefined,
       undefined,
@@ -1550,6 +1665,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (!o || o.zone !== "battlefield") continue;
       const you = controllerOf(s, o);
       add(o, you, (e) => (e === "becomesTargetOfOpponent" && you !== item!.controller) || e === "selfBecomesTarget", undefined, ev.stackId);
+    }
+  } else if (ev.type === "draw") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, (e, t) => {
+        if (e !== "playerDraws" || !t.draws) return false;
+        const by = t.draws.by;
+        if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you)) return false;
+        return t.draws.nth === undefined || t.draws.nth === ev.nth;
+      }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "step") {
     // Delayed triggers whose moment this is (CR 603.7): each triggers once.
@@ -1655,6 +1781,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoi
     ...(t.x ? { x: t.x } : {}),
     ...(t.kicked ? { kicked: t.kicked } : {}),
     ...(t.event ? { event: t.event } : {}),
+    ...(t.ifCond ? { ifCond: t.ifCond } : {}),
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });
@@ -1682,7 +1809,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Returning a card from a graveyard to its owner's hand helps its owner.
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
     if (["destroy", "exile", "bounce", "tap", "skipUntap"].includes(e.type) && "what" in e && e.what.ref === "target") mark(e.what.index, e.what.n);
-    if (e.type === "counters" && e.counter === "-1/-1" && e.what.ref === "target") mark(e.what.index, e.what.n);
+    if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
     if ((e.type === "loseLife" || e.type === "mill") && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);
@@ -1716,10 +1843,10 @@ function grantCost(text: string): number {
   let n = 0;
   for (const t of compileGranted(text).triggers)
     for (const e of allEffects(t.body.effects)) {
-      if (e.type === "sacrifice" || e.type === "pick" || e.type === "cumulativeUpkeep") n += 10;
+      if (e.type === "sacrifice" || (e.type === "pick" && e.action !== "counters") || e.type === "cumulativeUpkeep") n += 10;
       else if (e.type === "loseLife" && e.who.ref === "you") n += 4;
       else if (e.type === "discard" && e.who.ref === "you") n += 4;
-      else if ((e.type === "tap" && e.what.ref === "self") || (e.type === "counters" && e.counter === "-1/-1" && e.what.ref === "self")) n += 4;
+      else if ((e.type === "tap" && e.what.ref === "self") || (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "self")) n += 4;
     }
   return n;
 }

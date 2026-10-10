@@ -5,7 +5,7 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
-import { gainLife, log, player } from "./game";
+import { gainLife, log, player, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
@@ -66,6 +66,8 @@ export function dealDamage(
     log(s, `Damage from ${src.name} to ${targetName} is prevented (protection).`);
     return 0;
   }
+  // A shield counter replaces the damage, even damage that can't be prevented (CR 122.1c).
+  if ("object" in to && useShieldCounter(s, to.object, `${src.name} dealing damage to it`)) return 0;
   if (shielded.preventNext) {
     const stopped = Math.min(shielded.preventNext, n);
     shielded.preventNext -= stopped;

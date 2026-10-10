@@ -615,6 +615,40 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **8,103 cards are fully supported.** Rules tests: `test/face-down.test.ts`.
 
+### Auras' abilities, edicts, bounce lands, "until it leaves", riot, unleash, afterlife (added 2026-10-10)
+
+- **"Enchanted creature" and "equipped creature"** in abilities: "When this Aura enters, tap enchanted
+  creature", "{R}: Enchanted creature gets +1/+0 until end of turn", "Regenerate enchanted creature".
+  If the Aura was sacrificed to pay for the ability, it's the creature the Aura was attached to as it
+  last existed (CR 608.2h).
+- **Picking your own permanents** (CR 701.21): "sacrifice a creature", "each opponent sacrifices a
+  creature of their choice", "target player sacrifices an artifact", "return a land you control to its
+  owner's hand" (the bounce lands, Kor Skyfisher). Nothing is targeted. Each player picks in turn order,
+  starting with the active player, and then they all go at once (CR 101.4). With only as many as they
+  must pick, there's no choice to make. A bounce land with no other land returns itself (rulings).
+- **"Exile ... until ~ leaves the battlefield"** (CR 610.3): Banishing Light, Banisher Priest and the
+  like. When the source leaves, the card comes back right away under its owner's control, as a new
+  object (no counters). If the source left before its ability resolved, nothing is exiled
+  (CR 610.3b). An exiled token doesn't come back. An Aura comes back attached to something it can
+  enchant, which its owner picks (CR 303.4f); with nothing legal it stays in exile (CR 303.4g).
+- **"When this Equipment enters, attach it to target creature you control"**, and "attach ~ to target
+  creature you control" as an ability. It only attaches to something it legally could (a creature for
+  an Equipment, what an Aura can enchant, nothing with protection from it).
+- **"Target creature can't block this turn"**, "can't attack this turn", "can't attack or block this turn".
+- **Riot** (CR 702.136): enters with your choice of a +1/+1 counter or haste (for as long as it stays).
+- **Unleash** (CR 702.98): may enter with a +1/+1 counter; it can't block while it has any +1/+1 counter.
+  Riot's and unleash's choices are made as it enters, so abilities that trigger on it entering
+  (evolve) see the counter.
+- **Afterlife N** (CR 702.135): when it's put into a graveyard from the battlefield, create N 1/1 white
+  and black Spirit tokens with flying.
+- **On the table:** to sacrifice or return, click your glowing permanents, then Sacrifice or Return.
+  Riot and unleash ask with two buttons.
+- **Bots** sacrifice or return their least valuable permanents (a tapped land first, for bounce
+  lands), choose haste for riot when they can still attack this turn, and take unleash's counter
+  unless they're low on life.
+
+**8,413 cards are fully supported.** Rules tests: `test/auras-edicts.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).
@@ -631,7 +665,8 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
    costs~~ done. ~~"all"/"each" groups, choosing a creature type or color~~ done. ~~"counter unless
    they pay", energy, the monarch, "you may pay ... If you do"~~ done. ~~flashback, jump-start,
    retrace, escape, buyback, rebound, unearth, delayed triggers~~ done. ~~echo, cumulative upkeep,
-   evoke, dash, delve, living weapon, scavenge~~ done. ~~morph, megamorph, disguise~~ done. Next by
+   evoke, dash, delve, living weapon, scavenge~~ done. ~~morph, megamorph, disguise~~ done. ~~"enchanted creature" abilities, edicts, bounce lands, "exile until ~
+   leaves", riot, unleash, afterlife~~ done. Next by
    count: see `npx tsx tools/coverage.ts`.
    Hand-written overrides for cards that don't fit a template.
 3. ~~Layers and continuous effects~~ (CR 613, done except layers 1 and 3), replacement

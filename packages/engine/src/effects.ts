@@ -2,7 +2,7 @@
 // triggered-ability queue.
 
 import { allEffects } from "./abilities";
-import type { AbilityBody, Amount, ChoiceKind, DamageRecipient, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
+import type { AbilityBody, Amount, ChoiceKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
 import { manaValue, parseManaCost, payFromPool } from "./mana";
 import { planMana } from "./autopay";
 import { abilitiesOf, cardIdOf, defOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
@@ -77,7 +77,12 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
 export const COLOR_NAMES: Record<Color, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
 
 /** The names a player can choose from: every creature type (CR 205.3m) or color, but `except`. */
-export function choiceOptions(what: ChoiceKind, except?: string): string[] {
+/** Riot's and unleash's choice (see choiceOptions). */
+export const ENTERS_COUNTER = "+1/+1 counter";
+
+export function choiceOptions(what: ChoiceKind | EntersOption, except?: string): string[] {
+  if (what === "riot") return [ENTERS_COUNTER, "Haste"];
+  if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
   const all = what === "color" ? Object.values(COLOR_NAMES) : [...CREATURE_TYPES].sort();
   return all.filter((x) => x.toLowerCase() !== except?.toLowerCase());
 }
@@ -305,6 +310,43 @@ function sourceChosen(s: GameState, ctx: { sourceId?: ObjectId; sourceZc?: numbe
   return o && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc) ? o.chosen : undefined;
 }
 
+/**
+ * Each player picks their own permanents, in APNAP order, then they're all sacrificed or returned to
+ * their owners' hands at once (CR 101.4, 701.21a). With no more than they have to pick, there's no choice.
+ */
+function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx: ResolveCtx, src: string): "paused" | void {
+  const r = s.resolving!;
+  const sc = (r.scratch ??= {});
+  const n = (sc.n ??= amountNow(s, e.n, ctx));
+  const who = players(s, e.who, ctx);
+  if (!sc.queue) {
+    sc.queue = apnap(s, who);
+    sc.chosen = {};
+  }
+  while (sc.queue.length) {
+    const pid = sc.queue[0]!;
+    const options = pickOptions(s, e, pid);
+    if (options.length > n) {
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: n };
+      return "paused";
+    }
+    sc.chosen![pid] = options;
+    sc.queue.shift();
+  }
+  for (const pid of apnap(s, who))
+    for (const id of sc.chosen![pid] ?? []) {
+      const o = s.objects[id];
+      if (o?.zone !== "battlefield") continue;
+      log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
+      moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand");
+    }
+}
+
+/** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
+export function pickOptions(s: GameState, e: { filter: TargetSpec }, pid: PlayerId): ObjectId[] {
+  return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false));
+}
+
 /** Players in APNAP order: the active player first, then in turn order (CR 101.4). */
 function apnap(s: GameState, pids: PlayerId[]): PlayerId[] {
   const i = s.turnOrder.indexOf(s.activePlayer);
@@ -331,6 +373,21 @@ function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   }
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
+  if (ref.ref === "attached") {
+    // What the Aura or Equipment is attached to, while it's still the object the ability came from (CR 400.7).
+    // If it's gone (sacrificed to pay for the ability), what it was attached to as it last existed (CR 608.2h).
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (!me) return [];
+    const same = ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc;
+    let host: GameObject | undefined;
+    if (me.zone === "battlefield" && same) host = me.attachedTo ? s.objects[me.attachedTo] : undefined;
+    else {
+      const lk = s.lastKnown?.[me.id];
+      const was = lk && lk.zc === ctx.sourceZc ? lk.attachedTo : undefined;
+      host = was && (s.objects[was.id]?.zoneChanges ?? 0) === was.zc ? s.objects[was.id] : undefined;
+    }
+    return host?.zone === "battlefield" ? [host] : [];
+  }
   if (ref.ref === "subject") {
     // Only while it's still the same object on the battlefield (CR 400.7).
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
@@ -556,12 +613,22 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         log(s, `${defOf(s, o).name} gets a regeneration shield.`);
       }
       return;
-    case "exile":
+    case "exile": {
+      // "Until ~ leaves the battlefield": if it already left, nothing is exiled (CR 610.3a-b).
+      const me = e.until ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+      if (e.until && !me) {
+        log(s, `${src} has left the battlefield, so nothing is exiled.`);
+        return;
+      }
       for (const o of objects(s, e.what, ctx)) {
-        log(s, `${src} exiles ${defOf(s, o).name}.`);
+        log(s, `${src} exiles ${defOf(s, o).name}${e.until ? ` until ${src} leaves the battlefield` : ""}.`);
         moveObject(s, o.id, "exile");
+        if (me && o.zone === "exile") (me.exiledUntilLeaves ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
       }
       return;
+    }
+    case "pick":
+      return pickPermanents(s, e, ctx, src);
     case "bounce":
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
@@ -723,6 +790,12 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!host || !me || me.zone !== "battlefield" || me.attachedTo === host.id || host.id === me.id) return; // CR 701.3b-c
       if (objIsType(s, me, "Creature")) return; // an Equipment that's also a creature can't equip (CR 301.5c)
+      // Only to something it could be attached to: an Equipment to a creature (CR 301.5c), an Aura to
+      // what it can enchant (CR 303.4d), neither to something with protection from it (CR 702.16c-d).
+      const enchant = compileCard(defOf(s, me)).enchant;
+      const meChars = characteristics(s, me);
+      const meColors = meChars.colors;
+      if (meChars.subtypes.includes("Aura") ? !enchant || !objectMatches(s, enchant, host, ctx.controller, false, meColors) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, ctx.controller, false, meColors)) return;
       me.attachedTo = host.id;
       me.timestamp = s.nextTimestamp++;
       log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);

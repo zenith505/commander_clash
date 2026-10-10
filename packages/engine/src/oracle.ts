@@ -36,6 +36,7 @@ import type {
   PayCost,
   CastFromGraveyard,
   AltCostKind,
+  EntersOption,
 } from "./abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, stripReminder } from "./keywords";
 import { parseManaCost } from "./mana";
@@ -292,6 +293,8 @@ function compile(d: CardDef): CompiledCard {
         out.entersWithCounters = { counter: "+1/+1", n: prev + kw.plusCounters };
       }
       if (kw.bloodthirst) out.bloodthirst = (out.bloodthirst ?? 0) + kw.bloodthirst;
+      if (kw.entersOptions.length) out.entersOptions = [...(out.entersOptions ?? []), ...kw.entersOptions];
+      out.statics.push(...kw.statics);
       continue;
     }
     if (/^~ enters tapped\.$/.test(line)) {
@@ -675,10 +678,12 @@ interface KeywordParts {
   /** Modular N's "enters with N +1/+1 counters" (CR 702.43a). */
   plusCounters: number;
   bloodthirst: number;
+  entersOptions: EntersOption[];
+  statics: StaticAbility[];
 }
 
 function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
-  const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0 };
+  const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0, entersOptions: [], statics: [] };
   const plus = (n: number, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
   for (const raw of line.split(/,\s*/)) {
     const p = raw.trim();
@@ -781,6 +786,18 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
         event: "selfAttacks",
         body: { targets: [], effects: [{ type: "continuous", what: { ref: "allCreatures", other: true, attacking: true }, mods: [{ kind: "modifyPT", power: 1, toughness: 0 }], duration: "endOfTurn" }], text: "Battle cry: each other attacking creature gets +1/+0 until end of turn." },
       });
+    } else if (/^riot$/i.test(p)) out.entersOptions.push("riot"); // CR 702.136a; each instance works separately (702.136b)
+    else if (/^unleash$/i.test(p)) {
+      // CR 702.98a: "You may have this permanent enter with an additional +1/+1 counter on it" and "This
+      // permanent can't block as long as it has a +1/+1 counter on it" (any +1/+1 counter, rulings).
+      out.entersOptions.push("unleash");
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "cantBlock" }], condition: { kind: "selfCounter", counter: "+1/+1" }, text: "Unleash: ~ can't block as long as it has a +1/+1 counter on it." });
+    } else if ((m = /^afterlife (\d+)$/i.exec(p))) {
+      // CR 702.135a: "When this permanent is put into a graveyard from the battlefield, create N 1/1 white and black
+      // Spirit creature tokens with flying." Each instance triggers (702.135b).
+      const n = Number(m[1]);
+      const spirit: TokenSpec = { name: "Spirit", power: 1, toughness: 1, colors: ["W", "B"], types: ["Creature"], subtypes: ["Spirit"], keywords: ["Flying"] };
+      out.triggers.push({ event: "selfToGraveyard", body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n, token: spirit }], text: `Afterlife ${n}: create ${n === 1 ? "a" : n} 1/1 white and black Spirit creature token${n > 1 ? "s" : ""} with flying.` } });
     } else if ((m = /^bloodthirst (\d+)$/i.exec(p))) out.bloodthirst += Number(m[1]); // CR 702.54a
     else if ((m = /^soulshift (\d+)$/i.exec(p))) {
       // CR 702.46a: "When this permanent is put into a graveyard from the battlefield, you may return target
@@ -1809,15 +1826,42 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
+  // "Exile target creature an opponent controls until ~ leaves the battlefield" (CR 610.3).
+  if ((m = /^Exile (target .+|up to one target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
+  }
+  // "When ~ enters, attach it to target creature you control." (CR 701.3)
+  if ((m = /^Attach (?:~|it) to (target .+)$/i.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "attach", what }] : null;
+  }
+  // "Target creature can't block this turn", "~ can't attack or block this turn": until the turn ends.
+  if ((m = /^(.+?) can't (block|attack|attack or block) this turn$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods: Modification[] = m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
+    return what ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
+  }
+  // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
+  // of their choice", "return a land you control to its owner's hand" (CR 701.21).
+  if ((m = new RegExp(`^Return ${NUM} (.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
+    const filter = pickFilter(m[2]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
+  }
+  if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    const filter = pickFilter(m[3]!);
+    return who && filter && [{ type: "pick", who, filter, n: amt(m[2]!), action: "sacrifice" }];
+  }
   // Removal and tapping
-  if ((m = /^(Destroy|Exile|Tap|Untap) (target .+|all .+|each .+|~|it|that creature|that permanent)$/i.exec(s))) {
+  if ((m = /^(Destroy|Exile|Tap|Untap) (target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     if (!what) return null;
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy"];
     return [{ type, what }];
   }
   // Regeneration (CR 701.19a)
-  if ((m = /^Regenerate (~|target .+)$/i.exec(s))) {
+  if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
   }
@@ -1825,7 +1869,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^Return (target .+?|~|it) to its owner's hand$/i.exec(s))) {
+  if ((m = /^Return (target .+?|~|it|enchanted creature|equipped creature) to its owner's hand$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;
   }
@@ -2062,6 +2106,17 @@ function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   return parseObject(p, ctx);
 }
 
+/** What a "pick" effect picks from: "creature", "nonland permanent", "two lands", "artifact or creature", "Forest". */
+function pickFilter(phrase: string): TargetSpec | null {
+  const words = phrase.trim().replace(/ you control$/i, "").split(" ");
+  // "a Plains" is already singular; "two creatures" isn't.
+  const asIs = words.join(" ");
+  const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === words.length - 1 ? singular(w) : w)).join(" ");
+  const spec = parseTargetPhrase(one);
+  if (spec?.kind !== "object" || spec.controller) return null;
+  return { ...spec, text: one };
+}
+
 function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   const x = p.trim().toLowerCase();
   if (x === "you") return { ref: "you" };
@@ -2095,6 +2150,8 @@ function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (ctx.selfCard && /^it$/i.test(x)) return { ref: "selfCard" };
     return ctx.subject && /^that creature$/i.test(x) ? { ref: "subject" } : null;
   }
+  // "Enchanted creature", "equipped creature": what the source is attached to (not targeted).
+  if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) return { ref: "attached" };
   const group = parseGroup(x);
   if (group && group.other && ctx.spell) {
     // A spell's "other creatures you control": other than the creature it targeted ("Put two +1/+1

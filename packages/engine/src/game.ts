@@ -1,7 +1,7 @@
-import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, TargetChoice } from "./abilities";
+import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice } from "./abilities";
 import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { addDelayed, becomeMonarch, triggerBody, canChooseModes, choiceOptions, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
+import { addDelayed, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
@@ -282,6 +282,9 @@ export function applyAction(state: GameState, action: Action): GameState {
     case "searchLibrary":
       searchLibrary(s, p, action.found);
       break;
+    case "pickPermanents":
+      pickPermanents(s, p, action.ids);
+      break;
     case "chooseMay":
       chooseMay(s, p, action.yes);
       break;
@@ -411,7 +414,12 @@ export function moveObject(
   const wasCreature = last.types.includes("Creature");
   // A face-down permanent has no abilities of its own (CR 708.2), so nothing of the card's triggers as it leaves.
   const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
-  if (fromZone === "battlefield") (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller };
+  if (fromZone === "battlefield") {
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}) };
+  }
+  const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
+  o.exiledUntilLeaves = undefined;
   const from = zoneList(s, o);
   if (from) {
     const i = from.indexOf(id);
@@ -474,10 +482,55 @@ export function moveObject(
     if (escaped && printed.escapesWith) o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + printed.escapesWith;
     // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
     for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges, ...c });
-    fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
+    // Riot and unleash: whether it has a +1/+1 counter is part of how it enters (CR 614.12), so what it
+    // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
+    const options = printed.entersOptions ?? [];
+    options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
+    if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
   }
   // "Dies" is a creature put into a graveyard from the battlefield (CR 700.4); other triggers say "put into a graveyard".
   if (fromZone === "battlefield" && to === "graveyard") fireEvent(s, { type: "dies", id, controller: lastController, hadAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness });
+  if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
+}
+
+/**
+ * "Exile ... until ~ leaves the battlefield" ends: right after the source leaves, the cards come back
+ * under their owners' control, all at once (CR 610.3, 610.3c-d). Only if each is still the object it
+ * exiled; a token has ceased to exist (CR 111.7). An Aura's owner chooses what it enchants, and with
+ * nothing it can enchant it stays in exile (CR 303.4f-g).
+ */
+function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number }[], source: string) {
+  const back = links.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === links[i]!.zc && !c.isToken);
+  for (const c of back) {
+    const d = defOf(s, c);
+    let attachTo: ObjectId | undefined;
+    if (d.subtypes.includes("Aura")) {
+      attachTo = auraHostFor(s, c, c.owner);
+      if (!attachTo) {
+        log(s, `${d.name} stays in exile (nothing it can enchant).`);
+        continue;
+      }
+    }
+    log(s, `${d.name} returns to the battlefield (${source} left)${attachTo ? ` attached to ${nameOf(s, attachTo)}` : ""}.`);
+    moveObject(s, c.id, "battlefield", { controller: c.owner, ...(attachTo ? { attachTo } : {}) });
+  }
+}
+
+/**
+ * Where an Aura put onto the battlefield without a spell goes (CR 303.4f): something its enchant
+ * ability allows (it isn't targeted, so hexproof doesn't stop it). The player picks: one of their own
+ * if the Aura only helps what it enchants, an opponent's otherwise.
+ */
+function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): ObjectId | undefined {
+  const enchant = compileCard(defOf(s, aura)).enchant;
+  if (!enchant) return undefined;
+  const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura).colors));
+  const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
+  const good = (m: Modification) =>
+    m.kind === "addKeywords" || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
+  const statics = compileCard(defOf(s, aura)).statics;
+  const helps = statics.length > 0 && statics.every((st) => st.mods.every(good));
+  return (helps ? legal.find(mine) : legal.find((id) => !mine(id))) ?? legal[0];
 }
 
 /**
@@ -1374,6 +1427,18 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   continueResolution(s);
 }
 
+/** "Sacrifice a creature", "return a land you control": the permanents this player picked (see the "pick" effect). */
+function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("nothing to pick");
+  if (new Set(ids).size !== pend.count || ids.some((id) => !pend.options.includes(id))) throw new RulesError(`choose exactly ${pend.count} of the permanents offered`);
+  r.scratch.chosen![p.id] = ids;
+  r.scratch.queue.shift();
+  s.pending = null;
+  continueResolution(s);
+}
+
 /** Scry or surveil: put the looked-at cards back on top in the given order, the rest on the bottom or into the graveyard. */
 function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) {
   const pend = s.pending;
@@ -1405,18 +1470,27 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
 function chooseOption(s: GameState, p: Player, choice: string) {
   const pend = s.pending;
   if (pend?.kind !== "chooseOption" || pend.player !== p.id) throw new RulesError("nothing to choose");
-  if (!pend.options.includes(choice)) throw new RulesError(`${choice} isn't a ${pend.what === "color" ? "color" : "creature type"} you can choose`);
+  if (!pend.options.includes(choice)) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : "an option"} you can choose`);
   s.pending = null;
   if (pend.objectId) {
     const o = obj(s, pend.objectId);
-    o.chosen = withChoice(o.chosen, pend.what, choice);
-    s.entersChoices?.shift();
+    const entry = s.entersChoices?.shift();
+    if (pend.what === "riot" || pend.what === "unleash") {
+      // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
+      if (choice === ENTERS_COUNTER) o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + 1;
+      else if (pend.what === "riot")
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: pend.source, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      log(s, `${pend.source} enters ${choice === ENTERS_COUNTER ? "with a +1/+1 counter" : pend.what === "riot" ? "with haste" : "without a counter"} (${pend.what}).`);
+    } else {
+      o.chosen = withChoice(o.chosen, pend.what, choice);
+      log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
+    }
     invalidateCharacteristics(s);
-    log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
+    if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
     return;
   }
   const r = s.resolving;
-  if (!r) throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash") throw new RulesError("nothing to choose");
   r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${choice}.`);
   continueResolution(s);

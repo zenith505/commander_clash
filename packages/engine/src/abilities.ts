@@ -145,6 +145,8 @@ export type ObjRef =
   | { ref: "sacrificed" }
   /** Battle cry's "each other attacking creature". */
   | { ref: "allCreatures"; controller?: "you" | "opponent"; other?: boolean; attacking?: boolean }
+  /** "Enchanted creature", "equipped creature": the permanent the source is attached to, while it's still that source. */
+  | { ref: "attached" }
   /** "all creatures", "each artifact and enchantment", "other creatures you control": every permanent that matches, not targeted. */
   | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number };
 
@@ -223,8 +225,14 @@ export interface StaticAbility {
   mods: Modification[];
   text: string;
   /** "As long as there are seven or more cards in your graveyard" (threshold): applies only while true. */
-  condition?: { kind: "graveyardAtLeast"; n: number };
+  condition?: StaticCondition;
 }
+
+/**
+ * When a static ability applies: threshold's "seven or more cards in your graveyard", unleash's
+ * "as long as it has a +1/+1 counter on it" (CR 702.98a).
+ */
+export type StaticCondition = { kind: "graveyardAtLeast"; n: number } | { kind: "selfCounter"; counter: "+1/+1" | "-1/-1" };
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
@@ -235,7 +243,17 @@ export type Effect =
   | { type: "destroy"; what: ObjRef; noRegen?: boolean } // "It can't be regenerated."
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | { type: "regenerate"; what: ObjRef }
-  | { type: "exile"; what: ObjRef }
+  /**
+   * `until`: "exile target creature until ~ leaves the battlefield" (CR 610.3): it comes back under its
+   * owner's control right after the source leaves, and isn't exiled at all if the source left first.
+   */
+  | { type: "exile"; what: ObjRef; until?: "sourceLeaves" }
+  /**
+   * "Sacrifice a creature", "each opponent sacrifices a creature of their choice", "return a land you
+   * control to its owner's hand": each player picks n of their own permanents that match, in APNAP order,
+   * then they're all sacrificed or returned at once (CR 101.4, 701.21). Not targeted.
+   */
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: "sacrifice" | "bounce" }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean }
@@ -320,6 +338,9 @@ export type Effect =
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 export type ChoiceKind = "creatureType" | "color";
+
+/** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
+export type EntersOption = "riot" | "unleash";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition = { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string };
@@ -506,6 +527,11 @@ export interface CompiledCard {
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
   entersChoose?: { what: ChoiceKind; except?: string }[];
+  /**
+   * Riot (CR 702.136a): enters with a +1/+1 counter or gains haste. Unleash (CR 702.98a): may enter with
+   * a +1/+1 counter. Chosen as it enters, by its controller.
+   */
+  entersOptions?: EntersOption[];
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: "+1/+1" | "-1/-1"; n: Amount };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */

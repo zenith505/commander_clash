@@ -2,7 +2,7 @@ import { allEffects, type AbilityBody, type AltCostKind, type CastFromGraveyardK
 import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
-import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sourceColors, COLOR_NAMES } from "./effects";
+import { bindChosen, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sourceColors, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
   abilityProblem,
@@ -74,9 +74,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
+    if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action) }];
+    if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
+      // Riot: haste when it can still attack this turn, the counter otherwise. Unleash: the counter, unless we need blockers.
+      const haste = pend.what === "riot" && s.activePlayer === pid && s.step === "main1";
+      const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
+      return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
+    }
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
-      return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what, card, pend.options) }];
+      return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
     }
     if (pend.kind === "arrangeTop") {
       const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
@@ -433,6 +440,19 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
   }
   return out;
+}
+
+/**
+ * Which of our permanents to sacrifice or return to hand: the least valuable. Returning a land, a
+ * tapped one that's already been used this turn, and not the one that asked for it if we can help it.
+ */
+function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: "sacrifice" | "bounce"): ObjectId[] {
+  const self = s.resolving?.item.sourceId;
+  const cost = (id: ObjectId) => {
+    const o = obj(s, id);
+    return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);
+  };
+  return [...options].sort((a, b) => cost(a) - cost(b)).slice(0, count);
 }
 
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;

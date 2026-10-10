@@ -209,7 +209,9 @@ function exists(s: GameState, e: Inst, chars: CharMap): boolean {
   const src = chars.get(e.sourceId!);
   if (!src || !src.hasPrintedAbilities) return false;
   // Threshold: seven or more cards in its controller's graveyard (a condition, not a dependency on layers).
-  if (e.condition && (s.players[src.controller]?.graveyard.length ?? 0) < e.condition.n) return false;
+  if (e.condition?.kind === "graveyardAtLeast" && (s.players[src.controller]?.graveyard.length ?? 0) < e.condition.n) return false;
+  // Unleash: "as long as it has a +1/+1 counter on it" (CR 702.98a).
+  if (e.condition?.kind === "selfCounter" && !(s.objects[e.sourceId!]?.counters[e.condition.counter] ?? 0)) return false;
   if (e.affects.kind === "attached") {
     const host = s.objects[e.sourceId!]!.attachedTo;
     return !!host && chars.has(host);

@@ -471,6 +471,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       return;
     }
+    // "Sacrifice a creature", "return a land you control": click your permanents to pick them.
+    if (pending?.kind === "pickPermanents") {
+      if (pending.player === HUMAN && pending.options.includes(o.id))
+        setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id].slice(-pending.count)));
+      return;
+    }
     if (pending?.kind === "chooseMay" || pending?.kind === "payUnless" || pending?.kind === "mulligan") return;
     if (pending?.kind === "discardToHandSize" || pending?.kind === "discard" || pending?.kind === "bottomCards") {
       if (o.zone === "hand" && o.owner === HUMAN)
@@ -518,7 +524,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       (!!attackers?.has(o.id) && !(o.id in attacks) && aim !== o.id) ||
       (canBlockWith(o) && blocker !== o.id) ||
       (!!tapPick && !tapPick.chosen.includes(o.id) && tapCandidates(s, tapPick).some((c) => c.id === o.id)) ||
-      (!!costPick && !costPick.chosen.includes(o.id) && costPick.candidates.includes(o.id)),
+      (!!costPick && !costPick.chosen.includes(o.id) && costPick.candidates.includes(o.id)) ||
+      (pending?.kind === "pickPermanents" && pending.player === HUMAN && pending.options.includes(o.id) && !discards.includes(o.id)),
   };
   const waiting = waitingOn(s);
   const corners = seatCorners(s);
@@ -2043,6 +2050,33 @@ function Controls({
         </button>
       </div>
     );
+  if (pending?.kind === "chooseOption" && (pending.what === "riot" || pending.what === "unleash") && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}</strong>
+          {pending.what === "riot" ? " (riot): enter with a +1/+1 counter, or with haste?" : " (unleash): enter with a +1/+1 counter? It can't block while it has one."}
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className={o === pending.options[0] ? "" : "ghost"} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o}
+          </button>
+        ))}
+      </div>
+    );
+  if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
+    const verb = pending.action === "sacrifice" ? "sacrifice" : "return to your hand";
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> click {pending.count === 1 ? `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}` : `${pending.count} (${pending.what})`} of yours to {verb}.
+        </span>
+        <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
+          {pending.action === "sacrifice" ? "Sacrifice" : "Return"}
+        </button>
+      </div>
+    );
+  }
   if (pending?.kind === "chooseOption" && pending.what === "color")
     return (
       <div className="controls color-pick">
@@ -2192,7 +2226,7 @@ function GameLog({ s }: { s: GameState }) {
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
   if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand)\b/, " your $1");
-  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes)\b/g, (_, pre: string, v: string) =>
+  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks)\b/g, (_, pre: string, v: string) =>
     `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v.slice(0, -1)}`,
   );
 }

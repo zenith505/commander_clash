@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, CastFromGraveyardKind, ChoiceKind, Modification, PayCost, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, CastFromGraveyardKind, ChoiceKind, EntersOption, Modification, PayCost, TargetChoice, TargetSpec } from "./abilities";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
@@ -98,6 +98,8 @@ export interface GameObject {
    * disguise). Only its controller may look at it (CR 708.5).
    */
   faceDown?: FaceDownKind;
+  /** Cards this permanent exiled "until ~ leaves the battlefield" (CR 610.3), as they are in exile. */
+  exiledUntilLeaves?: { id: ObjectId; zc: number }[];
   /** A replacement effect: if it would leave this zone, it's exiled instead (flashback, CR 702.34a; unearth, 702.84a). */
   exileIfLeaves?: ZoneName;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
@@ -293,7 +295,12 @@ export type PendingDecision =
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
    */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind; options: string[]; objectId?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption; options: string[]; objectId?: ObjectId }
+  /**
+   * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
+   * (your own permanents) as a spell or ability resolves.
+   */
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: "sacrifice" | "bounce"; what: string; options: ObjectId[]; count: number }
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
   | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] };
@@ -334,7 +341,8 @@ export interface GameState {
   delayed?: DelayedTrigger[];
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId }>;
+  /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number } }>;
   nextTimestamp: number;
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
@@ -342,7 +350,11 @@ export interface GameState {
   /** A spell or ability partway through resolving, waiting on `pending` (see continueResolution). */
   resolving: Resolving | null;
   /** Permanents that just entered and still have an "as ~ enters, choose ..." choice to make (CR 614.12). */
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind; except?: string }[];
+  /**
+   * Choices made as permanents enter (CR 614.12), still to ask. `enters`: its enters event waits for
+   * the choice (riot, unleash: whether it has a +1/+1 counter as it enters matters to what triggers).
+   */
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number } }[];
   nextId: number;
   log: GameEvent[];
   winner: PlayerId | null;
@@ -421,6 +433,8 @@ export type Action =
   | { type: "arrangeTop"; player: PlayerId; top: ObjectId[]; away: ObjectId[] }
   /** Answer to searchLibrary: the cards found (first = the one for `firstTo`). */
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
+  /** Answer to pickPermanents. */
+  | { type: "pickPermanents"; player: PlayerId; ids: ObjectId[] }
   /** Answer to chooseOption: one of its options. */
   | { type: "chooseOption"; player: PlayerId; choice: string }
   /** Answer to chooseMay. */

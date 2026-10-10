@@ -120,6 +120,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const ch = o.zone === "battlefield" ? view(o) : characteristics(s, o);
       return ch?.[c.kind] ?? 0;
     }
+    case "counters": {
+      const o = refObjects(s, c.of, ctx)[0];
+      if (o?.zone === "battlefield") return o.counters[c.counter] ?? 0;
+      return c.of.ref === "self" || c.of.ref === "subject" ? (ctx.lki?.counters?.[c.counter] ?? 0) : 0;
+    }
     case "devotion": {
       // Each mana symbol of that color among the mana costs of permanents you control; a hybrid
       // symbol of two of the colors counts once (CR 700.5).

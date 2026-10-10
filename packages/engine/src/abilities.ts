@@ -11,7 +11,9 @@ import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId } from "./types"
 export type Amount = number | AmountExpr;
 
 /** Counter kinds effects can put on permanents. Stun and shield are keyword counters (CR 122.1c-d). */
-export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade";
+/** +1/+1, -1/-1, stun (CR 122.1d), shield (122.1c), and named counters with no rules of their own: charge, spore, oil, ... */
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade" | (string & {});
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
 export type PickAction = "sacrifice" | "bounce" | "counters";
@@ -70,7 +72,9 @@ export type Count =
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */
   | { kind: "wasKicked"; which?: number }
   /** "That much", "that many" in a triggered ability: the damage its event dealt. */
-  | { kind: "eventAmount" };
+  | { kind: "eventAmount" }
+  /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
+  | { kind: "counters"; counter: CounterKind; of: ObjRef };
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
@@ -586,6 +590,8 @@ export interface ActivatedAbility {
   exileSelf?: boolean;
   /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
   costs?: AdditionalCost[];
+  /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */
+  removeCounters?: { counter: CounterKind; n: number };
 }
 
 /**
@@ -613,6 +619,8 @@ export interface ManaAbility {
   sacrificeSelf: boolean;
   lifeCost?: number;
   energyCost?: number;
+  /** "{T}, Remove a charge counter from ~: Add one mana of any color." */
+  removeCounters?: { counter: CounterKind; n: number };
   produces: ManaProduce;
   /** Painlands: "~ deals 1 damage to you." */
   selfDamage?: number;

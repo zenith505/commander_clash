@@ -871,6 +871,19 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **11,154 cards are fully supported.** Rules tests: `test/dig.test.ts`, `test/fading-dethrone.test.ts`.
 
+### Charge, spore, oil and other named counters (added 2026-10-10)
+
+- Counters of any name (CR 122.1): "put a spore counter on ~", "~ enters with three charge counters on
+  it", "{T}, Remove a charge counter from ~: Add one mana of any color", "Remove three spore counters
+  from ~: Create a 1/1 green Saproling", "{2}, Remove a +1/+1 counter from ~: ...". Removing counters is
+  a cost (CR 602.2b): it can't be activated without enough of them.
+- Counting them: "for each oil counter on it", "the number of charge counters on ~", as it last existed
+  after it's sacrificed to pay for the ability.
+- Bots use abilities that remove named counters (they run out, so it isn't an endless loop).
+- Permanents show their named counters as chips.
+
+**11,323 cards are fully supported.** Rules tests: `test/named-counters.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

@@ -153,8 +153,8 @@ const num = (s: string) => NUMBER_WORDS[s.toLowerCase()] ?? Number(s);
 /** Like NUM, but X too (CR 107.3). */
 const NUMX = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\\d+|X)";
 /** Counter kinds effects can put on permanents (see CounterKind). */
-const COUNTER = "([+-]1/[+-]1|stun|shield)";
-const counterKind = (t: string): CounterKind => (t === "-1/-1" || t === "stun" || t === "shield" ? t : "+1/+1");
+const COUNTER = "([+-]1/[+-]1|(?!(?:additional|each|kind|that|those|the|its|more|fewer|of)\\b)[a-z]+)";
+const counterKind = (t: string): CounterKind => t;
 const X: AmountExpr = { count: { kind: "x" } };
 const amt = (s: string): Amount => (s === "X" ? X : num(s));
 /** A power/toughness change: "+2", "-1", "+X", "-X". */
@@ -181,7 +181,8 @@ const ALL_COLORS: ManaType[] = ["W", "U", "B", "R", "G"];
  * we can run (mana that can only be spent on some spells, "in any combination", ...).
  */
 export function parseManaAbility(line: string): ManaAbility | null {
-  const m = /^((?:\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+)(?:, (?:\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+))*): Add ([^.]+)\.((?: [^.]+\.)*)$/.exec(line);
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~`;
+  const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
   let tap = false;
@@ -189,8 +190,11 @@ export function parseManaAbility(line: string): ManaAbility | null {
   let manaCost = "";
   let lifeCost: number | undefined;
   let energyCost: number | undefined;
+  let removeCounters: ManaAbility["removeCounters"];
   for (const c of costs) {
-    if (c === "{T}") tap = true;
+    const rc = removeCounterCost(c);
+    if (rc) removeCounters = rc;
+    else if (c === "{T}") tap = true;
     else if (c === "Sacrifice ~") sacrificeSelf = true;
     else if (/^Pay \d+ life$/.test(c)) lifeCost = Number(/\d+/.exec(c)![0]);
     else if (/^Pay (\{E\})+$/.test(c)) energyCost = energyIn(c);
@@ -199,7 +203,7 @@ export function parseManaAbility(line: string): ManaAbility | null {
   }
   const produces = parseManaProduced(m[2]!);
   if (!produces) return null;
-  const out: ManaAbility = { text: line, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}) };
+  const out: ManaAbility = { text: line, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}) };
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
@@ -208,6 +212,12 @@ export function parseManaAbility(line: string): ManaAbility | null {
     else return null;
   }
   return out;
+}
+
+/** "Remove three spore counters from ~", "Remove a +1/+1 counter from ~" as part of a cost. */
+function removeCounterCost(part: string): { counter: CounterKind; n: number } | null {
+  const m = new RegExp(`^Remove ${NUM} ${COUNTER} counters? from ~$`).exec(part);
+  return m ? { counter: counterKind(m[2]!), n: num(m[1]!) } : null;
 }
 
 function parseManaProduced(text: string): ManaProduce | null {
@@ -1423,15 +1433,20 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
 
 function parseActivated(line: string): ActivatedAbility | "fail" | null {
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
   // Sacrificing other permanents or discarding cards as part of the cost (CR 602.2b, 601.2h).
   const extra: AdditionalCost[] = [];
+  let removeCounters: ActivatedAbility["removeCounters"];
   for (const part of costs.split(", ")) {
     let c: RegExpExecArray | null;
-    if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|${NUM}) (.+)$`).exec(part))) {
+    if (/^Remove /.test(part)) {
+      const rc = removeCounterCost(part);
+      if (!rc || !Number.isFinite(rc.n)) return "fail"; // "Remove X counters" isn't modeled
+      removeCounters = rc;
+    } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|${NUM}) (.+)$`).exec(part))) {
       const filter = pickFilter(c[3]!); // NUM is a group of its own
       if (!filter) return "fail";
       extra.push({ kind: "sacrifice", filter, n: c[1] === "another" ? 1 : num(c[1]!), ...(c[1] === "another" ? { other: true } : {}) });
@@ -1477,6 +1492,7 @@ function parseActivated(line: string): ActivatedAbility | "fail" | null {
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(energy ? { energyCost: energy } : {}),
     ...(extra.length ? { costs: extra } : {}),
+    ...(removeCounters ? { removeCounters } : {}),
   };
 }
 
@@ -2151,6 +2167,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     return of && count({ kind, of });
+  }
+  // "Charge counter on ~", "+1/+1 counters on it".
+  if ((m = new RegExp(`^${COUNTER} counters? on (~|it|that creature)$`).exec(p))) {
+    const of = whoseObject(m[2] === "~" ? "~'s" : m[2] === "it" ? "its" : "that creature's", ctx);
+    return of && count({ kind: "counters", counter: counterKind(m[1]!), of });
   }
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
   if ((m = /^(Aura|Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))

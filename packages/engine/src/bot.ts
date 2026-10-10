@@ -761,7 +761,8 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.
-      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length;
+      // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
+      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
       if ((ab.sacrificeSelf && !cashIn) || freeCost) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)

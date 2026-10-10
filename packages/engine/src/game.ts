@@ -935,6 +935,13 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
   log(s, `${p.name} plays ${d.name}${obj(s, id).tapped ? " (tapped)" : ""}.`);
 }
 
+/** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
+function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }) {
+  const left = (o.counters[rc.counter] ?? 0) - rc.n;
+  o.counters[rc.counter] = left;
+  if (left === 0 && rc.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
+}
+
 export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
@@ -956,6 +963,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.tap) o.tapped = true;
   if (ab.lifeCost) p.life -= ab.lifeCost;
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
+  if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
@@ -1421,6 +1429,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
   if (ab.lifeCost && p.life < ab.lifeCost) return `you can't pay ${ab.lifeCost} life`; // CR 119.4
+  if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
     const cp = crewProblem(s, pid, o, ab.crew, tapCreatures);
@@ -1485,10 +1494,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const abCost = parseManaCost(ab.manaCost);
   const paid = payFromPool(abCost, p.manaPool, (x ?? 0) * xCount(abCost), p.life)!;
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
-  const lki = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o) } : undefined;
+  const lki = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : undefined;
   p.manaPool = paid.pool;
   p.life -= paid.lifePaid + (ab.lifeCost ?? 0);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
+  if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(index);
   if (ab.tap) o.tapped = true;
   for (const c of tapCreatures ?? []) obj(s, c).tapped = true;

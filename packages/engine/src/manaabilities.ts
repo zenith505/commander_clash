@@ -81,13 +81,14 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   const p = player(s, pid);
   if (ab.lifeCost && p.life < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
+  if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (!ignorePool && ab.manaCost && !payFromPool(parseManaCost(ab.manaCost), p.manaPool)) return "not enough mana";
   return null;
 }
 
 /** How much a player gives up by using it, beyond the tap: lower is better. */
 export function manaPenalty(ab: ManaAbility): number {
-  return (ab.sacrificeSelf ? 8 : 0) + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost ? 2 : 0) + (ab.skipNextUntap ? 1 : 0);
+  return (ab.sacrificeSelf ? 8 : 0) + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters ? 2 : 0) + (ab.skipNextUntap ? 1 : 0);
 }
 
 /**

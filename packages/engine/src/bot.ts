@@ -737,9 +737,11 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       const ab = abilities[i]!;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
-      if ((ab.sacrificeSelf && !cashIn) || (!ab.tap && !ab.manaCost)) continue;
+      // A cost of nothing, "{0}" included, could be paid over and over.
+      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX;
+      if ((ab.sacrificeSelf && !cashIn) || freeCost) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
-      if (isSelfRegeneration(ab.body)) continue; // only when something threatens it (chooseRegeneration)
+      if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (doesNothingNow(s, id, ab.body)) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
@@ -786,7 +788,16 @@ function chooseUnearth(s: GameState, pid: PlayerId): Action[] | null {
  * ability on top of the stack is aimed at, or one in a combat it would lose, once blocks are
  * declared and before damage. One shield is enough.
  */
-const isSelfRegeneration = (body: AbilityBody) => body.effects.length > 0 && body.effects.every((e) => e.type === "regenerate" && e.what.ref === "self");
+/**
+ * If the ability only regenerates its source or what the source is attached to ("Regenerate enchanted
+ * creature"), that permanent (null when it's attached to nothing); undefined for any other ability.
+ */
+function regenerates(s: GameState, o: GameObject, body: AbilityBody): GameObject | null | undefined {
+  if (!body.effects.length || !body.effects.every((e) => e.type === "regenerate" && (e.what.ref === "self" || e.what.ref === "attached"))) return undefined;
+  const ref = (body.effects[0] as Extract<Effect, { type: "regenerate" }>).what.ref;
+  if (ref === "self") return o;
+  return o.attachedTo ? (s.objects[o.attachedTo] ?? null) : null;
+}
 
 function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
   const top = s.stack[s.stack.length - 1];
@@ -796,10 +807,12 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      if (!isSelfRegeneration(ab.body) || (o.regenShields ?? 0) > 0) continue;
-      const aimedAt = !!top && top.controller !== pid && top.targets?.some((t) => t.kind === "object" && t.id === id);
-      const foes = s.step === "declareBlockers" && !top ? (o.blocking ? [o.blocking] : o.attacking !== undefined ? (o.blockedBy ?? []) : []) : [];
-      const losing = foes.reduce((n, f) => n + (s.objects[f] ? power(s, obj(s, f)) : 0), 0) >= Math.max(1, lethalDamage(s, o));
+      // The creature it would regenerate: itself, or the one it enchants or equips, if that's ours.
+      const c = regenerates(s, o, ab.body);
+      if (!c || controllerOf(s, c) !== pid || (c.regenShields ?? 0) > 0) continue;
+      const aimedAt = !!top && top.controller !== pid && top.targets?.some((t) => t.kind === "object" && t.id === c.id);
+      const foes = s.step === "declareBlockers" && !top ? (c.blocking ? [c.blocking] : c.attacking !== undefined ? (c.blockedBy ?? []) : []) : [];
+      const losing = foes.reduce((n, f) => n + (s.objects[f] ? power(s, obj(s, f)) : 0), 0) >= Math.max(1, lethalDamage(s, c));
       if (!aimedAt && !losing) continue;
       if (abilityProblem(s, pid, id, i) && !/not enough mana/.test(abilityProblem(s, pid, id, i)!)) continue;
       const plan = planActivate(s, pid, id, i, undefined, undefined);

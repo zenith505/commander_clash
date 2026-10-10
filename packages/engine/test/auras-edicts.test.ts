@@ -73,6 +73,19 @@ describe("enchanted creature", () => {
 const power = (s: GameState, id: string) => characteristics(s, s.objects[id]!).power;
 const toughness = (s: GameState, id: string) => characteristics(s, s.objects[id]!).toughness;
 
+describe("bots and Aura abilities", () => {
+  it("don't activate a free 'regenerate enchanted creature' over and over", () => {
+    const leeches = card("Leech Test", "Enchantment — Aura", "{B}", { oracleText: "Enchant creature\n{0}: Regenerate enchanted creature.", keywords: ["Enchant"] });
+    supported(leeches);
+    const { s: s0, ap } = setup([]);
+    const mine = putOnBattlefield(s0, ap, bear());
+    const aura = putOnBattlefield(s0, ap, leeches);
+    s0.objects[aura]!.attachedTo = mine;
+    s0.players[ap]!.isBot = true;
+    expect(botActions(s0, ap).some((a) => a.type === "activateAbility")).toBe(false);
+  });
+});
+
 describe("picking your own permanents", () => {
   it("a bounce land returns a land you control, maybe itself", () => {
     supported(karoo, edict, marauder);

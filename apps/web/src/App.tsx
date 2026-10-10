@@ -4,6 +4,7 @@ import {
   abilityProblem,
   canCast,
   castProblem,
+  delveRoom,
   graveyardCast,
   commanderTax,
   abilitiesOf,
@@ -53,6 +54,7 @@ import {
   type AbilityBody,
   type AdditionalCost,
   type CastFromGraveyardKind,
+  type AltCostKind,
   type StackItem,
   type Step,
   type TargetChoice,
@@ -163,7 +165,14 @@ type CastDraft = {
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** Cast for its evoke or dash cost (CR 118.9). */
+  alt?: AltCostKind;
+  /** Cards exiled from your graveyard for delve (CR 702.66a). */
+  delve?: string[];
 };
+
+/** Choosing cards to exile for delve: any number up to `max`. */
+type DelvePick = { draft: CastDraft; label: string; max: number; candidates: string[]; chosen: string[] };
 
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string };
@@ -212,6 +221,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [kickPick, setKickPick] = useState<KickPick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [costPick, setCostPick] = useState<CostPick | null>(null);
+  const [delvePick, setDelvePick] = useState<DelvePick | null>(null);
   const [stackHidden, setStackHidden] = useState(false);
   const [handMinimized, toggleHand] = useHandTucked();
 
@@ -238,7 +248,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick);
+  const picking = !!(xPick || kickPick || costPick || delvePick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -310,13 +320,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}) };
+    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.alt ? { alt: d.alt } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     if (d.kicks === undefined && compiled.kicker)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, chosen: [] });
     if (d.buyback === undefined && compiled.buyback) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback });
     // Cast without paying its mana cost, X is 0 (CR 107.3b).
-    if (d.x === undefined && parseManaCost(card.manaCost).hasX && !free && !d.via) {
+    if (d.x === undefined && parseManaCost(card.manaCost).hasX && !free && !d.via && !d.alt) {
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: card.manaCost, max, value: max });
     }
@@ -342,7 +352,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
+      ...(d.delve?.length ? { delve: d.delve } : {}),
     };
+    // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
+    if (d.delve === undefined && !free) {
+      const max = delveRoom(s, HUMAN, d.objectId, choices, d.x ?? 0);
+      if (max > 0) {
+        const candidates = s.players[HUMAN]!.graveyard.filter((id) => id !== d.objectId && !d.exileCards?.includes(id));
+        let need = 0;
+        while (need < max && !planCast(s, HUMAN, d.objectId, d.targets, d.modes, d.convoke ?? "auto", d.x, { ...choices, ...(need ? { delve: candidates.slice(0, need) } : {}) })) need++;
+        return setDelvePick({ draft: d, label: card.name, max, candidates, chosen: candidates.slice(0, need) });
+      }
+    }
     dispatch(
       planCast(s, HUMAN, d.objectId, d.targets, d.modes, d.convoke ?? "auto", d.x, choices) ?? [
         { type: "castSpell", player: HUMAN, objectId: d.objectId, targets: d.targets, modes: d.modes, ...(d.convoke?.length ? { convoke: d.convoke } : {}), ...(d.x ? { x: d.x } : {}), ...choices },
@@ -362,10 +383,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
    * Start casting a card from your hand or command zone. A convoke spell first asks which
    * creatures to tap (suggesting some only when your mana can't pay), then modes, then targets.
    */
-  function startCast(id: string, convoke?: string[], via?: CastFromGraveyardKind) {
+  function startCast(id: string, convoke?: string[], via?: CastFromGraveyardKind, alt?: AltCostKind) {
     if (!s) return;
     const d = cardOf(s, id);
     if (via) return continueCast({ objectId: id, via }); // from a graveyard: the usual steps, without convoke
+    if (alt) return continueCast({ objectId: id, alt }); // evoke or dash
     if (convoke === undefined && compileCard(d).convoke && convokers(s).length && freeCastOf(s, HUMAN) !== id) {
       const fromMana = planCast(s, HUMAN, id) !== null;
       const total = spellCost(s, HUMAN, s.objects[id]!);
@@ -453,8 +475,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
-    // A card with cycling: choose between casting (or playing) it and cycling it.
-    if (o.zone === "hand" && handAbilities(s, o.id).length) return setMenu(o.id);
+    // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length)) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && compileCard(cardOf(s, o.id)).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
@@ -627,6 +649,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 startCast(menu, undefined, via);
               }}
+              onCastAlt={(alt) => {
+                setMenu(null);
+                startCast(menu, undefined, undefined, alt);
+              }}
               onClose={() => setMenu(null)}
             />
           )}
@@ -679,6 +705,25 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 continueCast({ ...costPick.draft, sacrifice: costPick.chosen });
               }}
               onCancel={() => setCostPick(null)}
+            />
+          )}
+          {delvePick && (
+            <CardChoice
+              s={s}
+              title={`${delvePick.label}: delve, exile up to ${delvePick.max} card${delvePick.max === 1 ? "" : "s"} from your graveyard, each paying for {1}`}
+              cards={delvePick.candidates}
+              chosen={delvePick.chosen}
+              n={delvePick.max}
+              min={0}
+              onHover={setHover}
+              onToggle={(id) =>
+                setDelvePick({ ...delvePick, chosen: delvePick.chosen.includes(id) ? delvePick.chosen.filter((x) => x !== id) : [...delvePick.chosen, id].slice(-delvePick.max) })
+              }
+              onDone={() => {
+                setDelvePick(null);
+                continueCast({ ...delvePick.draft, delve: delvePick.chosen });
+              }}
+              onCancel={() => setDelvePick(null)}
             />
           )}
           {costPick && costPick.kind !== "sacrifice" && (
@@ -765,7 +810,16 @@ function graveyardOptions(s: GameState, id: string): boolean {
 }
 
 function canCastWithTaps(s: GameState, id: string, convoke?: string[]) {
-  return (!convoke && canCast(s, HUMAN, id)) || planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto") !== null;
+  if ((!convoke && canCast(s, HUMAN, id)) || planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto") !== null) return true;
+  // With delve's help: as many cards from your graveyard as it can use (CR 702.66a).
+  const room = convoke ? 0 : delveRoom(s, HUMAN, id);
+  return room > 0 && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { delve: s.players[HUMAN]!.graveyard.filter((c) => c !== id).slice(0, room) }) !== null;
+}
+
+/** Could you cast this card from your hand for its evoke or dash cost now, tapping mana as needed? */
+function canCastAlt(s: GameState, id: string, alt: AltCostKind) {
+  const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt });
+  return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt }) !== null);
 }
 
 /** Indices of a card's abilities that work from your hand (cycling, CR 702.29a). */
@@ -914,6 +968,7 @@ function CardChoice({
   cards,
   chosen,
   n,
+  min,
   onHover,
   onToggle,
   onDone,
@@ -924,6 +979,8 @@ function CardChoice({
   cards: string[];
   chosen: string[];
   n: number;
+  /** "Up to n": fewer are fine, down to this many. */
+  min?: number;
   onHover: (d: CardDef | null) => void;
   onToggle: (id: string) => void;
   onDone: () => void;
@@ -934,8 +991,8 @@ function CardChoice({
       <div className="modal">
         <header>
           <strong>{title}</strong>
-          <span className="muted"> chosen {chosen.length} of {n}</span>
-          <button disabled={chosen.length !== n} onClick={onDone}>
+          <span className="muted"> chosen {chosen.length} of {min === undefined ? n : `up to ${n}`}</span>
+          <button disabled={min === undefined ? chosen.length !== n : chosen.length < min || chosen.length > n} onClick={onDone}>
             Done
           </button>
           <button className="ghost" onClick={onCancel}>
@@ -1765,6 +1822,7 @@ function AbilityMenu({
   onMana,
   onPlay,
   onCastVia,
+  onCastAlt,
   onClose,
 }: {
   s: GameState;
@@ -1775,6 +1833,8 @@ function AbilityMenu({
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
   onCastVia: (via: CastFromGraveyardKind) => void;
+  /** For a card in hand: cast it for its evoke or dash cost. */
+  onCastAlt: (alt: AltCostKind) => void;
   onClose: () => void;
 }) {
   const o = s.objects[objectId]!;
@@ -1797,6 +1857,17 @@ function AbilityMenu({
           {land ? (choice ? "Play it tapped" : "Play it") : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
+      {inHand &&
+        (compileCard(d).altCosts ?? []).map((a) => {
+          const ok = canCastAlt(s, objectId, a.kind);
+          const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { alt: a.kind }) ?? "");
+          const note = a.kind === "evoke" ? "it's sacrificed as it enters" : "haste, back to your hand at the end step";
+          return (
+            <button key={a.kind} disabled={!ok} title={problem || note} onClick={() => onCastAlt(a.kind)}>
+              {a.kind === "evoke" ? "Evoke" : "Dash"} <ManaCost cost={a.mana} size="sm" />
+            </button>
+          );
+        })}
       {inYard &&
         (compileCard(d).fromGraveyard ?? []).map((g) => {
           const ok = canCastFromGraveyard(s, objectId, g.kind);
@@ -2407,7 +2478,7 @@ function Hand({ s, ids, cardProps, tucked, onToggle }: { s: GameState; ids: stri
                 className="fan-slot"
                 style={{ ["--rot" as string]: `${off * step}deg`, ["--drop" as string]: (off / Math.max(1, mid)) ** 2 * 0.06 }}
               >
-                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id)} />
+                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind))} />
               </div>
             );
           })}

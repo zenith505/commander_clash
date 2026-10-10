@@ -276,7 +276,12 @@ export type Effect =
    * "You may [do something]": the controller chooses as it resolves whether to do it
    * (CR 608.2d). Its targets were still chosen when it was put on the stack (CR 603.3d).
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost } // "If you don't, ...": fabricate (CR 702.123a)
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean }
+  /**
+   * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
+   * age counter on it; if you don't, sacrifice it.
+   */
+  | { type: "cumulativeUpkeep"; pay: PayCost } // "If you don't, ...": fabricate (CR 702.123a)
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */
@@ -382,6 +387,10 @@ export interface TriggeredAbility {
   ifNotRenowned?: boolean;
   /** "When ~ enters, if it was kicked, ..." (an intervening if, CR 603.4). */
   ifKicked?: SpellCondition;
+  /** Evoke's "if its evoke cost was paid" (CR 702.74a). */
+  ifEvoked?: boolean;
+  /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
+  ifEcho?: boolean;
 }
 
 export interface ActivatedAbility {
@@ -403,6 +412,8 @@ export interface ActivatedAbility {
   lifeCost?: number;
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
+  /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a). */
+  exileSelf?: boolean;
 }
 
 /**
@@ -469,6 +480,9 @@ export type AdditionalCost =
  * without it the mana cost is paid. `costs` are paid on top. `exile`: the card is exiled instead of
  * going anywhere else when it leaves the stack.
  */
+/** Alternative costs that don't change where it's cast from (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a). */
+export type AltCostKind = "evoke" | "dash";
+
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
@@ -521,6 +535,10 @@ export interface CompiledCard {
   buyback?: string;
   /** Rebound (CR 702.88). */
   rebound?: boolean;
+  /** Evoke and dash (CR 702.74, 702.109): alternative costs for casting it from your hand. */
+  altCosts?: { kind: AltCostKind; mana: string }[];
+  /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
+  delve?: boolean;
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */
   textKeywords: string[];
   /** Lines the compiler couldn't turn into rules. Empty means the card is fully supported. */

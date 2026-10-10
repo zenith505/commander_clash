@@ -829,7 +829,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         // Paying to untap what's already untapped gets nothing: not worth asking.
         else if (e.pay && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
         else {
-          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: e.text.replace(/~/g, src), source: src, ...(e.pay ? { pay: e.pay } : {}) };
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: e.text.replace(/~/g, src), source: src, ...(e.pay ? { pay: e.pay } : {}), ...(e.keep ? { keep: true } : {}) };
           return "paused";
         }
       }
@@ -839,6 +839,20 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       }
       for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
+    }
+    case "cumulativeUpkeep": {
+      // CR 702.24a: an age counter first (once, even if it waits on the answer), then pay for each one or sacrifice.
+      const sc = (s.resolving!.scratch ??= {});
+      const o = objects(s, { ref: "self" }, ctx)[0];
+      if (sc.n === undefined) {
+        if (!o) return;
+        o.counters.age = (o.counters.age ?? 0) + 1;
+        sc.n = o.counters.age;
+        log(s, `${src} gets an age counter (${sc.n}).`);
+      }
+      const pay = timesPay(e.pay, sc.n);
+      // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
+      return runEffect(s, { type: "may", effects: [], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
     }
     case "counterUnlessPays": {
       // Ward (CR 702.21a) and "counter it unless that player pays": the spell or ability that triggered this.
@@ -1021,6 +1035,25 @@ export function canPayNow(s: GameState, pid: PlayerId, pay: PayCost): boolean {
   return !pay.mana || !!payFromPool(parseManaCost(pay.mana), p.manaPool) || !!planMana(s, pid, parseManaCost(pay.mana));
 }
 
+/** A cost paid `n` times over, as one cost (cumulative upkeep, CR 702.24a). */
+export function timesPay(pay: PayCost, n: number): PayCost {
+  return {
+    ...(pay.mana ? { mana: timesMana(pay.mana, n) } : {}),
+    ...(pay.life ? { life: pay.life * n } : {}),
+    ...(pay.energy ? { energy: pay.energy * n } : {}),
+  };
+}
+
+/** "{1}{U}" three times is "{3}{U}{U}{U}". */
+function timesMana(mana: string, n: number): string {
+  let generic = 0;
+  const rest = mana.replace(/\{(\d+)\}/g, (_, d: string) => {
+    generic += Number(d);
+    return "";
+  });
+  return (generic ? `{${generic * n}}` : "") + rest.repeat(n);
+}
+
 /** "{2} and 1 life", "{E}{E}", for prompts and logs. */
 export function describePay(pay: PayCost): string {
   return [pay.mana, pay.life ? `${pay.life} life` : "", pay.energy ? "{E}".repeat(pay.energy) : ""].filter(Boolean).join(" and ");
@@ -1142,6 +1175,15 @@ export type TriggerSourceEvent =
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   | { type: "targeted"; stackId: string };
 
+/**
+ * Echo (CR 702.30a): "if this permanent came under your control since the beginning of your last
+ * upkeep". This runs as the current upkeep begins, so "your last upkeep" is the one before it.
+ */
+export function echoDue(s: GameState, o: GameObject, you: PlayerId): boolean {
+  const last = player(s, you).lastUpkeepTurn;
+  return last === undefined || o.controlledSinceTurn >= last;
+}
+
 /** Evolve's comparison (CR 702.100a): is the entering creature bigger in power or toughness? */
 export function evolves(s: GameState, o: GameObject, stats: LastKnown): boolean {
   if (!objIsType(s, o, "Creature")) return false; // CR 702.100c
@@ -1186,7 +1228,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const you = controllerOf(s, entering);
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
     // "if it was kicked" is an intervening if (CR 603.4), and that can't change by the time it resolves.
-    add(entering, you, (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)), undefined, undefined, undefined, undefined, ev.x, entering.kicked);
+    // Evoke's sacrifice trigger only if the evoke cost was paid (CR 702.74a).
+    add(
+      entering,
+      you,
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifEvoked || entering.castAlt === "evoke"),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      ev.x,
+      entering.kicked,
+    );
     if (objIsType(s, entering, "Creature")) {
       const lki = { power: power(s, entering), toughness: toughness(s, entering) };
       for (const id of s.battlefield) {
@@ -1292,7 +1345,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      add(o, you, (e) => (e === want && you === ev.active) || (e === "eachEndStep" && ev.step === "end"));
+      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === "eachEndStep" && ev.step === "end"));
     }
   }
 }

@@ -143,7 +143,13 @@ export function planCast(
   const d = defOf(s, o);
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
-  const { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { via: choices.via, buyback: choices.buyback });
+  let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, choices);
+  if (choices.delve?.length) {
+    // Cards exiled for delve pay generic mana (CR 702.66a).
+    const reduced = payGenericWith(cost, extra, choices.delve.length);
+    if (!reduced) return null;
+    ({ cost, extra } = reduced);
+  }
   const paid = Object.fromEntries(Object.entries(choices).filter(([, v]) => (Array.isArray(v) ? v.length : v !== undefined && v !== false))) as CostChoices;
   const improvise = compileCard(d).improvise;
   const cast = (taps: Action[], creatures?: ObjectId[], artifacts?: ObjectId[]): Action[] => [

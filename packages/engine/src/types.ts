@@ -1,4 +1,4 @@
-import type { AbilityBody, CastFromGraveyardKind, ChoiceKind, Modification, PayCost, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, CastFromGraveyardKind, ChoiceKind, Modification, PayCost, TargetChoice, TargetSpec } from "./abilities";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
@@ -88,6 +88,8 @@ export interface GameObject {
   castFrom?: ZoneName;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
+  castAlt?: AltCostKind;
   /** A replacement effect: if it would leave this zone, it's exiled instead (flashback, CR 702.34a; unearth, 702.84a). */
   exileIfLeaves?: ZoneName;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
@@ -111,6 +113,9 @@ export interface Player {
   poison?: number;
   /** Energy counters (CR 107.14, 122.1). */
   energy?: number;
+  /** The turns this player's current and previous upkeeps began, for echo's "since the beginning of your last upkeep" (CR 702.30a). */
+  upkeepTurn?: number;
+  lastUpkeepTurn?: number;
   /** What's left of "prevent the next N damage that would be dealt to [this player] this turn" shields (CR 615.7). */
   preventNext?: number;
   /** Combat damage received from each commander, keyed by commander object id. CR 903.10a */
@@ -213,6 +218,10 @@ export interface CostChoices {
   via?: CastFromGraveyardKind;
   /** Pay the buyback cost (CR 702.27a). */
   buyback?: boolean;
+  /** Cast it for its evoke or dash cost instead of its mana cost (CR 118.9). */
+  alt?: AltCostKind;
+  /** Delve (CR 702.66a): cards exiled from your graveyard, each paying for {1}. */
+  delve?: ObjectId[];
   /** Permanents to sacrifice, cards to discard, cards to exile from your graveyard. */
   sacrifice?: ObjectId[];
   discard?: ObjectId[];
@@ -247,7 +256,7 @@ export type PendingDecision =
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil"; cards: ObjectId[]; source: string }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.

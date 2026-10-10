@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
+import { allEffects, type AbilityBody, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana } from "./autopay";
 import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
@@ -18,6 +18,8 @@ import {
   potentialAttackers,
   spellCost,
   graveyardCast,
+  altCost,
+  delveRoom,
   spellTargets,
   availableMana,
 } from "./game";
@@ -49,6 +51,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "castFree") {
       const plan = castPlan(s, pid, pend.objectId, true);
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
+    }
+    if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
+      // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
+      const { mana, life = 0, energy = 0 } = pend.pay;
+      const taps = mana ? planMana(s, pid, parseManaCost(mana)) : [];
+      const ok = !!taps && (!mana || manaValue(parseManaCost(mana)) <= Math.max(4, lands(s, pid) - 2)) && player(s, pid).life > life + 5 && (player(s, pid).energy ?? 0) >= energy;
+      return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "chooseMay" && pend.pay) {
       // "You may pay {1}. If you do, ...": worth it when the rest is, and it leaves us some life.
@@ -121,7 +130,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const options = [...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : castPlan(s, pid, id, false);
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -276,14 +285,28 @@ function targetIndexOf(e: Effect): number | undefined {
  * How to cast this card, with modes and targets we like, or null if it isn't worth it. `free`: cascade
  * lets us cast it without paying (then even a counterspell is cast if it has something to counter).
  */
-function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: CastFromGraveyardKind): Action[] | null {
+function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const d = defOf(s, obj(s, id));
-  const cost = parseManaCost(graveyardCast(d, via)?.mana ?? d.manaCost);
+  const cost = parseManaCost(graveyardCast(d, via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free) return null;
-  const xs = cost.hasX ? xChoices(availableMana(s, pid) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
+  const xs = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
   for (const x of xs) {
-    const plan = castPlanWithX(s, pid, id, free, x, via);
+    const plan = castPlanWithX(s, pid, id, free, x, via, alt);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Casting a card from our hand for an alternative cost, when its mana cost is out of reach: dash it
+ * (CR 702.109a), or evoke it (CR 702.74a) when it does something as it enters before it's sacrificed.
+ */
+function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const c = compileCard(defOf(s, obj(s, id)));
+  for (const a of c.altCosts ?? []) {
+    if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
+    const plan = castPlan(s, pid, id, false, undefined, a.kind);
     if (plan) return plan;
   }
   return null;
@@ -307,12 +330,12 @@ function xChoices(mana: number, perX: number): number[] {
 }
 
 /** What casting it costs apart from X: its mana value plus commander tax, less reductions. */
-function totalWithoutX(s: GameState, pid: PlayerId, id: string, via?: CastFromGraveyardKind): number {
-  const { cost, extra } = spellCost(s, pid, obj(s, id), 0, [], { via });
+function totalWithoutX(s: GameState, pid: PlayerId, id: string, via?: CastFromGraveyardKind, alt?: AltCostKind): number {
+  const { cost, extra } = spellCost(s, pid, obj(s, id), 0, [], { via, alt });
   return manaValue(cost) + extra;
 }
 
-function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via?: CastFromGraveyardKind): Action[] | null {
+function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const printed = castingBody(defOf(s, obj(s, id)));
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
@@ -326,6 +349,16 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
   const extra = chooseExtraCosts(s, pid, id, targets ?? [], via);
   if (!extra) return null;
+  if (alt) extra.alt = alt;
+  // Delve away as much as we can (CR 702.66a): the cards that do nothing more in the graveyard first.
+  const room = free ? 0 : delveRoom(s, pid, id, { ...extra, ...(via ? { via } : {}) }, x);
+  if (room) {
+    const keep = (c: string) => (compileCard(defOf(s, obj(s, c))).fromGraveyard?.length || abilitiesOf(s, obj(s, c)).activated.some((ab) => ab.zone === "graveyard") ? 1 : 0);
+    extra.delve = player(s, pid)
+      .graveyard.filter((c) => c !== id && !extra.exileCards?.includes(c))
+      .sort((a, b) => keep(a) - keep(b))
+      .slice(0, room);
+  }
   // Buy it back if we can afford to (CR 702.27a), then kick it if we can: the most kicker costs first (CR 702.33).
   const buybacks = compileCard(defOf(s, obj(s, id))).buyback && !via ? [true, false] : [false];
   for (const buyback of buybacks)
@@ -704,8 +737,12 @@ function chooseUnearth(s: GameState, pid: PlayerId): Action[] | null {
   for (const id of player(s, pid).graveyard) {
     const abilities = abilitiesOf(s, obj(s, id)).activated;
     for (let i = 0; i < abilities.length; i++) {
-      if (abilities[i]!.zone !== "graveyard") continue;
-      const plan = planActivate(s, pid, id, i);
+      const ab = abilities[i]!;
+      if (ab.zone !== "graveyard") continue;
+      // Scavenge needs a creature to grow (CR 702.97a).
+      const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
+      if (ab.body.targets.length && !targets) continue;
+      const plan = planActivate(s, pid, id, i, targets ?? undefined);
       if (plan) return plan;
     }
   }

@@ -1,7 +1,7 @@
-import type { AdditionalCost, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, TargetChoice } from "./abilities";
+import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, TargetChoice } from "./abilities";
 import { abilitiesOf, defOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { becomeMonarch, triggerBody, canChooseModes, choiceOptions, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
+import { addDelayed, becomeMonarch, triggerBody, canChooseModes, choiceOptions, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
@@ -413,7 +413,10 @@ export function moveObject(
   }
   if (o.zone === "battlefield") removeFromCombat(s, o);
   // Whether it was kicked stays with a spell that becomes a permanent, and nothing else (CR 400.7).
-  if (!(fromZone === "stack" && to === "battlefield")) o.kicked = undefined;
+  if (!(fromZone === "stack" && to === "battlefield")) {
+    o.kicked = undefined;
+    o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
+  }
   o.zone = to;
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.tapped = false;
@@ -618,9 +621,13 @@ function beginStep(s: GameState, step: Step) {
         else if (!characteristics(s, o).doesntUntap) o.tapped = false; // CR 502.3
       }
       return advanceStep(s); // no priority in untap (CR 502.4)
-    case "upkeep":
+    case "upkeep": {
+      const p = player(s, ap);
+      p.lastUpkeepTurn = p.upkeepTurn;
+      p.upkeepTurn = s.turn;
       fireEvent(s, { type: "step", step: "upkeep", active: ap });
       break;
+    }
     case "draw":
       draw(s, ap); // CR 504.1 (no one skips in multiplayer, CR 103.8c)
       break;
@@ -728,6 +735,7 @@ function resolveTop(s: GameState) {
     }
     log(s, `${d.name} resolves and enters the battlefield.`);
     moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}) });
+    if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
     return;
   }
   const body = item.body ?? compileCard(d).spell;
@@ -740,6 +748,15 @@ function resolveTop(s: GameState) {
     log(s, `${d.name} resolves. (Its effect is not implemented yet.)`);
   }
   if (s.objects[o.id]?.zone === "stack") moveObject(s, o.id, "graveyard");
+}
+
+/**
+ * Dash (CR 702.109a): "As long as this permanent's dash cost was paid, it has haste", and "return the
+ * permanent this spell becomes to its owner's hand at the beginning of the next end step".
+ */
+function dashed(s: GameState, o: GameObject, controller: PlayerId) {
+  s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller, sourceName: defOf(s, o).name, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+  addDelayed(s, "nextEndStep", controller, o, { targets: [], effects: [{ type: "bounce", what: { ref: "subject" } }], text: "Return ~ to its owner's hand (dash)." });
 }
 
 // ---------------------------------------------------------------------------
@@ -841,6 +858,11 @@ export function castProblem(
   if (!free && !via && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && compileCard(d).fromGraveyard?.length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
+  if (choices?.alt) {
+    if (!altCost(d, choices.alt)) return `${d.name} doesn't have ${choices.alt}`;
+    // Only one alternative cost can be applied to a spell (CR 118.9a).
+    if (via || free) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
+  }
   if (isType(d, "Land")) return "lands are played, not cast";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
   const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash");
@@ -870,7 +892,7 @@ export function castProblem(
   if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices);
   if (ap) return ap;
-  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { via: choices?.via, buyback: choices?.buyback });
+  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, choices);
   if (typeof cost === "string") return cost;
   if (!payFromPool(cost.cost, p.manaPool, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
@@ -880,7 +902,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: { via?: CastFromGraveyardKind; buyback?: boolean } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt"> = {}): { cost: ParsedCost; extra: number } {
   const d = defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
   const kicker = compileCard(d).kicker;
@@ -890,7 +912,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
-  const base = graveyardCast(d, how.via)?.mana ?? d.manaCost;
+  // So do evoke and dash (CR 702.74a, 702.109a).
+  const base = graveyardCast(d, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost;
   const mana = parseManaCost(base + kickCost);
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = 0;
@@ -902,7 +925,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
  */
-function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: { via?: CastFromGraveyardKind; buyback?: boolean } = {}): { cost: ParsedCost; extra: number } | string {
+function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices = {}): { cost: ParsedCost; extra: number } | string {
   const d = defOf(s, o);
   let { cost, extra } = spellCost(s, pid, o, x, kicks, how);
   if (convoke?.length) {
@@ -921,7 +944,45 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     if (!reduced) return `that's more artifacts than ${d.name}'s cost has generic mana for`;
     ({ cost, extra } = reduced);
   }
+  if (how.delve?.length) {
+    // Delve pays generic mana only, after the total cost is worked out (CR 702.66a-b).
+    if (!compileCard(d).delve) return `${d.name} doesn't have delve`;
+    const problem = delveProblem(s, pid, o, how.delve, how.exileCards ?? []);
+    if (problem) return problem;
+    const reduced = payGenericWith(cost, extra, how.delve.length);
+    if (!reduced) return `that's more cards than ${d.name}'s cost has generic mana for`;
+    ({ cost, extra } = reduced);
+  }
   return { cost, extra };
+}
+
+/** Cards exiled for delve: other cards in your graveyard, each once, not also exiled for another cost. */
+function delveProblem(s: GameState, pid: PlayerId, spell: GameObject, ids: ObjectId[], exiled: ObjectId[]): string | null {
+  if (new Set(ids).size !== ids.length) return "each card can only be exiled once for delve";
+  for (const id of ids) {
+    const c = s.objects[id];
+    if (!c || c.zone !== "graveyard" || c.owner !== pid || id === spell.id) return "delve exiles cards from your graveyard";
+    if (exiled.includes(id)) return `${nameOf(s, id)} is already being exiled`;
+  }
+  return null;
+}
+
+/**
+ * How many cards delve could exile for this spell: one for each generic mana in its total cost
+ * (CR 702.66a-b, rulings), no more than the other cards in your graveyard. Zero without delve.
+ */
+export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: CostChoices = {}, x = 0): number {
+  const o = obj(s, id);
+  if (!compileCard(defOf(s, o)).delve) return 0;
+  const { cost, extra } = spellCost(s, pid, o, x, choices.kicks, choices);
+  const generic = splitGeneric(cost, extra).extra;
+  const pool = player(s, pid).graveyard.filter((c) => c !== id && !choices.exileCards?.includes(c)).length;
+  return Math.min(generic, pool);
+}
+
+/** The card's evoke or dash cost, if it has that one. */
+export function altCost(d: CardDef, alt?: AltCostKind) {
+  return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -969,7 +1030,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const fromCommand = o.zone === "command";
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
-  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { via: choices.via, buyback: choices.buyback }) as { cost: ParsedCost; extra: number };
+  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, choices) as { cost: ParsedCost; extra: number };
   const paid = payFromPool(cost.cost, p.manaPool, cost.extra, p.life)!;
   p.manaPool = paid.pool;
   p.life -= paid.lifePaid;
@@ -985,6 +1046,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.castFrom = castFrom;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
+  o.castAlt = choices.alt;
   if (via?.exile) o.exileIfLeaves = "stack"; // CR 702.34a, 702.133a
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
@@ -1010,8 +1072,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
   const kickText = kicks ? describeKicks(d, kicks) : "";
-  const howText = (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") + (choices.buyback ? ", paying buyback" : "");
+  const howText =
+    (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
+    (choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.buyback ? ", paying buyback" : "") +
+    (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
+  for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const sacrificed = payAdditionalCosts(s, p, d, choices, via?.costs ?? []);
   if (sacrificed.length) item.sacrificed = sacrificed;
@@ -1211,6 +1278,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const stamped = stampTargets(s, targets);
   if (ab.sacrificeSelf) moveObject(s, id, "graveyard");
   if (ab.discardSelf) moveObject(s, id, "graveyard");
+  if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
   s.stack.push({
     id: stackId,

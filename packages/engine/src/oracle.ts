@@ -35,6 +35,7 @@ import type {
   UnlessPays,
   PayCost,
   CastFromGraveyard,
+  AltCostKind,
 } from "./abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, stripReminder } from "./keywords";
 import { parseManaCost } from "./mana";
@@ -250,6 +251,18 @@ function compile(d: CardDef): CompiledCard {
       else if ("rebound" in yard) out.rebound = true;
       else if ("escapesWith" in yard) out.escapesWith = yard.escapesWith;
       else out.activated.push(yard.unearth);
+      continue;
+    }
+    const costKw = parseCostKeyword(line, d);
+    if (costKw !== null) {
+      if (costKw === "fail") out.unsupported.push(raw);
+      else {
+        if (costKw.alt) (out.altCosts ??= []).push(costKw.alt);
+        if (costKw.delve) out.delve = true;
+        // Evoke's sacrifice trigger goes first, so the card's own enters abilities can resolve before it (rulings).
+        if (costKw.trigger) costKw.alt?.kind === "evoke" ? out.triggers.unshift(costKw.trigger) : out.triggers.push(costKw.trigger);
+        if (costKw.activated) out.activated.push(costKw.activated);
+      }
       continue;
     }
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
@@ -482,6 +495,100 @@ function parseGraveyardKeyword(
     };
   }
   return null;
+}
+
+/** A mana cost we can pay: no X, no snow, nothing unusual. */
+const plainMana = (cost: string) => parseManaCost(cost).supported && !parseManaCost(cost).hasX;
+
+const sacrificeSelf: Effect = { type: "sacrifice", what: { ref: "self" } };
+
+/**
+ * Keywords about costs: echo (CR 702.30), cumulative upkeep (702.24), evoke (702.74), dash (702.109),
+ * delve (702.66), living weapon (702.92), scavenge (702.97).
+ */
+function parseCostKeyword(
+  line: string,
+  d: CardDef,
+): { alt?: { kind: AltCostKind; mana: string }; trigger?: TriggeredAbility; activated?: ActivatedAbility; delve?: true } | "fail" | null {
+  let m: RegExpExecArray | null;
+  if ((m = /^Echo(?: |—)(.+?)\.?$/.exec(line))) {
+    const cost = m[1]!;
+    if (!/^(\{[^}]+\})+$/.test(cost) || !plainMana(cost)) return "fail"; // "Echo—Discard a card." isn't modeled
+    const text = `Echo ${cost}: at the beginning of your upkeep, if ~ came under your control since the beginning of your last upkeep, sacrifice it unless you pay ${cost}.`;
+    return {
+      trigger: {
+        event: "yourUpkeep",
+        ifEcho: true,
+        body: { targets: [], effects: [{ type: "may", effects: [], pay: { mana: cost }, otherwise: [sacrificeSelf], keep: true, text: `Pay echo ${cost} to keep ~` }], text },
+      },
+    };
+  }
+  if ((m = /^Cumulative upkeep(?: |—)(.+?)\.?$/.exec(line))) {
+    const raw = m[1]!.replace(/^Pay /, "");
+    const pay = parsePayCost(raw);
+    if (!pay || (pay.mana && !plainMana(pay.mana))) return "fail"; // "{G} or {W}", "Sacrifice a creature", ...
+    const what = describePayText(pay);
+    return {
+      trigger: {
+        event: "yourUpkeep",
+        body: { targets: [], effects: [{ type: "cumulativeUpkeep", pay }], text: `Cumulative upkeep ${what}: at the beginning of your upkeep, put an age counter on ~, then sacrifice it unless you pay ${what} for each age counter on it.` },
+      },
+    };
+  }
+  if ((m = /^(Evoke|Dash) ((?:\{[^}]+\})+)$/.exec(line))) {
+    const mana = m[2]!;
+    if (!plainMana(mana)) return "fail";
+    if (m[1] === "Dash") return d.types.includes("Creature") ? { alt: { kind: "dash", mana } } : "fail";
+    return {
+      alt: { kind: "evoke", mana },
+      trigger: { event: "selfEnters", ifEvoked: true, body: { targets: [], effects: [sacrificeSelf], text: "When ~ enters, if its evoke cost was paid, its controller sacrifices it." } },
+    };
+  }
+  if (line === "Delve") return { delve: true };
+  if (line === "Living weapon") {
+    if (!d.subtypes.includes("Equipment")) return "fail";
+    const germ: TokenSpec = { name: "Phyrexian Germ", power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: ["Phyrexian", "Germ"], keywords: [] };
+    return {
+      trigger: {
+        event: "selfEnters",
+        body: {
+          targets: [],
+          effects: [
+            { type: "createToken", who: { ref: "you" }, n: 1, token: germ },
+            { type: "attach", what: { ref: "created" } },
+          ],
+          text: "Living weapon: when ~ enters, create a 0/0 black Phyrexian Germ creature token, then attach ~ to it.",
+        },
+      },
+    };
+  }
+  if ((m = /^Scavenge ((?:\{[^}]+\})+)$/.exec(line))) {
+    const cost = m[1]!;
+    if (!plainMana(cost) || !/^\d+$/.test(d.power ?? "")) return "fail";
+    const n = Number(d.power);
+    return {
+      activated: {
+        manaCost: cost,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        zone: "graveyard",
+        exileSelf: true,
+        body: {
+          targets: [{ kind: "object", types: ["Creature"], text: "target creature" }],
+          effects: [{ type: "counters", what: { ref: "target", index: 0 }, counter: "+1/+1", n }],
+          text: `Put ${n} +1/+1 counter${n === 1 ? "" : "s"} on target creature.`,
+        },
+        text: `Scavenge ${cost}`,
+      },
+    };
+  }
+  return null;
+}
+
+/** "{1}", "1 life", "{B} and 1 life", "{E}", as printed in a cost. */
+function describePayText(pay: PayCost): string {
+  return [pay.mana, pay.life ? `${pay.life} life` : "", pay.energy ? "{E}".repeat(pay.energy) : ""].filter(Boolean).join(" and ");
 }
 
 function parseAdditionalCost(text: string): AdditionalCost | null {

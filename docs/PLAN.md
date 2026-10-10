@@ -563,6 +563,33 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **7,889 cards are fully supported.** Rules tests: `test/graveyard-cast.test.ts`.
 
+### Echo, cumulative upkeep, evoke, dash, delve, living weapon, scavenge (added 2026-10-10)
+
+- **Echo** (CR 702.30): at the beginning of your upkeep, if the permanent came under your control
+  since your last upkeep began, pay its echo cost or sacrifice it. So it's asked once, at the first
+  upkeep after you get it. Costs that aren't mana ("Echo—Discard a card") aren't modeled yet.
+- **Cumulative upkeep** (CR 702.24): each of your upkeeps it gets an age counter, then you pay the
+  cost once for each age counter, all of it or none, or sacrifice it. Mana and life costs work;
+  ones with a choice ("{G} or {W}") or an action ("Sacrifice a creature") don't yet. If you can't
+  pay, it's sacrificed without asking.
+- **Evoke** (CR 702.74): cast it for its evoke cost instead; it's sacrificed as it enters. Its own
+  enters abilities resolve first, so Mulldrifter still draws two.
+- **Dash** (CR 702.109): cast it for its dash cost instead; it has haste and goes back to its
+  owner's hand at the beginning of the next end step.
+- **Delve** (CR 702.66): exile cards from your graveyard as you cast it, each paying for {1} of
+  the generic mana. A picker suggests just enough cards to make it affordable.
+- **Living weapon** (CR 702.92): the Equipment enters with a 0/0 black Phyrexian Germ token and
+  attaches to it (Batterskull, Flayer Husk).
+- **Scavenge** (CR 702.97): from your graveyard, as a sorcery, exile the card to put +1/+1
+  counters equal to its power on target creature.
+- **On the table:** clicking a card with evoke or dash opens a menu with "Cast it", "Evoke" or
+  "Dash". The echo and cumulative upkeep prompts have Pay and Don't pay buttons.
+- **Bots** pay echo, pay cumulative upkeep while it stays cheap, evoke creatures whose enters
+  ability they want when the full cost is out of reach, dash when they can't pay the full cost,
+  delve away cards that do nothing else in their graveyard, and scavenge onto their creatures.
+
+**7,998 cards are fully supported.** Rules tests: `test/upkeep-alt-costs.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).
@@ -578,7 +605,8 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
    "for each" / "equal to the number of" / "where X is", */* creatures, last known information~~ done. ~~library search, typecycling, kicker, additional
    costs~~ done. ~~"all"/"each" groups, choosing a creature type or color~~ done. ~~"counter unless
    they pay", energy, the monarch, "you may pay ... If you do"~~ done. ~~flashback, jump-start,
-   retrace, escape, buyback, rebound, unearth, delayed triggers~~ done. Next by
+   retrace, escape, buyback, rebound, unearth, delayed triggers~~ done. ~~echo, cumulative upkeep,
+   evoke, dash, delve, living weapon, scavenge~~ done. Next by
    count: see `npx tsx tools/coverage.ts`.
    Hand-written overrides for cards that don't fit a template.
 3. ~~Layers and continuous effects~~ (CR 613, done except layers 1 and 3), replacement

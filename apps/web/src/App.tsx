@@ -1791,7 +1791,9 @@ function LibrarySearch({
 }) {
   const [found, setFound] = useState<string[]>([]);
   const groups = new Map<string, string[]>();
-  for (const id of pending.cards) {
+  // Looking at the top cards: all of them are shown, in order, and only the ones that qualify can be taken.
+  const dig = pending.dig;
+  for (const id of dig ? [] : pending.cards) {
     const name = cardOf(s, id).name;
     groups.set(name, [...(groups.get(name) ?? []), id]);
   }
@@ -1806,14 +1808,18 @@ function LibrarySearch({
       <div className="modal search">
         <header>
           <strong>
-            {pending.source}: search your library for {pending.what}
+            {dig ? `${pending.source}: put ${pending.what} ${dig.to}` : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
             {" "}
-            {pending.firstTo ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.` : `Found ${found.length} of ${pending.max}.`}
+            {dig
+              ? `The rest go ${dig.rest}.`
+              : pending.firstTo
+                ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
+                : `Found ${found.length} of ${pending.max}.`}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {found.length ? "Done" : "Find nothing"}
+            {found.length || pending.min > 0 ? "Done" : dig ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">
@@ -1835,9 +1841,27 @@ function LibrarySearch({
               </div>
             </>
           )}
-          <h4>Your library</h4>
+          {dig && (
+            <>
+              <h4>The top of your library</h4>
+              <div className="modal-cards">
+                {dig.looked
+                  .filter((id) => !found.includes(id))
+                  .map((id) => {
+                    const d = cardOf(s, id);
+                    const can = pending.cards.includes(id) && found.length < pending.max;
+                    return (
+                      <div key={id} className={`card big ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])} {...hoverProps(d, onHover)}>
+                        <CardFace d={d} />
+                      </div>
+                    );
+                  })}
+              </div>
+            </>
+          )}
+          {!dig && <h4>Your library</h4>}
           <div className="modal-cards">
-            {sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
+            {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {
               const left = ids.filter((id) => !found.includes(id)).length;
               const d = cardOf(s, ids[0]!);
@@ -2323,8 +2347,8 @@ function GameLog({ s }: { s: GameState }) {
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
   if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand)\b/, " your $1");
-  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks)\b/g, (_, pre: string, v: string) =>
-    `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v.slice(0, -1)}`,
+  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses)\b/g, (_, pre: string, v: string) =>
+    `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v === "amasses" ? "amass" : v.slice(0, -1)}`,
   );
 }
 

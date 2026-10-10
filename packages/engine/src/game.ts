@@ -231,6 +231,8 @@ export function applyAction(state: GameState, action: Action): GameState {
   switch (action.type) {
     case "passPriority":
       requireNoPending(s);
+      // Triggers held while activating mana abilities go on the stack before anyone passes (CR 117.5).
+      if (s.triggerQueue.length) break;
       passPriority(s, p.id);
       break;
     case "playLand":
@@ -305,7 +307,9 @@ export function applyAction(state: GameState, action: Action): GameState {
       turnFaceUp(s, p, action.objectId);
       break;
   }
-  afterAction(s);
+  // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
+  // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
+  afterAction(s, action.type === "activateMana");
   return s;
 }
 
@@ -758,6 +762,7 @@ function beginStep(s: GameState, step: Step) {
     }
     case "draw":
       draw(s, ap); // CR 504.1 (no one skips in multiplayer, CR 103.8c)
+      fireEvent(s, { type: "step", step: "draw", active: ap }); // "at the beginning of the draw step" triggers after it (CR 504.2)
       break;
     case "end":
       fireEvent(s, { type: "step", step: "end", active: ap });
@@ -1959,11 +1964,11 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
 // ---------------------------------------------------------------------------
 // State-based actions (CR 704) and leaving the game (CR 800.4)
 
-function afterAction(s: GameState) {
-  runStateBasedActions(s);
+function afterAction(s: GameState, holdTriggers = false) {
+  runStateBasedActions(s, holdTriggers);
 }
 
-export function runStateBasedActions(s: GameState) {
+export function runStateBasedActions(s: GameState, holdTriggers = false) {
   if (s.resolving) return; // not while a spell or ability is partway through resolving (CR 704.3)
   if (!s.pending && askEntersChoice(s)) return;
   for (let guard = 0; guard < 100; guard++) {
@@ -2046,7 +2051,7 @@ export function runStateBasedActions(s: GameState) {
   s.leftTogether = undefined;
   checkGameOver(s);
   // Then waiting triggered abilities go on the stack before anyone gets priority (CR 117.5).
-  if (!s.over && processTriggerQueue(s, turnOrderFrom(s, s.activePlayer))) s.passedInSuccession = [];
+  if (!s.over && !holdTriggers && processTriggerQueue(s, turnOrderFrom(s, s.activePlayer))) s.passedInSuccession = [];
 }
 
 /**

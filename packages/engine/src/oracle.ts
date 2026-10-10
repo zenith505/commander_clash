@@ -324,6 +324,13 @@ function compile(d: CardDef): CompiledCard {
         }
         out.entersWithCounters = { counter: "+1/+1", n: prev + kw.plusCounters };
       }
+      if (kw.entersCounter) {
+        if (out.entersWithCounters) {
+          out.unsupported.push(raw); // two kinds of counters as it enters: not modeled
+          continue;
+        }
+        out.entersWithCounters = { counter: kw.entersCounter.counter, n: kw.entersCounter.n };
+      }
       if (kw.bloodthirst) out.bloodthirst = (out.bloodthirst ?? 0) + kw.bloodthirst;
       if (kw.entersOptions.length) out.entersOptions = [...(out.entersOptions ?? []), ...kw.entersOptions];
       out.statics.push(...kw.statics);
@@ -756,6 +763,8 @@ interface KeywordParts {
   bloodthirst: number;
   entersOptions: EntersOption[];
   statics: StaticAbility[];
+  /** Fading N's fade counters, vanishing N's time counters (CR 702.32a, 702.63a). */
+  entersCounter?: { counter: CounterKind; n: number };
 }
 
 function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
@@ -862,6 +871,37 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
           text: `Modular: you may ${text}.`,
         },
       });
+    } else if ((m = /^afflict (\d+)$/i.exec(p))) {
+      // CR 702.130a: "Whenever this creature becomes blocked, defending player loses N life."
+      const n = Number(m[1]);
+      out.triggers.push({ event: "selfBecomesBlocked", body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eventPlayer" }, n }], text: `Afflict ${n}: defending player loses ${n} life.` } });
+    } else if (/^dethrone$/i.test(p)) {
+      // CR 702.105a: "Whenever this creature attacks the player with the most life or tied for most life, put a +1/+1 counter on this creature."
+      out.triggers.push({ event: "selfAttacks", attacksMostLife: true, body: { targets: [], effects: [plus(1)], text: "Dethrone: put a +1/+1 counter on ~." } });
+    } else if (/^training$/i.test(p)) {
+      // CR 702.149a: "Whenever this creature and at least one other creature with power greater than this
+      // creature's power attack, put a +1/+1 counter on this creature."
+      out.triggers.push({ event: "selfAttacks", training: true, body: { targets: [], effects: [plus(1)], text: "Training: put a +1/+1 counter on ~." } });
+    } else if ((m = /^fading (\d+)$/i.exec(p))) {
+      // CR 702.32a: "This permanent enters with N fade counters on it" and "At the beginning of your upkeep,
+      // remove a fade counter from this permanent. If you can't, sacrifice the permanent."
+      if (out.entersCounter) return null;
+      out.entersCounter = { counter: "fade", n: Number(m[1]) };
+      out.triggers.push({ event: "yourUpkeep", body: { targets: [], effects: [{ type: "removeSelfCounter", counter: "fade", orSacrifice: true }], text: "Fading: remove a fade counter from ~. If you can't, sacrifice it." } });
+    } else if ((m = /^vanishing(?: (\d+))?$/i.exec(p))) {
+      // CR 702.63a-b: "This permanent enters with N time counters on it," "At the beginning of your upkeep, if this
+      // permanent has a time counter on it, remove a time counter from it," and "When the last time counter is
+      // removed from this permanent, sacrifice it."
+      if (m[1]) {
+        if (out.entersCounter) return null;
+        out.entersCounter = { counter: "time", n: Number(m[1]) };
+      }
+      out.triggers.push({
+        event: "yourUpkeep",
+        ifCond: { kind: "selfCounter", counter: "time" },
+        body: { targets: [], effects: [{ type: "removeSelfCounter", counter: "time" }], text: "Vanishing: if ~ has a time counter on it, remove a time counter from it." },
+      });
+      out.triggers.push({ event: "selfLastTimeCounterRemoved", body: { targets: [], effects: [sacrificeSelf], text: "Vanishing: when the last time counter is removed from ~, sacrifice it." } });
     } else if (/^evolve$/i.test(p)) {
       // CR 702.100a
       out.triggers.push({ event: "anotherCreatureYouControlEnters", ifEvolves: true, body: { targets: [], effects: [{ type: "evolve" }], text: "Evolve: if that creature is bigger, put a +1/+1 counter on ~." } });
@@ -906,6 +946,13 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
           effects: [{ type: "may", effects: [{ type: "bounce", what: { ref: "target", index: 0 } }], text }],
           text: `Soulshift ${n}: you may ${text}.`,
         },
+      });
+    } else if ((m = /^ward—pay (\d+) life\.?$/i.exec(p))) {
+      // CR 702.21a with a life cost: "counter that spell or ability unless that player pays N life".
+      const life = Number(m[1]);
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", life }, ward: true }], text: `Ward—Pay ${life} life: counter that spell or ability unless its controller pays ${life} life.` },
       });
     } else if ((m = /^ward ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(p))) {
       // CR 702.21a: "Whenever this permanent becomes the target of a spell or ability an opponent
@@ -1152,6 +1199,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
+  [/^At the beginning of each (?:player's )?upkeep, (.+)$/, "eachUpkeep"],
+  [/^At the beginning of your draw step, (.+)$/, "yourDrawStep"],
+  [/^At the beginning of each player's draw step, (.+)$/, "eachDrawStep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
   // Heroic (an ability word): "Whenever you cast a spell that targets ~".
@@ -1160,7 +1210,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
 ];
 
@@ -1231,6 +1281,33 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
     enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
     body,
   };
+}
+
+/**
+ * The sentences after "Look at (Reveal) the top N cards of your library": which to take ("Put one of them
+ * into your hand", "You may reveal a creature card from among them and put it into your hand", "You may
+ * put one of those cards back on top of your library") and where the rest go ("Put the rest into your
+ * graveyard", "on the bottom of your library in a random order"). "more" while the rest is still to come.
+ */
+function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>): Extract<Effect, { type: "dig" }> | "more" | null {
+  const REST = "(into your graveyard|on the bottom of your library(?: in (?:any|a random) order)?)";
+  const restOf = (r: string) => (r === "into your graveyard" ? "graveyard" : "bottom");
+  let m: RegExpExecArray | null;
+  if (dig.into === undefined) {
+    if ((m = new RegExp(`^Put (one|two|three) of (?:them|those cards) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
+      Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand" });
+      if (m[2]) dig.rest = restOf(m[2]);
+    } else if ((m = /^You may (?:reveal (an? .+?) from among them and put it|put (an? .+?) from among them) into your hand$/.exec(s))) {
+      const filter = parseSearchFilter((m[1] ?? m[2])!.replace(/^an? /, ""));
+      if (!filter) return null;
+      Object.assign(dig, { count: 1, upTo: true, filter, into: "hand" });
+    } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
+      Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
+    } else return null;
+    return dig.rest ? (dig as Extract<Effect, { type: "dig" }>) : "more";
+  }
+  if ((m = new RegExp(`^Put the rest ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: restOf(m[1]!) };
+  return null;
 }
 
 const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) dies, (.+)$/;
@@ -1336,7 +1413,7 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" });
       if (body && thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
     }
@@ -1440,9 +1517,12 @@ function parseAffected(subject: string): Affects | null {
     const words = m[2]!.trim().split(/\s+/).filter(Boolean);
     const colors: Color[] = [];
     const subtypes: string[] = [];
+    const types = ["Creature"];
     let combat: "attacking" | "blocking" | undefined;
     for (const w of words) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
+      // "Artifact creatures you control get +1/+1": both card types.
+      else if (/^(artifact|enchantment)$/i.test(w) && !types.includes(capital(w.toLowerCase()))) types.push(capital(w.toLowerCase()));
       else if (CREATURE_TYPES.has(w)) subtypes.push(w);
       // "Attacking creatures you control get +1/+0": whichever are attacking right now (CR 611.3a).
       else if ((w.toLowerCase() === "attacking" || w.toLowerCase() === "blocking") && !combat) combat = w.toLowerCase() as "attacking" | "blocking";
@@ -1450,7 +1530,7 @@ function parseAffected(subject: string): Affects | null {
     }
     return {
       kind: "filter",
-      types: ["Creature"],
+      types,
       subtypes: subtypes.length ? subtypes : undefined,
       colors: colors.length ? colors : undefined,
       ...(combat ? { spec: { kind: "object" as const, combat, text: `${combat} creature` } } : {}),
@@ -1672,9 +1752,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   let curStart = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
   let payFirst: { pay: PayCost; text: string } | null = null;
+  // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
+  let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   for (let s of sentences) {
     s = s.replace(/^Then,? /, "");
     [prevStart, curStart] = [curStart, effects.length];
+    const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
+    if (look && !dig) {
+      dig = { type: "dig", n: amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
+      continue;
+    }
+    if (dig) {
+      const done = parseDig(s, dig);
+      if (!done) return null;
+      if (done === "more") continue;
+      effects.push(done);
+      dig = null;
+      continue;
+    }
     if (payFirst) {
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
@@ -1814,7 +1909,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     effects.push(...fx);
     if (!defineX()) return null;
   }
-  if (payFirst) return null;
+  if (payFirst || dig) return null;
   return effects.length ? { targets: ctx.targets, effects, text } : null;
 }
 
@@ -2160,6 +2255,14 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // "Sacrifice ~ unless you pay {U}" (upkeep costs): pay to keep it, or it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you pay (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const pay = parsePayCost(m[2]!);
+    if (!pay || (pay.mana && !plainMana(pay.mana))) return null;
+    return [{ type: "may", effects: [], pay, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} to keep ~` }];
+  }
+  // "That player draws an additional card" (Howling Mine): just another draw.
+  if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} \\{E\\}$`).exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: amt(m[1]!) }];
@@ -2356,6 +2459,14 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const token = PREDEFINED_TOKENS[m[3]!.charAt(0).toUpperCase() + m[3]!.slice(1).toLowerCase()];
     return who && token ? [{ type: "createToken", who, n: amt(m[2]!), token }] : null;
   }
+  // "Draw a card at the beginning of the next turn's upkeep" (a delayed trigger, CR 603.7).
+  if ((m = /^(.+) at the beginning of the next turn's upkeep$/.exec(s))) {
+    // Only what needs no targets or objects: the delayed ability has none of its own.
+    const before = ctx.targets.length;
+    const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
+    if (!inner || ctx.targets.length !== before || allEffects(inner).some((y) => "what" in y || ("who" in y && (y.who as { ref: string }).ref !== "you"))) return null;
+    return [{ type: "delayed", when: "nextTurnUpkeep", effects: inner, text: m[1]! }];
+  }
   // Proliferate (CR 701.27), amass (CR 701.47).
   if (/^Proliferate$/i.test(s)) return [{ type: "proliferate" }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
@@ -2392,6 +2503,11 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const a = parseObject(m[1]!, ctx);
     const b = a && parseObject(m[2]!, ctx);
     return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) && !isSeveral(b) ? [{ type: "fight", a, b }] : null;
+  }
+  if ((m = /^(.+?) deals damage to itself equal to its power$/i.exec(s)) && m[1] !== "~") {
+    // The creature is the source of damage to itself (its deathtouch, lifelink, infect apply).
+    const a = parseObject(m[1]!, ctx);
+    return a && !isGroup(a) && !isSeveral(a) ? [{ type: "bite", a, b: a }] : null;
   }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last

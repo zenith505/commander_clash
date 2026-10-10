@@ -11,7 +11,7 @@ import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId } from "./types"
 export type Amount = number | AmountExpr;
 
 /** Counter kinds effects can put on permanents. Stun and shield are keyword counters (CR 122.1c-d). */
-export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield";
+export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade";
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
 export type PickAction = "sacrifice" | "bounce" | "counters";
@@ -367,6 +367,10 @@ export type Effect =
   | { type: "explore" }
   /** Renown N (CR 702.112a): if it isn't renowned, N +1/+1 counters and it becomes renowned. */
   | { type: "renown"; n: number }
+  /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */
+  /** "Draw a card at the beginning of the next turn's upkeep": a delayed trigger made as this resolves (CR 603.7a). */
+  | { type: "delayed"; when: "nextTurnUpkeep"; effects: Effect[]; text: string }
+  | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
@@ -429,6 +433,12 @@ export type Effect =
    */
   | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean }
   /**
+   * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
+   * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
+   * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
+   */
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop"; rest: "graveyard" | "bottom"; reveal: boolean }
+  /**
    * "Choose a creature type." / "Choose a color." while it resolves: later instructions use the
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
    */
@@ -487,6 +497,9 @@ export type TriggerEvent =
   | "yourUpkeep" // At the beginning of your upkeep
   | "yourEndStep" // At the beginning of your end step
   | "eachEndStep" // At the beginning of the end step (every turn's)
+  | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
+  | "yourDrawStep" // At the beginning of your draw step (after the draw, CR 504.2)
+  | "eachDrawStep" // At the beginning of each player's draw step
   | "selfTurnedFaceUp" // "When ~ is turned face up" (CR 708.8: it doesn't enter again)
   | "selfCast" // "When you cast this spell": cascade (CR 702.85a), triggering from the stack
   | "castSpell" // Whenever you cast a noncreature spell (see `cast`), prowess (CR 702.108a)
@@ -502,7 +515,8 @@ export type TriggerEvent =
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.10)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
-  | "selfTargetedByYourSpell"; // heroic: "Whenever you cast a spell that targets ~"
+  | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
+  | "selfLastTimeCounterRemoved"; // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
 
 
 export interface TriggeredAbility {
@@ -535,6 +549,10 @@ export interface TriggeredAbility {
    * again as it resolves (CR 603.4).
    */
   ifEvolves?: boolean;
+  /** Dethrone (CR 702.105a): "attacks the player with the most life or tied for most life", as it attacks. */
+  attacksMostLife?: boolean;
+  /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
+  training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
   ifNotRenowned?: boolean;
   /** "When ~ enters, if it was kicked, ..." (an intervening if, CR 603.4). */

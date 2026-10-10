@@ -195,7 +195,7 @@ export interface StackItem {
  * beginning of your next upkeep". It triggers once, about `subject` (the card as it was then).
  */
 export interface DelayedTrigger {
-  when: "nextEndStep" | "yourNextUpkeep";
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep";
   controller: PlayerId;
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };
@@ -306,7 +306,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string } }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -440,6 +440,7 @@ export interface Resolving {
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     found?: ObjectId[]; // the cards a library search found
+    looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
   };
 }

@@ -940,6 +940,31 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         moveObject(s, o.id, "graveyard");
       }
       return;
+    case "delayed": {
+      // A spell's own object (it's on its way to the graveyard), or the source of the ability.
+      const item = s.resolving?.item;
+      const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
+      const o = id ? s.objects[id] : undefined;
+      if (o) addDelayed(s, e.when, ctx.controller, o, { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." });
+      return;
+    }
+    case "removeSelfCounter": {
+      // Fading (CR 702.32a): "remove a fade counter from this permanent. If you can't, sacrifice the permanent."
+      // Vanishing (CR 702.63a): removing the last time counter triggers its sacrifice ability.
+      const o = objects(s, { ref: "self" }, ctx)[0];
+      if (!o) return;
+      const name = characteristics(s, o).name;
+      const had = o.counters[e.counter] ?? 0;
+      if (had > 0) {
+        o.counters[e.counter] = had - 1;
+        log(s, `${name} loses a ${e.counter} counter (${had - 1} left).`);
+        if (had === 1 && e.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
+      } else if (e.orSacrifice && controllerOf(s, o) === ctx.controller) {
+        log(s, `${player(s, ctx.controller).name} sacrifices ${name}: it has no ${e.counter} counters left.`);
+        moveObject(s, o.id, "graveyard");
+      }
+      return;
+    }
     case "renown": {
       // "If it isn't renowned" again as it resolves (CR 603.4); gone means it can't become renowned.
       const o = objects(s, { ref: "self" }, ctx)[0];
@@ -1242,6 +1267,49 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: p.id, ...(to.tapped ? { tapped: true } : {}) });
         else moveObject(s, id, to.zone);
       });
+      return;
+    }
+    case "dig": {
+      const p = player(s, ctx.controller);
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.looked) {
+        sc.looked = p.library.slice(0, amountNow(s, e.n, ctx));
+        if (!sc.looked.length) return;
+        const options = sc.looked.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        const max = Math.min(e.count, options.length);
+        const min = e.upTo || e.filter ? 0 : max;
+        log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
+        if (max > 0 && !(min === max && options.length === max)) {
+          const kind = (e.filter?.text ?? "card").replace(/~/g, src);
+          // "Take none" says it's optional; "up to" only reads well with a number.
+          const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
+          const to = e.into === "hand" ? "into your hand" : "back on top of your library";
+          const rest = e.rest === "graveyard" ? "into your graveyard" : "on the bottom of your library";
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
+          return "paused";
+        }
+        sc.found = options.slice(0, max);
+      }
+      const looked = sc.looked;
+      const found = (sc.found ?? []).filter((id) => looked.includes(id));
+      const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
+      const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+      if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : names(found) + " back on top"}.`);
+      for (const id of found) {
+        if (e.into === "hand") moveObject(s, id, "hand");
+        else p.library = [id, ...p.library.filter((x) => x !== id)];
+      }
+      if (e.rest === "graveyard") {
+        if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
+        for (const id of rest) moveObject(s, id, "graveyard");
+      } else {
+        // "On the bottom in any order" or "in a random order": random either way.
+        const bottom = [...rest];
+        shuffle(s, bottom);
+        p.library = [...p.library.filter((x) => !rest.includes(x)), ...bottom];
+        if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "a card" : `${rest.length} cards`} on the bottom of their library.`);
+      }
       return;
     }
     case "choose": {
@@ -1549,6 +1617,8 @@ export type TriggerSourceEvent =
   /** A player gained life (one life-gain event, CR 119.10). */
   | { type: "lifeGained"; player: PlayerId }
   | { type: "attacks"; id: ObjectId }
+  /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
+  | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
   | { type: "turnedFaceUp"; id: ObjectId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
@@ -1556,7 +1626,7 @@ export type TriggerSourceEvent =
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
-  | { type: "step"; step: "upkeep" | "end"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "end"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -1607,6 +1677,19 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
 }
 
 /** Record every triggered ability that `ev` triggers. They go on the stack the next time a player would get priority. */
+/** Dethrone (CR 702.105a): it attacks the player with the most life or tied for most life. */
+function attacksMostLife(s: GameState, o: GameObject): boolean {
+  if (o.attacking === undefined) return false;
+  const lives = s.turnOrder.map((pid) => s.players[pid]!).filter((p) => !p.lost).map((p) => p.life);
+  return s.players[o.attacking]!.life >= Math.max(...lives);
+}
+
+/** Training (CR 702.149a): another creature with greater power attacks alongside it. */
+function trains(s: GameState, o: GameObject): boolean {
+  const mine = power(s, o);
+  return s.battlefield.some((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature") && power(s, s.objects[id]!) > mine);
+}
+
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // Abilities that trigger on the battlefield use the permanent's abilities right now;
   // leaves-the-battlefield triggers look back in time (CR 603.10a), so "dies" passes them in.
@@ -1727,7 +1810,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
       }
       if (o.attacking !== undefined && o.blockedBy?.length) {
-        add(o, you, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked");
+        // "Defending player" (afflict) is the player it's attacking.
+        add(o, you, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
           if (bl) add(o, you, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, you), undefined, undefined, bl);
@@ -1744,7 +1828,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e) => e === "selfAttacks");
+    add(o, controllerOf(s, o), (e, t) => e === "selfAttacks" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.training || trains(s, o)));
+  } else if (ev.type === "lastCounterRemoved") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
   } else if (ev.type === "attacksAlone") {
     // Exalted: each permanent its controller controls with exalted triggers (CR 702.83a).
     const attacker = obj(s, ev.id);
@@ -1810,18 +1897,22 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Delayed triggers whose moment this is (CR 603.7): each triggers once.
     for (const d of [...(s.delayed ?? [])]) {
       const due =
-        d.when === "nextEndStep" ? ev.step === "end" && !(d.turn === s.turn && d.step === "end") : ev.step === "upkeep" && ev.active === d.controller && d.turn < s.turn;
+        d.when === "nextEndStep"
+          ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
+          : ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       s.delayed = s.delayed!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);
-    const want = ev.step === "upkeep" ? "yourUpkeep" : "yourEndStep";
+    const want = ev.step === "upkeep" ? "yourUpkeep" : ev.step === "draw" ? "yourDrawStep" : "yourEndStep";
+    const each = ev.step === "upkeep" ? "eachUpkeep" : ev.step === "draw" ? "eachDrawStep" : "eachEndStep";
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === "eachEndStep" && ev.step === "end"));
+      // "That player" in "at the beginning of each player's upkeep" is the active player.
+      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || e === each, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     }
   }
 }

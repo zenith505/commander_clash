@@ -848,6 +848,29 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **10,949 cards are fully supported.** Rules tests: `test/dies-heroic-proliferate.test.ts`.
 
+### Looking at the top cards, fading, vanishing, dethrone, each upkeep (added 2026-10-10)
+
+- **"Look at the top N cards of your library"** then "Put one (two) of them into your hand and the rest
+  into your graveyard / on the bottom", "You may reveal a creature or land card from among them and put
+  it into your hand", "You may put one of those cards back on top". The player picks in a window showing
+  the cards looked at; cards that don't match are shown but can't be taken. "On the bottom in any order"
+  puts them there in a random order for now.
+- **Afflict** (CR 702.130), **dethrone** (702.105: checked as it attacks, ties count), **training**
+  (702.149), **fading** (702.32) and **vanishing** (702.63: removing the last time counter triggers the
+  sacrifice, so it uses the stack), **ward—pay N life**.
+- **"At the beginning of each (player's) upkeep / each player's draw step, that player ..."**: "that
+  player" is the active player; draw-step triggers come after the turn's draw (CR 504.2). "Draws an
+  additional card" is one more draw.
+- **"Sacrifice ~ unless you pay {U}"** (and "unless you pay 3 life"), **"Draw a card at the beginning of
+  the next turn's upkeep"** (a delayed trigger, whoever's turn is next), **"Other artifact creatures you
+  control get +1/+1"**, **"Target creature deals damage to itself equal to its power"**.
+- Fix: mana abilities activated just before casting are part of paying for the spell (CR 601.2g), so
+  what they trigger (a death trigger from sacrificing an Eldrazi Scion) goes on the stack after the spell
+  is cast, not before. Before, a bot could end up trying to cast a sorcery with that trigger on the stack.
+- Not yet: putting cards back "in any order" yourself, "tap target creature defending player controls".
+
+**11,154 cards are fully supported.** Rules tests: `test/dig.test.ts`, `test/fading-dethrone.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

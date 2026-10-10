@@ -10,6 +10,7 @@ import { allEffects } from "./abilities";
 import type {
   AbilityBody,
   Amount,
+  CountMod,
   CounterKind,
   AmountExpr,
   Count,
@@ -402,6 +403,11 @@ function compile(d: CardDef): CompiledCard {
     const extraLand = new RegExp(`^You may play ${NUM} additional lands? on each of your turns\\.$`).exec(line);
     if (extraLand) {
       out.extraLands = (out.extraLands ?? 0) + num(extraLand[1]!);
+      continue;
+    }
+    const countMod = parseCountMod(line);
+    if (countMod) {
+      (out.countMods ??= []).push(countMod);
       continue;
     }
     if (/^You have no maximum hand size\.$/.test(line)) {
@@ -3217,4 +3223,17 @@ function parseToken(power: number, toughness: number, desc: string, withText?: s
   const keywords = withText && !quoted ? parseKeywordList(withText) : [];
   if (!keywords || !subtypes.length) return null;
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(quoted ? { abilities: quoted[1]! } : {}) };
+}
+
+/** Token and counter doublers (CR 614.1a): Parallel Lives, Doubling Season, Hardened Scales, Xorn. */
+function parseCountMod(line: string): CountMod | undefined {
+  let m = /^If (?:an effect would create one or more tokens( under your control)?, it creates|one or more tokens would be created( under your control)?,) twice that many of those tokens(?: are created)? instead\.$/.exec(line);
+  if (m) return { what: "tokens", who: m[1] || m[2] ? "you" : "any", op: "double" };
+  m = /^If you would create one or more ([A-Z][a-z]+) tokens, instead create those tokens plus an additional \1 token\.$/.exec(line);
+  if (m) return { what: "tokens", who: "you", op: "plusOne", subtype: m[1]! };
+  m = /^If one or more \+1\/\+1 counters would be put on (another|a) creature( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature) instead\.$/.exec(line);
+  if (m) return { what: "counters", counter: "+1/+1", on: "creature", who: m[2] ? "you" : "any", op: m[3] === "twice that many" ? "double" : "plusOne", ...(m[1] === "another" ? { other: true } : {}) };
+  m = /^If an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead\.$/.exec(line);
+  if (m) return { what: "counters", on: "permanent", who: "you", op: "double" };
+  return undefined;
 }

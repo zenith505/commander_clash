@@ -10,6 +10,7 @@ import { nextRandom, shuffle } from "./rng";
 import { auraHostFor, castProblem, describeTargets, destroyPermanent, draw, gainLife, livingPlayers, log, moveObject, newObject, obj, opponents, player, untapPermanent } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
 import { modeCountProblem, withModes } from "./modes";
+import { putCounters, tokensToCreate } from "./counters";
 import { compileCard, compileGranted, MONARCH } from "./oracle";
 import { bindChosenKeywords, CHOSEN_PROTECTION, CREATURE_TYPES, type SourceQuality } from "./keywords";
 import { describeAmount, evalAmount, type AmountCtx } from "./amounts";
@@ -401,8 +402,7 @@ function proliferate(s: GameState, you: PlayerId, src: string) {
     let added = false;
     for (const [k, n] of Object.entries(o.counters)) {
       if (!n || (mine ? !helpful(k) : !harmfulCounter(k))) continue;
-      o.counters[k] = n + 1;
-      added = true;
+      if (putCounters(s, o, k, 1)) added = true;
     }
     if (added) names.push(defOf(s, o).name);
   }
@@ -450,8 +450,8 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const c = amountNow(s, e.counter!.n, ctx);
         if (c <= 0) continue;
         invalidateCharacteristics(s);
-        o.counters[k] = (o.counters[k] ?? 0) + c;
-        log(s, `${player(s, pid).name} puts ${c} ${k} counter${c > 1 ? "s" : ""} on ${defOf(s, o).name}.`);
+        const put = putCounters(s, o, k, c);
+        log(s, `${player(s, pid).name} puts ${put} ${k} counter${put > 1 ? "s" : ""} on ${defOf(s, o).name}.`);
         continue;
       }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
@@ -844,11 +844,14 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       // which becomes that subtype too. With several Armies, the one with the most counters is chosen.
       const n = amountNow(s, e.n, ctx);
       const armies = () => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === ctx.controller && characteristics(s, o).subtypes.includes("Army") && objIsType(s, o, "Creature"));
-      if (!armies().length) createToken(s, ctx.controller, { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] });
+      if (!armies().length) {
+        const army: TokenSpec = { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] };
+        for (let i = 0; i < tokensToCreate(s, ctx.controller, army, 1); i++) createToken(s, ctx.controller, army);
+      }
       const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
       if (!army) return;
       invalidateCharacteristics(s);
-      if (n > 0) army.counters["+1/+1"] = (army.counters["+1/+1"] ?? 0) + n;
+      if (n > 0) putCounters(s, army, "+1/+1", n);
       log(s, `${player(s, ctx.controller).name} amasses ${e.subtype} ${n}.`);
       if (!characteristics(s, army).subtypes.includes(e.subtype))
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [army.id], mods: [{ kind: "addTypes", types: [], subtypes: [e.subtype] }] });
@@ -913,7 +916,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       const o = id ? s.objects[id] : undefined;
       if (nonland && o?.zone === "battlefield" && (o.zoneChanges ?? 0) === zc) {
         invalidateCharacteristics(s);
-        o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + nonland;
+        putCounters(s, o, "+1/+1", nonland);
         log(s, `${defOf(s, o).name} gets ${nonland} +1/+1 counter${nonland > 1 ? "s" : ""}.`);
       }
       return;
@@ -928,8 +931,8 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       if (n <= 0) return;
       for (const o of objects(s, e.what, ctx)) {
         invalidateCharacteristics(s);
-        o.counters[e.counter] = (o.counters[e.counter] ?? 0) + n;
-        log(s, `${defOf(s, o).name} gets ${n} ${e.counter} counter${n > 1 ? "s" : ""}.`);
+        const put = putCounters(s, o, e.counter, n);
+        log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
       }
       return;
     }
@@ -982,7 +985,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       // "If it isn't renowned" again as it resolves (CR 603.4); gone means it can't become renowned.
       const o = objects(s, { ref: "self" }, ctx)[0];
       if (!o || o.renowned) return;
-      o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + e.n;
+      putCounters(s, o, "+1/+1", e.n);
       o.renowned = true;
       log(s, `${characteristics(s, o).name} gets ${e.n} +1/+1 counter${e.n > 1 ? "s" : ""} and becomes renowned.`);
       return;
@@ -998,7 +1001,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         log(s, `${src}'s evolve does nothing.`);
         return;
       }
-      o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + 1;
+      putCounters(s, o, "+1/+1", 1);
       log(s, `${characteristics(s, o).name} evolves.`);
       return;
     }
@@ -1051,7 +1054,7 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         }
         log(s, `${name} explores${top ? `: ${p.name} reveals ${defOf(s, obj(s, top)).name}` : ""}.`);
         if (self) {
-          self.counters["+1/+1"] = (self.counters["+1/+1"] ?? 0) + 1;
+          putCounters(s, self, "+1/+1", 1);
           invalidateCharacteristics(s);
         }
         if (!top) return; // nothing revealed: just the counter (rulings)
@@ -1101,7 +1104,8 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
     case "createToken": {
       const n = amountNow(s, e.n, ctx);
       if (s.resolving) s.resolving.created = [];
-      for (const pid of players(s, e.who, ctx)) for (let i = 0; i < n; i++) createToken(s, pid, e.token);
+      // Token doublers apply per player (CR 614.1a): "twice that many of those tokens".
+      for (const pid of players(s, e.who, ctx)) for (let i = 0; i < tokensToCreate(s, pid, e.token, n); i++) createToken(s, pid, e.token);
       if (n) log(s, `${src} creates ${n === 1 ? "a" : n} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${n > 1 ? "s" : ""}.`);
       return;
     }

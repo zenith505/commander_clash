@@ -901,6 +901,22 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **11,381 cards are fully supported.** Rules tests: `test/impulse.test.ts`.
 
+### Token and counter doublers (added 2026-10-10)
+
+- **Replacement effects on how many** (CR 614.1a, 616.1): Parallel Lives, Anointed Procession, Mondrak
+  ("twice that many tokens"), Primal Vigor (anyone's tokens and +1/+1 counters), Doubling Season (tokens
+  and any counters on your permanents), Hardened Scales ("that many plus one"), Branching Evolution,
+  Corpsejack Menace, Benevolent Hydra ("another creature"), Xorn (one extra Treasure).
+- Each copy applies again: two Parallel Lives make four times as many. When several apply, the plus-ones
+  go first and then the doubles, which is the order the affected player would pick.
+- They apply to every effect that puts counters or creates tokens, "enters with counters" included
+  (that's the rulings), but not to counters put on as a cost. A creature with its own doubler isn't
+  affected by it as it enters, since only permanents already there count (CR 614.12).
+- Not yet: Vorinclex (counters on players and halving), "instead create one of each" (Academy
+  Manufactor), -1/-1 counters from wither and infect damage.
+
+**11,393 cards are fully supported.** Rules tests: `test/doublers.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

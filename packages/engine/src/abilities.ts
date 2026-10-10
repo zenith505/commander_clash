@@ -697,6 +697,14 @@ export interface CastFromGraveyard {
   exile: boolean;
 }
 
+/**
+ * Replacement effects that change how many tokens are created or counters put on (CR 614.1a): Parallel Lives,
+ * Doubling Season, Hardened Scales, Xorn. `who`: "you" = only for its controller's tokens / permanents.
+ */
+export type CountMod =
+  | { what: "tokens"; who: "you" | "any"; op: "double" | "plusOne"; subtype?: string }
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent"; who: "you" | "any"; op: "double" | "plusOne"; other?: boolean };
+
 export interface CompiledCard {
   spell?: AbilityBody; // instants and sorceries
   triggers: TriggeredAbility[];
@@ -724,6 +732,7 @@ export interface CompiledCard {
   cantBeCountered?: boolean;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */

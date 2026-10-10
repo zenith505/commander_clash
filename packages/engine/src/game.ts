@@ -4,6 +4,7 @@ import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, 
 import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
+import { putCounters } from "./counters";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
@@ -500,13 +501,13 @@ export function moveObject(
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
     if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped)) o.tapped = true;
-    if (withCounters && counterN) o.counters[withCounters.counter] = counterN; // CR 614.1c
+    if (withCounters && counterN) putCounters(s, o, withCounters.counter, counterN, true); // CR 614.1c
     // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
     if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
-      o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + printed.bloodthirst;
-    for (const [k, n] of Object.entries(opts.counters ?? {})) o.counters[k] = (o.counters[k] ?? 0) + n;
+      putCounters(s, o, "+1/+1", printed.bloodthirst, true);
+    for (const [k, n] of Object.entries(opts.counters ?? {})) putCounters(s, o, k, n, true);
     // "~ escapes with N +1/+1 counters on it" (CR 702.138c).
-    if (escaped && printed.escapesWith) o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + printed.escapesWith;
+    if (escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
     // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
     for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges, ...c });
     // Riot and unleash: whether it has a +1/+1 counter is part of how it enters (CR 614.12), so what it
@@ -1640,7 +1641,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const entry = s.entersChoices?.shift();
     if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
-      if (choice === ENTERS_COUNTER) o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + 1;
+      if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
       else if (pend.what === "riot")
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: pend.source, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
       log(s, `${pend.source} enters ${choice === ENTERS_COUNTER ? "with a +1/+1 counter" : pend.what === "riot" ? "with haste" : "without a counter"} (${pend.what}).`);
@@ -2286,7 +2287,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId) {
   const d = defOf(s, o);
   log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${describeVia(fd.kind)} ${fd.cost}).`);
   // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
-  if (fd.kind === "megamorph") o.counters["+1/+1"] = (o.counters["+1/+1"] ?? 0) + 1;
+  if (fd.kind === "megamorph") putCounters(s, o, "+1/+1", 1);
   fireEvent(s, { type: "turnedFaceUp", id });
   s.passedInSuccession = [];
 }

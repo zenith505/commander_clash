@@ -16,7 +16,7 @@
 // another (CR 613.8). Once an effect starts applying, it keeps applying to the same
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
-import type { Affects, Amount, Modification, StaticAbility, TargetSpec } from "./abilities";
+import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec } from "./abilities";
 import { evalAmount } from "./amounts";
 import { bindChosen, objectMatches } from "./effects";
 import { basePower, baseToughness, defOf } from "./cards";
@@ -208,15 +208,57 @@ function exists(s: GameState, e: Inst, chars: CharMap): boolean {
   if (!e.affects) return true;
   const src = chars.get(e.sourceId!);
   if (!src || !src.hasPrintedAbilities) return false;
-  // Threshold: seven or more cards in its controller's graveyard (a condition, not a dependency on layers).
-  if (e.condition?.kind === "graveyardAtLeast" && (s.players[src.controller]?.graveyard.length ?? 0) < e.condition.n) return false;
-  // Unleash: "as long as it has a +1/+1 counter on it" (CR 702.98a).
-  if (e.condition?.kind === "selfCounter" && !(s.objects[e.sourceId!]?.counters[e.condition.counter] ?? 0)) return false;
+  if (e.condition && !conditionMet(s, e.condition, e.sourceId!, src.controller, chars)) return false;
   if (e.affects.kind === "attached") {
     const host = s.objects[e.sourceId!]!.attachedTo;
     return !!host && chars.has(host);
   }
   return true;
+}
+
+const PERMANENT_CARD_TYPES = ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"];
+
+/**
+ * Is an "as long as" condition true? Whatever it looks at on the battlefield is seen as the layers
+ * applied so far have left it, so an effect that changes that waits for it (CR 613.8a).
+ */
+function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap): boolean {
+  const src = s.objects[sourceId]!;
+  const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
+  switch (cond.kind) {
+    case "graveyardAtLeast": // threshold
+      return (s.players[you]?.graveyard.length ?? 0) >= cond.n;
+    case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
+      return new Set(yard().flatMap((d) => d.types)).size >= cond.n;
+    case "graveyardPermanents": // descend
+      return yard().filter((d) => d.types.some((t) => PERMANENT_CARD_TYPES.includes(t))).length >= cond.n;
+    case "selfCounter": // unleash (CR 702.98a)
+      return (src.counters[cond.counter] ?? 0) > 0;
+    case "yourTurn":
+      return s.activePlayer === you;
+    case "self": {
+      if (cond.is === "attacking") return src.attacking !== undefined;
+      const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
+      const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");
+      if (cond.is === "enchanted") return attached.some(aura);
+      if (cond.is === "equipped") return attached.some((a) => a.c?.subtypes.includes("Equipment"));
+      // Modified: counters, equipped, or enchanted by an Aura its controller controls (CR 700.9).
+      const mine = chars.get(sourceId)?.controller;
+      return Object.values(src.counters).some((n) => (n ?? 0) > 0) || attached.some((a) => a.c?.subtypes.includes("Equipment") || (aura(a) && a.c?.controller === mine));
+    }
+    case "control": {
+      // "Defending player" is the player the source is attacking (CR 506.2); it has none otherwise.
+      const who = cond.who === "defending" ? src.attacking : you;
+      if (who === undefined) return false;
+      let n = 0;
+      for (const [id, c] of chars) {
+        if (cond.other && id === sourceId) continue;
+        if (cond.who === "opponent" ? c.controller === you : c.controller !== who) continue;
+        if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
+      }
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+    }
+  }
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {
@@ -437,6 +479,7 @@ function countSignature(s: GameState): string {
     const o = s.objects[id]!;
     if (o.tapped || o.attacking !== undefined || o.blocking) parts.push(`${id}${o.tapped ? "t" : ""}${o.attacking !== undefined ? "a" : ""}${o.blocking ? "b" : ""}`);
   }
+  parts.push(`${s.activePlayer}`);
   return parts.join("|");
 }
 
@@ -444,11 +487,13 @@ const isCounted = (a: Amount) => typeof a !== "number";
 /** Does any static ability on the battlefield count something? */
 function usesCounts(s: GameState): boolean {
   for (const id of s.battlefield) {
-    for (const st of compileCard(defOf(s, s.objects[id]!)).statics)
+    for (const st of compileCard(defOf(s, s.objects[id]!)).statics) {
+      if (st.condition) return true; // "as long as": attacking, tapped lands, the graveyard, whose turn it is
       for (const m of st.mods) {
         if (m.kind === "definePT") return true;
         if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
       }
+    }
   }
   return false;
 }

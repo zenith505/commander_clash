@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
@@ -738,7 +738,7 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.
-      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX;
+      const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length;
       if ((ab.sacrificeSelf && !cashIn) || freeCost) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
@@ -756,7 +756,9 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       for (const x of xs) {
         const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
         if (!targets) continue;
-        plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x);
+        const costs = abilityCosts(s, pid, o, ab, targets);
+        if (costs === null) continue;
+        plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x, costs);
         if (plan) break;
       }
       // Not worth sacrificing a Treasure to cash in a Food or Clue.
@@ -789,6 +791,36 @@ function chooseUnearth(s: GameState, pid: PlayerId): Action[] | null {
  * declared and before damage. One shield is enough.
  */
 /**
+ * What to sacrifice or discard to pay for an activated ability (CR 602.2b): only spare things, tokens
+ * that aren't creatures we'd miss, or lands once we have plenty, and cards when our hand is full.
+ * Undefined when it costs none of that; null when we'd rather not pay.
+ */
+function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], keep?: ObjectId): CostChoices | null | undefined {
+  if (!ab.costs?.length) return undefined;
+  const out: CostChoices = {};
+  const targeted = new Set(targets.map((t) => t.id));
+  for (const c of ab.costs) {
+    if (c.kind === "sacrifice") {
+      const pool = s.battlefield
+        .map((x) => obj(s, x))
+        .filter((x) => controllerOf(s, x) === pid && x.id !== o.id && x.id !== keep && !x.isCommander && !targeted.has(x.id) && !out.sacrifice?.includes(x.id))
+        .filter((x) => objectMatches(s, c.filter, x, pid, false))
+        .filter((x) => (objIsType(s, x, "Land") ? lands(s, pid) >= 8 : x.isToken && worth(s, pid, x) <= 3))
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+      if (pool.length < c.n) return null;
+      out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+    } else if (c.kind === "discard") {
+      const hand = player(s, pid).hand.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
+      if (hand.length < c.n || player(s, pid).hand.length < c.n + 4) return null;
+      const picks = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => hand.includes(x)).slice(0, c.n);
+      if (picks.length < c.n) return null;
+      out.discard = picks;
+    } else return null;
+  }
+  return out;
+}
+
+/**
  * If the ability only regenerates its source or what the source is attached to ("Regenerate enchanted
  * creature"), that permanent (null when it's attached to nothing); undefined for any other ability.
  */
@@ -815,7 +847,9 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
       const losing = foes.reduce((n, f) => n + (s.objects[f] ? power(s, obj(s, f)) : 0), 0) >= Math.max(1, lethalDamage(s, c));
       if (!aimedAt && !losing) continue;
       if (abilityProblem(s, pid, id, i) && !/not enough mana/.test(abilityProblem(s, pid, id, i)!)) continue;
-      const plan = planActivate(s, pid, id, i, undefined, undefined);
+      const costs = abilityCosts(s, pid, o, ab, [], c.id);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, undefined, costs);
       if (plan) return plan;
     }
   }

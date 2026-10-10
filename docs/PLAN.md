@@ -649,6 +649,35 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **8,413 cards are fully supported.** Rules tests: `test/auras-edicts.test.ts`.
 
+### Sacrifice and discard costs on abilities, "as long as" abilities (added 2026-10-10)
+
+- **"Sacrifice a creature: ..."**, "Sacrifice another creature:", "{1}, Sacrifice an artifact or land:",
+  "{1}, Discard a card: ...": costs paid as you activate, after choosing targets (CR 602.2b, 601.2h),
+  so nobody can respond by killing what you sacrificed. "Another" can't be the ability's own source.
+  "The sacrificed creature's power" is that creature as it last existed (CR 608.2h).
+- **"As long as" abilities** (CR 604.1, 611.3): they apply only while the condition is true, checked
+  all the time.
+  - "~ gets +1/+2 as long as you control a Forest" (Kird Ape), "another artifact", "no untapped lands",
+    "an opponent controls an Island", "a white or black permanent".
+  - Metalcraft (three or more artifacts), delirium (four or more card types among cards in your
+    graveyard, CR 205.2a), descend (permanent cards in your graveyard), threshold.
+  - "As long as it's attacking", "it's enchanted / equipped", "it's modified" (counters, Equipment,
+    or an Aura its controller controls, CR 700.9), "it has a +1/+1 counter on it".
+  - "During your turn, ~ has first strike."
+  - "~ can't be blocked as long as defending player controls an artifact": the player it's attacking.
+  - What the condition looks at is seen after earlier layers, so an effect that makes an artifact
+    stop being one turns metalcraft off (CR 613.8).
+  - Not yet: "This spell has flash as long as ..." (it works from your hand), and "each creature you
+    control can't be blocked as long as defending player ..." (each attacker has its own defending player).
+- **Targets and groups** can now say "untapped", "token" and "nontoken" ("destroy target untapped
+  creature", "each player sacrifices a nontoken creature").
+- **On the table:** after choosing targets, click what to sacrifice (it glows), then Sacrifice and
+  activate; a discard cost asks with your hand's cards.
+- **Bots** only sacrifice tokens worth little (or a land when they have plenty), and only discard
+  with a full hand.
+
+**9,019 cards are fully supported.** Rules tests: `test/activation-costs.test.ts`, `test/as-long-as.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).
@@ -666,7 +695,7 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
    they pay", energy, the monarch, "you may pay ... If you do"~~ done. ~~flashback, jump-start,
    retrace, escape, buyback, rebound, unearth, delayed triggers~~ done. ~~echo, cumulative upkeep,
    evoke, dash, delve, living weapon, scavenge~~ done. ~~morph, megamorph, disguise~~ done. ~~"enchanted creature" abilities, edicts, bounce lands, "exile until ~
-   leaves", riot, unleash, afterlife~~ done. Next by
+   leaves", riot, unleash, afterlife~~ done. ~~sacrifice/discard costs on abilities, "as long as"~~ done. Next by
    count: see `npx tsx tools/coverage.ts`.
    Hand-written overrides for cards that don't fit a template.
 3. ~~Layers and continuous effects~~ (CR 613, done except layers 1 and 3), replacement

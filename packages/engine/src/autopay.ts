@@ -249,15 +249,16 @@ export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: nu
 }
 
 /** Like planCast, for an activated ability. A crew ability needs the creatures to tap (`tapCreatures`). */
-export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number): Action[] | null {
-  const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x);
+export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): Action[] | null {
+  const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
   const ab = abilitiesOf(s, obj(s, objectId)).activated[index]!;
   const cost = parseManaCost(ab.manaCost);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
-  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, tapCreatures);
+  // Don't tap for mana what's about to be sacrificed either.
+  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? [])]);
   if (!taps) return null;
-  return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}) }];
+  return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}) }];
 }
 
 /**

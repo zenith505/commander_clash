@@ -257,7 +257,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       break;
     case "activateAbility":
       requireNoPending(s);
-      activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x);
+      activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs);
       s.passedInSuccession = [];
       break;
     case "chooseModes":
@@ -1202,8 +1202,16 @@ function kickProblem(d: CardDef, kicks?: number[]): string | null {
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
 function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices): string | null {
   const d = defOf(s, o);
+  return extraCostProblem(s, pid, o, [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, choices?.via)?.costs ?? [])], choices, `cast ${d.name}`);
+}
+
+/**
+ * Can these costs beyond mana be paid, for a spell (`o` is the card being cast) or an ability (`o` is its
+ * source)? Without choices, just whether they could be. `doing`: "cast X", "activate X's ability".
+ */
+function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string): string | null {
+  const d = defOf(s, o);
   const p = player(s, pid);
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, choices?.via)?.costs ?? [])];
   const given = (k: "sacrifice" | "discard" | "exileCards") => choices?.[k];
   for (const k of ["sacrifice", "discard", "exileCards"] as const)
     if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k}`;
@@ -1214,13 +1222,13 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
     }
     const pool =
       c.kind === "sacrifice"
-        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, c.filter, obj(s, id), pid, false))
+        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id) && objectMatches(s, c.filter, obj(s, id), pid, false))
         : c.kind === "discard"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
       c.kind === "sacrifice"
-        ? `${c.n === 1 ? "a" : c.n} ${c.filter.text}`
+        ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
         : c.kind === "discard"
           ? c.filter
             ? `${c.n === 1 ? "a" : c.n} ${c.filter.text}`
@@ -1229,7 +1237,7 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
     const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     if (!chosen) {
-      if (pool.length < c.n) return `you need to ${verb} ${what} to cast ${d.name}`;
+      if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
       continue;
     }
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id))) return `choose ${what} to ${verb}`;
@@ -1239,8 +1247,13 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 
 /** Pay a spell's additional costs; returns what was sacrificed as it last existed. */
 function payAdditionalCosts(s: GameState, p: Player, d: CardDef, choices: CostChoices, more: AdditionalCost[] = []) {
+  return payExtraCosts(s, p, [...(compileCard(d).additionalCosts ?? []), ...more], choices);
+}
+
+/** Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h). */
+function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices) {
   const sacrificed: LastKnown[] = [];
-  for (const c of [...(compileCard(d).additionalCosts ?? []), ...more]) {
+  for (const c of costs) {
     if (c.kind === "payLife") {
       p.life -= c.n;
       log(s, `${p.name} pays ${c.n} life.`);
@@ -1274,7 +1287,7 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
  * Why this activated ability can't be activated right now, or null. Without `targets`, only
  * checks that legal targets exist; for a modal ability, without `modes` only that a mode can be chosen.
  */
-export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number): string | null {
+export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {
   const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
@@ -1309,6 +1322,10 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const tp = targets ? targetProblem(s, body.targets, targets, pid, src) : hasLegalTargetsFor(s, body.targets, pid, src) ? null : "no legal targets";
     if (tp) return tp;
   }
+  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length) {
+    const cp = extraCostProblem(s, pid, o, ab.costs ?? [], costs, `activate ${d.name}'s ability`);
+    if (cp) return cp;
+  }
   const cost = parseManaCost(ab.manaCost);
   const xp = xProblem(cost, x);
   if (xp) return xp;
@@ -1340,14 +1357,15 @@ function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number
   return total >= n ? null : `those creatures have total power ${total}; crew ${n} needs ${n} or more`;
 }
 
-function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number) {
+function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices) {
   const o = obj(s, id);
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose creatures to crew with");
+  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
-  const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x);
+  const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = parseManaCost(ab.manaCost);
@@ -1362,7 +1380,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   for (const c of tapCreatures ?? []) obj(s, c).tapped = true;
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
-  if (ab.sacrificeSelf) moveObject(s, id, "graveyard");
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}) : [];
+  if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
   if (ab.discardSelf) moveObject(s, id, "graveyard");
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
@@ -1379,6 +1398,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     modes: ab.body.modal ? modes : undefined,
     ...(lki ? { lki } : {}),
     ...(abCost.hasX ? { x: x ?? 0 } : {}),
+    ...(sacrificed.length ? { sacrificed } : {}),
   });
   if (ab.discardSelf) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.crew !== undefined) log(s, `${p.name} crews ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);

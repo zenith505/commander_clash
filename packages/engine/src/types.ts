@@ -423,7 +423,8 @@ export type Action =
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */
-  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number }
+  /** `costs`: what's sacrificed or discarded to pay for it (see ActivatedAbility.costs). */
+  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices }
   | { type: "chooseModes"; player: PlayerId; modes: number[] }
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId }[] }

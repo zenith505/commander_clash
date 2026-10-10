@@ -18,6 +18,7 @@ import type {
   CompiledCard,
   Modification,
   StaticAbility,
+  StaticCondition,
   DamageRecipient,
   Effect,
   EntersChoice,
@@ -384,7 +385,7 @@ function compile(d: CardDef): CompiledCard {
       });
       continue;
     }
-    const st = parseStatic(line) ?? parseThreshold(line);
+    const st = parseStatic(line) ?? parseConditionalStatic(line);
     if (st) {
       out.statics.push(st);
       continue;
@@ -437,7 +438,7 @@ function checkCastingLinks(out: CompiledCard) {
         delete o.cost;
       }
     }
-    if (o.ref === "sacrificed" && !out.additionalCosts?.some((c) => c.kind === "sacrifice")) bad = true;
+    if (o.ref === "sacrificed" && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : needs.add("creatureType"));
     if (o.kind === "chosenColor") needs.add("color");
@@ -446,7 +447,13 @@ function checkCastingLinks(out: CompiledCard) {
   };
   const needs = new Set<ChoiceKind>();
   const choices = new Set<ChoiceKind>((out.entersChoose ?? []).map((c) => c.what));
-  visit([out.spell, out.triggers, out.statics, out.activated, out.mana]);
+  // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
+  let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice");
+  visit([out.spell, out.triggers, out.statics, out.mana]);
+  for (const ab of out.activated) {
+    canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
+    visit(ab);
+  }
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // "Enters with a counter for each creature of the chosen type" would be counted before the choice is made.
   needs.clear();
@@ -921,19 +928,61 @@ function parseEntersChoice(line: string): EntersChoice | null {
 }
 
 /**
- * Threshold (an ability word, CR 207.2c): "~ gets +1/+1 as long as there are seven or more cards in
- * your graveyard", "As long as there are seven or more cards in your graveyard, ~ gets +1/+1 and has flying."
+ * A static ability that applies only "as long as" something is true: threshold's "~ gets +1/+1 as long
+ * as there are seven or more cards in your graveyard", "As long as you control three or more artifacts,
+ * ~ has flying", Kird Ape's "~ gets +1/+2 as long as you control a Forest", "~ has first strike as long
+ * as it's attacking". An ability word in front ("Metalcraft —", "Descend 4 —") has no rules meaning
+ * (CR 207.2c); the condition is spelled out after it.
  */
-function parseThreshold(line: string): StaticAbility | null {
-  const text = line.replace(/^Threshold — /, "").replace(/\.$/, "");
-  const cond = "(?:there are )?(seven|\\d+) or more cards (?:are )?in your graveyard";
-  let m = new RegExp(`^(.+?) as long as ${cond}$`).exec(text);
-  let statement = m?.[1];
-  let n = m?.[2];
-  if (!m && (m = new RegExp(`^As long as ${cond}, (.+)$`).exec(text))) [statement, n] = [m[2], m[1]];
-  if (!statement || !n) return null;
-  const st = parseStatic(`${statement}.`);
-  return st ? { ...st, text: line, condition: { kind: "graveyardAtLeast", n: num(n) } } : null;
+function parseConditionalStatic(line: string): StaticAbility | null {
+  const text = line.replace(/^[A-Z][A-Za-z' -]+(?: \d+)? — /, "").replace(/\.$/, "");
+  let statement: string | undefined;
+  let cond: string | undefined;
+  let m: RegExpExecArray | null;
+  if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
+  else if ((m = /^As long as ([^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
+  else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
+  if (!statement || !cond) return null;
+  const st = parseStatic(`${statement.replace(/^(it|this creature|this permanent)\b/i, "~")}.`);
+  if (!st || st.condition) return null;
+  // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
+  if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
+  const condition = parseStaticCondition(cond, st);
+  return condition ? { ...st, text: line, condition } : null;
+}
+
+const CONTROL_COUNT = new RegExp(`^(?:(no|another|an?)|${NUM} or more(?: other)?|${NUM} or fewer) (.+)$`);
+
+/** The condition of an "as long as" static ability (see parseConditionalStatic). */
+function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
+  let m: RegExpExecArray | null;
+  if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
+  if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
+  if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
+  if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  // "It" is the source only when the ability is about the source itself.
+  const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified)$/.exec(text);
+  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" };
+  if ((m = /^(?:~|it) has an? ([+-]1\/[+-]1) counter on it$/.exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
+    return { kind: "selfCounter", counter: m[1] === "+1/+1" ? "+1/+1" : "-1/-1" };
+  if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
+    const who = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "defending";
+    // Each attacking creature has its own defending player (CR 506.2), so only the source's own is modeled.
+    if (who === "defending" && st.affects.kind !== "self") return null;
+    const q = CONTROL_COUNT.exec(m[2]!);
+    if (!q) return null;
+    // NUM is a group of its own: q[1] the word, q[2] "N or more", q[3] "N or fewer", q[4] what.
+    const filter = pickFilter(q[4]!);
+    if (!filter) return null;
+    if (q[1] === "no") return { kind: "control", who, filter, max: 0 };
+    if (q[1] === "another") return { kind: "control", who, filter, min: 1, other: true };
+    if (q[1]) return { kind: "control", who, filter, min: 1 };
+    // "two or more other artifacts" leaves the source out
+    const other = / or more other /.test(m[2]!);
+    if (q[2]) return { kind: "control", who, filter, min: num(q[2]!), ...(other ? { other } : {}) };
+    return { kind: "control", who, filter, max: num(q[3]!) };
+  }
+  return null;
 }
 
 function isKeywordLine(line: string): boolean {
@@ -1048,9 +1097,24 @@ function parseTrigger(raw: string) {
 
 function parseActivated(line: string): ActivatedAbility | "fail" | null {
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const m = /^((?:(?:\{[^}]+\})+|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\})(?:, (?:(?:\{[^}]+\})+|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}))*): (.+)$/.exec(line);
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?`;
+  const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
+  // Sacrificing other permanents or discarding cards as part of the cost (CR 602.2b, 601.2h).
+  const extra: AdditionalCost[] = [];
+  for (const part of costs.split(", ")) {
+    let c: RegExpExecArray | null;
+    if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|${NUM}) (.+)$`).exec(part))) {
+      const filter = pickFilter(c[3]!); // NUM is a group of its own
+      if (!filter) return "fail";
+      extra.push({ kind: "sacrifice", filter, n: c[1] === "another" ? 1 : num(c[1]!), ...(c[1] === "another" ? { other: true } : {}) });
+    } else if ((c = new RegExp(`^Discard ${NUM} (?:(.+?) )?cards?$`).exec(part))) {
+      const filter = c[2] ? parseSearchFilter(`${c[2]} card`) : undefined;
+      if (filter === null) return "fail";
+      extra.push({ kind: "discard", n: num(c[1]!), ...(filter ? { filter } : {}) });
+    }
+  }
   let effectText = m[2]!;
   let sorcerySpeed = false;
   let oncePerTurn = false;
@@ -1086,6 +1150,7 @@ function parseActivated(line: string): ActivatedAbility | "fail" | null {
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(energy ? { energyCost: energy } : {}),
+    ...(extra.length ? { costs: extra } : {}),
   };
 }
 
@@ -2282,9 +2347,9 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   if (inGraveyard && (controller || / (?:you|an opponent) controls?$/.test(p))) return null;
   if (p === "player" || p === "opponent") return Object.keys(extra).length || inGraveyard ? null : { kind: "player", opponent: p === "opponent", text };
   let tapped: boolean | undefined;
-  if (p.startsWith("tapped ")) {
-    tapped = true;
-    p = p.slice(7);
+  if ((m = /^(un)?tapped /.exec(p))) {
+    tapped = !m[1];
+    p = p.slice(m[0].length);
   }
   if (p.startsWith("attacking or blocking ")) {
     extra.combat = "attackingOrBlocking";
@@ -2312,7 +2377,10 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
     const words = alt.trim().split(/\s+/);
     for (let i = 0; i < words.length; i++) {
       const w = words[i]!;
-      if (w.startsWith("non")) {
+      if (w === "token" || w === "nontoken") {
+        if (alts.length > 1) return null;
+        extra.token = w === "token";
+      } else if (w.startsWith("non")) {
         const rest = w.slice(3).replace(/^-/, "");
         if (COLOR_WORDS[rest]) notColors.push(COLOR_WORDS[rest]!);
         else if (TYPE_WORDS[rest]) notTypes.push(TYPE_WORDS[rest]!);
@@ -2346,11 +2414,11 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
     ...extra,
   };
   if (inGraveyard) {
-    if (isSpell || tapped || extra.combat) return null;
+    if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined) return null;
     return { kind: "card", ...filters, ...(owner ? { owner } : {}), text };
   }
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || supertypes.length ? null : { kind: "spell", ...filters, text };
-  return { kind: "object", ...filters, controller, tapped, text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || supertypes.length ? null : { kind: "spell", ...filters, text };
+  return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
 }
 
 function parseKeywordList(text: string): string[] | null {

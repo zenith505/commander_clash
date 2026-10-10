@@ -52,7 +52,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
-  if (spec.tapped && !o.tapped) return false;
+  if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
+  if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
   // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d).

@@ -184,7 +184,17 @@ type BuybackPick = { draft: CastDraft; label: string; cost: string };
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; chosen: number[] };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = { draft: CastDraft; kind: "sacrifice" | "discard" | "exileCards"; label: string; what: string; n: number; candidates: string[]; chosen: string[] };
+type CostPick = ({ draft: CastDraft; activate?: undefined } | { activate: ActivateDraft; draft?: undefined }) & {
+  kind: "sacrifice" | "discard" | "exileCards";
+  label: string;
+  what: string;
+  n: number;
+  candidates: string[];
+  chosen: string[];
+};
+
+/** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
@@ -293,7 +303,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setTargeting(null);
     if (targeting.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
     if (targeting.mode === "cast") return continueCast({ ...targeting.draft, targets: chosen });
-    dispatch(planActivate(s, HUMAN, targeting.objectId, targeting.index, chosen, targeting.modes, undefined, targeting.x) ?? []);
+    continueActivate({ objectId: targeting.objectId, index: targeting.index, modes: targeting.modes, x: targeting.x, targets: chosen });
   }
 
   function useAbility(objectId: string, index: number, modes?: number[], x?: number) {
@@ -311,7 +321,37 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     const body = withModes(ab.body, modes);
     if (body.targets.length) return setTargeting({ mode: "activate", objectId, index, specs: body.targets, chosen: [], label, modes, x });
-    dispatch(planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, x) ?? [{ type: "activateAbility", player: HUMAN, objectId, index, modes, ...(x ? { x } : {}) }]);
+    continueActivate({ objectId, index, modes, x });
+  }
+
+  /** After targets: pick what to sacrifice or discard for the ability's costs (CR 602.2b, 601.2h), then activate. */
+  function continueActivate(d: ActivateDraft) {
+    if (!s) return;
+    const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
+    for (const c of ab.costs ?? []) {
+      if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
+      if (d[c.kind] !== undefined) continue;
+      const candidates =
+        c.kind === "sacrifice"
+          ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !(c.other && id === d.objectId) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
+          : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
+      const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
+      const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
+      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
+    }
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}) };
+    dispatch(
+      planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs) ?? [
+        { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs },
+      ],
+    );
+  }
+
+  /** Done picking what to sacrifice, discard or exile: carry on casting or activating. */
+  function finishCostPick(pick: CostPick) {
+    setCostPick(null);
+    if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
+    else continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
   /**
@@ -718,10 +758,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {costPick && costPick.kind === "sacrifice" && (
             <CostPickBar
               pick={costPick}
-              onDone={() => {
-                setCostPick(null);
-                continueCast({ ...costPick.draft, sacrifice: costPick.chosen });
-              }}
+              onDone={() => finishCostPick(costPick)}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -755,10 +792,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })
               }
-              onDone={() => {
-                setCostPick(null);
-                continueCast({ ...costPick.draft, [costPick.kind]: costPick.chosen });
-              }}
+              onDone={() => finishCostPick(costPick)}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -970,7 +1004,7 @@ function CostPickBar({ pick, onDone, onCancel }: { pick: CostPick; onDone: () =>
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        Sacrifice and cast
+        {pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
       <button className="ghost" onClick={onCancel}>
         Cancel

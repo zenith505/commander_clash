@@ -97,7 +97,10 @@ export interface TargetSpec {
   controller?: "you" | "opponent";
   /** For players: only opponents. */
   opponent?: boolean;
+  /** true: tapped; false: untapped. */
   tapped?: boolean;
+  /** true: a token; false: "nontoken". */
+  token?: boolean;
   /** "a card named ~": the source's name (only for searches). */
   named?: string;
   /** None of these subtypes. */
@@ -229,10 +232,25 @@ export interface StaticAbility {
 }
 
 /**
- * When a static ability applies: threshold's "seven or more cards in your graveyard", unleash's
- * "as long as it has a +1/+1 counter on it" (CR 702.98a).
+ * When a static ability applies ("as long as ..."): threshold's "seven or more cards in your graveyard",
+ * unleash's "as long as it has a +1/+1 counter on it" (CR 702.98a), metalcraft's "three or more
+ * artifacts", delirium's "four or more card types among cards in your graveyard", and so on.
  */
-export type StaticCondition = { kind: "graveyardAtLeast"; n: number } | { kind: "selfCounter"; counter: "+1/+1" | "-1/-1" };
+export type StaticCondition =
+  | { kind: "graveyardAtLeast"; n: number }
+  /** Delirium: card types among cards in your graveyard (CR 205.2a). */
+  | { kind: "graveyardTypes"; n: number }
+  /** Descend: permanent cards in your graveyard (CR 110.4b). */
+  | { kind: "graveyardPermanents"; n: number }
+  | { kind: "selfCounter"; counter: "+1/+1" | "-1/-1" }
+  /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9). */
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" }
+  | { kind: "yourTurn" }
+  /**
+   * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
+   * an opponent controls an Island", "as long as defending player controls an artifact".
+   */
+  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean };
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
@@ -436,6 +454,8 @@ export interface ActivatedAbility {
   energyCost?: number;
   /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a). */
   exileSelf?: boolean;
+  /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
+  costs?: AdditionalCost[];
 }
 
 /**
@@ -491,7 +511,8 @@ export type EntersChoice = { kind: "payLife"; n: number } | { kind: "reveal"; fi
 /** Everything the engine knows how to do with one card. */
 /** A cost paid along with a spell's mana cost (CR 118.8). */
 export type AdditionalCost =
-  | { kind: "sacrifice"; filter: TargetSpec; n: number }
+  /** `other`: "sacrifice another creature", not the ability's source. */
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean }
   | { kind: "discard"; n: number; filter?: TargetSpec } // "discard a land card" (retrace)
   | { kind: "payLife"; n: number }
   | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number };

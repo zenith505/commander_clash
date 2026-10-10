@@ -53,6 +53,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
+  if (spec.controller === "eventPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
@@ -947,8 +948,27 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       // A spell's own object (it's on its way to the graveyard), or the source of the ability.
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
+      const body = { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
+      if (e.each === "created") {
+        for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
+        return;
+      }
       const o = id ? s.objects[id] : undefined;
-      if (o) addDelayed(s, e.when, ctx.controller, o, { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." });
+      if (o) addDelayed(s, e.when, ctx.controller, o, body);
+      return;
+    }
+    case "ninjutsu": {
+      // Put this card onto the battlefield from your hand tapped and attacking whom the returned creature was
+      // attacking (CR 702.49a, c). It was never declared as an attacker, so "whenever attacks" doesn't trigger (508.4).
+      const id = ctx.sourceId;
+      const o = id ? s.objects[id] : undefined;
+      const zc = s.resolving?.item.sourceZc;
+      if (!o || o.zone !== "hand" || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
+      moveObject(s, o.id, "battlefield", { tapped: true });
+      if ((o.zone as string) !== "battlefield") return;
+      const defender = ctx.lki?.attacking;
+      if (defender !== undefined && inCombat(s) && livingPlayers(s).includes(defender)) o.attacking = defender;
+      log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${player(s, o.attacking).name}` : ""} (ninjutsu).`);
       return;
     }
     case "impulse": {
@@ -962,6 +982,17 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       }
       if (ids.length)
         log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"} ${e.until === "thisTurn" ? "this turn" : "until the end of their next turn"}.`);
+      return;
+    }
+    case "moveCounter": {
+      // Remove it from the first and put it on the second; if either can't happen, neither does (CR 122.5).
+      const from = objects(s, e.from, ctx)[0];
+      const to = objects(s, e.to, ctx)[0];
+      if (!from || !to || from.id === to.id || !(from.counters[e.counter] ?? 0)) return;
+      from.counters[e.counter]! -= 1;
+      const put = putCounters(s, to, e.counter, 1);
+      invalidateCharacteristics(s);
+      log(s, `${characteristics(s, from).name} moves a ${e.counter} counter onto ${characteristics(s, to).name}${put > 1 ? ` (${put} counters are put on it)` : ""}.`);
       return;
     }
     case "removeSelfCounter": {
@@ -1105,8 +1136,13 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       const n = amountNow(s, e.n, ctx);
       if (s.resolving) s.resolving.created = [];
       // Token doublers apply per player (CR 614.1a): "twice that many of those tokens".
-      for (const pid of players(s, e.who, ctx)) for (let i = 0; i < tokensToCreate(s, pid, e.token, n); i++) createToken(s, pid, e.token);
-      if (n) log(s, `${src} creates ${n === 1 ? "a" : n} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${n > 1 ? "s" : ""}.`);
+      for (const pid of players(s, e.who, ctx)) {
+        const k = tokensToCreate(s, pid, e.token, n);
+        // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
+        const defender = e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
+        for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: e.tapped || e.attacking, attacking: defender });
+        if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${e.tapped || e.attacking ? " tapped" : ""}${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
+      }
       return;
     }
     case "mill":
@@ -1614,11 +1650,35 @@ export function tokenDef(t: TokenSpec): CardDef {
   };
 }
 
-function createToken(s: GameState, pid: PlayerId, t: TokenSpec) {
+function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId } = {}) {
   const o = newObject(s, tokenDef(t), pid, "exile");
   o.isToken = true;
-  moveObject(s, o.id, "battlefield"); // enters like any permanent, so ETB triggers see it
+  moveObject(s, o.id, "battlefield", opts.tapped ? { tapped: true } : {}); // enters like any permanent, so ETB triggers see it
+  if (opts.attacking !== undefined && o.zone === "battlefield") o.attacking = opts.attacking;
   s.resolving?.created?.push(o.id);
+}
+
+/** From the declare attackers step to the end of combat step: when creatures can be attacking (CR 506.1). */
+export const inCombat = (s: GameState) => ["declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
+
+/**
+ * Whom a creature put onto the battlefield attacking attacks (CR 508.4): its controller chooses; we pick whom
+ * the source (or the creature it's attached to) is attacking, else whom most of their attackers attack, else
+ * the next opponent. Undefined outside combat, where it just isn't attacking.
+ */
+export function attackDefault(s: GameState, pid: PlayerId, sourceId?: ObjectId): PlayerId | undefined {
+  if (!inCombat(s) || s.activePlayer !== pid) return undefined;
+  const living = opponents(s, pid);
+  const src = sourceId ? s.objects[sourceId] : undefined;
+  const host = src?.attachedTo ? s.objects[src.attachedTo] : undefined;
+  for (const o of [src, host]) if (o?.zone === "battlefield" && o.attacking !== undefined && living.includes(o.attacking)) return o.attacking;
+  const count = new Map<PlayerId, number>();
+  for (const id of s.battlefield) {
+    const a = s.objects[id]!.attacking;
+    if (a !== undefined && living.includes(a)) count.set(a, (count.get(a) ?? 0) + 1);
+  }
+  const best = [...count].sort((a, b) => b[1] - a[1])[0];
+  return best ? best[0] : living[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -2012,9 +2072,33 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
   return added;
 }
 
+const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : compileCard(s.cards[t.sourceCardId]!).triggers[t.index]);
+
+/**
+ * State triggers (CR 603.8): one triggers when its state is true, and not again until that instance has
+ * resolved or left the stack.
+ */
+export function checkStateTriggers(s: GameState) {
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    const triggers = abilitiesOf(s, o).triggers;
+    triggers.forEach((t, index) => {
+      if (t.event !== "state" || !t.state) return;
+      const waiting = s.triggerQueue.some((q) => q.sourceId === id && q.index === index) || s.stack.some((x) => x.sourceId === id && x.stateIndex === index && x.sourceZc === (o.zoneChanges ?? 0));
+      if (waiting || !staticConditionNow(s, t.state, id, controllerOf(s, o))) return;
+      s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0 });
+    });
+  }
+}
+
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
-  return t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body;
+  const body = t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body;
+  // "Target creature that player controls": that player is known once it triggers.
+  const who = t.event?.player;
+  if (!body.targets.some((x) => x.controller === "eventPlayer")) return body;
+  const fix = (x: TargetSpec): TargetSpec => (x.controller === "eventPlayer" ? (({ controller: _, ...rest }) => ({ ...rest, ...(who !== undefined ? { controlledBy: who } : { controller: "eventPlayer" as const }) }))(x) : x);
+  return { ...body, targets: body.targets.map(fix), ...(body.modal ? { modal: { ...body.modal, modes: body.modal.modes.map((m) => ({ ...m, targets: m.targets?.map(fix) })) } } : {}) };
 }
 
 export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoice[]) {
@@ -2039,6 +2123,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoi
     ...(t.kicked ? { kicked: t.kicked } : {}),
     ...(t.event ? { event: t.event } : {}),
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
+    ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });

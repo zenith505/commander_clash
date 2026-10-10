@@ -108,7 +108,12 @@ export interface TargetSpec {
   combat?: "attacking" | "blocking" | "attackingOrBlocking";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
-  controller?: "you" | "opponent";
+  /**
+   * "Target creature that player controls" in a trigger about a player ("Whenever ~ deals combat damage to a
+   * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
+   */
+  controller?: "you" | "opponent" | "eventPlayer";
+  controlledBy?: PlayerId;
   /** For players: only opponents. */
   opponent?: boolean;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
@@ -373,10 +378,18 @@ export type Effect =
   | { type: "renown"; n: number }
   /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */
   /** "Draw a card at the beginning of the next turn's upkeep": a delayed trigger made as this resolves (CR 603.7a). */
-  | { type: "delayed"; when: "nextTurnUpkeep"; effects: Effect[]; text: string }
+  /**
+   * A delayed trigger (CR 603.7) about this ability's source, or with `each: "created"` one about each token it
+   * just created ("Sacrifice them at the beginning of the next end step", mobilize 702.181a).
+   */
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep"; effects: Effect[]; text: string; each?: "created" }
+  /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
+  | { type: "ninjutsu" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
+  /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
+  | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
@@ -384,7 +397,8 @@ export type Effect =
   /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game"; notSource?: boolean }
   | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
-  | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec }
+  /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
+  | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean }
   | { type: "mill"; who: PlayerRef; n: Amount }
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
@@ -481,6 +495,8 @@ export interface AbilityBody {
 }
 
 export type TriggerEvent =
+  /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
+  | "state"
   | "selfEnters" // When this enters
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
@@ -532,6 +548,8 @@ export type TriggerEvent =
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** For "state": the game state that triggers it, checked whenever state-based actions are (CR 603.8). */
+  state?: StaticCondition;
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
   cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
@@ -678,7 +696,9 @@ export type AdditionalCost =
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean }
   | { kind: "discard"; n: number; filter?: TargetSpec } // "discard a land card" (retrace)
   | { kind: "payLife"; n: number }
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number };
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number }
+  /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
+  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean };
 
 /**
  * Ways to cast a card from a graveyard (CR 601.3e): flashback (702.34), jump-start (702.133) and

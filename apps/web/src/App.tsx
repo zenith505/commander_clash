@@ -49,6 +49,7 @@ import {
   canEnterUntapped,
   crewPower,
   potentialAttackers,
+  returnCandidates,
   power,
   toughness,
   waitingOn,
@@ -188,7 +189,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined } | { activate: ActivateDraft; draft?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand";
   label: string;
   what: string;
   n: number;
@@ -197,7 +198,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined } | { activate: Activa
 };
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[] };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
@@ -353,6 +354,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (!s) return;
     const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
     for (const c of ab.costs ?? []) {
+      if (c.kind === "returnToHand") {
+        // Ninjutsu: click the unblocked attacker to return (CR 702.49a).
+        if (d.returnToHand !== undefined) continue;
+        return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `return ${c.n === 1 ? "an" : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
+      }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
       if (d[c.kind] !== undefined) continue;
       const candidates =
@@ -363,7 +369,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs },
@@ -375,7 +381,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   function finishCostPick(pick: CostPick) {
     setCostPick(null);
     if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
-    else continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
+    else if (pick.kind !== "returnToHand") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
   /**
@@ -400,7 +406,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const specs = spellTargets(s, d.objectId, d.modes);
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: [], label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of [...(compiled.additionalCosts ?? []), ...(graveyardCast(card, d.via)?.costs ?? [])]) {
-      if (c.kind === "payLife") continue;
+      if (c.kind === "payLife" || c.kind === "returnToHand") continue; // no spell asks to return a permanent yet
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       const me = s.players[HUMAN]!;
@@ -783,7 +789,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && costPick.kind === "sacrifice" && (
+          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand") && (
             <CostPickBar
               pick={costPick}
               onDone={() => finishCostPick(costPick)}
@@ -809,7 +815,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && (
+          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -873,6 +879,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "payLife") return `pay ${c.n} life`;
   if (c.kind === "sacrifice") return `sacrifice ${n(c.n, c.filter.text)}`;
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}`;
+  if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
 }
 
@@ -1038,7 +1045,7 @@ function CostPickBar({ pick, onDone, onCancel }: { pick: CostPick; onDone: () =>
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
+        {pick.kind === "returnToHand" ? "Return and activate" : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
       <button className="ghost" onClick={onCancel}>
         Cancel

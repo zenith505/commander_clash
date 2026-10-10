@@ -917,6 +917,29 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **11,393 cards are fully supported.** Rules tests: `test/doublers.test.ts`.
 
+### Ninjutsu, mobilize, tokens that enter attacking, graft, state triggers (added 2026-10-10)
+
+- **Ninjutsu** (CR 702.49): once blockers are declared, pay the cost and return an unblocked attacker you
+  control to your hand to put the ninja onto the battlefield tapped and attacking the same player. It was never
+  declared as an attacker, so "whenever it attacks" doesn't trigger, but it deals combat damage. From your hand,
+  click the ninja and choose Ninjutsu, then click the attacker to return. The game stops after blocks on your turn
+  when you could. Bots use it to swap a token or a smaller attacker for the ninja.
+- **Mobilize N** (CR 702.181): when it attacks, N tapped and attacking 1/1 red Warriors, sacrificed at the next end step.
+- **"Create ... tokens that are tapped and attacking"** (CR 508.4): they attack whom the source attacks (or whom most
+  of your attackers attack). Outside combat, or on someone else's turn, they just enter tapped (506.3d).
+  "Sacrifice/Exile them at the beginning of the next end step" after them.
+- **"Target creature that player controls"** in "whenever ~ deals combat damage to a player" triggers: only
+  that player's permanents (Mistblade Shinobi, Sunder Shaman, ...).
+- **Graft N** (CR 702.58): enters with N +1/+1 counters; whenever another creature enters, you may move one onto
+  it. Moving a counter puts it on the other creature, so Hardened Scales and doublers apply (CR 122.5, 122.6).
+  Bots only move counters onto their own creatures.
+- **State triggers** (CR 603.8): "When you control no Islands, sacrifice ~." It triggers whenever state-based
+  actions are checked and the state is true, and not again while that instance is waiting or on the stack.
+- Not yet: myriad and other token copies (CR 707), "at end of combat" delayed triggers, choosing which player
+  the attacking tokens attack.
+
+**11,480 cards are fully supported.** Rules tests: `test/ninjutsu.test.ts`, `test/graft.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

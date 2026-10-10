@@ -879,6 +879,17 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
           text: `Fabricate ${n}: put ${n} +1/+1 counter${n > 1 ? "s" : ""} on ~ or create ${n} 1/1 Servo${n > 1 ? "s" : ""}.`,
         },
       });
+    } else if ((m = /^graft (\d+)$/i.exec(p))) {
+      // CR 702.58a: "This permanent enters with N +1/+1 counters on it" and "Whenever another creature enters, if this
+      // permanent has a +1/+1 counter on it, you may move a +1/+1 counter from this permanent onto that creature."
+      out.plusCounters += Number(m[1]);
+      const text = "move a +1/+1 counter from ~ onto that creature";
+      out.triggers.push({
+        event: "permanentEnters",
+        enters: { filter: { kind: "object", types: ["Creature"], text: "creature" }, other: true },
+        ifCond: { kind: "selfCounter", counter: "+1/+1" },
+        body: { targets: [], effects: [{ type: "may", effects: [{ type: "moveCounter", counter: "+1/+1", from: { ref: "self" }, to: { ref: "subject" } }], text }], text: `Graft: you may ${text}.` },
+      });
     } else if ((m = /^modular (\d+)$/i.exec(p))) {
       // CR 702.43a: "This permanent enters with N +1/+1 counters on it" and "When this permanent is put into a graveyard
       // from the battlefield, you may put a +1/+1 counter on target artifact creature for each +1/+1 counter on this permanent."
@@ -981,6 +992,35 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
       out.triggers.push({
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: m[1]! }, ward: true }], text: `Ward ${m[1]}: counter that spell or ability unless its controller pays ${m[1]}.` },
+      });
+    } else if ((m = /^ninjutsu ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
+      // CR 702.49a: "[Cost], Reveal this card from your hand, Return an unblocked attacking creature you control to
+      // its owner's hand: Put this card onto the battlefield from your hand tapped and attacking."
+      out.activated.push({
+        manaCost: m[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: false,
+        zone: "hand",
+        costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }],
+        body: { targets: [], effects: [{ type: "ninjutsu" }], text: "Put ~ onto the battlefield from your hand tapped and attacking." },
+        text: `Ninjutsu ${m[1]}`,
+      });
+    } else if ((m = /^mobilize (\d+)$/i.exec(p))) {
+      // CR 702.181a: "Whenever this creature attacks, create N tapped and attacking 1/1 red Warrior creature tokens.
+      // Sacrifice them at the beginning of the next end step."
+      const n = Number(m[1]);
+      const warrior: TokenSpec = { name: "Warrior", power: 1, toughness: 1, colors: ["R"], types: ["Creature"], subtypes: ["Warrior"], keywords: [] };
+      out.triggers.push({
+        event: "selfAttacks",
+        body: {
+          targets: [],
+          effects: [
+            { type: "createToken", who: { ref: "you" }, n, token: warrior, tapped: true, attacking: true },
+            { type: "delayed", when: "nextEndStep", each: "created", effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "sacrifice ~" },
+          ],
+          text: `Mobilize ${n}: create ${n === 1 ? "a" : n} tapped and attacking 1/1 red Warrior creature token${n > 1 ? "s" : ""}. Sacrifice ${n > 1 ? "them" : "it"} at the beginning of the next end step.`,
+        },
       });
     } else if ((m = /^cycling ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
       // CR 702.29a: "[Cost], Discard this card: Draw a card." Only while the card is in your hand.
@@ -1450,6 +1490,13 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (dies) return dies;
   const group = parseGroupTrigger(line);
   if (group) return group;
+  // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
+  const st = /^When (you control no .+?), (.+)$/.exec(line);
+  if (st) {
+    const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+    const body = state && parseBody(st[2]!, { selfIt: true });
+    return state && body ? { event: "state", state, body } : "fail";
+  }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);
     if (m) {
@@ -1758,6 +1805,8 @@ interface Ctx {
   activated?: boolean;
   /** The last sentence created one token: "put a +1/+1 counter on it" means that token. */
   lastCreated?: boolean;
+  /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
+  lastCreatedAny?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
@@ -2033,7 +2082,10 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx): { effects: Eff
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
-  if (fx) ctx.lastCreated = last?.type === "createToken" && last.n === 1;
+  if (fx) {
+    ctx.lastCreated = last?.type === "createToken" && last.n === 1;
+    ctx.lastCreatedAny = last?.type === "createToken";
+  }
   return fx;
 }
 
@@ -2530,10 +2582,18 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const mods = what && parseChanges(m[2]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }
-  // Tokens
-  if ((m = new RegExp(`^Create ${NUMX} (\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+))?$`, "i").exec(s))) {
-    const token = parseToken(Number(m[2]), Number(m[3]), m[4]!, m[5]);
-    return token ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token }] : null;
+  // Tokens, maybe "tapped and attacking" (CR 508.4): "Create a tapped and attacking 1/1 red Warrior creature
+  // token", "Create two 1/1 white Soldier creature tokens with haste that are tapped and attacking".
+  if ((m = new RegExp(`^Create ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
+    const token = parseToken(Number(m[3]), Number(m[4]), m[5]!, m[6]);
+    const how = `${m[2] ?? ""} ${m[7] ?? ""}`;
+    const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}) };
+    return token ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...state }] : null;
+  }
+  // "Sacrifice them at the beginning of the next end step" / "Exile it ...": about the tokens just created.
+  if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|that token|those tokens) at the beginning of the next end step$/i.exec(s))) {
+    const verb = m[1]!.toLowerCase();
+    return [{ type: "delayed", when: "nextEndStep", each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
   }
   // Predefined tokens (CR 111.10): "Create a Treasure token", "Its controller creates two Treasure tokens"
   if ((m = new RegExp(`^(?:(.+?) creates?|Create) ${NUMX} (Treasure|Food|Clue) tokens?$`, "i").exec(s))) {
@@ -2852,9 +2912,16 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (group) return { ref: "each", filter: group.filter, ...(group.other ? { other: true } : {}) };
   const m = /^target (.+)$/i.exec(x);
   if (!m) return null;
-  const spec = parseTargetPhrase(m[1]!);
-  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards) return null;
-  return { ref: "target", index: addTarget(ctx, spec) };
+  const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
+  const spec = parseTargetPhrase(phrase);
+  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
+  return { ref: "target", index: addTarget(ctx, theirs ? { ...spec, controller: "eventPlayer", text: `target ${m[1]!}` } : spec) };
+}
+
+/** "Creature that player controls" in a trigger about a player: the phrase without it, and whether it was there. */
+function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
+  const m = / that player controls$/i.exec(phrase);
+  return m && ctx.eventPlayer ? [phrase.slice(0, m.index), true] : [phrase, false];
 }
 
 const SEVERAL_TARGETS = /^(?:(up to )?(one|two|three|four|five|six|\d+) (other )?|(another) |(one or two|one, two, or three) )target (.+)$/i;
@@ -2870,8 +2937,10 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const [, upTo, count, other, another, range, phrase] = m;
   const [required, n] = range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
-  const spec = parseTargetPhrase(n > 1 ? singularPhrase(phrase!) : phrase!);
-  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards) return null;
+  const [mine, theirs] = thatPlayerControls(phrase!, ctx);
+  const parsed = parseTargetPhrase(n > 1 ? singularPhrase(mine) : mine);
+  if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
+  const spec: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
   const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "card" ? [i] : []));
   let notSource = false;
   if (other || another) {

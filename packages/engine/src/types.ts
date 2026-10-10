@@ -182,6 +182,8 @@ export interface StackItem {
   modes?: number[];
   /** For a triggered ability: the object its event was about (exalted's attacker), see PendingTrigger.subject. */
   subject?: { id: ObjectId; zc: number };
+  /** For a state trigger: which of its source's triggered abilities it is (CR 603.8). */
+  stateIndex?: number;
   lki?: LastKnown;
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
@@ -239,6 +241,8 @@ export interface LastKnown {
   power?: number;
   toughness?: number;
   manaValue?: number;
+  /** The player a creature returned for ninjutsu was attacking (CR 702.49c). */
+  attacking?: PlayerId;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
@@ -259,6 +263,8 @@ export interface CostChoices {
   sacrifice?: ObjectId[];
   discard?: ObjectId[];
   exileCards?: ObjectId[];
+  /** Permanents to return to their owner's hand: ninjutsu's unblocked attacker (CR 702.49a). */
+  returnToHand?: ObjectId[];
 }
 
 /**

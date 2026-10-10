@@ -6,6 +6,7 @@ import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, dam
 import { withModes } from "./modes";
 import {
   abilityProblem,
+  returnCandidates,
   attackProblem,
   blockProblem,
   canEnterUntapped,
@@ -130,7 +131,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseProtection(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -499,6 +500,11 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       if (!t || t.kind === "none" || !r.legal[i]) continue;
       v += harm[i] !== isMine(s, pid, t) ? 1 : -1;
     } else if ((inner.type === "loseLife" || inner.type === "discard") && "who" in inner && inner.who.ref === "you") v -= 1;
+    else if (inner.type === "moveCounter") {
+      // Graft: only onto our own creatures.
+      const to = r.item.subject && s.objects[r.item.subject.id];
+      if (!to || controllerOf(s, to) !== pid) v -= 2;
+    }
     else v += 1;
   }
   return v >= 0;
@@ -791,6 +797,32 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       }
       // Not worth sacrificing a Treasure to cash in a Food or Clue.
       if (cashIn && plan?.some((a) => a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf)) continue;
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * Ninjutsu (CR 702.49a) once blockers are declared: swap the least valuable unblocked attacker (a token, or
+ * anything smaller than the ninja) for the ninja, when the stack is empty.
+ */
+function chooseNinjutsu(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer !== pid || s.step !== "declareBlockers" || s.stack.length) return null;
+  for (const id of player(s, pid).hand) {
+    const abilities = abilitiesOf(s, obj(s, id)).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const cost = ab.zone === "hand" ? ab.costs?.find((c) => c.kind === "returnToHand") : undefined;
+      if (!cost || cost.kind !== "returnToHand") continue;
+      const d = defOf(s, obj(s, id));
+      const ninja = (Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0);
+      const pool = returnCandidates(s, pid, cost)
+        .map((x) => obj(s, x))
+        .filter((x) => !x.isCommander && (x.isToken || worth(s, pid, x) < ninja))
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+      if (!pool.length) continue;
+      const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, undefined, { returnToHand: [pool[0]!.id] });
       if (plan) return plan;
     }
   }

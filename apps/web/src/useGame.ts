@@ -100,6 +100,15 @@ function hasInstantPlay(s: GameState): boolean {
     if (!(isType(d, "Instant") || d.keywords.includes("Flash"))) continue;
     if (planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
   }
+  // Ninjutsu once blockers are declared (CR 702.49a): an ability that works from your hand (cycling doesn't count here).
+  for (const id of me.hand) {
+    const abilities = abilitiesOf(s, obj(s, id)).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      if (abilities[i]!.zone !== "hand" || !abilities[i]!.costs?.some((c) => c.kind === "returnToHand")) continue;
+      const problem = abilityProblem(s, HUMAN, id, i);
+      if (!problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, id, i))) return true;
+    }
+  }
   // Turning a face-down permanent face up is a special action, any time you have priority (CR 702.37e).
   for (const id of s.battlefield) {
     const o = obj(s, id);

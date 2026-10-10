@@ -1,7 +1,7 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice } from "./abilities";
 import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
+import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
@@ -1354,9 +1354,9 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string): string | null {
   const d = defOf(s, o);
   const p = player(s, pid);
-  const given = (k: "sacrifice" | "discard" | "exileCards") => choices?.[k];
-  for (const k of ["sacrifice", "discard", "exileCards"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k}`;
+  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand") => choices?.[k];
+  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand"] as const)
+    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k}`;
   for (const c of costs) {
     if (c.kind === "payLife") {
       if (p.life < c.n) return `you can't pay ${c.n} life`; // CR 119.4
@@ -1365,7 +1365,9 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const pool =
       c.kind === "sacrifice"
         ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id) && objectMatches(s, c.filter, obj(s, id), pid, false))
-        : c.kind === "discard"
+        : c.kind === "returnToHand"
+          ? returnCandidates(s, pid, c)
+          : c.kind === "discard"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
@@ -1375,8 +1377,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? c.filter
             ? `${c.n === 1 ? "a" : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
-          : `${c.n === 1 ? "a" : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : "exile";
+          : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
+    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     if (!chosen) {
       if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
@@ -1387,16 +1389,38 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   return null;
 }
 
+/**
+ * What can be returned to hand for a cost. Ninjutsu wants an unblocked attacker: one that's attacking once
+ * blockers have been declared and wasn't blocked (CR 509.1h, 702.49a).
+ */
+export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "returnToHand" }>): ObjectId[] {
+  const afterBlocks = ["declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step) && s.pending?.kind !== "declareBlockers";
+  return s.battlefield.filter((id) => {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || !objectMatches(s, c.filter, o, pid, false)) return false;
+    return !c.unblockedAttacker || (afterBlocks && o.attacking !== undefined && o.blockedBy === undefined);
+  });
+}
+
 /** Pay a spell's additional costs; returns what was sacrificed as it last existed. */
 function payAdditionalCosts(s: GameState, p: Player, d: CardDef, choices: CostChoices, more: AdditionalCost[] = []) {
   return payExtraCosts(s, p, [...(compileCard(d).additionalCosts ?? []), ...more], choices);
 }
 
-/** Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h). */
-function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices) {
+/**
+ * Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h).
+ * `returned` gets whom a creature returned to hand was attacking (ninjutsu, CR 702.49c).
+ */
+function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown) {
   const sacrificed: LastKnown[] = [];
   for (const c of costs) {
-    if (c.kind === "payLife") {
+    if (c.kind === "returnToHand") {
+      for (const id of choices.returnToHand ?? []) {
+        if (returned) returned.attacking = obj(s, id).attacking;
+        log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
+        moveObject(s, id, "hand");
+      }
+    } else if (c.kind === "payLife") {
       p.life -= c.n;
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "sacrifice") {
@@ -1465,7 +1489,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const tp = targets ? targetProblem(s, body.targets, targets, pid, src, id) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
-  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length) {
+  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length) {
     const cp = extraCostProblem(s, pid, o, ab.costs ?? [], costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
@@ -1506,7 +1530,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose creatures to crew with");
-  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard" || c.kind === "returnToHand") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
@@ -1514,7 +1538,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const abCost = parseManaCost(ab.manaCost);
   const paid = payFromPool(abCost, p.manaPool, (x ?? 0) * xCount(abCost), p.life)!;
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
-  const lki = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : undefined;
+  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   p.manaPool = paid.pool;
   p.life -= paid.lifePaid + (ab.lifeCost ?? 0);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
@@ -1524,7 +1548,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   for (const c of tapCreatures ?? []) obj(s, c).tapped = true;
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}) : [];
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
   if (ab.discardSelf) moveObject(s, id, "graveyard");
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
@@ -2094,6 +2118,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   }
   s.leftTogether = undefined;
   checkGameOver(s);
+  checkStateTriggers(s);
   // Then waiting triggered abilities go on the stack before anyone gets priority (CR 117.5).
   if (!s.over && !holdTriggers && processTriggerQueue(s, turnOrderFrom(s, s.activePlayer))) s.passedInSuccession = [];
 }

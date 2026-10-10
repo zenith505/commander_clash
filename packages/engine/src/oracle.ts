@@ -19,6 +19,7 @@ import type {
   Modification,
   StaticAbility,
   StaticCondition,
+  CostMod,
   DamageRecipient,
   Effect,
   EntersChoice,
@@ -383,6 +384,14 @@ function compile(d: CardDef): CompiledCard {
         body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
         text: line,
       });
+      continue;
+    }
+    const cost = parseCostChange(line);
+    if (cost) {
+      if (cost === "fail") out.unsupported.push(raw);
+      else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod];
+      else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
+      else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
       continue;
     }
     const st = parseStatic(line) ?? parseConditionalStatic(line);
@@ -949,6 +958,51 @@ function parseConditionalStatic(line: string): StaticAbility | null {
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
   const condition = parseStaticCondition(cond, st);
   return condition ? { ...st, text: line, condition } : null;
+}
+
+/**
+ * Cost changes (CR 601.2f). A permanent's "Instant and sorcery spells you cast cost {1} less to cast",
+ * "Noncreature spells cost {1} more to cast", "Spells your opponents cast cost {1} more to cast"; and a
+ * spell's own "This spell costs {1} less to cast for each creature card in your graveyard", "... where X
+ * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
+ * mana: a reduction can't take colored mana off (CR 118.7a).
+ */
+function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | "fail" | null {
+  const text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
+  let m: RegExpExecArray | null;
+  if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
+    const c = parseCount(m[2]!, null, true);
+    return c ? { less: { ...c, times: (c.times ?? 1) * Number(m[1]) } } : "fail";
+  }
+  if ((m = /^~ costs \{X\} less to cast, where X is (.+)$/.exec(text))) {
+    const c = parseCount(m[1]!, null);
+    return c ? { less: c } : "fail";
+  }
+  const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
+  if ((m = /^~ costs \{(\d+)\} less to cast if (.+)$/.exec(text)) || (m = /^If (.+), ~ costs \{(\d+)\} less to cast$/.exec(text))) {
+    const [n, condText] = /^~/.test(text) ? [m[1]!, m[2]!] : [m[2]!, m[1]!];
+    const cond = parseStaticCondition(condText, self);
+    return cond ? { lessIf: { n: Number(n), cond } } : "fail";
+  }
+  m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with mana value \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
+  if (!m || !/spells?$/i.test(m[2]!)) return null;
+  const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
+  // "Spells you cast", "Instant and sorcery spells", "Noncreature spells", "Dragon spells", "Blue spells"
+  const filter = words ? parseTargetPhrase(`${words} spell${m[4] ?? ""}`) : { kind: "spell" as const, text: "spell" };
+  if (!filter || filter.kind !== "spell") return "fail";
+  const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";
+  if (m[5] && who !== "you") return "fail";
+  const n = Number(/\d+/.exec(m[6]!)![0]) * (m[7] === "less" ? -1 : 1);
+  return {
+    costMod: {
+      who,
+      filter: { ...filter, text: `${words ? `${words.toLowerCase()} ` : ""}spells` },
+      n,
+      ...(m[1] ? { turn: m[1] === "During your turn" ? "yours" : "notYours" } : {}),
+      ...(m[5] ? { fromGraveyard: true } : {}),
+      text: line,
+    },
+  };
 }
 
 const CONTROL_COUNT = new RegExp(`^(?:(no|another|an?)|${NUM} or more(?: other)?|${NUM} or fewer) (.+)$`);

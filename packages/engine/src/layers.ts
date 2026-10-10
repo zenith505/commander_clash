@@ -248,17 +248,25 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "control": {
       // "Defending player" is the player the source is attacking (CR 506.2); it has none otherwise.
-      const who = cond.who === "defending" ? src.attacking : you;
-      if (who === undefined) return false;
-      let n = 0;
-      for (const [id, c] of chars) {
-        if (cond.other && id === sourceId) continue;
-        if (cond.who === "opponent" ? c.controller === you : c.controller !== who) continue;
-        if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
-      }
-      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+      // "An opponent controls seven or more lands": any one opponent.
+      const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
+      return whose.some((who) => {
+        let n = 0;
+        for (const [id, c] of chars) {
+          if (cond.other && id === sourceId) continue;
+          if (c.controller !== who) continue;
+          if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
+        }
+        return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+      });
     }
   }
+}
+
+/** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
+export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId): boolean {
+  const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
+  return conditionMet(s, cond, sourceId, you, chars);
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {

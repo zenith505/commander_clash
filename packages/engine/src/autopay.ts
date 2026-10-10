@@ -1,11 +1,11 @@
 import { abilitiesOf, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { manaAbilitiesOn, manaAbilityProblem, manaOptions, manaPenalty } from "./manaabilities";
+import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import type { TargetChoice } from "./abilities";
 import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, xCount, type ManaPool, type ParsedCost } from "./mana";
-import type { Action, CostChoices, GameObject, GameState, ManaType, ObjectId, PlayerId } from "./types";
+import type { Action, CardDef, CostChoices, GameObject, GameState, ManaType, ObjectId, PlayerId } from "./types";
 
 /** One way to make mana with a permanent, for planning. */
 interface Option {
@@ -164,7 +164,14 @@ export function planCast(
     const imp = improvise ? autoImprovise(s, pid, reduced, 0, convoke) : null;
     return imp ? cast(imp.taps, convoke, imp.artifacts) : null;
   }
-  const taps = planMana(s, pid, cost, extra);
+  let taps = planMana(s, pid, cost, extra);
+  // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
+  // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
+  // So when the cost depends on the board, don't sacrifice permanents for its mana.
+  if (taps && costDependsOnBoard(s, d)) {
+    const sacs = taps.flatMap((a) => (a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf ? [a.objectId] : []));
+    if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, sacs);
+  }
   if (taps) return cast(taps);
   if (convoke !== "auto") return null;
   // Tap artifacts for improvise, or creatures for convoke, only when mana alone can't pay.
@@ -173,6 +180,12 @@ export function planCast(
   if (!compileCard(d).convoke) return null;
   const auto = autoConvoke(s, pid, cost, extra);
   return auto ? cast(auto.taps, auto.creatures) : null;
+}
+
+/** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */
+function costDependsOnBoard(s: GameState, d: CardDef): boolean {
+  const c = compileCard(d);
+  return !!(c.costLess?.length || c.costLessIf?.length) || s.battlefield.some((id) => !!compileCard(defOf(s, obj(s, id))).costMods);
 }
 
 /**

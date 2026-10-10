@@ -532,6 +532,23 @@ export type EntersCondition =
  */
 export type EntersChoice = { kind: "payLife"; n: number } | { kind: "reveal"; filter: TargetSpec };
 
+/**
+ * "Instant and sorcery spells you cast cost {1} less to cast", "Noncreature spells cost {1} more to cast",
+ * "During turns other than yours, spells you cast cost {1} less to cast" (CR 601.2f): generic mana added
+ * to or taken off the total cost of matching spells. `n` is positive for more, negative for less.
+ */
+export interface CostMod {
+  /** Whose spells: the permanent's controller's, their opponents', or everyone's. */
+  who: "you" | "opponents" | "all";
+  /** Which spells (printed characteristics, with the chosen X counted in the mana value, CR 202.3e). */
+  filter: TargetSpec;
+  n: number;
+  turn?: "yours" | "notYours";
+  /** "Spells you cast from your graveyard". */
+  fromGraveyard?: boolean;
+  text: string;
+}
+
 /** Everything the engine knows how to do with one card. */
 /** A cost paid along with a spell's mana cost (CR 118.8). */
 export type AdditionalCost =
@@ -592,6 +609,13 @@ export interface CompiledCard {
    * (CR 702.41a): each amount comes off the generic mana of its total cost (CR 601.2f).
    */
   costLess?: Amount[];
+  /** "This spell costs {2} less to cast if you control a Wizard": the reduction while the condition holds. */
+  costLessIf?: { n: number; cond: StaticCondition }[];
+  /**
+   * A permanent's static abilities that make spells cost more or less: "Creature spells you cast cost
+   * {1} less to cast", "Noncreature spells cost {1} more to cast" (CR 601.2f).
+   */
+  costMods?: CostMod[];
   /**
    * Kicker (CR 702.33): the optional additional costs, each payable once; multikicker's can be paid
    * any number of times (702.33c).

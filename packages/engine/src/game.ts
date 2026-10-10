@@ -4,7 +4,7 @@ import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, 
 import { addDelayed, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceColors, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
-import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
+import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -987,8 +987,11 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
   const kicker = compileCard(d).kicker;
   const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "");
-  // "Without paying its mana cost": additional costs like kicker are still paid (CR 118.9d).
-  if (freeCastOf(s, pid) === o.id) return { cost: parseManaCost(kickCost), extra: 0 };
+  // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
+  const mods = costModsFor(s, pid, o, d, x);
+  // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
+  // increases (CR 118.9d, 601.2f).
+  if (freeCastOf(s, pid) === o.id) return { cost: parseManaCost(kickCost), extra: Math.max(0, mods.more - mods.less) };
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
@@ -996,9 +999,39 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const base = how.faceDown ? "{3}" : (graveyardCast(d, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost);
   const mana = parseManaCost(base + kickCost);
   const total = splitGeneric(mana, tax + x * xCount(mana));
-  let less = 0;
+  let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
-  return { cost: total.cost, extra: Math.max(0, total.extra - less) };
+  for (const c of compileCard(d).costLessIf ?? []) if (staticConditionNow(s, c.cond, o.id, pid)) less += c.n;
+  // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
+  return { cost: total.cost, extra: Math.max(0, total.extra + mods.more - less) };
+}
+
+/**
+ * What permanents' static abilities add to and take off a spell's cost as `pid` casts it: "Creature
+ * spells you cast cost {1} less", "Noncreature spells cost {1} more" (CR 601.2f). The spell is checked
+ * as it will be on the stack, X included in its mana value (CR 202.3e).
+ */
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number): { more: number; less: number } {
+  let [more, less] = [0, 0];
+  const mv = manaValue(parseManaCost(d.manaCost)) + x * xCount(parseManaCost(d.manaCost));
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    const mods = compileCard(defOf(s, src)).costMods;
+    if (!mods) continue;
+    const c = characteristics(s, src);
+    if (!c.hasPrintedAbilities) continue;
+    for (const m of mods) {
+      if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : false) continue;
+      if (m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
+      if (m.fromGraveyard && o.zone !== "graveyard") continue;
+      const { manaValue: range, ...rest } = m.filter;
+      if (!printedMatches(rest, d)) continue;
+      if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
+      if (m.n > 0) more += m.n;
+      else less -= m.n;
+    }
+  }
+  return { more, less };
 }
 
 /**

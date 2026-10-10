@@ -700,6 +700,25 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **9,380 cards are fully supported.** Rules tests: `test/targets.test.ts`.
 
+### Spells that cost more or less (added 2026-10-10)
+
+- **Cost changes from permanents**: "Instant and sorcery spells you cast cost {1} less to cast"
+  (Goblin Electromancer), "Noncreature spells cost {1} more to cast" (Thalia, which taxes its controller
+  too), "Artifact and enchantment spells your opponents cast cost {2} more", "During turns other than
+  yours, spells you cast cost {1} less", mana value limits, and "from your graveyard".
+- **A spell's own reductions**: "This spell costs {1} less to cast for each creature on the battlefield"
+  (Blasphemous Act), "costs {X} less, where X is ...", and "costs {1} less if you control a Wizard"
+  (or any "as long as" condition from the last round).
+- **The order follows CR 601.2f**: the printed cost plus additional costs, then increases, then
+  reductions. Reductions only take off generic mana (CR 118.7a), and a free cast still pays increases
+  (CR 118.9d). A permanent that loses its abilities stops changing costs.
+- **Autopay locks the cost first** (CR 601.2f-g): when a spell's cost depends on the board, it won't
+  sacrifice a Treasure for mana if that would make affinity for artifacts count one fewer.
+- Not yet: "the first spell you cast each turn costs less", "costs {1} less for each target", and
+  reductions of colored mana.
+
+**9,493 cards are fully supported.** Rules tests: `test/cost-changes.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).

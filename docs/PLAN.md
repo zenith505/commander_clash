@@ -940,6 +940,28 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 
 **11,480 cards are fully supported.** Rules tests: `test/ninjutsu.test.ts`, `test/graft.test.ts`.
 
+### Copies: clones, token copies, populate, embalm, eternalize (added 2026-10-10)
+
+- **Copiable values** (CR 707.2, layer 1): a copy uses the copied object's printed values as modified by other copy
+  effects and its exceptions, never its counters, Auras, or other effects. A copy is its own card definition, so its
+  name, types, power and toughness, and abilities read from its rules text all just work. A clone of a clone copies
+  what the first clone copied (707.3).
+- **"You may have ~ enter as a copy of any creature on the battlefield"** (Clone, Phyrexian Metamorph, ...): chosen as
+  it enters (CR 707.5, 614.12), so it enters with the copied card's "enters tapped", "enters with counters" and its
+  enters triggers. Choosing nothing, a 0/0 Clone dies. In the game a row of buttons names each choice; hovering one
+  shows the card. Bots copy the best creature, not their own legend.
+- **Exceptions** (CR 707.9): "except it isn't legendary", "it's an artifact / a 1/1 Spirit in addition to its other
+  types", "it has haste" or a quoted ability, "its name is ~". They are part of the copy's copiable values (707.9b).
+- **"Create a token that's a copy of ..."**: Kiki-Jiki, Helm of the Host, Naga ninjas. Token doublers apply. Tapped
+  and attacking copies work like the other attacking tokens.
+- **Populate** (CR 701.36): copy a creature token you control (not targeted; you choose if you have several).
+- **Embalm and eternalize** (CR 702.128, 702.129): from your graveyard, at sorcery speed, exile the card to create a
+  token copy of it: white Zombie with no mana cost, or 4/4 black Zombie.
+- Not yet: "becomes a copy" (CR 707.4), copying spells (Twincast, storm), myriad, copying double-faced or
+  face-down permanents.
+
+**11,577 cards are fully supported.** Rules tests: `test/copies.test.ts`.
+
 ## Roadmap
 
 1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).
@@ -959,7 +981,7 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
    leaves", riot, unleash, afterlife~~ done. ~~sacrifice/discard costs on abilities, "as long as"~~ done. ~~"up to N targets", "another target"~~ done. Next by
    count: see `npx tsx tools/coverage.ts`.
    Hand-written overrides for cards that don't fit a template.
-3. ~~Layers and continuous effects~~ (CR 613, done except layers 1 and 3), replacement
+3. ~~Layers and continuous effects~~ (CR 613, done except layer 3 and "becomes a copy" in layer 1), replacement
    effects (CR 614), and choices (targets, ~~modes~~, ~~X~~, ordering triggers).
 4. ~~Mulligans (London + Commander free mulligan)~~, proper legend-rule choice, 903.9 choice.
 5. Deck builder using the full card DB, with rulings in the card preview.

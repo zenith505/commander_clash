@@ -85,6 +85,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
       return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
     }
+    if (pend.kind === "chooseOption" && pend.what === "copy") {
+      // Clone the best permanent, but not a legendary one we already control (the legend rule, CR 704.5j).
+      const ids = pend.options.filter((x) => x !== "none" && s.objects[x]);
+      const ok = ids.filter((x) => !(characteristics(s, obj(s, x)).supertypes.includes("Legendary") && controllerOf(s, obj(s, x)) === pid));
+      const best = ok.sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - worth(s, pid, obj(s, a)) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
@@ -466,7 +473,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
-  if (action === "counters" && (counter === "+1/+1" || counter === "shield")) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
+  if (action === "populate" || (action === "counters" && (counter === "+1/+1" || counter === "shield"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   const cost = (id: ObjectId) => {
     const o = obj(s, id);
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);

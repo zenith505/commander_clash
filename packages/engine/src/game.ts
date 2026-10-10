@@ -1,10 +1,11 @@
-import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice } from "./abilities";
+import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
+import { copyKey } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
@@ -459,6 +460,7 @@ export function moveObject(
   }
   o.zone = to;
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
+  o.copyOf = undefined; // copy effects end with the object (CR 400.7)
   o.tapped = false;
   o.damage = 0;
   o.damagedBy = undefined;
@@ -500,27 +502,63 @@ export function moveObject(
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
-    if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped)) o.tapped = true;
-    if (withCounters && counterN) putCounters(s, o, withCounters.counter, counterN, true); // CR 614.1c
-    // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
-    if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
-      putCounters(s, o, "+1/+1", printed.bloodthirst, true);
-    for (const [k, n] of Object.entries(opts.counters ?? {})) putCounters(s, o, k, n, true);
-    // "~ escapes with N +1/+1 counters on it" (CR 702.138c).
-    if (escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
-    // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
-    for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges, ...c });
-    // Riot and unleash: whether it has a +1/+1 counter is part of how it enters (CR 614.12), so what it
-    // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
-    const options = printed.entersOptions ?? [];
-    options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
-    if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
+    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}), ...(escaped ? { escaped } : {}) };
+    // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
+    // enters and what it triggers wait for that choice.
+    if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
+    else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
   }
   // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
   // triggers say "put into a graveyard" or "leaves the battlefield".
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
+}
+
+type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean };
+
+/**
+ * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
+ * then its enters event. `withCounters`: its "enters with N counters", counted before it was on the battlefield.
+ */
+function finishEntering(s: GameState, o: GameObject, printed: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number }) {
+  const id = o.id;
+  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped)) o.tapped = true;
+  if (withCounters) putCounters(s, o, withCounters.counter, withCounters.n, true); // CR 614.1c
+  // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
+  if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
+    putCounters(s, o, "+1/+1", printed.bloodthirst, true);
+  for (const [k, n] of Object.entries(opts.counters ?? {})) putCounters(s, o, k, n, true);
+  // "~ escapes with N +1/+1 counters on it" (CR 702.138c).
+  if (opts.escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
+  // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
+  for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
+  // Riot and unleash: whether it has a +1/+1 counter is part of how it enters (CR 614.12), so what it
+  // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
+  const options = printed.entersOptions ?? [];
+  options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
+  if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
+}
+
+/** What a permanent entering "as a copy of" something could copy: other permanents on the battlefield (not targeted). */
+export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec): ObjectId[] {
+  return s.battlefield.filter((id) => id !== o.id && objectMatches(s, filter, obj(s, id), controllerOf(s, o), false));
+}
+
+/** It enters as a copy of `target`, or of nothing ("none"), then finishes entering as what it now is (CR 707.5). */
+function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opts: EnterOpts) {
+  const own = compileCard(defOf(s, o)).entersAsCopy;
+  if (choice !== "none" && own) {
+    const target = obj(s, choice);
+    const except = own.except?.name === "~" ? { ...own.except, name: realDefOf(s, o).name } : own.except;
+    o.copyOf = copyKey(s, defOf(s, target), except);
+    invalidateCharacteristics(s);
+    log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}.`);
+  }
+  const printed = compileCard(defOf(s, o));
+  const ewc = printed.entersWithCounters;
+  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x })) : 0;
+  finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 
 /**
@@ -1663,6 +1701,10 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.objectId) {
     const o = obj(s, pend.objectId);
     const entry = s.entersChoices?.shift();
+    if (pend.what === "copy") {
+      enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
+      return;
+    }
     if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
       if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
@@ -1678,7 +1720,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
   r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${choice}.`);
   continueResolution(s);
@@ -1696,6 +1738,13 @@ function askEntersChoice(s: GameState): boolean {
     if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== c.zc) {
       q.shift();
       continue;
+    }
+    if (c.what === "copy") {
+      // "You may have ~ enter as a copy of ...": any of them, or none (CR 707.5).
+      const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter);
+      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...ids, "none"], labels: [...labels, "Don't copy"], objectId: o.id };
+      return true;
     }
     s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id };
     return true;

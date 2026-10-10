@@ -42,7 +42,7 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
 }
 
 /** How many of this token `pid` really creates when an effect would create `n`. */
-export function tokensToCreate(s: GameState, pid: PlayerId, token: TokenSpec, n: number): number {
+export function tokensToCreate(s: GameState, pid: PlayerId, token: Pick<TokenSpec, "subtypes">, n: number): number {
   const ops = modsInPlay(s)
     .filter(({ mod, controller }) => mod.what === "tokens" && (mod.who === "any" || controller === pid) && (!mod.subtype || token.subtypes.includes(mod.subtype)))
     .map(({ mod }) => mod.op);

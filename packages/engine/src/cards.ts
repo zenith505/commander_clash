@@ -34,12 +34,13 @@ export const FACE_DOWN = faceDownCard("face-down", false);
 export const FACE_DOWN_WARD = faceDownCard("face-down-ward", true);
 
 /** The card definition an object uses right now: its own, or a face-down one (CR 708.2). */
-export const cardIdOf = (o: GameObject): string => (o.faceDown ? (o.faceDown === "disguise" ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : o.cardId);
+/** Its definition's key: face-down values, or what it's a copy of (CR 707.2), or its own card. */
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? (o.faceDown === "disguise" ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : (o.copyOf ?? o.cardId));
 
 export const defOf = (s: GameState, o: GameObject): CardDef => {
   if (o.faceDown) return o.faceDown === "disguise" ? FACE_DOWN_WARD : FACE_DOWN;
-  const d = s.cards[o.cardId];
-  if (!d) throw new Error(`missing card def ${o.cardId}`);
+  const d = s.cards[o.copyOf ?? o.cardId];
+  if (!d) throw new Error(`missing card def ${o.copyOf ?? o.cardId}`);
   return d;
 };
 

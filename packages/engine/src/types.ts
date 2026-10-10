@@ -41,6 +41,8 @@ export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile
 export interface GameObject {
   id: ObjectId;
   cardId: string; // key into GameState.cards
+  /** A copy effect's values (CR 707.2), a key into GameState.cards: Clone as it entered, until it leaves. */
+  copyOf?: string;
   owner: PlayerId;
   /**
    * The player it came under the control of when it entered its zone (or who cast it).
@@ -322,7 +324,8 @@ export type PendingDecision =
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
    */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption; options: string[]; objectId?: ObjectId }
+  /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption; options: string[]; labels?: string[]; objectId?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves.
@@ -388,7 +391,7 @@ export interface GameState {
    * Choices made as permanents enter (CR 614.12), still to ask. `enters`: its enters event waits for
    * the choice (riot, unleash: whether it has a +1/+1 counter as it enters matters to what triggers).
    */
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean } }[];
   nextId: number;
   log: GameEvent[];
   winner: PlayerId | null;

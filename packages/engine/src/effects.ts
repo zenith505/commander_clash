@@ -11,6 +11,7 @@ import { auraHostFor, castProblem, describeTargets, destroyPermanent, draw, gain
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "./layers";
 import { modeCountProblem, withModes } from "./modes";
 import { putCounters, tokensToCreate } from "./counters";
+import { copyKey, type CopyExcept } from "./copies";
 import { compileCard, compileGranted, MONARCH } from "./oracle";
 import { bindChosenKeywords, CHOSEN_PROTECTION, CREATURE_TYPES, type SourceQuality } from "./keywords";
 import { describeAmount, evalAmount, type AmountCtx } from "./amounts";
@@ -446,6 +447,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     for (const id of sc.chosen![pid] ?? []) {
       const o = s.objects[id];
       if (o?.zone !== "battlefield") continue;
+      if (e.action === "populate") {
+        if (s.resolving) s.resolving.created ??= [];
+        tokenCopies(s, pid, defOf(s, o), 1, ctx);
+        continue;
+      }
       if (e.action === "counters") {
         const k = e.counter!.kind;
         const c = amountNow(s, e.counter!.n, ctx);
@@ -458,6 +464,21 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand");
     }
+}
+
+/** Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). */
+function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean } = {}) {
+  const key = copyKey(s, base, opts.except);
+  const k = tokensToCreate(s, pid, s.cards[key]!, n);
+  const defender = opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
+  for (let i = 0; i < k; i++) {
+    const o = newObject(s, s.cards[key]!, pid, "exile");
+    o.isToken = true;
+    moveObject(s, o.id, "battlefield", opts.tapped || opts.attacking ? { tapped: true } : {});
+    if (defender !== undefined && o.zone === "battlefield") o.attacking = defender;
+    s.resolving?.created?.push(o.id);
+  }
+  if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a token that's a copy" : `${k} tokens that are copies`} of ${base.name}.`);
 }
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
@@ -1130,6 +1151,17 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       me.attachedTo = host.id;
       me.timestamp = s.nextTimestamp++;
       log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+      return;
+    }
+    case "createTokenCopy": {
+      // The copiable values of what it copies as it is now, or as it last existed (CR 707.2, 608.2h): a card in
+      // a graveyard is copied as that card.
+      const source = e.ofSource ? undefined : objects(s, e.what, ctx)[0];
+      const base = e.ofSource ? ctx.sourceDef : source && defOf(s, source);
+      if (!base) return;
+      const n = amountNow(s, e.n, ctx);
+      if (s.resolving) s.resolving.created = [];
+      for (const pid of players(s, e.who, ctx)) tokenCopies(s, pid, base, n, ctx, e);
       return;
     }
     case "createToken": {

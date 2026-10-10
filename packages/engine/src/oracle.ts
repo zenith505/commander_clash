@@ -7,6 +7,7 @@
 // Anything it can't handle can later get a hand-written override keyed by oracle id.
 
 import { allEffects } from "./abilities";
+import type { CopyExcept } from "./copies";
 import type {
   AbilityBody,
   Amount,
@@ -405,6 +406,16 @@ function compile(d: CardDef): CompiledCard {
       out.extraLands = (out.extraLands ?? 0) + num(extraLand[1]!);
       continue;
     }
+    // Clones: "You may have ~ enter as a copy of any creature on the battlefield[, except ...]." (CR 707.5)
+    const clone = /^You may have ~ enter as a copy of (?:any |an? )?(.+?)(?:, except (.+?))?\.?$/.exec(line);
+    if (clone && !/graveyard|\bcard\b/.test(clone[1]!)) {
+      const filter = parseTargetPhrase(clone[1]!.replace(/ on the battlefield$/, ""));
+      const except = clone[2] ? parseCopyExcept(clone[2]) : undefined;
+      if (filter?.kind === "object" && except !== null) {
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}) };
+        continue;
+      }
+    }
     const countMod = parseCountMod(line);
     if (countMod) {
       (out.countMods ??= []).push(countMod);
@@ -676,6 +687,29 @@ function parseCostKeyword(
           ],
           text: "Living weapon: when ~ enters, create a 0/0 black Phyrexian Germ creature token, then attach ~ to it.",
         },
+      },
+    };
+  }
+  // Embalm and eternalize (CR 702.128, 702.129): exile it from your graveyard to create a token copy of it.
+  if ((m = /^(Embalm|Eternalize) ((?:\{[^}]+\})+)$/.exec(line))) {
+    const cost = m[2]!;
+    if (!plainMana(cost)) return "fail";
+    const embalm = m[1] === "Embalm";
+    const except: CopyExcept = embalm ? { colors: ["W"], addSubtypes: ["Zombie"], noManaCost: true } : { pt: [4, 4], colors: ["B"], addSubtypes: ["Zombie"], noManaCost: true };
+    return {
+      activated: {
+        manaCost: cost,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        zone: "graveyard",
+        exileSelf: true,
+        body: {
+          targets: [],
+          effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, except, ofSource: true }],
+          text: `Create a token that's a copy of ~, except it's a ${embalm ? "white" : "4/4 black"} Zombie ${d.subtypes.join(" ")} with no mana cost.`,
+        },
+        text: `${m[1]} ${cost}`,
       },
     };
   }
@@ -2083,8 +2117,8 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
   if (fx) {
-    ctx.lastCreated = last?.type === "createToken" && last.n === 1;
-    ctx.lastCreatedAny = last?.type === "createToken";
+    ctx.lastCreated = (last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1;
+    ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy";
   }
   return fx;
 }
@@ -2590,6 +2624,16 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}) };
     return token ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...state }] : null;
   }
+  // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
+  // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".
+  if ((m = new RegExp(`^(?:(.+?) creates|Create) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    const what = parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
+    const except = m[5] ? parseCopyExcept(m[5]) : undefined;
+    if (!who || !what || except === null || isGroup(what)) return null;
+    const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };
+    return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(except ? { except } : {}), ...state }];
+  }
   // "Sacrifice them at the beginning of the next end step" / "Exile it ...": about the tokens just created.
   if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|that token|those tokens) at the beginning of the next end step$/i.exec(s))) {
     const verb = m[1]!.toLowerCase();
@@ -2611,6 +2655,8 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   }
   // Proliferate (CR 701.27), amass (CR 701.47).
   if (/^Proliferate$/i.test(s)) return [{ type: "proliferate" }];
+  // Populate (CR 701.36): copy a creature token you control, not targeted; with none, nothing happens.
+  if (/^Populate$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
   // Blink: "Exile target creature you control, then return it to the battlefield under its owner's control".
   if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/i.exec(s))) {
@@ -3305,4 +3351,51 @@ function parseCountMod(line: string): CountMod | undefined {
   m = /^If an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead\.$/.exec(line);
   if (m) return { what: "counters", on: "permanent", who: "you", op: "double" };
   return undefined;
+}
+
+const COPY_CARD_TYPES = new Set(["Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle", "Instant", "Sorcery", "Kindred"]);
+
+/**
+ * The exceptions of a copy effect (CR 707.9): "it isn't legendary", "it's an artifact in addition to its other
+ * types", "it's a 1/1 Spirit creature in addition to its other types", "it has haste", 'it has "..."', "its name
+ * is ~" (~ being the copy's own name, see CopyExcept.name). Null if any part isn't understood.
+ */
+export function parseCopyExcept(text: string): CopyExcept | null {
+  const out: CopyExcept = {};
+  // Quoted abilities first, so commas inside them don't split anything.
+  const quoted: string[] = [];
+  let t = text.replace(/"([^"]+)"/g, (_, q: string) => `\u0000${quoted.push(q) - 1}\u0000`);
+  t = t.replace(/^(?:it|they|he|she) /, "");
+  const parts = t.split(/,? and (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)|, (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)/).map((p) => p.trim().replace(/^(?:it|they|he|she) /, ""));
+  for (const p of parts) {
+    let m: RegExpExecArray | null;
+    if (/^(?:isn't|aren't|is not|are not) legendary$/.test(p)) out.notLegendary = true;
+    else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're) legendary$/.test(p)) out.legendary = true;
+    else if ((m = /^(?:is|are|it's|they're) (?:an? )?(?:(\d+)\/(\d+) )?((?:(?:white|blue|black|red|green|colorless) )*)(?:and (?:white|blue|black|red|green) )?(.+?) in addition to (?:its|their) other (?:creature )?types$/.exec(p))) {
+      if (m[1]) out.pt = [Number(m[1]), Number(m[2])];
+      const colors = (m[3] ?? "").trim().split(" ").filter((c) => c && c !== "colorless");
+      if (colors.length) out.colors = colors.map((c) => ({ white: "W", blue: "U", black: "B", red: "R", green: "G" })[c]) as Color[];
+      const words = m[4]!.split(" ").map((w) => w.replace(/s$/, "")).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+      if (words.some((w) => !/^[A-Z][a-z]+$/.test(w))) return null;
+      out.addTypes = words.filter((w) => COPY_CARD_TYPES.has(w));
+      out.addSubtypes = words.filter((w) => !COPY_CARD_TYPES.has(w));
+    } else if ((m = /^(?:'s|’s|is|are|it's|they're) (\d+)\/(\d+)$/.exec(p))) out.pt = [Number(m[1]), Number(m[2])];
+    else if ((m = /^(?:has|have) (.+)$/.exec(p))) {
+      for (const piece of m[1]!.split(/,? and (?=\u0000)|, (?=\u0000)|(?<=\u0000) and /)) {
+        const q = /^\u0000(\d+)\u0000$/.exec(piece.trim());
+        if (q) {
+          (out.text ??= []).push(quoted[Number(q[1])]!);
+          continue;
+        }
+        for (const kw of piece.split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean)) {
+          const simple = parseKeywordList(kw);
+          if (simple) (out.keywords ??= []).push(...simple);
+          else if (/^[a-z]+(?: [a-z]+)?(?: \d+)?$/.test(kw)) (out.text ??= []).push(capital(kw)); // "dethrone", "vanishing 3"
+          else return null;
+        }
+      }
+    } else if (/^(?:its|his|her) name is ~$/.test(p)) out.name = "~";
+    else return null;
+  }
+  return out;
 }

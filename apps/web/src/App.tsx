@@ -2206,18 +2206,37 @@ function Controls({
       </div>
     );
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
-    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : "return to your hand";
+    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : "return to your hand";
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong> click {pending.count === 1 ? `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}` : `${pending.count} (${pending.what})`} of yours to {verb}.
         </span>
         <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : "Return"}
+          {pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );
   }
+  if (pending?.kind === "chooseOption" && pending.what === "copy" && pending.player === HUMAN)
+    return (
+      <div className="controls copy-pick">
+        <span>
+          <strong>{pending.source}:</strong> enter as a copy of
+        </span>
+        {pending.options.map((o, i) => (
+          <button
+            key={o}
+            className={o === "none" ? "ghost" : ""}
+            onMouseEnter={() => o !== "none" && s.objects[o] && onHover(cardOf(s, o))}
+            onMouseLeave={() => onHover(null)}
+            onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}
+          >
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "color")
     return (
       <div className="controls color-pick">

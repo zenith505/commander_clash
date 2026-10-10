@@ -67,7 +67,7 @@ describe("rules text compiler", () => {
     expect(compileCard(sorcerer).activated[0]).toMatchObject({ tap: true, manaCost: "" });
     expect(compileCard(raise).spell?.effects[0]).toMatchObject({ type: "createToken", n: 2, token: { power: 1, toughness: 1, colors: ["W"] } });
     expect(compileCard(card("Opt", "Instant", "{U}", { oracleText: "Scry 1.\nDraw a card." })).spell?.effects).toEqual([{ type: "scry", n: 1 }, { type: "draw", who: { ref: "you" }, n: 1 }]);
-    expect(compileCard(card("Grow", "Instant", "{G}", { oracleText: "Populate.\nDraw a card." })).unsupported).toEqual(["Populate.", "Draw a card."]);
+    expect(compileCard(card("Grow", "Instant", "{G}", { oracleText: "Manifest the top card of your library.\nDraw a card." })).unsupported).toEqual(["Manifest the top card of your library.", "Draw a card."]);
   });
 });
 

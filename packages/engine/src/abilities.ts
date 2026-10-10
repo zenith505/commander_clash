@@ -3,6 +3,7 @@
 // here is data, so abilities can sit on the stack inside GameState.
 
 import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId } from "./types";
+import type { CopyExcept } from "./copies";
 
 /**
  * A number an effect uses: fixed, or worked out from the game. A spell or ability works out
@@ -16,7 +17,8 @@ export type Amount = number | AmountExpr;
 export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade" | (string & {});
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
-export type PickAction = "sacrifice" | "bounce" | "counters";
+/** "populate": create a token that's a copy of the picked creature token (CR 701.36). */
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -397,6 +399,9 @@ export type Effect =
   /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game"; notSource?: boolean }
   | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
+  /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
+  /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
+  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean }
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
   | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean }
   | { type: "mill"; who: PlayerRef; n: Amount }
@@ -468,7 +473,7 @@ export type Effect =
 export type ChoiceKind = "creatureType" | "color";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash";
+export type EntersOption = "riot" | "unleash" | "copy";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
@@ -744,6 +749,8 @@ export interface CompiledCard {
    * a +1/+1 counter. Chosen as it enters, by its controller.
    */
   entersOptions?: EntersOption[];
+  /** "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). */
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */

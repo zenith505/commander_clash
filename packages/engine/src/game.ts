@@ -826,7 +826,11 @@ function beginStep(s: GameState, step: Step) {
     case "combatDamage":
       dealCombatDamage(s, false);
       break;
+    case "beginCombat":
+      fireEvent(s, { type: "step", step: "beginCombat", active: ap });
+      break;
     case "endCombat":
+      fireEvent(s, { type: "step", step: "endCombat", active: ap });
       break;
     case "cleanup": {
       for (const o of attackersAndBlockers(s)) clearCombat(o);

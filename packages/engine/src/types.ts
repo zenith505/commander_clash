@@ -204,7 +204,7 @@ export interface StackItem {
  * beginning of your next upkeep". It triggers once, about `subject` (the card as it was then).
  */
 export interface DelayedTrigger {
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep";
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat";
   controller: PlayerId;
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };

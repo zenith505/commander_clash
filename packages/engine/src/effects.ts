@@ -2,7 +2,7 @@
 // triggered-ability queue.
 
 import { allEffects, refCovers } from "./abilities";
-import type { AbilityBody, Amount, ChosenTarget, ChoiceKind, CounterKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility } from "./abilities";
+import type { AbilityBody, Amount, ChosenTarget, ChoiceKind, CounterKind, DamageRecipient, EntersOption, Effect, Modification, ObjRef, PlayerRef, Range, SearchDest, SpellCondition, TargetChoice, UnlessPays, PayCost, TargetSpec, TokenSpec, TriggeredAbility, TriggerEvent } from "./abilities";
 import { manaValue, parseManaCost, payFromPool } from "./mana";
 import { planMana } from "./autopay";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
@@ -467,10 +467,10 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
 }
 
 /** Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). */
-function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean } = {}) {
+function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
   const key = copyKey(s, base, opts.except);
   const k = tokensToCreate(s, pid, s.cards[key]!, n);
-  const defender = opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
+  const defender = opts.defender ?? (opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined);
   for (let i = 0; i < k; i++) {
     const o = newObject(s, s.cards[key]!, pid, "exile");
     o.isToken = true;
@@ -974,6 +974,11 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
         for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
         return;
       }
+      if (e.each === "subject") {
+        const subj = objects(s, { ref: "subject" }, ctx)[0];
+        if (subj) addDelayed(s, e.when, ctx.controller, subj, body, cardIdOf(s.objects[id ?? ""] ?? subj));
+        return;
+      }
       const o = id ? s.objects[id] : undefined;
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
       return;
@@ -1016,6 +1021,44 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       log(s, `${characteristics(s, from).name} moves a ${e.counter} counter onto ${characteristics(s, to).name}${put > 1 ? ` (${put} counters are put on it)` : ""}.`);
       return;
     }
+    case "myriad": {
+      // Each choice first; then the tokens all enter at once (myriad rulings).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const defending = ctx.event?.player;
+      if (!sc.queue) {
+        sc.queue = apnap(s, opponents(s, ctx.controller).filter((p) => p !== defending));
+        sc.chosen = {};
+      }
+      const me = objects(s, { ref: "self" }, ctx)[0];
+      const base = me ? defOf(s, me) : ctx.sourceDef; // as it last existed if it's gone (CR 707.2, 608.2h)
+      while (sc.queue.length) {
+        const pid = sc.queue[0]!;
+        if (sc.may === undefined) {
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `create a token copy of ${base.name} attacking ${player(s, pid).name}`, source: src };
+          return "paused";
+        }
+        if (sc.may) sc.chosen![pid] = [];
+        sc.may = undefined;
+        sc.queue.shift();
+      }
+      r.created = [];
+      if (!inCombat(s)) return;
+      for (const pid of Object.keys(sc.chosen!).map(Number) as PlayerId[])
+        if (livingPlayers(s).includes(pid)) tokenCopies(s, ctx.controller, base, 1, ctx, { tapped: true, defender: pid });
+      return;
+    }
+    case "removeCounters":
+      for (const o of objects(s, e.what, ctx)) {
+        const had = o.counters[e.counter] ?? 0;
+        const n = Math.min(had, e.n === "all" ? had : amountNow(s, e.n, ctx));
+        if (n <= 0) continue;
+        o.counters[e.counter] = had - n;
+        invalidateCharacteristics(s);
+        log(s, `${characteristics(s, o).name} loses ${n} ${e.counter} counter${n > 1 ? "s" : ""}.`);
+        if (had === n && e.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
+      }
+      return;
     case "removeSelfCounter": {
       // Fading (CR 702.32a): "remove a fade counter from this permanent. If you can't, sacrifice the permanent."
       // Vanishing (CR 702.63a): removing the last time counter triggers its sacrifice ability.
@@ -1515,9 +1558,18 @@ function finishSpell(s: GameState, id: ObjectId) {
 }
 
 /** "At the beginning of the next end step" / "your next upkeep", about this object as it is now (CR 603.7). */
-export function addDelayed(s: GameState, when: DelayedTrigger["when"], controller: PlayerId, o: GameObject, body: AbilityBody) {
-  (s.delayed ??= []).push({ when, controller, sourceCardId: cardIdOf(o), subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step });
+export function addDelayed(s: GameState, when: DelayedTrigger["when"], controller: PlayerId, o: GameObject, body: AbilityBody, sourceCardId = cardIdOf(o)) {
+  (s.delayed ??= []).push({ when, controller, sourceCardId, subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step });
 }
+
+/** The trigger events for the beginning of a step: on your turn, and on every turn. */
+const STEP_TRIGGERS: Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]> = {
+  upkeep: ["yourUpkeep", "eachUpkeep"],
+  draw: ["yourDrawStep", "eachDrawStep"],
+  end: ["yourEndStep", "eachEndStep"],
+  beginCombat: ["yourBeginCombat", "eachBeginCombat"], // CR 507.1
+  endCombat: ["yourEndCombat", "eachEndCombat"], // "at end of combat" (CR 511.2)
+};
 
 /** A player becomes the monarch, and whoever was stops being it (CR 725.3). */
 export function becomeMonarch(s: GameState, pid: PlayerId) {
@@ -1739,7 +1791,7 @@ export type TriggerSourceEvent =
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
-  | { type: "step"; step: "upkeep" | "draw" | "end"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -1918,7 +1970,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       if (o.blocking) {
-        add(o, you, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked");
+        add(o, you, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
         const at = s.objects[o.blocking];
         if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
       }
@@ -1941,7 +1993,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e, t) => e === "selfAttacks" && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.training || trains(s, o)));
+    // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.training || trains(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     for (const id of s.battlefield) {
@@ -2025,18 +2078,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "step") {
     // Delayed triggers whose moment this is (CR 603.7): each triggers once.
     for (const d of [...(s.delayed ?? [])]) {
+      // Made during that step, "the next end step" or "end of combat" is a later one (CR 603.7c, 511.2).
       const due =
         d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
-          : ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
+          : d.when === "endOfCombat"
+            ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
+            : ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       s.delayed = s.delayed!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);
-    const want = ev.step === "upkeep" ? "yourUpkeep" : ev.step === "draw" ? "yourDrawStep" : "yourEndStep";
-    const each = ev.step === "upkeep" ? "eachUpkeep" : ev.step === "draw" ? "eachDrawStep" : "eachEndStep";
+    const [want, each] = STEP_TRIGGERS[ev.step];
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);

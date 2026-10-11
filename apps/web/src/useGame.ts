@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   abilityProblem,
+  invalidateCharacteristics,
   abilitiesOf,
   applyAction,
   controllerOf,
@@ -87,6 +88,19 @@ function stackOpeningHand(s: GameState) {
     me.graveyard.push(id!);
     s.objects[id!]!.zone = "graveyard";
   }
+  // "?board=Card A|Card B" starts those cards on your battlefield (for trying combos and clones).
+  const board = new URLSearchParams(location.search).get("board");
+  for (const name of board ? board.split("|") : []) {
+    const i = me.library.findIndex((id) => cardOf(s, id).name === name);
+    if (i < 0) continue;
+    const [id] = me.library.splice(i, 1);
+    const o = s.objects[id!]!;
+    o.zone = "battlefield";
+    o.timestamp = s.nextTimestamp++;
+    o.controlledSinceTurn = -1;
+    s.battlefield.push(id!);
+  }
+  invalidateCharacteristics(s);
 }
 
 /** Can the human do something right now besides tapping mana: an instant, flash spell, cycling, or activated ability? */

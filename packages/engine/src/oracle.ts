@@ -1040,6 +1040,20 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
         body: { targets: [], effects: [{ type: "ninjutsu" }], text: "Put ~ onto the battlefield from your hand tapped and attacking." },
         text: `Ninjutsu ${m[1]}`,
       });
+    } else if (/^myriad$/i.test(p)) {
+      // CR 702.116a: "Whenever this creature attacks, for each opponent other than defending player, you may create a
+      // token that's a copy of this creature that's tapped and attacking that player ... exile the tokens at end of combat."
+      out.triggers.push({
+        event: "selfAttacks",
+        body: {
+          targets: [],
+          effects: [
+            { type: "myriad" },
+            { type: "delayed", when: "endOfCombat", each: "created", effects: [{ type: "exile", what: { ref: "subject" } }], text: "exile ~" },
+          ],
+          text: "Myriad: for each opponent other than defending player, you may create a token copy of ~ that's tapped and attacking that player. Exile the tokens at end of combat.",
+        },
+      });
     } else if ((m = /^mobilize (\d+)$/i.exec(p))) {
       // CR 702.181a: "Whenever this creature attacks, create N tapped and attacking 1/1 red Warrior creature tokens.
       // Sacrifice them at the beginning of the next end step."
@@ -1278,7 +1292,13 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
   [/^When(?:ever)? ~ becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget"],
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
-  [/^Whenever ~ attacks, (.+)$/, "selfAttacks"],
+  [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
+  [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
+  // The beginning of combat step (CR 507) and end of combat step (CR 511).
+  [/^At the beginning of combat on your turn, (.+)$/, "yourBeginCombat"],
+  [/^At the beginning of (?:each combat|combat on each player's turn), (.+)$/, "eachBeginCombat"],
+  [/^At end of combat on your turn, (.+)$/, "yourEndCombat"],
+  [/^At end of combat, (.+)$/, "eachEndCombat"],
   // Battle cards aren't supported, so nothing can attack one and "a player or battle" is just a player.
   // Revisit when battles are (CR 310).
   [/^Whenever ~ deals combat damage to a player(?: or battle)?, (.+)$/, "selfDealsCombatDamageToPlayer"],
@@ -1304,7 +1324,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
+  "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
 ];
@@ -1556,7 +1576,7 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep", defending: event === "selfAttacks" || event === "selfBecomesBlocked" });
       if (body && thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
     }
@@ -1847,6 +1867,8 @@ interface Ctx {
   castSpell?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
+  /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
+  defending?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
   subjectLeft?: boolean;
 }
@@ -1875,7 +1897,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) return parseModal(modal[1]!, modal[2]!, text.trim(), opts.spell);
   if (text.includes("•")) return null; // modes with text before them, or a kind of choice we don't support
@@ -1890,6 +1912,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.spell ? { spell: true } : {}),
     ...(opts.castSpell ? { castSpell: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
+    ...(opts.defending ? { defending: true } : {}),
   };
   const effects: Effect[] = [];
   const sentences = splitSentences(text.trim())
@@ -2423,6 +2446,27 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // "Sacrifice it at end of combat", "destroy that creature at end of combat" (CR 511.2, 603.7): a delayed trigger
+  // about the source or about the object the trigger was about, with no targets of its own.
+  if ((m = /^(.+?) at end of combat$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
+    const before = ctx.targets.length;
+    const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
+    if (!inner || ctx.targets.length !== before) return null;
+    const refs = new Set<string>();
+    let players = true;
+    for (const y of allEffects(inner)) {
+      if ("what" in y) refs.add((y.what as ObjRef).ref);
+      if ("who" in y && (y.who as PlayerRef).ref !== "you") players = false;
+      if (y.type === "delayed") players = false;
+    }
+    if (!players || refs.size !== 1) return null;
+    const [ref] = refs;
+    if (ref === "subject") return [{ type: "delayed", when: "endOfCombat", each: "subject", effects: inner, text: m[1]! }];
+    if (ref !== "self") return null;
+    // The delayed trigger is about the source as it is now: if it leaves, it's a new object (CR 400.7).
+    const effects = JSON.parse(JSON.stringify(inner).replace(/\{"ref":"self"\}/g, '{"ref":"subject"}')) as Effect[];
+    return [{ type: "delayed", when: "endOfCombat", effects, text: m[1]! }];
+  }
   // "Sacrifice ~ unless you pay {U}" (upkeep costs): pay to keep it, or it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you pay (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const pay = parsePayCost(m[2]!);
@@ -2585,7 +2629,7 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?|~|it|that card|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands)$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?|~|it|that card|that creature|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;
   }
@@ -2594,6 +2638,10 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {
     const filter = pickFilter(m[3]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: counterKind(m[2]!), n: amt(m[1]!) } }];
+  }
+  if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
+    const what = parseObject(m[3]!, ctx);
+    return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
   }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
@@ -2635,9 +2683,10 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(except ? { except } : {}), ...state }];
   }
   // "Sacrifice them at the beginning of the next end step" / "Exile it ...": about the tokens just created.
-  if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|that token|those tokens) at the beginning of the next end step$/i.exec(s))) {
+  if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens) at (the beginning of the next end step|end of combat)$/i.exec(s))) {
     const verb = m[1]!.toLowerCase();
-    return [{ type: "delayed", when: "nextEndStep", each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
+    const when = m[2] === "end of combat" ? "endOfCombat" : "nextEndStep";
+    return [{ type: "delayed", when, each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
   }
   // Predefined tokens (CR 111.10): "Create a Treasure token", "Its controller creates two Treasure tokens"
   if ((m = new RegExp(`^(?:(.+?) creates?|Create) ${NUMX} (Treasure|Food|Clue) tokens?$`, "i").exec(s))) {
@@ -2904,6 +2953,7 @@ function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "each player") return { ref: "eachPlayer" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
+  if (x === "defending player" && ctx.defending) return { ref: "eventPlayer" };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -3154,6 +3204,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   const notColors: Color[] = [];
   const supertypes: string[] = [];
   const notSupertypes: string[] = [];
+  const notSubtypes: string[] = [];
   const subtypes: string[] = [];
   const SUPERTYPE_WORDS: Record<string, string> = { basic: "Basic", legendary: "Legendary", snow: "Snow" };
   const alts = p ? p.split(/ or |, /) : [];
@@ -3173,6 +3224,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
         if (COLOR_WORDS[rest]) notColors.push(COLOR_WORDS[rest]!);
         else if (TYPE_WORDS[rest]) notTypes.push(TYPE_WORDS[rest]!);
         else if (SUPERTYPE_WORDS[rest]) notSupertypes.push(SUPERTYPE_WORDS[rest]!);
+        else if (alts.length === 1 && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall"
         else return null;
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
       else if (CREATURE_TYPES.has(capital(w)) || BASIC_TYPES.includes(capital(w))) subtypes.push(capital(w));
@@ -3199,6 +3251,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
     ...(supertypes.length ? { supertypes } : {}),
     ...(notSupertypes.length ? { notSupertypes } : {}),
     ...(subtypes.length ? { subtypes } : {}),
+    ...(notSubtypes.length ? { notSubtypes } : {}),
     ...extra,
   };
   if (inGraveyard) {

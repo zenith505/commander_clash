@@ -384,12 +384,20 @@ export type Effect =
    * A delayed trigger (CR 603.7) about this ability's source, or with `each: "created"` one about each token it
    * just created ("Sacrifice them at the beginning of the next end step", mobilize 702.181a).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep"; effects: Effect[]; text: string; each?: "created" }
+  /**
+   * `each`: about each token just created, or about the object the trigger was about ("destroy that creature at end
+   * of combat"), instead of the source.
+   */
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat"; effects: Effect[]; text: string; each?: "created" | "subject" }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
+  /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
+  /** CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player). */
+  | { type: "myriad" }
+  | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
   | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
@@ -523,6 +531,11 @@ export type TriggerEvent =
   | "creatureYouControlAttacksAlone" // exalted (CR 702.83a)
   | "yourUpkeep" // At the beginning of your upkeep
   | "yourEndStep" // At the beginning of your end step
+  | "yourBeginCombat" // At the beginning of combat on your turn (CR 507.1)
+  | "eachBeginCombat" // At the beginning of each combat
+  | "yourEndCombat" // At end of combat on your turn
+  | "eachEndCombat" // At end of combat (CR 511.2)
+  | "selfAttacksOrBlocks" // Whenever ~ attacks or blocks
   | "eachEndStep" // At the beginning of the end step (every turn's)
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
   | "yourDrawStep" // At the beginning of your draw step (after the draw, CR 504.2)

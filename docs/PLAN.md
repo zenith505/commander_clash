@@ -957,10 +957,30 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 - **Populate** (CR 701.36): copy a creature token you control (not targeted; you choose if you have several).
 - **Embalm and eternalize** (CR 702.128, 702.129): from your graveyard, at sorcery speed, exile the card to create a
   token copy of it: white Zombie with no mana cost, or 4/4 black Zombie.
-- Not yet: "becomes a copy" (CR 707.4), copying spells (Twincast, storm), myriad, copying double-faced or
+- Not yet: "becomes a copy" (CR 707.4), copying spells (Twincast, storm), copying double-faced or
   face-down permanents.
 
 **11,577 cards are fully supported.** Rules tests: `test/copies.test.ts`.
+
+### Beginning and end of combat, myriad (added 2026-10-11)
+
+- **"At the beginning of combat on your turn"** and **"at the beginning of each combat"** (CR 507): they trigger as
+  the beginning of combat step starts, before attackers are declared.
+- **"At end of combat"** (CR 511.2): "sacrifice it at end of combat", "destroy that creature at end of combat"
+  (basilisks), "return that creature to its owner's hand at end of combat", "exile the tokens at end of combat".
+  These are delayed triggers (CR 603.7) about the source or about the creature the trigger was about; if that
+  creature has left the battlefield in the meantime, nothing happens. One made during the end of combat step waits
+  for the next combat.
+- **"Whenever ~ attacks or blocks"**, **"defending player"** in attack triggers (the player it attacked), "non-Wall"
+  style subtype exclusions, and **removing counters** as an effect ("remove a +1/+1 counter from it").
+- **Myriad** (CR 702.116): when it attacks, for each other opponent, you choose whether to create a token copy
+  attacking that player. The copies enter at once after all the choices and are exiled at end of combat. With only
+  one opponent left, nothing happens.
+- Not yet: "if ~ attacked or blocked this combat" conditions, "until end of combat" effects, attacking
+  planeswalkers with myriad copies, "at the beginning of combat on each opponent's turn".
+- Play-testing: `?board=Card A|Card B` in the URL starts those cards (from your deck) on your battlefield.
+
+**11,752 cards are fully supported.** Rules tests: `test/combat-steps.test.ts`.
 
 ## Roadmap
 

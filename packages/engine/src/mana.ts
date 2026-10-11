@@ -1,0 +1,174 @@
+import { COLORS, type Color, type ManaType } from "./types";
+
+/** One symbol of a mana cost, normalized. CR 107.4 */
+export type CostSymbol =
+  | { kind: "generic"; amount: number }
+  | { kind: "colored"; color: ManaType } // includes {C}
+  | { kind: "hybrid"; options: Color[] } // {W/U}
+  | { kind: "twoHybrid"; color: Color } // {2/W}
+  | { kind: "phyrexian"; color: Color } // {W/P}
+  | { kind: "x" }
+  | { kind: "unsupported"; raw: string };
+
+export interface ParsedCost {
+  symbols: CostSymbol[];
+  hasX: boolean;
+  supported: boolean;
+}
+
+const isColor = (s: string): s is Color => (COLORS as readonly string[]).includes(s);
+
+export function parseManaCost(cost: string): ParsedCost {
+  const symbols: CostSymbol[] = [];
+  for (const m of cost.matchAll(/\{([^}]+)\}/g)) {
+    const raw = m[1]!;
+    const parts = raw.split("/");
+    if (/^\d+$/.test(raw)) symbols.push({ kind: "generic", amount: Number(raw) });
+    else if (raw === "X") symbols.push({ kind: "x" });
+    else if (raw === "C" || isColor(raw)) symbols.push({ kind: "colored", color: raw as ManaType });
+    else if (parts.length === 2 && parts[1] === "P" && isColor(parts[0]!)) symbols.push({ kind: "phyrexian", color: parts[0] });
+    else if (parts.length === 2 && parts[0] === "2" && isColor(parts[1]!)) symbols.push({ kind: "twoHybrid", color: parts[1] });
+    else if (parts.length === 2 && isColor(parts[0]!) && isColor(parts[1]!)) symbols.push({ kind: "hybrid", options: [parts[0], parts[1]] });
+    else symbols.push({ kind: "unsupported", raw });
+  }
+  return {
+    symbols,
+    hasX: symbols.some((s) => s.kind === "x"),
+    supported: !symbols.some((s) => s.kind === "unsupported"),
+  };
+}
+
+export type ManaPool = Record<ManaType, number>;
+export const emptyPool = (): ManaPool => ({ W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 });
+export const poolTotal = (p: ManaPool) => Object.values(p).reduce((a, b) => a + b, 0);
+
+export interface Payment {
+  pool: ManaPool; // pool after paying
+  lifePaid: number;
+}
+
+/**
+ * Try to pay `cost` (+ `extraGeneric`, e.g. commander tax) from `pool`.
+ * Returns the remaining pool, or null if it can't be paid. Pays the most constrained
+ * symbols first so a greedy pass doesn't spend mana a later symbol needed.
+ * Phyrexian symbols fall back to 2 life when `life` allows.
+ */
+export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity): Payment | null {
+  if (!cost.supported) return null;
+  const p = { ...pool };
+  let generic = extraGeneric;
+  let lifePaid = 0;
+  const hybrids: Color[][] = [];
+  const twoHybrids: Color[] = [];
+  const phyrexian: Color[] = [];
+  for (const s of cost.symbols) {
+    if (s.kind === "generic") generic += s.amount;
+    else if (s.kind === "colored") {
+      if (p[s.color] <= 0) return null;
+      p[s.color]--;
+    } else if (s.kind === "hybrid") hybrids.push(s.options);
+    else if (s.kind === "twoHybrid") twoHybrids.push(s.color);
+    else if (s.kind === "phyrexian") phyrexian.push(s.color);
+    // X is chosen as 0 for now.
+  }
+  for (const opts of hybrids) {
+    const best = opts.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0];
+    if (!best) return null;
+    p[best]--;
+  }
+  for (const c of phyrexian) {
+    if (p[c] > 0) p[c]--;
+    else if (life - lifePaid >= 2) lifePaid += 2;
+    else return null;
+  }
+  for (const c of twoHybrids) {
+    if (p[c] > 0) p[c]--;
+    else generic += 2;
+  }
+  // Generic: spend colorless first, then whichever color we have most of.
+  while (generic > 0) {
+    const from: ManaType | undefined =
+      p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0] as ManaType | undefined);
+    if (!from) return null;
+    p[from]--;
+    generic--;
+  }
+  return { pool: p, lifePaid };
+}
+
+/** How many {X} a cost has: {X}{X} means paying X twice (CR 107.3). */
+export const xCount = (cost: ParsedCost) => cost.symbols.filter((sym) => sym.kind === "x").length;
+
+/** Why `x` isn't a value X can have for this cost, or null (CR 107.3a; X is a whole number, CR 107.1). */
+export function xProblem(cost: ParsedCost, x: number | undefined): string | null {
+  if (x === undefined || x === 0) return null;
+  if (!cost.hasX) return "this has no X to choose";
+  if (!Number.isInteger(x) || x < 0) return "X must be a whole number, 0 or more";
+  return null;
+}
+
+/** Mana value of a cost (X counts as 0 off the stack). CR 202.3 */
+export function manaValue(cost: ParsedCost): number {
+  let n = 0;
+  for (const s of cost.symbols) {
+    if (s.kind === "generic") n += s.amount;
+    else if (s.kind === "twoHybrid") n += 2;
+    else if (s.kind !== "x" && s.kind !== "unsupported") n += 1;
+  }
+  return n;
+}
+
+/**
+ * Convoke (CR 702.51a): each tapped creature pays for one generic mana or one mana of its
+ * color. It applies to the total cost, commander tax included (CR 702.51b), so `extraGeneric`
+ * is folded in. Every creature must pay for something. Returns what's left to pay, or null if
+ * these creatures can't all be used. Colored symbols are matched first (a maximum matching,
+ * so a two-color creature doesn't take a symbol only another could pay), the rest pay generic.
+ */
+export function convokeReduce(cost: ParsedCost, extraGeneric: number, creatureColors: Color[][]): ParsedCost | null {
+  if (!cost.supported) return null;
+  // Symbols a creature can pay as colored mana; {C} needs colorless mana, which no creature's color is.
+  const slots: { i: number; colors: Color[] }[] = [];
+  cost.symbols.forEach((sym, i) => {
+    if (sym.kind === "colored" && sym.color !== "C") slots.push({ i, colors: [sym.color] });
+    else if (sym.kind === "phyrexian" || sym.kind === "twoHybrid") slots.push({ i, colors: [sym.color] });
+    else if (sym.kind === "hybrid") slots.push({ i, colors: sym.options });
+  });
+  const slotOwner: (number | undefined)[] = slots.map(() => undefined);
+  const augment = (c: number, seen: Set<number>): boolean => {
+    for (let k = 0; k < slots.length; k++) {
+      if (seen.has(k) || !slots[k]!.colors.some((col) => creatureColors[c]!.includes(col))) continue;
+      seen.add(k);
+      if (slotOwner[k] === undefined || augment(slotOwner[k]!, seen)) {
+        slotOwner[k] = c;
+        return true;
+      }
+    }
+    return false;
+  };
+  let unmatched = 0;
+  creatureColors.forEach((_, c) => {
+    if (!augment(c, new Set())) unmatched++;
+  });
+  const genericTotal = cost.symbols.reduce((n, sym) => n + (sym.kind === "generic" ? sym.amount : 0), extraGeneric);
+  if (unmatched > genericTotal) return null;
+  const paid = new Set(slots.flatMap((slot, k) => (slotOwner[k] !== undefined ? [slot.i] : [])));
+  const symbols = cost.symbols.filter((sym, i) => sym.kind !== "generic" && !paid.has(i));
+  if (genericTotal - unmatched > 0) symbols.unshift({ kind: "generic", amount: genericTotal - unmatched });
+  return { symbols, hasX: cost.hasX, supported: true };
+}
+
+/** A cost with all its generic mana gathered into `extra`, the way the total cost is figured (CR 601.2f). */
+export function splitGeneric(cost: ParsedCost, extra: number): { cost: ParsedCost; extra: number } {
+  const generic = cost.symbols.reduce((n, sym) => n + (sym.kind === "generic" ? sym.amount : 0), extra);
+  return { cost: { ...cost, symbols: cost.symbols.filter((sym) => sym.kind !== "generic") }, extra: generic };
+}
+
+/**
+ * Pay `n` of the generic mana another way: improvise's tapped artifacts (CR 702.126a). Each must pay
+ * for one generic mana, so null if there's less generic mana than that.
+ */
+export function payGenericWith(cost: ParsedCost, extra: number, n: number): { cost: ParsedCost; extra: number } | null {
+  const g = splitGeneric(cost, extra);
+  return n > g.extra ? null : { cost: g.cost, extra: g.extra - n };
+}

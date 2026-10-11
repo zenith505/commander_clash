@@ -1,0 +1,476 @@
+// Characteristics of permanents after continuous effects: the layer system (CR 613).
+//
+// An object's characteristics start from its card (or token definition) and every
+// applicable continuous effect is applied in layer order:
+//   2 control, 4 type, 5 color, 6 abilities, 7a defined P/T, 7b set P/T, 7c modify P/T (and counters),
+//   7d switch P/T, then rules effects such as "can't block" (CR 613.11).
+// Layers 1 (copy) and 3 (text) have no effects in the engine yet, so cards needing them stay
+// unsupported. Characteristic-defining power and toughness (7a) work on the battlefield only.
+//
+// Effects come from two places:
+//  - resolved spells and abilities, stored in GameState.effects with the set of objects
+//    they affect locked in when they began (CR 611.2c);
+//  - static abilities of permanents on the battlefield, regenerated on every computation
+//    and applying to whatever matches right now (CR 611.3a).
+// Within a layer, effects apply in timestamp order (CR 613.7) unless one depends on
+// another (CR 613.8). Once an effect starts applying, it keeps applying to the same
+// objects in later layers even if its source loses the ability meanwhile (CR 613.6).
+
+import type { Affects, Amount, Modification, StaticAbility, TargetSpec } from "./abilities";
+import { evalAmount } from "./amounts";
+import { bindChosen, objectMatches } from "./effects";
+import { basePower, baseToughness, defOf } from "./cards";
+import { subtypeSet } from "./keywords";
+import { compileCard } from "./oracle";
+import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
+
+export type Layer = "2" | "4" | "5" | "6" | "7a" | "7b" | "7c" | "7d" | "rules";
+const LAYERS: Layer[] = ["2", "4", "5", "6", "7a", "7b", "7c", "7d", "rules"];
+
+export function layerOf(m: Modification): Layer {
+  switch (m.kind) {
+    case "control":
+      return "2";
+    case "addTypes":
+    case "setTypes":
+    case "setSubtypes":
+      return "4";
+    case "setColors":
+      return "5";
+    case "addKeywords":
+    case "removeKeywords":
+    case "loseAllAbilities":
+      return "6";
+    case "definePT":
+      return "7a";
+    case "setPT":
+      return "7b";
+    case "modifyPT":
+      return "7c";
+    case "switchPT":
+      return "7d";
+    default:
+      return "rules";
+  }
+}
+
+/** One step in how a permanent's power/toughness was reached, for display and debugging. */
+export interface PTPart {
+  source: string;
+  kind: "set" | "modify" | "switch" | "counters";
+  power: number;
+  toughness: number;
+  untilEndOfTurn: boolean;
+}
+
+export interface Characteristics {
+  name: string;
+  supertypes: string[];
+  types: string[];
+  subtypes: string[];
+  /** Changeling: it has every creature type (CR 702.73a, a characteristic-defining ability). */
+  allCreatureTypes: boolean;
+  colors: Color[];
+  keywords: string[];
+  /** False once an effect made it lose all abilities: none of its printed abilities work. */
+  hasPrintedAbilities: boolean;
+  controller: PlayerId;
+  power: number;
+  toughness: number;
+  printedPower: number;
+  printedToughness: number;
+  pt: PTPart[];
+  cantAttack: boolean;
+  cantBlock: boolean;
+  cantBeBlocked: boolean;
+  doesntUntap: boolean;
+  /** "Can block only creatures with flying" (CR 509.1b). */
+  blocksOnlyFlyers: boolean;
+  /** "Attacks each combat if able" (CR 508.1d). */
+  attacksIfAble: boolean;
+  /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
+  cantBeBlockedBy: TargetSpec[];
+  /** "Can't be blocked by more than one creature" (CR 509.1b). */
+  maxOneBlocker: boolean;
+}
+
+/**
+ * The card's keywords. The card data names some only generically ("Protection", "Toxic");
+ * the text says which ("Protection from black", "Toxic 2"), so those come from the text.
+ */
+export function printedKeywords(d: CardDef): string[] {
+  const fromText = compileCard(d).textKeywords;
+  if (!fromText.length) return [...d.keywords];
+  return [...d.keywords.filter((k) => k !== "Protection" && k !== "Toxic"), ...fromText];
+}
+
+/** Characteristics straight from the card, with no effects applied. */
+function printed(s: GameState, o: GameObject): Characteristics {
+  const d = defOf(s, o);
+  return {
+    name: d.name,
+    supertypes: [...d.supertypes],
+    types: [...d.types],
+    subtypes: [...d.subtypes],
+    allCreatureTypes: d.keywords.includes("Changeling"),
+    colors: [...d.colors],
+    keywords: printedKeywords(d),
+    hasPrintedAbilities: true,
+    controller: o.controller,
+    power: basePower(d),
+    toughness: baseToughness(d),
+    printedPower: basePower(d),
+    printedToughness: baseToughness(d),
+    pt: [],
+    cantAttack: false,
+    cantBlock: false,
+    cantBeBlocked: false,
+    doesntUntap: false,
+    blocksOnlyFlyers: false,
+    attacksIfAble: false,
+    cantBeBlockedBy: [],
+    maxOneBlocker: false,
+  };
+}
+
+const copyChars = (c: Characteristics): Characteristics => ({
+  ...c,
+  supertypes: [...c.supertypes],
+  types: [...c.types],
+  subtypes: [...c.subtypes],
+  colors: [...c.colors],
+  keywords: [...c.keywords],
+  pt: [...c.pt],
+  cantBeBlockedBy: [...c.cantBeBlockedBy],
+});
+
+type CharMap = Map<ObjectId, Characteristics>;
+
+/** A continuous effect being applied: a stored one, or one generated by a static ability. */
+interface Inst {
+  key: string;
+  timestamp: number;
+  order: number;
+  sourceId?: ObjectId;
+  sourceName: string;
+  untilEndOfTurn: boolean;
+  mods: Modification[];
+  /** Stored effects: fixed controller and affected set. */
+  controller?: PlayerId;
+  fixed?: ObjectId[];
+  /** Static abilities: what it applies to, evaluated continuously. */
+  affects?: Affects;
+  /** Static abilities that apply only while something is true (threshold). */
+  condition?: StaticAbility["condition"];
+  /** Set when it first applies (CR 613.6). */
+  locked?: ObjectId[];
+}
+
+function gather(s: GameState): Inst[] {
+  const out: Inst[] = [];
+  let order = 0;
+  for (const e of s.effects)
+    out.push({
+      key: e.id,
+      timestamp: e.timestamp,
+      order: order++,
+      sourceId: e.sourceId,
+      sourceName: e.sourceName,
+      untilEndOfTurn: e.duration === "endOfTurn",
+      mods: e.mods,
+      controller: e.controller,
+      fixed: e.affected,
+    });
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    const d = defOf(s, o);
+    compileCard(d).statics.forEach((st, i) =>
+      out.push({
+        key: `${id}#${i}`,
+        timestamp: o.timestamp, // CR 613.7a
+        order: order++,
+        sourceId: id,
+        sourceName: d.name,
+        untilEndOfTurn: false,
+        mods: st.mods,
+        affects: st.affects,
+        condition: st.condition,
+      }),
+    );
+  }
+  return out;
+}
+
+const sameCI = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
+/** Does a static ability's source still have it? It must be on the battlefield and not have lost its abilities. */
+function exists(s: GameState, e: Inst, chars: CharMap): boolean {
+  if (!e.affects) return true;
+  const src = chars.get(e.sourceId!);
+  if (!src || !src.hasPrintedAbilities) return false;
+  // Threshold: seven or more cards in its controller's graveyard (a condition, not a dependency on layers).
+  if (e.condition && (s.players[src.controller]?.graveyard.length ?? 0) < e.condition.n) return false;
+  if (e.affects.kind === "attached") {
+    const host = s.objects[e.sourceId!]!.attachedTo;
+    return !!host && chars.has(host);
+  }
+  return true;
+}
+
+function controllerOfInst(e: Inst, chars: CharMap): PlayerId {
+  if (e.controller !== undefined) return e.controller;
+  return chars.get(e.sourceId!)!.controller;
+}
+
+function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
+  if (e.locked) return e.locked.filter((id) => chars.has(id));
+  if (e.fixed) return e.fixed.filter((id) => chars.has(id));
+  const a = e.affects!;
+  if (a.kind === "self") return [e.sourceId!];
+  if (a.kind === "attached") {
+    const host = s.objects[e.sourceId!]!.attachedTo;
+    return host && chars.has(host) ? [host] : [];
+  }
+  const you = controllerOfInst(e, chars);
+  const out: ObjectId[] = [];
+  // "Creatures you control of the chosen type": the choice made as the source entered.
+  const spec = a.spec && bindChosen(a.spec, s.objects[e.sourceId!]?.chosen);
+  for (const [id, c] of chars) {
+    if (a.other && id === e.sourceId) continue;
+    if (!a.types.every((t) => c.types.includes(t))) continue;
+    if (a.subtypes?.length && !(c.allCreatureTypes && c.types.includes("Creature")) && !a.subtypes.some((t) => c.subtypes.some((x) => sameCI(x, t)))) continue;
+    if (a.colors?.length && !a.colors.some((col) => c.colors.includes(col))) continue;
+    if (a.controller === "you" && c.controller !== you) continue;
+    if (a.controller === "opponent" && c.controller === you) continue;
+    if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c)) continue;
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * New subtypes replace the existing ones of the same kind only (CR 205.1a): "becomes a Frog"
+ * replaces creature types and leaves an Equipment an Equipment.
+ */
+function setSubtypes(c: Characteristics, subtypes: string[]) {
+  if (!subtypes.length) return;
+  const sets = new Set(subtypes.map(subtypeSet));
+  c.subtypes = [...c.subtypes.filter((st) => !sets.has(subtypeSet(st))), ...subtypes];
+  if (sets.has("Creature")) c.allCreatureTypes = false;
+}
+
+function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, chars: CharMap) {
+  // Numbers a static ability counts are counted now, with what the earlier layers did (CR 611.3a, 613.4).
+  const num = (a: Amount) =>
+    evalAmount(s, a, { controller: controllerOfInst(e, chars), sourceId: e.sourceId, chosen: e.sourceId ? s.objects[e.sourceId]?.chosen : undefined, view: (o) => chars.get(o.id) });
+  switch (m.kind) {
+    case "control":
+      c.controller = controllerOfInst(e, chars);
+      return;
+    case "addTypes":
+      for (const t of m.types) if (!c.types.includes(t)) c.types.push(t);
+      for (const t of m.subtypes) if (!c.subtypes.includes(t)) c.subtypes.push(t);
+      return;
+    case "setTypes": {
+      // The new card types replace the old, but an instant or sorcery stays one (CR 205.1a). Subtypes of
+      // card types it no longer has go too; those of types it keeps stay unless the effect sets that kind.
+      const kept = c.types.filter((t) => t === "Instant" || t === "Sorcery");
+      c.types = [...m.types, ...kept.filter((t) => !m.types.includes(t))];
+      const hasSet = (set: string | null) => set === null || (set === "Spell" ? c.types.includes("Instant") || c.types.includes("Sorcery") : c.types.includes(set));
+      c.subtypes = c.subtypes.filter((st) => hasSet(subtypeSet(st)));
+      if (!c.types.includes("Creature")) c.allCreatureTypes = false;
+      setSubtypes(c, m.subtypes);
+      return;
+    }
+    case "setSubtypes":
+      setSubtypes(c, m.subtypes);
+      return;
+    case "setColors":
+      c.colors = [...m.colors];
+      return;
+    case "addKeywords":
+      for (const k of m.keywords) if (!c.keywords.some((x) => sameCI(x, k))) c.keywords.push(k);
+      return;
+    case "removeKeywords":
+      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k)));
+      return;
+    case "loseAllAbilities":
+      c.keywords = [];
+      c.hasPrintedAbilities = false;
+      return;
+    case "definePT":
+      if (m.power !== undefined) c.power = num(m.power);
+      if (m.toughness !== undefined) c.toughness = num(m.toughness);
+      c.pt.push({ source: e.sourceName, kind: "set", power: c.power, toughness: c.toughness, untilEndOfTurn: false });
+      return;
+    case "setPT": {
+      const [p, t] = [num(m.power), num(m.toughness)];
+      c.power = p;
+      c.toughness = t;
+      c.pt.push({ source: e.sourceName, kind: "set", power: p, toughness: t, untilEndOfTurn: e.untilEndOfTurn });
+      return;
+    }
+    case "modifyPT": {
+      const [p, t] = [num(m.power), num(m.toughness)];
+      c.power += p;
+      c.toughness += t;
+      c.pt.push({ source: e.sourceName, kind: "modify", power: p, toughness: t, untilEndOfTurn: e.untilEndOfTurn });
+      return;
+    }
+    case "switchPT":
+      [c.power, c.toughness] = [c.toughness, c.power];
+      c.pt.push({ source: e.sourceName, kind: "switch", power: c.power, toughness: c.toughness, untilEndOfTurn: e.untilEndOfTurn });
+      return;
+    case "cantAttack":
+      c.cantAttack = true;
+      return;
+    case "cantBlock":
+      c.cantBlock = true;
+      return;
+    case "cantBeBlocked":
+      c.cantBeBlocked = true;
+      return;
+    case "doesntUntap":
+      c.doesntUntap = true;
+      return;
+    case "blocksOnlyFlyers":
+      c.blocksOnlyFlyers = true;
+      return;
+    case "attacksIfAble":
+      c.attacksIfAble = true;
+      return;
+    case "cantBeBlockedBy":
+      c.cantBeBlockedBy.push(m.filter);
+      return;
+    case "maxOneBlocker":
+      c.maxOneBlocker = true;
+      return;
+  }
+}
+
+const modsIn = (e: Inst, layer: Layer) => e.mods.filter((m) => layerOf(m) === layer);
+
+/** Apply an effect's parts for one layer. With `lock`, its affected set is fixed from now on (CR 613.6). */
+function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock: boolean) {
+  const ids = appliesTo(s, e, chars);
+  if (lock && !e.locked) e.locked = ids;
+  for (const id of ids) for (const m of modsIn(e, layer)) applyMod(s, chars.get(id)!, m, e, chars);
+}
+
+/**
+ * Mods that can change what another effect exists for or applies to. Effects only look at
+ * controller, types, colors, and whether a source still has its abilities, so only these
+ * can create a dependency (CR 613.8a).
+ */
+const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setColors", "loseAllAbilities"]);
+
+function signature(s: GameState, e: Inst, chars: CharMap): string {
+  if (!exists(s, e, chars)) return "gone";
+  return `${controllerOfInst(e, chars)}|${appliesTo(s, e, chars).join(",")}`;
+}
+
+/**
+ * Does `a` depend on `b` (CR 613.8a)? It does if applying `b` would change whether `a`
+ * exists, what it applies to, or what it does. Effects with a locked-in set of objects
+ * from a resolved spell can't depend on anything.
+ */
+function dependsOn(s: GameState, a: Inst, b: Inst, layer: Layer, chars: CharMap): boolean {
+  if (a.locked || a.fixed) return false;
+  if (!modsIn(b, layer).some((m) => CAN_CREATE_DEPENDENCY.has(m.kind))) return false;
+  if (!b.locked && !exists(s, b, chars)) return false;
+  const trial: CharMap = new Map(chars);
+  for (const id of appliesTo(s, b, chars)) trial.set(id, copyChars(chars.get(id)!));
+  applyInLayer(s, { ...b }, layer, trial, false);
+  return signature(s, a, chars) !== signature(s, a, trial);
+}
+
+function computeAll(s: GameState): CharMap {
+  const chars: CharMap = new Map();
+  for (const id of s.battlefield) chars.set(id, printed(s, s.objects[id]!));
+  const insts = gather(s).sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
+  for (const layer of LAYERS) {
+    let rem = insts.filter((e) => modsIn(e, layer).length && (e.locked || exists(s, e, chars)));
+    while (rem.length) {
+      // CR 613.8b-c: apply the earliest effect that doesn't wait on another; re-evaluate after each.
+      // In a dependency loop, timestamp order wins.
+      const pick = rem.find((a) => !rem.some((b) => b !== a && dependsOn(s, a, b, layer, chars))) ?? rem[0]!;
+      rem = rem.filter((e) => e !== pick);
+      if (!pick.locked && !exists(s, pick, chars)) continue; // an earlier effect in this layer removed it
+      applyInLayer(s, pick, layer, chars, true);
+    }
+    if (layer === "7c") {
+      // Counters apply in 7c (CR 613.4c). Everything in 7c adds up, so order doesn't matter.
+      for (const [id, c] of chars) {
+        const o = s.objects[id]!;
+        const n = (o.counters["+1/+1"] ?? 0) - (o.counters["-1/-1"] ?? 0);
+        if (!n) continue;
+        c.power += n;
+        c.toughness += n;
+        c.pt.push({ source: "counters", kind: "counters", power: n, toughness: n, untilEndOfTurn: false });
+      }
+    }
+  }
+  return chars;
+}
+
+// ---------------------------------------------------------------------------
+// Cache. Computing every permanent at once is needed (effects look at each other), so the
+// result is cached per state and thrown away whenever something that matters changes.
+
+const cache = new WeakMap<GameState, { map: CharMap; sig?: string }>();
+let cacheEnabled = true;
+
+/**
+ * Static abilities that count things ("+1/+1 for each card in your hand", Death's Shadow's life
+ * total) can change without anything that invalidates the cache happening: a draw, a life change,
+ * tapping. When the cached result used such a count, it's only good while these stay the same.
+ */
+function countSignature(s: GameState): string {
+  const parts: string[] = [];
+  for (const pid of s.turnOrder) {
+    const p = s.players[pid]!;
+    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.graveyard.length}`);
+  }
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (o.tapped || o.attacking !== undefined || o.blocking) parts.push(`${id}${o.tapped ? "t" : ""}${o.attacking !== undefined ? "a" : ""}${o.blocking ? "b" : ""}`);
+  }
+  return parts.join("|");
+}
+
+const isCounted = (a: Amount) => typeof a !== "number";
+/** Does any static ability on the battlefield count something? */
+function usesCounts(s: GameState): boolean {
+  for (const id of s.battlefield) {
+    for (const st of compileCard(defOf(s, s.objects[id]!)).statics)
+      for (const m of st.mods) {
+        if (m.kind === "definePT") return true;
+        if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
+      }
+  }
+  return false;
+}
+
+/** Turn the cache off to check that invalidation is complete (tests compare both ways). */
+export function setCharacteristicsCache(on: boolean) {
+  cacheEnabled = on;
+}
+
+/** Call after anything that could change characteristics: zones, counters, effects, attachments. */
+export function invalidateCharacteristics(s: GameState) {
+  cache.delete(s);
+}
+
+export function characteristics(s: GameState, o: GameObject): Characteristics {
+  if (o.zone !== "battlefield") return printed(s, o);
+  let hit = cacheEnabled ? cache.get(s) : undefined;
+  if (hit?.sig !== undefined && hit.sig !== countSignature(s)) hit = undefined;
+  if (!hit || !hit.map.has(o.id)) {
+    hit = { map: computeAll(s), ...(usesCounts(s) ? { sig: countSignature(s) } : {}) };
+    if (cacheEnabled) cache.set(s, hit);
+  }
+  return hit.map.get(o.id) ?? printed(s, o);
+}
+
+/** Who controls this object right now (after control-changing effects). */
+export const controllerOf = (s: GameState, o: GameObject): PlayerId => (o.zone === "battlefield" ? characteristics(s, o).controller : o.controller);

@@ -1,0 +1,436 @@
+:root {
+  --bg: #101219;
+  --panel: #1b1e28;
+  --panel-2: #262a37;
+  --line: #343a4b;
+  --text: #ece9e2;
+  --muted: #8d93a5;
+  --accent: #e3b34c;
+  --attack: #e65a43;
+  --block: #4596e6;
+  --ok: #4fc47f;
+
+  /* Mana symbol colors */
+  --mana-W: #f8f4d8;
+  --mana-U: #a9d0ee;
+  --mana-B: #b7aca6;
+  --mana-R: #f19a7d;
+  --mana-G: #9fcf9d;
+  --mana-C: #cfc8c5;
+  --mana-2: #cfc8c5;
+
+  /* Card sizes scale with the window. Cards are 488x680 (ratio 0.718). */
+  --bf-card: clamp(62px, 5.4vw, 124px);
+  --zone-card: clamp(48px, 3.9vw, 88px);
+  --hand-card: clamp(96px, 8.2vw, 170px);
+
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-size: 15px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+button {
+  background: var(--accent); color: #1a1a1a; border: 0; border-radius: 8px;
+  padding: 10px 18px; font-weight: 700; font-size: 15px; cursor: pointer;
+}
+button:disabled { opacity: 0.4; cursor: default; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.error { color: var(--attack); }
+.splash { display: grid; place-items: center; height: 100vh; font-size: 18px; }
+
+/* Lobby */
+.lobby { max-width: 1000px; margin: 40px auto; padding: 0 16px; }
+.lobby h1 { font-size: 36px; }
+.deck-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.deck-choice { display: flex; flex-direction: column; gap: 8px; background: var(--panel); color: var(--text); padding: 10px; }
+.deck-choice img { width: 100%; border-radius: 10px; }
+
+/* Table: 2x2 seats in turn order (you bottom right) and a side panel with the log, the stack
+   and, under them, the turn/phase/controls pane. Your hand floats over the bottom of your own seat. */
+.table {
+  display: grid; height: 100vh; gap: 8px; padding: 8px; overflow: clip; /* clip, not hidden: nothing can scroll the table */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) clamp(280px, 20vw, 400px);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "tl tr side"
+    "bl br side";
+}
+.seat.tl { grid-area: tl; }
+.seat.tr { grid-area: tr; }
+.seat.bl { grid-area: bl; }
+.seat.br { grid-area: br; }
+.hand-dock { grid-area: br; }
+.side { grid-area: side; }
+
+/* Seats */
+.seat {
+  background: var(--panel); border-radius: 10px; padding: 8px 10px; border: 2px solid var(--line);
+  min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; overflow: hidden;
+}
+.seat.me { background: #1d2230; }
+.seat.active { border-color: var(--accent); box-shadow: 0 0 18px rgba(227, 179, 76, 0.18); }
+.seat.clickable { cursor: pointer; }
+.seat.lost { opacity: 0.35; }
+.seat header { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.seat .name { font-weight: 800; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+.seat .life { font-weight: 800; font-size: 24px; color: var(--ok); }
+.seat .poison { font-weight: 800; font-size: 20px; color: #9be15d; }
+.seat .energy { font-weight: 800; font-size: 18px; color: #ffd84d; }
+.seat .monarch { font-weight: 700; font-size: 14px; color: #f4c542; border: 1px solid #f4c54266; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.turn-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.turn-dot.off { visibility: hidden; }
+.priority-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1a1a1a; background: var(--accent); padding: 2px 6px; border-radius: 4px; }
+.pool-slot { margin-left: auto; }
+.seat-body { display: flex; gap: 10px; flex: 1; min-height: 0; }
+/* Padding so the 3px highlight ring and the hover lift of edge cards aren't clipped by the scroll box. */
+.battlefield { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 8px 6px 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; flex-shrink: 0; } /* never squeeze rows into each other; the battlefield scrolls instead */
+.row.nonlands { min-height: calc(var(--bf-card) * 1.4); }
+.row.lands { margin-top: auto; padding-top: 6px; border-top: 1px dashed var(--line); }
+
+/* Zone column: command, library, graveyard, exile */
+.zones { display: grid; grid-template-columns: repeat(2, auto); gap: 6px 8px; align-content: start; }
+.zone { display: flex; flex-direction: column; align-items: center; gap: 2px; --card-w: var(--zone-card); }
+.zone-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.zone-card { display: flex; flex-direction: column; align-items: center; }
+.zone-empty {
+  width: var(--zone-card); aspect-ratio: 488 / 680; border: 1px dashed var(--line); border-radius: 6px;
+  display: grid; place-items: center; font-size: 10px; color: var(--muted); text-align: center;
+}
+.clickable-zone { cursor: zoom-in; }
+.zone.has-options { box-shadow: 0 0 0 2px var(--ok); border-radius: 8px; }
+.zone-count {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78); color: #fff; font-weight: 800; font-size: 15px; padding: 2px 8px; border-radius: 6px;
+}
+
+/* Cards */
+.card {
+  --card-w: var(--bf-card);
+  position: relative; width: var(--card-w); aspect-ratio: 488 / 680; border-radius: 6px; cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s; flex: none;
+  background: var(--panel-2); /* placeholder while the image loads */
+}
+.zone .card { --card-w: var(--zone-card); }
+.hand .card { --card-w: var(--hand-card); }
+.card img { width: 100%; height: 100%; border-radius: 6px; display: block; }
+.card-text {
+  width: 100%; height: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  font-size: clamp(9px, calc(var(--card-w) / 9), 14px); padding: 4px; overflow: hidden; display: flex; flex-direction: column; gap: 3px;
+}
+.ct-name { font-weight: 700; line-height: 1.1; }
+.ct-type { color: var(--muted); margin-top: auto; }
+.card.back { cursor: default; }
+.back-design {
+  width: 100%; height: 100%; border-radius: 6px; border: 3px solid #2b2016;
+  background: radial-gradient(ellipse at center, #7a4b22 0%, #4a2c13 45%, #22150a 100%);
+}
+.card.playable { box-shadow: 0 0 0 3px var(--ok); }
+.card.attacking { box-shadow: 0 0 0 3px var(--attack); }
+.card.blocking { box-shadow: 0 0 0 3px var(--block); }
+.card.selected { box-shadow: 0 0 0 3px var(--accent); transform: translateY(-8px); }
+.card.sick img { filter: saturate(0.55) brightness(0.9); }
+.card:hover { transform: translateY(-4px); z-index: 2; }
+.battlefield .card.selected { transform: translateY(-5px); } /* stays inside the battlefield's padding */
+.card.big { --card-w: 150px; }
+
+/* A slot reserves room for a tapped (sideways) card so it doesn't overlap its neighbours. */
+.slot { flex: none; display: flex; align-items: center; justify-content: center; }
+.slot-tapped { width: calc(var(--bf-card) * 1.393); height: calc(var(--bf-card) * 1.393); }
+.card.tapped, .card.tapped:hover { transform: rotate(90deg) scale(0.96); }
+.pt {
+  position: absolute; right: 3px; bottom: 3px; background: rgba(0, 0, 0, 0.85);
+  font-size: clamp(11px, calc(var(--card-w) / 8), 15px); font-weight: 700; padding: 1px 5px; border-radius: 4px;
+}
+.pt em { color: var(--attack); font-style: normal; }
+.badge { position: absolute; left: 3px; top: 3px; font-size: 10px; font-weight: 700; padding: 1px 4px; border-radius: 4px; }
+.attack-badge { background: var(--attack); color: #fff; }
+
+/* Piles of identical lands */
+.pile { display: flex; position: relative; }
+.pile .slot + .slot { margin-left: calc(var(--bf-card) * -0.72); }
+.pile .slot-tapped + .slot-tapped { margin-left: calc(var(--bf-card) * -1.05); }
+.pile-count {
+  position: absolute; right: -4px; top: -6px; background: var(--accent); color: #1a1a1a;
+  font-weight: 800; font-size: 12px; padding: 1px 6px; border-radius: 10px; z-index: 3;
+}
+
+/* Control pane: under the log (and the stack, which never covers it). Everything stacks
+   vertically; prompts wrap their text and their buttons share the row below. */
+.control-pane {
+  display: flex; flex-direction: column; gap: 8px; background: var(--panel); border-radius: 10px;
+  padding: 10px 12px; flex: none;
+}
+.turn-info { display: flex; align-items: baseline; gap: 10px; font-size: 16px; flex-wrap: wrap; }
+.turn-info .thinking { margin-left: auto; }
+.control-pane .controls { flex-wrap: wrap; margin-left: 0; }
+.control-pane .controls > span { flex: 1 1 100%; }
+.control-pane .controls > button { flex: 1 1 0; }
+.control-pane .targeting > span { flex: 1 1 100%; }
+.control-pane .prio-toggle { align-self: flex-start; }
+.phase-track { display: flex; gap: 3px; flex-wrap: wrap; }
+.phase-track .step {
+  position: relative; font-size: 11px; font-weight: 400; padding: 3px 6px; border-radius: 4px;
+  background: var(--panel-2); color: var(--muted); border: 1px solid transparent;
+}
+.phase-track .step:disabled { opacity: 1; cursor: default; }
+.phase-track .step:not(:disabled):hover { border-color: var(--line); color: var(--text); }
+.phase-track .step.on { background: var(--accent); color: #1a1a1a; font-weight: 700; }
+/* A stop on opponents' turns: a red marker in the corner */
+.phase-track .step.stop { border-color: var(--attack); color: var(--text); }
+.phase-track .step.stop::after {
+  content: ""; position: absolute; right: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--attack); box-shadow: 0 0 0 2px var(--panel);
+}
+.thinking { color: var(--muted); font-size: 14px; }
+.controls { display: flex; gap: 12px; align-items: center; margin-left: auto; font-size: 15px; }
+.game-over { font-size: 20px; font-weight: 800; display: flex; gap: 12px; align-items: center; }
+
+/* Hand: fanned over the bottom right of your seat, partly below the screen edge.
+   Tucked, only the tops of the cards show. Clicks between cards reach the table below. */
+.hand-dock { position: relative; pointer-events: none; z-index: 20; }
+.hand {
+  /* The outer cards lean out past the fan's box: leave room for them on both sides. */
+  position: absolute; right: calc(var(--hand-card) * 0.3 + 6px); bottom: calc(var(--hand-card) * -0.55 - 8px);
+  display: flex; align-items: flex-start; gap: calc(var(--hand-card) * 0.3 + 4px); transition: bottom 0.25s ease;
+}
+.hand.tucked { bottom: calc(var(--hand-card) * -1.03 - 8px); }
+/* Keep your own permanents clear of the hand: the battlefield ends where the hand starts. */
+.seat.me .battlefield { padding-bottom: calc(var(--hand-card) * 0.84); transition: padding-bottom 0.25s ease; }
+.table.hand-tucked .seat.me .battlefield { padding-bottom: calc(var(--hand-card) * 0.36); }
+.hand-toggle {
+  pointer-events: auto; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line); padding: 6px 10px; font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.hand-arrow { color: var(--accent); }
+.fan { display: flex; align-items: flex-end; padding-top: 6px; }
+.fan-slot {
+  pointer-events: auto; transform-origin: 50% 120%; position: relative;
+  transform: translateY(calc(var(--hand-card) * var(--drop))) rotate(var(--rot));
+  transition: transform 0.16s ease;
+}
+.fan-slot + .fan-slot { margin-left: calc(var(--hand-card) * (var(--shown) - 1)); }
+/* Hovering lifts the card along its own slant. The slot itself stays put, so the card
+   can't slide out from under the mouse and flicker. */
+.fan .slot { transition: transform 0.16s ease; }
+.fan-slot:hover { z-index: 30; }
+.fan-slot:hover .slot { transform: translateY(calc(var(--hand-card) * -0.55)) scale(1.06); }
+.hand.tucked .fan-slot:hover .slot { transform: translateY(calc(var(--hand-card) * -0.3)) scale(1.04); }
+.fan .card { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); }
+.fan .card:hover { transform: none; }
+.fan .card.playable { box-shadow: 0 0 0 3px var(--ok), 0 6px 18px rgba(0, 0, 0, 0.55); }
+.fan .card.selected { transform: translateY(calc(var(--hand-card) * -0.18)); }
+
+/* The card under the mouse, large, beside the mouse */
+.hover-card {
+  position: fixed; left: 0; top: 0; z-index: 70; pointer-events: none; width: clamp(240px, 17vw, 330px);
+  filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.7));
+}
+.hover-card img { width: 100%; aspect-ratio: 488 / 680; border-radius: 14px; display: block; background: var(--panel-2); }
+.big-text {
+  background: #12151d; border: 1px solid var(--line); border-radius: 14px; padding: 14px; font-size: 15px;
+  white-space: pre-wrap; display: flex; flex-direction: column; gap: 6px; min-height: 200px;
+}
+.big-text p { margin: 4px 0; line-height: 1.4; }
+.big-pt { margin-top: auto; align-self: flex-end; font-weight: 800; font-size: 18px; }
+
+/* Side panel */
+.side { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.side-main { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.oracle-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.log { flex: 1; overflow-y: auto; background: var(--panel); border-radius: 10px; padding: 10px; font-size: 13px; min-height: 120px; }
+.log > div { padding: 2px 0; }
+.log .pip { vertical-align: -3px; margin: 0 1px; }
+.turn-line { color: var(--accent); margin-top: 6px; font-weight: 700; }
+.quit { background: var(--panel-2); color: var(--text); }
+
+/* Mana symbols */
+.pip {
+  --pip: 18px;
+  width: var(--pip); height: var(--pip); border-radius: 50%; display: inline-grid; place-items: center; flex: none;
+  color: #111; font-weight: 800; font-size: calc(var(--pip) * 0.6); line-height: 1;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.pip.sm { --pip: 15px; }
+.pip.lg { --pip: 24px; }
+.pip-W { background: var(--mana-W); }
+.pip-U { background: var(--mana-U); }
+.pip-B { background: var(--mana-B); }
+.pip-R { background: var(--mana-R); }
+.pip-G { background: var(--mana-G); }
+.pip-C { background: var(--mana-C); }
+.pip-generic { background: var(--mana-C); }
+.pip-tap { background: #d9d4cf; font-size: calc(var(--pip) * 0.75); }
+.pip-energy { background: #2b2b33; color: #ffd84d; font-size: calc(var(--pip) * 0.7); }
+.mana-cost { display: inline-flex; gap: 2px; align-items: center; vertical-align: middle; }
+.mana-pool { display: inline-flex; gap: 10px; align-items: center; }
+.pool-group { display: inline-flex; gap: 3px; align-items: center; }
+.pool-count { font-weight: 800; font-size: 20px; }
+
+/* Graveyard / exile viewer */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: grid; place-items: center; z-index: 50; }
+.modal { background: var(--panel); border-radius: 12px; padding: 16px; width: min(1100px, 92vw); max-height: 85vh; display: flex; flex-direction: column; gap: 12px; }
+.modal header { display: flex; align-items: center; gap: 10px; }
+.modal header button:first-of-type { margin-left: auto; }
+/* Room around the cards for the 3px highlight ring and the hover/selected lift, which a scrolling box would clip. */
+.modal-cards { display: flex; flex-wrap: wrap; gap: 12px; overflow-y: auto; min-height: 0; padding: 12px 8px 8px; margin: 0 -8px; }
+.modal .card.big { --card-w: clamp(130px, 8.5vw, 180px); }
+/* A modal with several card rows scrolls as a whole, so each row keeps its full height. */
+.modal-body { overflow-y: auto; min-height: 0; padding: 0 8px; margin: 0 -8px; }
+.modal-body .modal-cards { overflow: visible; }
+
+@media (max-width: 1000px) {
+  .table {
+    height: auto; grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas: "tl" "tr" "bl" "br" "hand" "side";
+    overflow: visible;
+  }
+  .hand-dock { grid-area: hand; pointer-events: auto; }
+  .hand, .hand.tucked { position: static; }
+  .seat.me .battlefield, .table.hand-tucked .seat.me .battlefield { padding-bottom: 0; }
+  .seat { min-height: 260px; }
+}
+
+/* Targeting and ability menus */
+.card.targetable, .stack-card.targetable .card { box-shadow: 0 0 0 3px #c77dff; cursor: crosshair; }
+.seat.targetable { border-color: #c77dff; box-shadow: 0 0 18px rgba(199, 125, 255, 0.35); cursor: crosshair; }
+.targeting, .ability-menu { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #2d2340; padding: 6px 10px; border-radius: 8px; }
+.ability-menu button { font-size: 13px; padding: 6px 10px; display: inline-flex; gap: 4px; align-items: center; }
+.ability-menu button.noop { background: var(--panel-2); color: var(--muted); }
+.noop-tag { font-size: 11px; font-weight: 600; font-style: italic; margin-left: 4px; }
+button.ghost { background: var(--panel-2); color: var(--text); }
+.x-pick input { width: 64px; font-size: 16px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); text-align: center; }
+.x-pick button.ghost { min-width: 34px; font-size: 16px; }
+
+/* Player name: hover for commander damage */
+.seat .name .name-text { text-decoration: underline dotted rgba(255, 255, 255, 0.35); text-underline-offset: 4px; cursor: help; }
+.cmd-pop {
+  position: fixed; z-index: 60; min-width: 280px; max-width: 360px; background: #12151d; border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); pointer-events: none;
+}
+.cmd-pop-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 6px; }
+.cmd-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 4px 0; font-size: 14px; }
+.cmd-n { font-weight: 800; }
+.cmd-row.hit .cmd-n { color: var(--accent); }
+.cmd-row.danger .cmd-n { color: var(--attack); }
+.cmd-bar { grid-column: 1 / -1; height: 4px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
+.cmd-bar > span { display: block; height: 100%; background: var(--accent); }
+.cmd-row.danger .cmd-bar > span { background: var(--attack); }
+
+/* Priority toggle */
+.prio-toggle { display: inline-flex; align-items: center; gap: 4px; background: var(--panel-2); border-radius: 8px; padding: 3px 3px 3px 10px; }
+.prio-toggle button { background: transparent; color: var(--muted); padding: 6px 12px; font-size: 13px; }
+.prio-toggle button.on { background: var(--accent); color: #1a1a1a; }
+
+/* What effects have done to a permanent */
+.kw-overlay {
+  position: absolute; left: 0; right: 0; top: 22%; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  pointer-events: none;
+}
+.kw {
+  background: rgba(20, 16, 40, 0.88); color: #ffd36e; border: 1px solid #ffd36e; border-radius: 4px;
+  font-size: clamp(8px, calc(var(--card-w) / 10), 12px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 1px 4px; max-width: 94%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 0 8px rgba(255, 211, 110, 0.45);
+}
+.chips { position: absolute; left: 3px; bottom: 3px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; pointer-events: none; }
+.chip { font-size: clamp(9px, calc(var(--card-w) / 10), 13px); font-weight: 800; padding: 1px 5px; border-radius: 10px; line-height: 1.3; }
+.chip.counter { background: #2f8f4e; color: #fff; border: 1px solid #7fe0a0; }
+.chip.counter.minus { background: #8f2f3a; border-color: #ff9aa5; }
+.chip.temp { background: rgba(0, 0, 0, 0.8); color: #7fd3ff; border: 1px dashed #7fd3ff; }
+.chip.other { background: rgba(0, 0, 0, 0.8); color: var(--text); border: 1px solid var(--line); }
+.chip.shield { background: rgba(0, 0, 0, 0.8); color: #ffe08a; border: 1px solid #ffe08a; }
+.pt b { font-weight: 800; }
+.pt b.up { color: #5ef08f; }
+.pt b.down { color: #ff6b6b; }
+
+/* Stack overlay: covers the preview and log while anything is on the stack */
+.stack-overlay {
+  position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; gap: 8px;
+  background: #101219; border: 2px solid #5a4a7a; border-radius: 10px; padding: 10px;
+  box-shadow: 0 0 30px rgba(199, 125, 255, 0.2);
+}
+.stack-overlay header { display: flex; align-items: center; gap: 8px; }
+.stack-overlay header strong { font-size: 18px; }
+.stack-overlay header button { margin-left: auto; padding: 5px 10px; font-size: 12px; }
+.stack-cards { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; padding: 4px; }
+.stack-card {
+  display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 10px;
+  background: var(--panel); border-left: 4px solid var(--who); cursor: default;
+}
+.stack-card .card { --card-w: clamp(84px, 6vw, 120px); cursor: inherit; }
+.stack-card.top .card { --card-w: clamp(130px, 9.5vw, 200px); }
+.stack-card.top { background: var(--panel-2); }
+.stack-card .card:hover { transform: none; }
+.stack-card.targetable { cursor: crosshair; }
+.stack-card .card.ability img { filter: brightness(0.7); }
+.ability-banner {
+  position: absolute; left: 0; right: 0; top: 40%; text-align: center; background: rgba(60, 40, 100, 0.9); color: #e8d9ff;
+  font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 0;
+}
+.stack-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 14px; }
+.stack-who { font-weight: 800; color: var(--who); }
+.stack-desc { overflow-wrap: anywhere; }
+.stack-targets { color: #e8d9ff; font-weight: 600; }
+.stack-x { font-weight: 700; color: var(--text); }
+.stack-tab {
+  position: absolute; top: 6px; right: 6px; z-index: 5; background: #5a4a7a; color: #fff; padding: 6px 12px; font-size: 13px;
+}
+
+/* Targeting arrows, drawn over everything */
+/* Arrows sit above every window (pickers, popups) so a target inside one is never hidden; only the hover preview is higher. */
+.arrows { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 65; overflow: visible; }
+.arrow-line { fill: none; stroke-width: 4; stroke-linecap: round; }
+.arrow-glow { fill: none; stroke-width: 12; stroke-linecap: round; opacity: 0.25; filter: blur(3px); }
+.arrow:not(.aiming) .arrow-line { stroke-dasharray: 1; animation: arrow-draw 0.35s ease-out both; }
+.arrow.aiming .arrow-line { stroke-dasharray: 0.03 0.02; opacity: 0.9; }
+.arrow-ring { fill: none; stroke-width: 3; opacity: 0.85; }
+.arrow.aiming .arrow-ring { stroke-dasharray: 5 4; }
+@keyframes arrow-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+/* Auras and Equipment peek out above what they're attached to */
+.attach-group { position: relative; padding-top: calc(var(--n) * 22px); display: flex; align-items: flex-end; }
+.attach-group > .slot { position: relative; z-index: 1; }
+.attached { position: absolute; left: 50%; top: calc(var(--i) * 22px); transform: translateX(-50%); z-index: 0; }
+.attached .card { --card-w: calc(var(--bf-card) * 0.92); }
+.attached .card:hover { transform: translateY(-14px); z-index: 5; }
+.attached .slot-tapped { width: auto; height: auto; }
+
+/* Layer results on a card */
+.kw.lost { color: #ff8a8a; border-color: #ff8a8a; text-decoration: line-through; box-shadow: 0 0 8px rgba(255, 107, 107, 0.4); }
+.kw.none { color: #ff8a8a; border-color: #ff8a8a; }
+.chip.static { background: rgba(0, 0, 0, 0.8); color: #7fd3ff; border: 1px solid #7fd3ff; }
+.pt.set { outline: 1px solid #c77dff; }
+.owner-badge {
+  position: absolute; right: 3px; top: 3px; background: #5a4a7a; color: #fff; font-size: 10px; font-weight: 800;
+  padding: 1px 5px; border-radius: 4px; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Choosing modes for a modal spell or ability */
+.mode-menu button { max-width: 360px; text-align: left; white-space: normal; }
+.mode-menu button.chosen { background: #c77dff; color: #1a1a1a; }
+.stack-modes { font-size: 12px; color: #d9b8ff; }
+.modal h4 { margin: 10px 0 4px; font-weight: 600; color: #cbb8e8; }
+.arrange-row { min-height: 120px; }
+.arrange-card { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.arrange-card .card { cursor: pointer; }
+.arrange-order { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.arrange-order button { padding: 2px 8px; }
+.seat .shield-note { font-weight: 800; font-size: 18px; color: #ffe08a; }
+
+/* Library search */
+.modal.search .zone-count { top: auto; left: auto; bottom: 8px; right: 8px; transform: none; }
+.modal.search .card.dim { opacity: 0.45; cursor: default; }
+.kick-count { min-width: 28px; text-align: center; font-size: 16px; font-weight: 700; }
+
+/* Naming a creature type or a color */
+.modal.type-pick { width: min(900px, 92vw); }
+.modal.type-pick input { margin-left: auto; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); min-width: 220px; }
+.type-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+.type-list button { padding: 4px 10px; }
+.controls.color-pick button { display: inline-flex; align-items: center; gap: 6px; }

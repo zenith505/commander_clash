@@ -1,0 +1,417 @@
+import type { AbilityBody, CastFromGraveyardKind, ChoiceKind, Modification, PayCost, TargetChoice, TargetSpec } from "./abilities";
+
+// Core data model for the rules engine. Everything in GameState is plain JSON so a
+// game can be serialized, replayed, sent over a network, or snapshotted for undo.
+
+export type Color = "W" | "U" | "B" | "R" | "G";
+export const COLORS: readonly Color[] = ["W", "U", "B", "R", "G"];
+export type ManaType = Color | "C";
+
+export type PlayerId = number;
+export type ObjectId = string;
+
+/** Static, printed characteristics of a card (one per oracle card). CR 109.3 */
+export interface CardDef {
+  oracleId: string;
+  name: string;
+  manaCost: string; // Scryfall notation, e.g. "{2}{W}{U}"
+  cmc: number;
+  typeLine: string;
+  supertypes: string[]; // Legendary, Basic, Snow, World
+  types: string[]; // Creature, Instant, Land, ...
+  subtypes: string[];
+  oracleText: string;
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
+  colors: Color[];
+  colorIdentity: Color[];
+  keywords: string[];
+  producedMana?: ManaType[];
+  imageUrl?: string;
+  artUrl?: string;
+}
+
+export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command";
+
+/** A game object (card or token) in some zone. CR 109 */
+export interface GameObject {
+  id: ObjectId;
+  cardId: string; // key into GameState.cards
+  owner: PlayerId;
+  /**
+   * The player it came under the control of when it entered its zone (or who cast it).
+   * Control-changing effects apply on top of this in layer 2, so read the current
+   * controller with `controllerOf`, never this field. CR 108.4, 613.1b
+   */
+  controller: PlayerId;
+  zone: ZoneName;
+  /** When it entered its zone, or (for Auras/Equipment) last became attached. CR 613.7d-e */
+  timestamp: number;
+  /** The permanent this Aura or Equipment is attached to. CR 301.5, 303.4 */
+  attachedTo?: ObjectId;
+  /** Controller as of the last control check, to notice control changes (summoning sickness, combat). */
+  seenController?: PlayerId;
+  tapped: boolean;
+  /** Turn number the current controller gained control of it (summoning sickness, CR 302.6). */
+  controlledSinceTurn: number;
+  damage: number;
+  deathtouchDamage: boolean;
+  counters: Record<string, number>;
+  isCommander: boolean;
+  isToken: boolean;
+  /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
+  regenShields?: number;
+  /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
+  preventNext?: number;
+  /** Activated abilities (by index) activated this turn, for "activate only once each turn" (CR 602.5b). */
+  activatedThisTurn?: number[];
+  /** Renown's designation (CR 702.112b), until it leaves the battlefield. */
+  renowned?: boolean;
+  /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
+  skipNextUntap?: boolean;
+  /** Attack/block bookkeeping, cleared at end of combat. */
+  attacking?: PlayerId;
+  blocking?: ObjectId;
+  blockedBy?: ObjectId[];
+  /** Set when a commander lands in graveyard/exile; consumed by the SBA in CR 903.9a. */
+  justMovedForCommander?: boolean;
+  /**
+   * How many times it has changed zones. A card that changes zones is a new object with no
+   * memory of its old one (CR 400.7), so targets and abilities remember this number and stop
+   * applying when it changes.
+   */
+  zoneChanges?: number;
+  /** As a spell, and as the permanent it became: the kicker costs paid for it, by index (CR 702.33d). */
+  kicked?: number[];
+  /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
+  castFrom?: ZoneName;
+  castVia?: CastFromGraveyardKind;
+  buyback?: boolean;
+  /** A replacement effect: if it would leave this zone, it's exiled instead (flashback, CR 702.34a; unearth, 702.84a). */
+  exileIfLeaves?: ZoneName;
+  /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
+  chosen?: Chosen;
+}
+
+export interface Player {
+  id: PlayerId;
+  name: string;
+  life: number;
+  library: ObjectId[]; // index 0 is the top
+  hand: ObjectId[];
+  graveyard: ObjectId[];
+  exile: ObjectId[];
+  command: ObjectId[];
+  manaPool: Record<ManaType, number>;
+  landsPlayedThisTurn: number;
+  /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
+  commanderCasts: Record<ObjectId, number>;
+  /** Poison counters (CR 122.1f); ten or more loses the game (CR 704.5c). */
+  poison?: number;
+  /** Energy counters (CR 107.14, 122.1). */
+  energy?: number;
+  /** What's left of "prevent the next N damage that would be dealt to [this player] this turn" shields (CR 615.7). */
+  preventNext?: number;
+  /** Combat damage received from each commander, keyed by commander object id. CR 903.10a */
+  commanderDamage: Record<ObjectId, number>;
+  lost: boolean;
+  lossReason?: string;
+  drewFromEmptyLibrary: boolean;
+  isBot: boolean;
+}
+
+export type Step =
+  | "untap"
+  | "upkeep"
+  | "draw"
+  | "main1"
+  | "beginCombat"
+  | "declareAttackers"
+  | "declareBlockers"
+  | "firstStrikeDamage"
+  | "combatDamage"
+  | "endCombat"
+  | "main2"
+  | "end"
+  | "cleanup";
+
+export interface StackItem {
+  id: string;
+  kind: "spell" | "ability";
+  objectId?: ObjectId; // the card on the stack, for spells
+  sourceId?: ObjectId; // the permanent an ability came from
+  sourceCardId?: string; // its card definition (abilities remember their source, CR 113.7a)
+  sourceZc?: number; // the source's zoneChanges when the ability was created: "this creature" means that object only
+  controller: PlayerId;
+  description: string;
+  /** For a triggered ability: the spell or ability on the stack that triggered it ("that spell", ward). */
+  cause?: string;
+  /** What it does: for a modal spell or ability, just the chosen modes (CR 700.2). */
+  body?: AbilityBody;
+  targets?: TargetChoice[];
+  /** Chosen modes, for display. */
+  modes?: number[];
+  /** For a triggered ability: the object its event was about (exalted's attacker), see PendingTrigger.subject. */
+  subject?: { id: ObjectId; zc: number };
+  lki?: LastKnown;
+  /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
+  x?: number;
+  /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
+  kicked?: number[];
+  /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
+  sacrificed?: LastKnown[];
+}
+
+/**
+ * A delayed triggered ability (CR 603.7): "at the beginning of the next end step" or "at the
+ * beginning of your next upkeep". It triggers once, about `subject` (the card as it was then).
+ */
+export interface DelayedTrigger {
+  when: "nextEndStep" | "yourNextUpkeep";
+  controller: PlayerId;
+  sourceCardId: string;
+  subject: { id: ObjectId; zc: number };
+  body: AbilityBody;
+  /** Made during an end step, "the next end step" is the following turn's (CR 603.7c doesn't fire it in the same step). */
+  turn: number;
+  step: Step;
+}
+
+/** A triggered ability waiting to be put on the stack. CR 603.3 */
+export interface PendingTrigger {
+  sourceId: ObjectId;
+  sourceCardId: string;
+  controller: PlayerId;
+  index: number; // which of the card's triggered abilities
+  sourceZc?: number; // the source's zoneChanges when it triggered
+  modes?: number[]; // once chosen, for a modal trigger (CR 603.3c)
+  cause?: string; // the stack item that triggered it, see StackItem.cause
+  /** The object the event was about, as it was then ("that creature" for exalted). */
+  subject?: { id: ObjectId; zc: number };
+  /** Last known information the ability needs: the counters on a permanent that left, evolve's creature's P/T. */
+  lki?: LastKnown;
+  /** For an enters trigger of a permanent that was a spell with X: that X (CR 107.3m). */
+  x?: number;
+  kicked?: number[];
+  /** A delayed trigger's own ability (its source card has no such printed ability). */
+  body?: AbilityBody;
+}
+
+export interface LastKnown {
+  counters?: Record<string, number>;
+  power?: number;
+  toughness?: number;
+  manaValue?: number;
+}
+
+/** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
+export interface CostChoices {
+  /** Kicker costs to pay, by index; multikicker's index 0 once per time (CR 702.33). */
+  kicks?: number[];
+  /** Casting from a graveyard: which way (flashback, jump-start, retrace, escape). */
+  via?: CastFromGraveyardKind;
+  /** Pay the buyback cost (CR 702.27a). */
+  buyback?: boolean;
+  /** Permanents to sacrifice, cards to discard, cards to exile from your graveyard. */
+  sacrifice?: ObjectId[];
+  discard?: ObjectId[];
+  exileCards?: ObjectId[];
+}
+
+/**
+ * A continuous effect created by a resolving spell or ability (CR 611.2). The objects it
+ * affects are locked in when it begins (CR 611.2c). Continuous effects from static
+ * abilities aren't stored: they're generated from the permanents on the battlefield
+ * whenever characteristics are computed (CR 611.3), see layers.ts.
+ */
+export interface ContinuousEffect {
+  id: string;
+  timestamp: number; // CR 613.7b
+  controller: PlayerId;
+  sourceName: string;
+  sourceId?: ObjectId;
+  /** "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a). */
+  duration: "endOfTurn" | "game";
+  affected: ObjectId[];
+  mods: Modification[];
+}
+
+/** What the engine is waiting on from a specific player, beyond normal priority. */
+export type PendingDecision =
+  | { kind: "declareAttackers"; player: PlayerId }
+  | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[] }
+  | { kind: "discardToHandSize"; player: PlayerId; count: number }
+  /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
+  | { kind: "discard"; player: PlayerId; count: number; source: string }
+  /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
+  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil"; cards: ObjectId[]; source: string }
+  /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost }
+  /**
+   * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
+   * may activate mana abilities first (CR 605.3a), then pays or declines.
+   */
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; source: string; what: string }
+  /**
+   * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
+   * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
+   */
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string }
+  /**
+   * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
+   * mulligans this player has taken so far; `bottomIfKept` how many cards keeping now costs.
+   */
+  | { kind: "mulligan"; player: PlayerId; taken: number; bottomIfKept: number; canMulligan: boolean }
+  /** After keeping, put this many cards from the hand on the bottom of the library (CR 103.5). */
+  | { kind: "bottomCards"; player: PlayerId; count: number }
+  /**
+   * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
+   * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
+   */
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string }
+  /**
+   * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
+   * while a spell or ability resolves. `options` are the names allowed.
+   */
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind; options: string[]; objectId?: ObjectId }
+  | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
+  /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
+  | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] };
+
+export interface GameEvent {
+  seq: number;
+  turn: number;
+  text: string;
+}
+
+export interface GameState {
+  seed: number;
+  rngState: number;
+  turn: number;
+  activePlayer: PlayerId;
+  priority: PlayerId;
+  step: Step;
+  /** Players who have passed priority in succession without any action. CR 117.4 */
+  passedInSuccession: PlayerId[];
+  turnOrder: PlayerId[];
+  players: Player[];
+  objects: Record<ObjectId, GameObject>;
+  cards: Record<string, CardDef>;
+  battlefield: ObjectId[];
+  stack: StackItem[];
+  triggerQueue: PendingTrigger[];
+  effects: ContinuousEffect[];
+  /** "Prevent all combat damage that would be dealt this turn" (Fog) is in effect until cleanup. */
+  preventCombatDamage?: boolean;
+  /** Players dealt damage this turn, for bloodthirst (CR 702.54a). */
+  damagedThisTurn?: PlayerId[];
+  /**
+   * Power and toughness of permanents as they last existed on the battlefield (CR 608.2h), for
+   * "destroy target creature; you gain life equal to its power". `zc` is its zoneChanges while it
+   * was there. Cleared each turn.
+   */
+  /** Delayed triggered abilities waiting for their moment (CR 603.7): unearth's exile, rebound's cast. */
+  delayed?: DelayedTrigger[];
+  /** The player who is the monarch (CR 725), once someone has become it. */
+  monarch?: PlayerId;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId }>;
+  nextTimestamp: number;
+  pending: PendingDecision | null;
+  /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
+  mulligans?: MulliganState | null;
+  /** A spell or ability partway through resolving, waiting on `pending` (see continueResolution). */
+  resolving: Resolving | null;
+  /** Permanents that just entered and still have an "as ~ enters, choose ..." choice to make (CR 614.12). */
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind; except?: string }[];
+  nextId: number;
+  log: GameEvent[];
+  winner: PlayerId | null;
+  over: boolean;
+}
+
+/**
+ * A spell or ability that stopped partway through resolving for a player's choice. Its
+ * effects run in order (CR 608.2c); `next` is the one waiting, and `scratch` holds choices
+ * made for it so far. No player gets priority and state-based actions aren't checked until
+ * it finishes (CR 608.2, 704.3).
+ */
+export interface MulliganState {
+  /** Mulligans each player has taken so far. */
+  taken: Record<string, number>;
+  /** Players who have kept their hand. */
+  kept: PlayerId[];
+  /** Players still to declare this round, in turn order from the starting player. */
+  toDeclare: PlayerId[];
+  /** Players who declared a mulligan this round; they all take it once everyone has declared. */
+  going: PlayerId[];
+}
+
+/** A creature type and/or color chosen for an object or a resolving spell. */
+export interface Chosen {
+  type?: string;
+  color?: Color;
+}
+
+export interface Resolving {
+  item: StackItem;
+  body: AbilityBody;
+  legal: boolean[]; // which targets were legal as it began resolving (CR 608.2b)
+  /** Who controlled each targeted spell as resolution began, for "its controller" after it's countered (CR 608.2h). */
+  spellControllers?: (PlayerId | null)[];
+  /** The cards of targeted spells, for "its mana value" after it's countered (CR 608.2h). */
+  spellObjects?: (ObjectId | null)[];
+  /** The tokens its last "create" made, for "put a counter on it". */
+  created?: ObjectId[];
+  /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
+  chosen?: Chosen;
+  next: number;
+  scratch?: {
+    queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
+    chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
+    arranged?: { top: ObjectId[]; away: ObjectId[] };
+    may?: boolean; // the answer to "you may ..."
+    paid?: boolean; // the answer to "unless that player pays ..."
+    explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
+    cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
+    n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
+    found?: ObjectId[]; // the cards a library search found
+  };
+}
+
+/** Everything a player can do. Every input to the engine is one of these. */
+export type Action =
+  | { type: "passPriority"; player: PlayerId }
+  /** `untapped`: for a land that may enter untapped by paying life or revealing a card (CR 614.12), do that. */
+  | { type: "playLand"; player: PlayerId; objectId: ObjectId; untapped?: boolean }
+  /**
+   * Activate a mana ability (CR 605.3): `ability` indexes manaAbilitiesOn (unset: the cheapest
+   * one that makes `mana`), `mana` is the choice for one that offers several.
+   */
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number }
+  /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
+  | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
+  /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */
+  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number }
+  | { type: "chooseModes"; player: PlayerId; modes: number[] }
+  | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
+  | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId }[] }
+  | { type: "declareBlockers"; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[] }
+  | { type: "discard"; player: PlayerId; objectIds: ObjectId[] }
+  /** Answer to arrangeTop: `top` goes back on top in this order (first = top); `away` goes to the bottom (scry) or graveyard (surveil). */
+  | { type: "arrangeTop"; player: PlayerId; top: ObjectId[]; away: ObjectId[] }
+  /** Answer to searchLibrary: the cards found (first = the one for `firstTo`). */
+  | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
+  /** Answer to chooseOption: one of its options. */
+  | { type: "chooseOption"; player: PlayerId; choice: string }
+  /** Answer to chooseMay. */
+  | { type: "chooseMay"; player: PlayerId; yes: boolean }
+  /** Answer to mulligan: keep the hand, or shuffle it away and draw a new one. */
+  | { type: "mulligan"; player: PlayerId; keep: boolean }
+  /** Answer to bottomCards: these cards go on the bottom of the library, the first one lowest. */
+  | { type: "bottomCards"; player: PlayerId; objectIds: ObjectId[] }
+  /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */
+  | { type: "payUnless"; player: PlayerId; pay: boolean }
+  | { type: "concede"; player: PlayerId };
+
+export class RulesError extends Error {}

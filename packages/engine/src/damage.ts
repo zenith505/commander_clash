@@ -1,0 +1,109 @@
+// Dealing damage (CR 120), in one place so every way of dealing it (combat, spells,
+// abilities, fight) gets the same results: prevention effects stop it (CR 615: Fog, prevention
+// shields, and protection, CR 702.16e), infect
+// and wither turn it into -1/-1 counters (CR 702.90c, 702.80a), infect turns damage to a
+// player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
+// deathtouch and lifelink apply (CR 702.2, 702.15).
+
+import { gainLife, log, player } from "./game";
+import { protectionColors, toxicValue } from "./keywords";
+import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
+import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
+
+/** What a damage source looks like as it deals damage. */
+export interface DamageSource {
+  name: string;
+  controller: PlayerId;
+  colors: Color[];
+  keywords: string[];
+  /** A commander dealing combat damage counts toward commander damage (CR 903.10a). */
+  commanderId?: ObjectId;
+}
+
+/**
+ * A permanent (or a card that just left the battlefield) as a damage source: its current
+ * characteristics on the battlefield, its last known ones otherwise (CR 702.90d, 702.80b).
+ */
+export function objectSource(s: GameState, o: GameObject): DamageSource {
+  const c = characteristics(s, o);
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, keywords: c.keywords, ...(o.isCommander ? { commanderId: o.id } : {}) };
+}
+
+/** A spell, or an ability whose source is gone: the card's printed characteristics. */
+export const cardSource = (d: CardDef, controller: PlayerId): DamageSource => ({ name: d.name, controller, colors: d.colors, keywords: d.keywords });
+
+const has = (src: DamageSource, k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
+
+/** Would damage from `src` to this permanent be prevented by protection (CR 702.16e)? */
+export const protectedFrom = (keywords: readonly string[], colors: readonly Color[]) => protectionColors(keywords).some((c) => colors.includes(c));
+
+/**
+ * Deal `n` damage from `src` to a permanent or player. Returns how much was dealt (0 if it
+ * was all prevented). Combat damage also counts for commander damage and toxic.
+ *
+ * Lifelink makes the source's controller gain that much life (CR 702.15b). Damage a source deals
+ * to several things at once is one life-gain event (CR 119.10), so callers dealing it that way
+ * pass `lifelink` to add the life up and gain it once themselves.
+ */
+export function dealDamage(
+  s: GameState,
+  src: DamageSource,
+  to: { object: GameObject } | { player: PlayerId },
+  n: number,
+  opts: { combat?: boolean; lifelink?: { n: number } } = {},
+): number {
+  if (n <= 0) return 0;
+  // Prevention effects (CR 615). Protection doesn't use up a shield, so it's applied first
+  // (the affected player would choose that order, CR 616.1).
+  if (opts.combat && s.preventCombatDamage) return 0;
+  const shielded = "object" in to ? to.object : player(s, to.player);
+  const targetName = "object" in to ? characteristics(s, to.object).name : player(s, to.player).name;
+  if ("object" in to && protectedFrom(characteristics(s, to.object).keywords, src.colors)) {
+    log(s, `Damage from ${src.name} to ${targetName} is prevented (protection).`);
+    return 0;
+  }
+  if (shielded.preventNext) {
+    const stopped = Math.min(shielded.preventNext, n);
+    shielded.preventNext -= stopped;
+    n -= stopped;
+    log(s, `${stopped} damage from ${src.name} to ${targetName} is prevented.`);
+    if (n <= 0) return 0;
+  }
+  if ("object" in to) {
+    const o = to.object;
+    const c = characteristics(s, o);
+    // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt.
+    if (has(src, "Infect") || has(src, "Wither")) {
+      o.counters["-1/-1"] = (o.counters["-1/-1"] ?? 0) + n;
+      invalidateCharacteristics(s);
+      log(s, `${src.name} deals ${n} damage to ${c.name} (as -1/-1 counters).`);
+    } else {
+      o.damage += n;
+      log(s, `${src.name} deals ${n} damage to ${c.name}.`);
+    }
+    if (has(src, "Deathtouch")) o.deathtouchDamage = true;
+  } else {
+    const p = player(s, to.player);
+    if (has(src, "Infect")) {
+      p.poison = (p.poison ?? 0) + n;
+      log(s, `${src.name} deals ${n} damage to ${p.name} (${n} poison counter${n === 1 ? "" : "s"}).`);
+    } else {
+      p.life -= n;
+      log(s, `${src.name} deals ${n} damage to ${p.name}.`);
+    }
+    if (!(s.damagedThisTurn ??= []).includes(p.id)) s.damagedThisTurn.push(p.id);
+    if (opts.combat) {
+      if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
+      const toxic = toxicValue(src.keywords);
+      if (toxic > 0) {
+        p.poison = (p.poison ?? 0) + toxic;
+        log(s, `${p.name} gets ${toxic} poison counter${toxic === 1 ? "" : "s"} (toxic).`);
+      }
+    }
+  }
+  if (has(src, "Lifelink")) {
+    if (opts.lifelink) opts.lifelink.n += n;
+    else gainLife(s, src.controller, n); // CR 702.15b
+  }
+  return n;
+}

@@ -1,0 +1,588 @@
+# Commander Clash: architecture and plan
+
+## Data we have (from Scryfall bulk export, Oct 2026)
+
+| File | Size | What it is |
+|---|---|---|
+| `all-cards-20261007211808.jsonl` | 2.9 GB | Every printing of every card in every language. One JSON card object per line. |
+| `unique-artwork-20261007210232.jsonl` | 300 MB | One printing per unique illustration: 54,726 lines, 99% English, 37,606 oracle cards. |
+| `rulings-20261007210031.jsonl` | 26 MB | 79,706 rulings for 20,080 cards. `{oracle_id, source, published_at, comment}`. |
+| `MagicCompRules 20260925.pdf` | 2.5 MB | Comprehensive Rules, effective Sept 25 2026. 312 pages, ~3,000 numbered rules. Commander is rule 903. |
+
+**How they link:** `oracle_id` is the key. Every printing of a card shares one
+oracle_id; rulings attach to oracle_id. Artwork isn't stored locally: each card object
+has `image_uris` (or `card_faces[].image_uris` for double-faced cards) pointing at
+Scryfall's image CDN in sizes from `small` to `png`, plus `art_crop`.
+
+For English play, unique-artwork already contains every card's oracle text, so the
+build script uses it by default. all-cards only adds other languages and extra
+printings; the script can stream it when we want printing choice.
+
+After filtering out tokens, art cards, planes, schemes and vanguards we get **33,076
+English playable cards**.
+
+## Platform
+
+TypeScript, split in two:
+
+- **Engine** (`packages/engine`): a pure function `applyAction(state, action) -> state`.
+  State is plain JSON, so games are serializable, replayable from a seed and action
+  list, easy to test, and ready to run on a server for online play later. Bots and the
+  UI use the same `legalActions` / `planCast` helpers.
+- **Client** (`apps/web`): React + Vite. Runs in any browser; can be wrapped as a
+  desktop app (Tauri/Electron) later without changing the engine.
+
+Performance today: ~1 ms per engine action including a full state copy, which is plenty
+for play. When we add search-based AI we'll switch to structural sharing.
+
+## What works now
+
+- 4 players, 40 life, command zone, commander tax, commander damage (21), commander
+  returning to the command zone, deck validation (100 cards, singleton, color identity).
+- Full turn structure with priority passing (all players must pass in succession), the
+  stack, sorcery vs instant timing, land drops, mana abilities, auto mana payment.
+- Combat: attacking any opponent, blocking, flying/reach, first strike, double strike,
+  trample, deathtouch, lifelink, menace, vigilance, haste, defender, indestructible.
+- State-based actions: life, empty library, lethal damage, legend rule, commander damage.
+- Players leaving the game (their stuff leaves with them), last player standing wins.
+- Bots that play lands, cast spells, attack and block.
+- Browser UI: lobby, 4-seat table, hand, card preview, log, attack/block selection.
+
+### Table UI (added 2026-10-08)
+
+- **Stack overlay** (`StackOverlay` in `apps/web/src/App.tsx`): while anything is on the
+  stack, the cards themselves cover the preview and log, top item first and largest.
+  "Show log" tucks it into a tab; it reopens when something new goes on the stack. Bots
+  pass more slowly while the stack has something on it so you can read it.
+- **Priority mode** (`PriorityMode` in `useGame.ts`, saved in the browser): *Hold* (the
+  default) stops whenever a response could matter (something on the stack, combat that
+  involves you, an opponent's end step) and you have mana up, even with nothing to cast,
+  so your pace doesn't give away your hand. It doesn't stop right after your own spell.
+  *Auto-pass* only stops when you have an instant-speed play. Space passes, Esc cancels.
+- **Commander damage** shows in a hover card on each player's name.
+- **On-card state** (`modifications()` in `cards.ts`): +1/+1 / -1/-1 counters as a solid
+  chip, until-end-of-turn P/T as a dashed chip, granted keywords as gold labels across the
+  card, and the current P/T with power and toughness colored green (higher than printed)
+  or red (lower).
+- **Targeting arrows** (`Arrows.tsx`): arched arrows in each player's color. Yours follow
+  the mouse while you choose and snap onto legal targets; a bot's appear dashed for a
+  moment before it commits; every stack item's arrows stay until it resolves.
+
+### Card effects (added 2026-10-08)
+
+Card text is compiled into a small effect language (`packages/engine/src/oracle.ts` ->
+`abilities.ts`) and executed by `effects.ts`:
+
+- **Effects:** damage, draw, gain/lose life, destroy, exile, return to hand, tap/untap,
+  +1/+1 and -1/-1 counters, +N/+N and keywords until end of turn, creature tokens, mill,
+  counter target spell. Works on "target ...", "each opponent", "creatures you control",
+  "it", "its controller", and "this creature".
+- **Targeting** (CR 115, 601.2c, 608.2b): type, color, controller and tapped restrictions,
+  hexproof; targets are re-checked on resolution and a spell with no legal targets left
+  does nothing.
+- **Triggered abilities** (CR 603): enters, dies, attacks, deals combat damage to a player,
+  another creature you control enters, your upkeep, your end step. They wait in a queue
+  and go on the stack in APNAP order before anyone gets priority; targets are chosen then.
+- **Activated abilities** (CR 602): mana, {T} and "Sacrifice this" costs, sorcery-speed
+  restriction, summoning sickness for {T}.
+- **Statics:** enters tapped, can't block, can't be blocked, Flash, Hexproof.
+
+**2,657 of 33,076 cards** are now fully supported (was 941): every line of their text is
+compiled. The compiler reports each line it can't handle, which drives what to add next.
+The five sample decks include instants and sorceries.
+
+### Layers and continuous effects (added 2026-10-09)
+
+Every characteristic the game reads (types, colors, keywords, power/toughness, controller)
+now comes from `characteristics(state, object)` in `packages/engine/src/layers.ts`, which
+applies all continuous effects in layer order (CR 613):
+
+| Layer | What | Examples now working |
+|---|---|---|
+| 2 | control | Mind Control, Act of Treason, Steal Artifact |
+| 4 | type and subtype | "becomes a 0/1 Frog", "is still a land", Changeling |
+| 5 | color | "becomes white until end of turn" |
+| 6 | add/remove abilities | lords granting flying, "loses all abilities" |
+| 7b | set P/T | "becomes a 1/1" |
+| 7c | modify P/T, then counters | anthems, Equipment, pump spells, +1/+1 / -1/-1 counters |
+| 7d | switch P/T | "switch its power and toughness" |
+
+Then rule flags (can't attack, can't block, can't be blocked, doesn't untap).
+
+- **Two kinds of effect.** Effects from resolved spells and abilities lock the set of
+  objects they affect when they resolve (CR 611.2c): a "creatures you control get +1/+1
+  until end of turn" doesn't pump a creature that enters later. Static abilities
+  (anthems, lords, Auras, Equipment) are re-evaluated continuously (CR 611.3a) and stop
+  the moment their source leaves or loses its abilities.
+- **Order within a layer** is timestamp order (CR 613.7) with dependencies (CR 613.8):
+  an effect that would change what another effect applies to, or whether it exists,
+  goes first; a dependency loop falls back to timestamps. Timestamps are refreshed when
+  an object changes zones or becomes attached (CR 613.7d-e).
+- **Locking across layers** (CR 613.6): once an effect starts applying in an earlier
+  layer, it keeps applying to the same objects in later layers, even if those objects
+  no longer match its text.
+- **Control** (layer 2): a creature that changes control has summoning sickness for its
+  new controller (CR 302.6) and is removed from combat (CR 506.4). Control effects end
+  when their controller leaves the game (CR 800.4a).
+- **Auras** target what they'll enchant as they're cast, enter attached (CR 303.4f), and
+  go to the graveyard when the thing they enchant is gone or no longer legal (CR 704.5m).
+  **Equipment** has Equip (sorcery speed, creature you control) and falls off anything
+  that stops being a creature (CR 704.5n).
+- **Evasion** checks are in one place (`blockProblem` in `game.ts`): flying/reach, fear,
+  intimidate, shadow, landwalk, can't block, can't be blocked, plus menace.
+- Also new: "can't be countered", "enters with N +1/+1 counters", activated costs like
+  `{1}{R}` (a parser bug had been rejecting these), and the full creature-type list from
+  CR 205.3m so the compiler can't mistake "Enchanted" for a creature type.
+- **Not yet:** layer 1 (copy effects), layer 3 (text-changing), layer 7a
+  (characteristic-defining P/T like `*/*`). Cards that need them stay unsupported.
+
+The table shows the results: Auras and Equipment peek out above the permanent they're
+attached to, a stolen permanent carries its owner's name, lost keywords are struck
+through, and static P/T bonuses get a solid blue chip (temporary ones stay dashed).
+Crowded battlefields shrink their cards to fit (down to 55%) before scrolling.
+
+Rules tests: `packages/engine/test/layers.test.ts` works through the Comprehensive Rules'
+own examples (CR 613.4d, 613.5, 613.6, 613.9 and others), and a consistency test plays bot
+games with and without the characteristics cache and checks the logs match.
+
+**3,535 cards are fully supported** (`npm run coverage` prints the count and the most
+common lines still missing).
+
+### Modal spells and target filters (added 2026-10-09)
+
+- **Modes (CR 700.2)** (`packages/engine/src/modes.ts`): "Choose one", "Choose two",
+  "Choose three", "Choose one or both", "Choose one or more" and "choose up to one", on
+  spells, triggered abilities and activated abilities. Modes are chosen as the spell is
+  cast (601.2b) or the trigger is put on the stack (603.3c), before targets. A mode whose
+  targets can't be chosen can't be picked (700.2a), and only the chosen modes' targets are
+  chosen (700.2c). The chosen modes then resolve in printed order as one spell, so a
+  -1/-1 and a +1/+1 counter on the same 1/1 never see it as 0/0, and if every target is
+  gone none of the modes happen, untargeted ones included (608.2b). A trigger with no
+  choosable mode is removed; with only one possible choice it's made for you.
+- **Mode picker** on the table: one click for "choose one", toggles plus Done otherwise;
+  modes with no legal targets are greyed out. The chosen modes show on the stack.
+- **Target filters**: with/without a keyword ("creature with flying"), power, toughness
+  or mana value bounds, colors ("blue permanent"), supertypes ("nonbasic land",
+  "legendary creature"), and attacking/blocking. They read current characteristics, so a
+  creature that loses flying in response stops being a legal target.
+- **Fixes:** split, adventure and double-faced cards were counted as supported with
+  both halves' mana costs run together; they're unsupported until faces are modeled
+  (CR 709-712). Automatic mana payment used a land's original controller, so a bot could
+  try to tap a land stolen from it. Planning a cast now checks the chosen targets.
+
+**3,722 cards are fully supported.** Of 607 modal cards, most of the unsupported ones fail
+on a single mode: graveyard targets ("return target creature card from your graveyard"),
+discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its controller pays".
+
+### Choices during resolution, graveyards and tokens (added 2026-10-09)
+
+- **Pausing a resolution.** A spell or ability can stop partway through to wait for a
+  player (`s.resolving` in the engine). No one gets priority and state-based actions aren't
+  checked until it finishes (CR 608.2, 704.3). Once it finishes, an instant or sorcery
+  goes to the graveyard (608.2n).
+- **Discard** (CR 701.9) works three ways. "Target player discards two cards": that
+  player chooses. "Each opponent discards a card": each chooses in turn order, then all
+  the cards are discarded at once (CR 101.4). "At random" is also supported. A hand with
+  no more cards than the number discards whole, without asking.
+- **Scry and surveil** (CR 701.22, 701.25) open a screen with two rows: the top of your
+  library, in order, and the bottom (scry) or graveyard (surveil). Click a card to move it
+  between rows. The log doesn't name the cards you scry, since they stay hidden.
+- **Fight and "deals damage equal to its power to"** (CR 701.14). If either creature is
+  gone, not a creature, or no longer a legal target, there's no damage at all. Each
+  creature's own deathtouch and lifelink apply.
+- **Targets in graveyards** (CR 109.2a, 115.2): "target creature card from your
+  graveyard", "card from a graveyard", "from an opponent's graveyard", with the same type,
+  color and mana value filters. Supported effects:
+  - return it to its owner's hand;
+  - return or put it onto the battlefield (tapped too);
+  - exile it;
+  - put it on top of or on the bottom of its owner's library;
+  - "exile target player's graveyard", and each opponent's or all graveyards.
+
+  A reanimated card enters under the control of the spell's controller (CR 110.2a) and
+  still belongs to its owner. Reanimating anything that could be an Aura (enchantment or
+  permanent cards) stays unsupported, because the player would have to choose what it
+  enchants (CR 303.4f). A card that leaves the graveyard before the spell resolves is a
+  new object, so the spell can't find it (CR 400.7). Choosing a graveyard target opens a
+  picker that shows only the legal cards, grouped by graveyard.
+- **"You may"** used to be dropped by the compiler, so "you may destroy target
+  creature" always destroyed. Now the controller is asked Yes or No as it resolves
+  (CR 608.2d). Its targets are still chosen when it goes on the stack (CR 603.3d). Bots
+  say no when the effect would now hurt them, for example when their own creature was the
+  only legal target.
+- **Treasure, Food and Clue** (CR 111.10), plus investigate (CR 701.16):
+  - **Treasure**: "{T}, Sacrifice ~: Add one mana of any color" is a mana ability with a
+    sacrifice cost (CR 605.1a), so Lotus Petal-style cards work too. When a permanent can
+    make the same color without being sacrificed, that ability is used. Automatic payment
+    uses Treasures last.
+  - **Clicking a permanent** with a choice of colors or a sacrifice cost now opens a small
+    menu. Before, it tapped for the first color.
+  - **Bots** cash in Food and Clues when they have mana to spare. They won't sacrifice a
+    Treasure just to pay for one.
+- **"Its controller" of a countered spell** uses who controlled the spell as the
+  counterspell started resolving (last known information, CR 608.2h). Before, cards like
+  Psychic Strike countered the spell but nobody milled.
+- **Testing aid:** open the game with `?hand=Card A|Card B` to swap those cards from your
+  library into your opening hand.
+- Sample decks now include a few cards that use these mechanics.
+
+**4,344 cards are fully supported.** Rules tests: `test/actions.test.ts` and
+`test/graveyard.test.ts`.
+
+### Table UI, round 3 (added 2026-10-09)
+
+- **Combat by arrows.** Click an attacker, then the player it attacks; click a blocker,
+  then the attacker. Arrows follow the mouse and snap only onto legal choices
+  (`blockProblem` in the engine).
+- **Hover preview** appears next to the mouse, for cards anywhere: battlefield, hand,
+  stack, zones.
+- **Auto-pass** always passes, except at stops you set by clicking steps on the phase
+  track (saved in the browser). Your own main phases and your decisions always stop.
+- **Floating hand**: a fanned hand at the bottom right that can be tucked away with the
+  arrow (remembered). Your battlefield keeps room so the hand doesn't cover your lands.
+- **Play log** says what was activated, with which cost, and at what.
+- Abilities that are legal but do nothing right now (Staff of Domination's untap while
+  it's untapped, CR 602.2) are marked "does nothing now", and bots skip them.
+
+### Cycling, crew, convoke, ward, cast triggers (added 2026-10-09)
+
+- **Cycling** (CR 702.29a): "[Cost], Discard this card: Draw a card", only from its
+  owner's hand, at instant speed. Discarding is part of the cost, so the card is in the
+  graveyard while the draw is on the stack. Clicking a card with cycling opens a menu: cast
+  it (or play it) or cycle it. Bots cycle lands they don't need and spells they're far
+  from casting. Typecycling (search the library) isn't supported.
+- **Crew N** (CR 702.122a): tap any number of *other* untapped creatures you control with
+  total power N or more. Summoning-sick creatures can crew (it isn't a {T} cost), a
+  Vehicle can't crew itself, and a crewed Vehicle can crew another. The Vehicle becomes an
+  artifact creature until end of turn and stays a Vehicle (CR 205.1b); it has its printed
+  P/T only while it's a creature (CR 301.7). Choosing Crew opens a picker that suggests the
+  cheapest crew (creatures that couldn't attack anyway first), with arrows into the
+  Vehicle. Bots crew before combat when it gives up less attacking power than it adds.
+- **Convoke** (CR 702.51): each creature you tap pays {1} or one mana of its color,
+  including commander tax (702.51b); it can't pay {C}. Summoning-sick creatures can
+  convoke. Matching creatures to colored symbols is a maximum matching, so a two-color
+  creature doesn't take a symbol only another could pay. Casting a convoke spell asks
+  which creatures to tap, suggesting some only when your mana can't pay; bots convoke
+  when their lands fall short.
+- **Ward {cost}** (CR 702.21a): when a spell or ability an opponent controls targets the
+  permanent, ward triggers (once, however many of its targets name it). As it resolves the
+  other player may tap mana (CR 605.3a) and pays, or the spell or ability is countered.
+  A spell that can't be countered isn't. You get Pay / Don't pay buttons; bots pay when
+  they can, and avoid aiming at warded permanents they couldn't pay for. Only mana costs
+  (not "Ward—Pay 3 life").
+- **"Whenever you cast" triggers** (CR 601.2i), prowess (702.108, each instance
+  separately), "whenever an opponent casts", "whenever a player casts", with spell filters
+  ("noncreature", "instant or sorcery", "white", "artifact"...). They go on the stack above
+  the spell and resolve first. Ability words ("Magecraft —") are ignored (CR 207.2c);
+  "cast or copy" counts as cast, since nothing copies spells yet.
+- **Type-changing fix (CR 205.1).** "Becomes a 2/2 artifact creature" used to replace
+  all the card's types; now it keeps them (205.1b). "A Golem artifact creature" keeps them
+  too, except its creature types. Setting subtypes replaces only subtypes of the same
+  kind, so "becomes a Frog" leaves an Equipment an Equipment and a Forest a Forest, and
+  setting card types drops only the subtypes of card types the object lost (205.1a).
+- Sample decks include a card for each of these mechanics (Vehicles are otherwise left
+  out, since they need crew).
+
+**4,717 cards are fully supported.** Rules tests: `test/mechanics.test.ts`.
+
+### UI polish (added 2026-10-09)
+
+- Cards in the graveyard picker, the zone viewer and the scry/surveil screen are larger,
+  and the box around them leaves room for the highlight ring and the lift, which used to
+  be cut off at the edges. Pickers with several rows scroll as a whole.
+- The battlefield has the same room, so rings on cards at its edges aren't clipped.
+
+### Mulligans and Ken's round 4 notes (added 2026-10-09)
+
+- **Mulligans** (London, CR 103.5, with the multiplayer free first mulligan, CR 103.5c).
+  The starting player declares first, then the others in turn order; everyone who chose
+  to mulligan shuffles and draws 7 at the same time; this repeats until everyone keeps.
+  Keeping after N mulligans puts N - 1 cards on the bottom (you pick them; the first pick
+  goes lowest). No more mulligans once the kept hand would be zero cards. The bottoming is
+  done when you keep, which is the same as doing it after each mulligan since the next
+  mulligan would shuffle those cards back anyway. A player who concedes mid-mulligan drops
+  out (the next player starts if it was the starting player). Bots keep 2 to 5 lands, or
+  anything after two mulligans, and bottom spare lands or their most expensive spells.
+  `createGame(..., { mulligans: true })`; the web game and the simulator use it.
+- **Combat ends on time** (CR 511.3): creatures leave combat as the end of combat step
+  ends, not at cleanup, so attack arrows are gone in main phase 2 (and "attacking" checks
+  are false there).
+- Arrows aimed at a player land on the player's name, which never moves (the turn dot is
+  always laid out, just hidden off-turn), instead of the life total.
+- Arrows draw above every window (graveyard picker, popups); an arrow to a card in an open
+  picker points at it there and snaps to it while aiming.
+- A phase-track stop on opponents' turns is used once: it clears after you pass priority
+  in that step.
+- The center bar is gone: turn, phase track, prompts, buttons and the priority toggle sit
+  in a pane under the log (the stack overlay never covers it), so the seats get the height.
+- Only the top of the stack draws its target arrows; the rest show theirs once on top.
+
+### Protection, poison, exalted, landfall, regeneration (added 2026-10-09)
+
+- **Damage in one place** (`src/damage.ts`, CR 120): combat, spells, abilities and fight
+  all deal damage through `dealDamage`, so every rule below applies to every source.
+- **Protection from a color** (CR 702.16, DEBT): can't be the target of spells of that
+  color or abilities from sources of that color, damage from such sources is prevented,
+  creatures of that color can't block it, and Auras/Equipment of that color fall off
+  (704.5m/704.5n). "Protection from white and from red" is two abilities (702.16g). The
+  card data only says "Protection", so the color comes from the rules text. Protection
+  from creatures, everything, or card types isn't supported.
+- **Shroud** (CR 702.18): can't be the target of anything.
+- **Infect** (CR 702.90): damage to players is poison counters, to creatures -1/-1
+  counters; lifelink still works. **Wither** (702.80): -1/-1 counters on creatures.
+  **Toxic N** (702.164): combat damage to a player also gives N poison counters.
+  Ten or more poison counters loses the game (CR 704.5c); the seat shows ☠ N.
+- **Exalted** (CR 702.83): each instance triggers when a creature you control attacks
+  alone (CR 506.5), +1/+1 until end of turn on that creature.
+- **Landfall** ("Whenever a land you control enters"); a land with it sees itself enter
+  (CR 603.6a). Ability triggers can refer to "it" (the creature that triggered them).
+- **"Attacks each combat if able"** (CR 508.1d): you can't confirm attackers until it
+  attacks (not if it's tapped or summoning sick, CR 508.1c). **"Can block only creatures
+  with flying"** (509.1b).
+- **Regeneration** (CR 701.19): "Regenerate ~" makes a shield that replaces the next
+  destruction this turn (lethal damage, deathtouch, destroy effects): it stays, tapped,
+  with its damage removed, and leaves combat. "It can't be regenerated" skips the shield.
+  0 toughness isn't destruction, so regeneration doesn't help (704.5f). Shields end at
+  cleanup (514.2). Bots regenerate a creature that a spell or ability is aimed at, or that
+  would lose its fight once blocks are declared (one shield at a time); you can regenerate
+  whenever you like, since a shield made early still works later in the turn.
+- Sample decks include a card for each of these.
+
+**5,189 cards are fully supported.** Rules tests: `test/combat-keywords.test.ts`.
+
+### Blocking, lands, persist, prevention, life gain (added 2026-10-09)
+
+- **Auto-pass fix:** on your own turn, once blockers are declared, auto-pass stops before
+  damage if you have an instant or ability you could use (the active player gets priority
+  first, CR 117.3a). With nothing to play it still passes.
+- **Blocking triggers** (CR 509.3), once every defending player has declared: "whenever ~
+  blocks", "becomes blocked", "blocks or becomes blocked" (once per combat), and "blocks a
+  creature" / "becomes blocked by a creature" (once per creature, which "that creature" means;
+  filters like "a creature with flying" work). **Bushido N** (702.45), **flanking** (702.25,
+  blockers without flanking get -1/-1 and can die before damage), **rampage N** (702.23, blockers
+  beyond the first counted as it resolves), "+1/+1 for each creature blocking it".
+- **Evasion:** horsemanship (702.31); "can't be blocked by creatures with power 2 or less", "by
+  Walls", "by blue creatures", "by artifact creatures"; "can't be blocked by more than one
+  creature" (all CR 509.1b).
+- **Lands that enter tapped unless ...** (CR 614.1d): two or fewer / two or more other lands,
+  two or more basic lands, a Plains or an Island (check lands), a planeswalker, two or more
+  opponents, a player at 13 or less life, opponents with eight or more lands. It doesn't count
+  itself. **Shock lands** ("you may pay 2 life") and **reveal lands** ("you may reveal a Dragon
+  card") ask you when you play them (CR 614.12); bots reveal when they can and pay life at 16 or
+  more. A land put onto the battlefield by an effect doesn't pay or reveal.
+- **Persist, undying** (702.79, 702.93): back with a -1/-1 (+1/+1) counter if it had none, read
+  from last known information; a token doesn't come back. **Soulshift N** (702.46).
+- **Damage prevention** (CR 615): "prevent the next N damage that would be dealt to any target
+  this turn" shields (on creatures and players, shown as chips), and Fog. Protection is applied
+  before shields, so it doesn't use them up. Shields end at cleanup.
+- **"Whenever you gain life"** (CR 119.10): one trigger per life-gain event. A lifelink
+  creature dealing combat damage to several things is one event; two lifelink creatures are two.
+  All life gain now goes through one function.
+- **Activated abilities:** "Activate only once each turn" (602.5b), "Pay N life" costs (119.4).
+- **Threshold**: statics that apply while seven or more cards are in your graveyard.
+- "Destroy target Wall", "target Elf": target phrases can name creature and basic land types.
+- "This Aura" now reads as the card itself ("When this Aura enters, draw a card"), and in
+  triggers about the permanent itself, "it" means that permanent ("put a +1/+1 counter on it",
+  "untap it"), except in "dies" triggers.
+
+**5,810 cards are fully supported.** Rules tests: `test/blocks-lands-prevention.test.ts`.
+
+### Mana abilities, explore, cascade and more (added 2026-10-09)
+
+- **Mana abilities** (CR 605) are compiled like other abilities now, not matched by a few fixed
+  patterns: costs of {T}, mana ("{1}, {T}: Add {W}{U}", Signets), "Sacrifice ~", "Pay 1 life";
+  more than one mana ("{T}: Add {C}{C}"); a choice ("{W} or {U}", "two mana of any one color");
+  "for each creature you control" (Gaea's Cradle, Cabal Coffers); your commander's color identity
+  (Arcane Signet, CR 903.4f); painlands' "deals 1 damage to you"; "doesn't untap during your next
+  untap step"; "Activate only once each turn". Auto-pay plans with them: free sources first, then
+  abilities that cost mana when they make more mana or a missing color, paying for them with
+  sources whose colors aren't needed. Clicking a permanent with several options opens a menu
+  listing each ability and what it adds. Tokens can have quoted abilities ('It has "Sacrifice
+  this creature: Add {C}."', Eldrazi Spawn and Scions).
+- **Explore** (701.44): a land goes to your hand; otherwise a +1/+1 counter, then you choose
+  whether the card goes to your graveyard. With an empty library it just gets the counter, and if
+  it left the battlefield you still reveal (rulings).
+- **Renown N** (702.112, checked as it triggers and resolves), **bloodthirst N** (702.54),
+  **fabricate N** (702.123, counters or Servos; Servos if it's gone), **modular N** (702.43,
+  counts the +1/+1 counters it had as it died), **evolve** (702.100, compared again on resolution,
+  with the new creature's last known P/T if it's gone), **battle cry** (702.91).
+- **+1/+1 and -1/-1 counters cancel** as a state-based action (704.5q), after the same pass's
+  deaths, so persist and modular still see both.
+- **Cascade** (702.85): exiles until a nonland card with lower mana value, then asks whether to
+  cast it without paying its mana cost (modes and targets as usual, from exile, during the
+  resolution); the rest go to the bottom in a random order. Bots cast it when they like the targets.
+- **Affinity for artifacts** (702.41) and the like reduce generic mana only (total cost, CR 601.2f);
+  **improvise** (702.126) taps artifacts for generic mana when mana alone can't pay.
+- New triggers: "when ~ becomes the target of a spell or ability", "at the beginning of the end
+  step" (every turn's), "when ~ is put into a graveyard from the battlefield" (any permanent). In
+  triggers after it left the battlefield, "it" and its name mean the card where it went ("return it
+  to its owner's hand"). "Sacrifice ~" as an effect.
+- **Fixed:** "target artifact creature" (and any two card types together) matched an artifact *or*
+  a creature; it now needs both.
+
+**6,244 cards are fully supported.** Rules tests: `test/mana-counters-cascade.test.ts`.
+
+### X costs, counted amounts and last known information (added 2026-10-09)
+
+- **X** (CR 107.3): announced while casting or activating, after modes and before targets
+  (601.2b-c, 602.2b), paid as generic mana ({X}{X} pays it twice), and remembered by the spell
+  on the stack (shown as "X = n"). A permanent's enters abilities and "enters with X counters"
+  use the spell's X (107.3m). Cast without paying its mana cost, X can only be 0 (107.3b).
+  Cost reductions come off the total, X included (601.2f). The game screen asks for X with a
+  picker that starts at the most your mana can pay; bots pick a big X and never cast for X=0.
+  Text that uses X without a way to choose it (no {X} cost and no "where X is") isn't trusted.
+- **Counted amounts**: "for each creature you control", "equal to the number of cards in your
+  hand", "where X is ...", "twice", "plus/minus N", devotion (700.5), domain, power, toughness
+  and mana value of a creature or of the spell being countered, Auras and Equipment attached to
+  it, cards in graveyards and libraries, life totals. A resolving spell counts once, as it
+  resolves, and a pump it gives stays the same afterwards (608.2h, 611.2c: Craterhoof Behemoth).
+  A static ability counts again whenever it's checked (611.3a: "gets +1/+1 for each artifact you
+  control", Death's Shadow). A negative result counts as 0 (107.1b).
+- **\*/\* creatures** (604.3): power and toughness defined by an ability are applied in layer 7a
+  (613.4a), so later effects still modify them; one that loses all abilities is 0 for each *.
+  Only on the battlefield for now (in other zones * reads as 0).
+- **Last known information** (608.2h): a creature that left the battlefield is used as it last
+  existed there: Swords to Plowshares gives life equal to the exiled creature's power to its
+  controller then; "Sacrifice ~: it deals damage equal to its power" uses its power before the
+  sacrifice; dies triggers see its last power (Bottle Golems).
+- "It" after "create a token" means that token ("create a 3/3 ... and put X +1/+1 counters on it").
+
+**6,719 cards are fully supported.** Rules tests: `test/amounts-x.test.ts`.
+
+### Library search, typecycling, kicker and additional costs (added 2026-10-10)
+
+- **Searching a library** (CR 701.23): tutors, land ramp, fetch lands and "cards named ~".
+  Searching for a card with a stated quality ("a basic land card") lets you find fewer, even none
+  (701.23b); "a card" or "N cards" must find as many as possible (701.23d). Cards found aren't
+  shown to other players unless the text says to reveal them (701.23e). "You may search ... then
+  shuffle" is one choice: saying no means no shuffle. Templates: into your hand, onto the
+  battlefield (tapped), on top after shuffling (Vampiric Tutor), into the graveyard, and the
+  Cultivate split ("put one onto the battlefield tapped and the other into your hand"; with only
+  one found it goes onto the battlefield, per the rulings). The game screen shows a search window
+  with your matching cards grouped by name; bots take lands of the basic type they have fewest of,
+  or their biggest castable spell. An Aura put onto the battlefield this way needs something to
+  enchant chosen (303.4f), so those cards aren't supported yet.
+- **Typecycling** (702.29e): "Forestcycling {1}" discards the card to search for a Forest card;
+  it counts as cycling for "whenever you cycle" (702.29f).
+- **Kicker and multikicker** (702.33): chosen while casting, after modes and before X and
+  targets (601.2b); the kicker cost is added to the total cost and still has to be paid when the
+  spell is cast without paying its mana cost (118.9d). "If it was kicked" text, "enters with N
+  counters if kicked", "when ~ enters, if it was kicked" (an intervening if, 603.4), cards with two
+  kicker costs ("if it was kicked with its {1}{G} kicker") and multikicker counts all work. Kicked
+  status belongs to the spell and the permanent it becomes, and is forgotten when it changes
+  zones again. A kicked mode that needs new targets (702.33g) isn't supported yet. The game
+  screen asks with a bar (Kick it / Don't kick, or a count for multikicker); bots kick when they
+  can afford it.
+- **Additional costs** (601.2f-h): "As an additional cost to cast this spell, sacrifice a
+  creature / discard a card / pay N life / exile N cards from your graveyard". Sacrificed objects
+  are remembered (608.2h), so "the sacrificed creature's power" works (Fling).
+  A spell can't discard itself to pay its own cost (601.2a). The game screen
+  asks you to pick the permanent or cards; bots sacrifice tokens and cheap permanents (never
+  their commander), pay life only when they're well ahead, and discard their least useful card.
+
+**7,147 cards are fully supported.** Rules tests: `test/search.test.ts`, `test/kicker-costs.test.ts`.
+
+### Effects on groups, and creature types or colors chosen (added 2026-10-10)
+
+- **Groups of permanents**: "destroy all artifacts, creatures, and enchantments", "each creature
+  without flying", "all creatures you control with a +1/+1 counter on them", "other Elves you
+  control", "Return all creatures to their owners' hands", "untap all lands you control". These
+  don't target (CR 115.10), so hexproof and protection don't stop them. "Artifacts and enchantments"
+  means each permanent that is either one. Who's in the group is decided as the effect happens, and
+  a pump it gives stays with those creatures only (CR 611.2c). "~ deals 1 damage to each creature
+  and each player" deals it all at once (CR 120.3), so lifelink is one life gain.
+- **Static abilities for groups**: "Each creature you control with a +1/+1 counter on it has
+  trample", "All Sliver creatures have haste", "Other creatures you control with flying get +1/+1",
+  "Artifacts you control have indestructible". Who they apply to is checked continuously.
+- **"Other" in a spell**: after "target creature you control", "other creatures you control" means
+  all but that target (Phalanx Tactics). When it means "other than the Zombies just named" (In
+  Oketra's Name) the card isn't supported yet.
+- **Choosing a creature type or color** (CR 614.12, 205.3m): "As ~ enters, choose a creature type"
+  is chosen as it enters, before state-based actions and its enters triggers, and forgotten when it
+  leaves (CR 400.7). "Choose a creature type. Destroy all creatures that aren't of the chosen type"
+  is chosen as the spell resolves. Changelings are every creature type. Supported uses: groups and
+  counts "of the chosen type/color" (Plague Engineer, Engineered Plague, Kindred Dominance, Distant
+  Melody), "Add one mana of the chosen color" (Coldsteel Heart, the Gates, the Thriving lands), "Whenever
+  you cast a spell of the chosen color" (Diamond Mare), creature-type lords (Instruments of War).
+  The game screen asks for a color with five buttons, and for a creature type with a searchable list
+  that puts the types already on the battlefield and in your hand first. Bots name what opponents
+  have most of for harmful effects and their own most common type or color otherwise.
+- **Bots and sweepers**: a bot casts "destroy all" and "damage to each" effects only when they hurt
+  the opponents more than itself, weighing creatures, lands and its commander.
+
+**7,547 cards are fully supported.** Rules tests: `test/mass-choose.test.ts`.
+
+### "Counter unless they pay", energy, the monarch, "you may pay" (added 2026-10-10)
+
+- **"Counter target spell unless its controller pays {3}"** (CR 118.12): Mana Leak, Force Spike,
+  Spell Pierce, No More Lies ("exile it instead"), Countervailing Winds ("{1} for each card in your
+  graveyard", counted as it resolves, not counting itself), Clash of Wills and Condescend ("{X}"),
+  Mundungu ("{1} and 1 life"), and abilities like Spiketail Hatchling's. The spell's controller is
+  asked as it resolves and can tap mana then; a cost of {0} is just paid (CR 118.5). A spell that
+  can't be countered isn't, and nobody is asked. "Whenever a player casts a spell, counter it unless
+  that player pays {3}" (Nether Void) works the same way, like ward.
+- **Energy** (CR 107.14): "you get {E}{E}", "you get an amount of {E} equal to ...", "Pay {E}{E}:"
+  costs (mana abilities too), and "you may pay {E}{E}. If you do, ...". Energy shows as ⚡ next to
+  a player's life.
+- **"You may pay {1}. If you do, ..."** with mana, life or energy: asked as it resolves, with a Pay
+  button that taps what's needed. If you can't pay, you aren't asked; paying to untap something
+  already untapped isn't asked either. Everything after "If you do," in that sentence depends on
+  paying.
+- **The monarch** (CR 725): "you become the monarch". The monarch draws a card at the beginning
+  of their end step; a creature that deals combat damage to the monarch makes its controller the
+  monarch. Both are triggered abilities with no source, controlled by the monarch. If the monarch
+  leaves the game, the active player becomes the monarch (725.4). A 👑 marks the monarch.
+- **Bots** pay "unless" costs and "you may pay" costs when they can and it's worth it, counter a
+  spell with "unless its controller pays" only when that player can't pay, use counter abilities on
+  the battlefield, and attack an opponent who is the monarch unless someone else is low enough to
+  finish.
+
+**7,724 cards are fully supported.** Rules tests: `test/counter-energy-monarch.test.ts`.
+
+### Casting from graveyards, buyback, rebound, unearth (added 2026-10-10)
+
+- **Flashback** (CR 702.34): cast an instant or sorcery from your graveyard for its flashback
+  cost, including costs with extra parts ("Flashback—{1}{U}, Pay 3 life."). It's exiled whenever
+  it leaves the stack afterwards, so a countered flashback spell is exiled too.
+- **Jump-start** (CR 702.133): cast it from your graveyard for its mana cost plus discarding a
+  card; exiled afterwards. **Retrace** (CR 702.81): cast it from your graveyard by also discarding
+  a land card; it goes back to the graveyard, so it can be cast again.
+- **Escape** (CR 702.138): cast it from your graveyard for its escape cost, exiling the stated
+  number of *other* cards from your graveyard. "~ escapes with N +1/+1 counters" works.
+- **Buyback** (CR 702.27): an optional extra cost asked when you cast; if paid, the spell returns
+  to your hand as it resolves (not if it's countered).
+- **Rebound** (CR 702.88): cast from your hand, it's exiled as it resolves, and at your next
+  upkeep you may cast it from exile for free. These are delayed triggered abilities (CR 603.7),
+  which now work in general.
+- **Unearth** (CR 702.84): at sorcery speed, return the creature from your graveyard; it gains
+  haste, is exiled at the next end step, and is exiled instead if it would leave the battlefield.
+- **On the table:** your graveyard gets a green ring and a ✦ when a card there can be cast or
+  used. Click it, click the card, and pick "Flashback", "Unearth" and so on from its menu.
+- **Bots** flash back, jump-start, retrace (only with lands to spare), escape, pay buyback when
+  they can afford it, recast rebound spells, and unearth creatures before combat.
+
+**7,889 cards are fully supported.** Rules tests: `test/graveyard-cast.test.ts`.
+
+## Roadmap
+
+1. ~~Effects system~~ and ~~oracle text compiler~~ (first version done).
+2. **More templates, by frequency** (`npm run coverage`): "up to N targets" and "another target",
+   abilities that work from the graveyard ("Return ~ from your graveyard"), "if you do",
+   split/adventure/double-faced cards. ~~Auras and Equipment~~, ~~enters with
+   counters~~, ~~modal spells~~, ~~scry/surveil, discard, fight, graveyard targets,
+   Treasure/Food/Clue~~, ~~cycling, crew, convoke, ward, prowess and "whenever you
+   cast"~~, ~~protection, shroud, infect/wither/toxic, exalted, landfall, regeneration, must
+   attack~~ done. ~~blocking triggers, conditional tapped lands, persist/undying/soulshift, prevention,
+   life-gain triggers, threshold~~ done. ~~mana abilities with costs or several mana, explore, renown,
+   bloodthirst, fabricate, modular, evolve, battle cry, cascade, affinity, improvise~~ done. ~~X costs,
+   "for each" / "equal to the number of" / "where X is", */* creatures, last known information~~ done. ~~library search, typecycling, kicker, additional
+   costs~~ done. ~~"all"/"each" groups, choosing a creature type or color~~ done. ~~"counter unless
+   they pay", energy, the monarch, "you may pay ... If you do"~~ done. ~~flashback, jump-start,
+   retrace, escape, buyback, rebound, unearth, delayed triggers~~ done. Next by
+   count: see `npx tsx tools/coverage.ts`.
+   Hand-written overrides for cards that don't fit a template.
+3. ~~Layers and continuous effects~~ (CR 613, done except layers 1 and 3), replacement
+   effects (CR 614), and choices (targets, ~~modes~~, ~~X~~, ordering triggers).
+4. ~~Mulligans (London + Commander free mulligan)~~, proper legend-rule choice, 903.9 choice.
+5. Deck builder using the full card DB, with rulings in the card preview.
+6. Better bots, then online play (engine runs on a server; clients send actions).

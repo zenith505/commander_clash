@@ -177,6 +177,16 @@ export function compile(d: CardDef): CompiledCard {
       else {
         if (costKw.alt) (out.altCosts ??= []).push(costKw.alt);
         if (costKw.delve) out.delve = true;
+        // Two of the same: each would work separately (CR 702.153b), which isn't modeled.
+        const twice = (costKw.madness && out.madness) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge);
+        if (twice) {
+          out.unsupported.push(raw);
+          continue;
+        }
+        if (costKw.madness) out.madness = costKw.madness;
+        if (costKw.suspend) out.suspend = costKw.suspend;
+        if (costKw.casualty) out.casualty = costKw.casualty;
+        if (costKw.dredge) out.dredge = costKw.dredge;
         if (costKw.faceDown) {
           if (out.faceDownCast) out.unsupported.push(raw); // two ways to turn it face up: not modeled
           else out.faceDownCast = costKw.faceDown;

@@ -49,6 +49,11 @@ import {
   parseManaCost,
   autoConvoke,
   autoCrew,
+  casualtyCandidates,
+  dredgeOptions,
+  madnessCastOf,
+  planSuspend,
+  suspendProblem,
   compileCard,
   canEnterUntapped,
   crewPower,
@@ -182,6 +187,8 @@ type CastDraft = {
   alt?: AltCostKind;
   /** Cards exiled from your graveyard for delve (CR 702.66a). */
   delve?: string[];
+  /** The creature sacrificed for casualty, or none (CR 702.153a). */
+  casualty?: string[];
 };
 
 /** Choosing cards to exile for delve: any number up to `max`. */
@@ -195,7 +202,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined } | { activate: ActivateDraft; draft?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty";
   label: string;
   what: string;
   n: number;
@@ -411,7 +418,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: card.manaCost, max, value: max });
     }
-    const specs = spellTargets(s, d.objectId, d.modes);
+    const specs = spellTargets(s, d.objectId, d.modes, d.alt);
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: [], label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of [...(compiled.additionalCosts ?? []), ...(graveyardCast(card, d.via)?.costs ?? [])]) {
       if (c.kind === "payLife" || c.kind === "returnToHand") continue; // no spell asks to return a permanent yet
@@ -428,8 +435,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : "exile from your graveyard";
       return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
+    // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
+    if (d.casualty === undefined && compiled.casualty !== undefined) {
+      const candidates = casualtyCandidates(s, HUMAN, card).filter((id) => !d.sacrifice?.includes(id));
+      if (candidates.length)
+        return setCostPick({ draft: d, kind: "casualty", label: card.name, what: `casualty ${compiled.casualty}: you may sacrifice a creature with power ${compiled.casualty} or greater to copy it`, n: 1, candidates, chosen: [] });
+    }
     const choices = {
       ...kicks,
+      ...(d.casualty?.length ? { casualty: d.casualty[0]! } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -570,7 +584,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
-    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast)) return setMenu(o.id);
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend)) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && compileCard(cardOf(s, o.id)).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
@@ -767,6 +781,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 dispatch(planCast(s, HUMAN, menu, undefined, undefined, "auto", undefined, { faceDown: true }) ?? [{ type: "castSpell", player: HUMAN, objectId: menu, faceDown: true }]);
               }}
+              onSuspend={() => {
+                setMenu(null);
+                dispatch(planSuspend(s, HUMAN, menu) ?? [{ type: "suspend", player: HUMAN, objectId: menu }]);
+              }}
               onTurnFaceUp={() => {
                 setMenu(null);
                 dispatch(planTurnFaceUp(s, HUMAN, menu) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu }]);
@@ -815,10 +833,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand") && (
+          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty") && (
             <CostPickBar
               pick={costPick}
               onDone={() => finishCostPick(costPick)}
+              onSkip={costPick.kind === "casualty" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -841,7 +860,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && (
+          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -896,6 +915,14 @@ const PHASES: Step[] = ["untap", "upkeep", "draw", "main1", "beginCombat", "decl
 function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
+
+const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness" };
+const ALT_NOTES: Record<AltCostKind, string> = {
+  evoke: "it's sacrificed as it enters",
+  dash: "haste, back to your hand at the end step",
+  bestow: "an Aura on a creature; a creature again if it's ever unattached",
+  madness: "",
+};
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape" };
 
@@ -1064,7 +1091,7 @@ function KickPickBar({
 }
 
 /** Sacrificing as an additional cost (CR 601.2h): click the permanents to sacrifice. */
-function CostPickBar({ pick, onDone, onCancel }: { pick: CostPick; onDone: () => void; onCancel: () => void }) {
+function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
   return (
     <div className="targeting">
       <span>
@@ -1073,6 +1100,7 @@ function CostPickBar({ pick, onDone, onCancel }: { pick: CostPick; onDone: () =>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
         {pick.kind === "returnToHand" ? "Return and activate" : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
+      {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
         Cancel
       </button>
@@ -1597,6 +1625,11 @@ function ZoneViewer({
                 {...hoverProps(d, onHover)}
               >
                 <CardFace d={d} />
+                {view.zone === "exile" && !!s.objects[id]!.counters.time && (
+                  <span className="zone-tag" title="Suspended: one time counter comes off in each of its owner's upkeeps">
+                    {s.objects[id]!.counters.time} time counter{s.objects[id]!.counters.time === 1 ? "" : "s"}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -2021,6 +2054,7 @@ function AbilityMenu({
   onCastVia,
   onCastAlt,
   onCastFaceDown,
+  onSuspend,
   onTurnFaceUp,
   onClose,
 }: {
@@ -2036,6 +2070,8 @@ function AbilityMenu({
   onCastAlt: (alt: AltCostKind) => void;
   /** For a card in hand with morph or disguise: cast it face down for {3}. */
   onCastFaceDown: () => void;
+  /** For a card in hand with suspend: exile it with time counters (CR 702.62a). */
+  onSuspend: () => void;
   /** For your face-down permanent: turn it face up. */
   onTurnFaceUp: () => void;
   onClose: () => void;
@@ -2045,6 +2081,7 @@ function AbilityMenu({
   // A card you may play from exile for now works like one in your hand (impulse draw).
   const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
+  const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const upCost = o.zone === "battlefield" ? faceUpCost(s, o) : undefined;
   const inYard = o.zone === "graveyard";
   const land = isLand(s, objectId);
@@ -2067,13 +2104,17 @@ function AbilityMenu({
         (compileCard(d).altCosts ?? []).map((a) => {
           const ok = canCastAlt(s, objectId, a.kind);
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { alt: a.kind }) ?? "");
-          const note = a.kind === "evoke" ? "it's sacrificed as it enters" : "haste, back to your hand at the end step";
           return (
-            <button key={a.kind} disabled={!ok} title={problem || note} onClick={() => onCastAlt(a.kind)}>
-              {a.kind === "evoke" ? "Evoke" : "Dash"} <ManaCost cost={a.mana} size="sm" />
+            <button key={a.kind} disabled={!ok} title={problem || ALT_NOTES[a.kind]} onClick={() => onCastAlt(a.kind)}>
+              {ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" />
             </button>
           );
         })}
+      {suspend && (
+        <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.n} time counter${suspend.n === 1 ? "" : "s"}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
+          Suspend {suspend.n} <ManaCost cost={suspend.cost} size="sm" />
+        </button>
+      )}
       {faceDownCast && (
         <button
           disabled={!planCast(s, HUMAN, objectId, undefined, undefined, "auto", undefined, { faceDown: true })}
@@ -2162,11 +2203,51 @@ function Controls({
     return (
       <div className="controls">
         <span onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
-          <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> without paying its mana cost?
+          {pending.how === "madness" ? (
+            <>
+              <strong>Madness:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it goes to your graveyard.
+            </>
+          ) : pending.how === "suspend" ? (
+            <>
+              <strong>Suspend:</strong> the last time counter is gone. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it stays in exile.
+            </>
+          ) : (
+            <>
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> without paying its mana cost?
+            </>
+          )}
         </span>
-        <button onClick={() => onCastFree(pending.objectId)}>Cast it</button>
+        <button
+          disabled={pending.how === "madness" && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
+          title={pending.how === "madness" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
+          onClick={() => onCastFree(pending.objectId)}
+        >
+          Cast it
+        </button>
         <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>
           Don't
+        </button>
+      </div>
+    );
+  }
+  if (pending?.kind === "dredge" && pending.player === HUMAN) {
+    const options = pending.options.filter((id) => dredgeOptions(s, HUMAN).includes(id));
+    return (
+      <div className="controls">
+        <span>
+          <strong>Dredge:</strong> draw a card, or mill instead to return a card from your graveyard to your hand?
+          {pending.left > 1 ? ` (${pending.left} draws left)` : ""}
+        </span>
+        {options.map((id) => {
+          const d = cardOf(s, id);
+          return (
+            <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "dredge", player: HUMAN, objectId: id }])}>
+              Dredge {d.name} (mill {compileCard(d).dredge})
+            </button>
+          );
+        })}
+        <button className="ghost" onClick={() => dispatch([{ type: "dredge", player: HUMAN }])}>
+          Draw
         </button>
       </div>
     );
@@ -2771,7 +2852,7 @@ function Hand({ s, ids, cardProps, tucked, onToggle }: { s: GameState; ids: stri
                 className="fan-slot"
                 style={{ ["--rot" as string]: `${off * step}deg`, ["--drop" as string]: (off / Math.max(1, mid)) ** 2 * 0.06 }}
               >
-                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null)} />
+                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null)} />
               </div>
             );
           })}

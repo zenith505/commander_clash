@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
-import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
+import { autoCrew, planActivate, planCast, planMana, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
 import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -26,6 +26,8 @@ import {
   spellTargets,
   availableMana,
   exilePlayable,
+  castDef,
+  casualtyCandidates,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
@@ -63,6 +65,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "castFree") {
       const plan = castPlan(s, pid, pend.objectId, true);
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
+    }
+    if (pend.kind === "dredge") {
+      const pick = chooseDredge(s, pid, pend.options);
+      return [{ type: "dredge", player: pid, ...(pick ? { objectId: pick } : {}) }];
     }
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
@@ -167,7 +173,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const options = [...exilePlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -175,6 +181,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile"));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
+    // Suspend what we can't cast now (CR 702.62a).
+    const sus = chooseSuspend(s, pid);
+    if (sus) return sus;
     // Unearth a creature to attack with this turn (CR 702.84a).
     if (s.step === "main1") {
       const dig = chooseUnearth(s, pid);
@@ -369,10 +378,46 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   }
   for (const a of c.altCosts ?? []) {
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
+    if (a.kind === "bestow") continue; // tried first, see bestowPlan
     const plan = castPlan(s, pid, id, false, undefined, a.kind);
     if (plan) return plan;
   }
   return null;
+}
+
+/** Bestow it on one of our creatures when we can afford to (CR 702.103a): the bonus now, and a creature later. */
+function bestowPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "hand" || !altCost(defOf(s, o), "bestow")) return null;
+  return castPlan(s, pid, id, false, undefined, "bestow");
+}
+
+/**
+ * A card to suspend (CR 702.62a): one we can't cast now, whose suspend cost we can pay, when it's worth the wait (a
+ * card with no mana cost, or one costing more than we can make soon). The cheapest wait first.
+ */
+function chooseSuspend(s: GameState, pid: PlayerId): Action[] | null {
+  const mana = availableMana(s, pid);
+  const options = player(s, pid)
+    .hand.map((id) => ({ id, sus: compileCard(defOf(s, obj(s, id))).suspend }))
+    .filter((x): x is { id: string; sus: { n: number; cost: string } } => !!x.sus)
+    .filter((x) => !defOf(s, obj(s, x.id)).manaCost || mv(s, x.id) > mana + 1)
+    .sort((a, b) => a.sus.n - b.sus.n);
+  for (const x of options) {
+    const plan = planSuspend(s, pid, x.id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Dredge instead of drawing (CR 702.52a) when the library can spare the cards: the most expensive card we could get
+ * back, if it's worth more than a random draw (mana value 3 or more, or a creature).
+ */
+function chooseDredge(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId | undefined {
+  const lib = player(s, pid).library.length;
+  const ok = options.filter((id) => lib - (compileCard(defOf(s, obj(s, id))).dredge ?? 0) >= 20 && (mv(s, id) >= 3 || isType(defOf(s, obj(s, id)), "Creature")));
+  return ok.sort((a, b) => mv(s, b) - mv(s, a))[0];
 }
 
 /** Casting a card from our graveyard (flashback, escape, ...): the first way that works. */
@@ -399,18 +444,27 @@ function totalWithoutX(s: GameState, pid: PlayerId, id: string, via?: CastFromGr
 }
 
 function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
-  const printed = castingBody(defOf(s, obj(s, id)));
+  const printed = castingBody(castDef(s, id, alt));
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
   const modes = choice?.modes;
   const body = printed && withModes(printed, modes);
-  const specs = spellTargets(s, id, modes);
+  const specs = spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
   if (specs.length && !targets) return null;
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
   const extra = chooseExtraCosts(s, pid, id, targets ?? [], via);
+  if (extra) {
+    // Casualty: a token or a cheap creature for a copy of the spell (CR 702.153a).
+    const victim = casualtyCandidates(s, pid, castDef(s, id, alt))
+      .map((x) => obj(s, x))
+      .filter((o) => !o.isCommander && !extra.sacrifice?.includes(o.id) && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id))
+      .filter((o) => o.isToken || worth(s, pid, o) <= 3)
+      .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+    if (victim) extra.casualty = victim.id;
+  }
   if (!extra) return null;
   if (alt) extra.alt = alt;
   // Delve away as much as we can (CR 702.66a): the cards that do nothing more in the graveyard first.

@@ -323,6 +323,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "soulbond":
     case "ninjutsu":
     case "impulse":
+    case "madness":
+    case "suspendTick":
+    case "suspendCast":
+    case "exileSelfWithTime":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":

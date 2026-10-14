@@ -55,14 +55,19 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         runEffectInner(s, { type: "continuous", what: e.what, mods: [{ kind: "modifyPT", power: e.power * n, toughness: e.toughness * n }], duration: "endOfTurn" }, ctx);
       }
       return;
-    case "draw":
-      // Worked out for each player in turn: "draws cards equal to the number of cards in their hand".
-      for (const pid of players(s, e.who, ctx)) {
+    case "draw": {
+      // Worked out for each player in turn: "draws cards equal to the number of cards in their hand". A draw that
+      // stops for dredge (CR 702.52a) is finished by the answer, and this carries on with the next player.
+      const sc = (s.resolving!.scratch ??= {});
+      const queue = (sc.drawQueue ??= players(s, e.who, ctx));
+      while (queue.length) {
+        const pid = queue.shift()!;
         const n = amountNow(s, e.n, ctx);
-        draw(s, pid, n);
         log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
+        if (!draw(s, pid, n)) return "paused";
       }
       return;
+    }
     case "getEnergy":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);

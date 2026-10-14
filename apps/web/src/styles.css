@@ -446,3 +446,5 @@ button.ghost { background: var(--panel-2); color: var(--text); }
 .card-text.face-down-face .ct-name { color: #e8d6b0; }
 .card-text.face-down-face .ct-type { color: #c9b48a; }
 .card-text.face-down-face .ct-peek { margin-top: 6px; font-size: 0.72em; color: #fff; background: rgba(0, 0, 0, 0.45); border-radius: 4px; padding: 1px 4px; }
+.modal-cards .card { position: relative; }
+.zone-tag { position: absolute; left: 6px; bottom: 6px; font-size: 12px; font-weight: 800; padding: 1px 6px; border-radius: 10px; background: rgba(0, 0, 0, 0.8); color: #ffe08a; border: 1px solid #ffe08a; }

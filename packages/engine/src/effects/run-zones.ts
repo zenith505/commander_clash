@@ -7,8 +7,14 @@ import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { pickOptions } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { tokenCopies } from "./run-tokens";
+import { compileCard } from "../oracle";
 import { addDelayed } from "./run-spells";
 import { fireEvent, inCombat } from "./triggers";
+
+/** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
+export function isSuspended(s: GameState, o: GameObject): boolean {
+  return o.zone === "exile" && (o.counters.time ?? 0) > 0 && !!compileCard(defOf(s, o)).suspend;
+}
 
 /** Put an exiled card onto the battlefield; an Aura needs something to enchant, or it stays in exile (CR 303.4f-g). */
 function returnFromExile(s: GameState, c: GameObject, controller: PlayerId, src: string, counter?: CounterKind) {
@@ -167,6 +173,62 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (castProblem(s, p.id, o.id) === null) return "paused";
       s.pending = null;
       log(s, `${src} can't be cast.`);
+      return;
+    }
+    case "madness": {
+      // CR 702.35a: the owner may cast it for its madness cost as this resolves, ignoring timing (rulings); if they
+      // don't (or can't), it goes to the graveyard. It has to still be in exile as the same object (CR 400.7).
+      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      const here = () => !!o && o.zone === "exile" && (o.zoneChanges ?? 0) === ctx.subject!.zc;
+      if (!here()) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.may === undefined) {
+        sc.may = false;
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o!.id, source: src, how: "madness" };
+        // Mana abilities can still be activated to pay for it (CR 601.2g), so only the mana in the pool may be short.
+        const problem = castProblem(s, ctx.controller, o!.id);
+        if (problem === null || /^not enough mana/.test(problem)) return "paused";
+        s.pending = null;
+      }
+      if (!here()) return; // it was cast
+      log(s, `${defOf(s, o!).name} is put into ${player(s, o!.owner).name}'s graveyard (madness).`);
+      moveObject(s, o!.id, "graveyard");
+      return;
+    }
+    case "suspendTick": {
+      // CR 702.62a: "At the beginning of your upkeep, if this card is suspended, remove a time counter from it."
+      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== ctx.subject!.zc || !isSuspended(s, o)) return;
+      const left = o.counters.time! - 1;
+      if (left > 0) o.counters.time = left;
+      else delete o.counters.time;
+      log(s, `${defOf(s, o).name} loses a time counter${left ? ` (${left} left)` : ""}.`);
+      if (!left) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
+      return;
+    }
+    case "suspendCast": {
+      // CR 702.62a: "you may play it without paying its mana cost if able. If you don't, it remains exiled."
+      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.may !== undefined) return; // asked already
+      sc.may = false;
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "suspend" };
+      if (castProblem(s, ctx.controller, o.id) === null) return "paused";
+      s.pending = null;
+      log(s, `${defOf(s, o).name} can't be cast; it stays in exile.`);
+      return;
+    }
+    case "exileSelfWithTime": {
+      const item = s.resolving?.item;
+      const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+      if (!o || o.zone !== "stack") return;
+      const name = defOf(s, o).name;
+      moveObject(s, o.id, "exile"); // a copy ceases to exist (CR 707.10a)
+      const moved = s.objects[o.id];
+      if (moved?.zone !== "exile") return;
+      moved.counters.time = e.n;
+      log(s, `${name} is exiled with ${e.n} time counter${e.n === 1 ? "" : "s"} on it.`);
       return;
     }
     case "destroy":

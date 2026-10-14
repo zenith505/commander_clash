@@ -1,5 +1,6 @@
 import type { Effect } from "../abilities";
-import { defOf } from "../cards";
+import { cardIdOf, defOf } from "../cards";
+import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
 import { log, moveObject, obj, player } from "../game";
 import type { GameState, ObjectId, PlayerId } from "../types";
@@ -167,10 +168,32 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
   }
 }
 
-/** Move cards from a player's hand to their graveyard (CR 701.9a). */
-export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "") {
+/**
+ * Move cards from a player's hand to their graveyard (CR 701.9a). A card with madness is exiled instead, and its
+ * madness ability triggers (CR 702.35a): it's still discarded. `quiet`: the caller says what happened (cycling).
+ */
+export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false) {
   if (!ids.length) return;
   const names = ids.map((id) => defOf(s, obj(s, id)).name);
-  for (const id of ids) moveObject(s, id, "graveyard");
-  log(s, `${player(s, pid).name} discards ${names.join(", ")}${how}.`);
+  if (!quiet) log(s, `${player(s, pid).name} discards ${names.join(", ")}${how}.`);
+  for (const id of ids) {
+    const o = obj(s, id);
+    const madness = compileCard(defOf(s, o)).madness;
+    if (!madness) {
+      moveObject(s, id, "graveyard");
+      continue;
+    }
+    moveObject(s, id, "exile");
+    if (o.zone !== "exile") continue;
+    log(s, `${defOf(s, o).name} is exiled instead (madness).`);
+    // Its owner controls the trigger (CR 113.8): "its owner may cast it by paying [cost]".
+    s.triggerQueue.push({
+      sourceId: id,
+      sourceCardId: cardIdOf(o),
+      controller: o.owner,
+      index: -1,
+      subject: { id, zc: o.zoneChanges ?? 0 },
+      body: { targets: [], effects: [{ type: "madness" }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
+    });
+  }
 }

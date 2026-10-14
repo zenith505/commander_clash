@@ -510,6 +510,13 @@ function computeAll(s: GameState): CharMap {
   for (const id of s.battlefield) chars.set(id, printed(s, s.objects[id]!));
   const insts = gather(s).sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
   for (const layer of LAYERS) {
+    // Suspend's "it gains haste until you lose control of the spell or the permanent it becomes" (CR 702.62a): from
+    // when it was cast, so before the other layer 6 effects; only while its caster controls it (layer 2 is done).
+    if (layer === "6")
+      for (const [id, c] of chars) {
+        const o = s.objects[id]!;
+        if (o.suspendHaste !== undefined && o.suspendHaste === c.controller && !c.keywords.includes("Haste")) c.keywords.push("Haste");
+      }
     let rem = insts.filter((e) => modsIn(e, layer).length && (e.locked || exists(s, e, chars)));
     while (rem.length) {
       // CR 613.8b-c: apply the earliest effect that doesn't wait on another; re-evaluate after each.

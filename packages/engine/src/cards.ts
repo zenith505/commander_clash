@@ -13,7 +13,7 @@ export function pairedWith(s: GameState, o: GameObject): GameObject | undefined 
 }
 
 export { SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keywords";
-import { canonicalKeyword, SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keywords";
+import { canonicalKeyword, SUPPORTED_KEYWORDS, stripReminder, subtypeSet, type SupportedKeyword } from "./keywords";
 
 const BASIC_LAND_MANA: Record<string, Color> = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" };
 
@@ -55,8 +55,33 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   if (o.faceDown) return o.faceDown === "disguise" ? FACE_DOWN_WARD : FACE_DOWN;
   const d = s.cards[copiedId(o)];
   if (!d) throw new Error(`missing card def ${copiedId(o)}`);
-  return d;
+  return o.bestowed ? bestowedDef(d) : d;
 };
+
+const bestowed = new Map<string, CardDef>();
+
+/**
+ * What a bestowed spell or permanent is (CR 702.103b): an Aura enchantment with enchant creature, not a creature. Its
+ * creature types go with the creature type (CR 205.1a), and so do its power and toughness. This isn't a copiable
+ * value (CR 707.2), so copies of it use the card itself (`cardIdOf`).
+ */
+export function bestowedDef(d: CardDef): CardDef {
+  const hit = bestowed.get(d.oracleId);
+  if (hit) return hit;
+  const types = d.types.filter((t) => t !== "Creature");
+  const subtypes = [...d.subtypes.filter((t) => subtypeSet(t) !== "Creature"), "Aura"];
+  const { power: _p, toughness: _t, ...rest } = d;
+  const out: CardDef = {
+    ...rest,
+    oracleId: `${d.oracleId}|bestowed`,
+    types,
+    subtypes,
+    typeLine: `${[...d.supertypes, ...types].join(" ")} — ${subtypes.join(" ")}`,
+    oracleText: `Enchant creature\n${d.oracleText}`,
+  };
+  bestowed.set(d.oracleId, out);
+  return out;
+}
 
 /**
  * What a face-down permanent will be once turned face up: its card, or what a copy effect made it a copy of while

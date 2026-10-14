@@ -428,6 +428,14 @@ export type Effect =
   | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat"; effects: Effect[]; text: string; each?: "created" | "subject" }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
+  /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
+  | { type: "madness" }
+  /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
+  | { type: "suspendTick" }
+  /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
+  | { type: "suspendCast" }
+  /** "Exile ~ with three time counters on it": the resolving spell suspends itself again (Arc Blade). */
+  | { type: "exileSelfWithTime"; n: number }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
@@ -663,6 +671,8 @@ export interface TriggeredAbility {
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */
   ifEvoked?: boolean;
+  /** Casualty's "if a casualty cost was paid for it" (CR 702.153a). */
+  ifCasualty?: boolean;
   /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
   ifEcho?: boolean;
   /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
@@ -784,8 +794,11 @@ export type AdditionalCost =
  * without it the mana cost is paid. `costs` are paid on top. `exile`: the card is exiled instead of
  * going anywhere else when it leaves the stack.
  */
-/** Alternative costs that don't change where it's cast from (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a). */
-export type AltCostKind = "evoke" | "dash";
+/**
+ * Alternative costs (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a) and bestow (CR 702.103a) from your hand;
+ * madness (CR 702.35a) only as its trigger resolves, from exile.
+ */
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness";
 
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
 export interface CastFromGraveyard {
@@ -878,8 +891,16 @@ export interface CompiledCard {
   buyback?: string;
   /** Rebound (CR 702.88). */
   rebound?: boolean;
-  /** Evoke and dash (CR 702.74, 702.109): alternative costs for casting it from your hand. */
+  /** Evoke, dash and bestow (CR 702.74, 702.109, 702.103): alternative costs for casting it from your hand. */
   altCosts?: { kind: AltCostKind; mana: string }[];
+  /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
+  madness?: string;
+  /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */
+  suspend?: { n: number; cost: string };
+  /** Dredge N (CR 702.52a): in your graveyard, a draw may be replaced by milling N and returning it to your hand. */
+  dredge?: number;
+  /** Casualty N (CR 702.153a): you may sacrifice a creature with power N or greater as you cast it, to copy it. */
+  casualty?: number;
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
   /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */

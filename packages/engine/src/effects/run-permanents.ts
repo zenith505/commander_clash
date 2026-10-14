@@ -85,9 +85,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sc.connive = { pid, ...(o ? { id: o.id, zc: o.zoneChanges ?? 0 } : {}) };
         if (n <= 0) return;
         log(s, `${o ? defOf(s, o).name : src} connives${n > 1 ? ` ${n}` : ""}.`);
-        draw(s, pid, n);
         sc.queue = [pid];
         sc.chosen = {};
+        if (!draw(s, pid, n)) return "paused"; // dredge's choice finishes the draws (CR 702.52a)
       }
       const { pid, id, zc } = sc.connive;
       const n = sc.n ?? 0;

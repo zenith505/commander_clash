@@ -1,7 +1,7 @@
 import { abilitiesOf, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, turnFaceUpProblem } from "./game";
+import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import type { TargetChoice } from "./abilities";
 import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, xCount, type ManaPool, type ParsedCost } from "./mana";
@@ -343,4 +343,15 @@ export function planTurnFaceUp(s: GameState, pid: PlayerId, id: ObjectId): Actio
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(fd.cost)) : [];
   return taps ? [...taps, { type: "turnFaceUp", player: pid, objectId: id }] : null;
+}
+
+/** Tap mana for a card's suspend cost, then suspend it (CR 702.62a), or null if that can't be done now. */
+export function planSuspend(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const o = s.objects[id];
+  const sus = o && compileCard(defOf(s, o)).suspend;
+  if (!sus) return null;
+  const problem = suspendProblem(s, pid, id);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem ? planMana(s, pid, parseManaCost(sus.cost)) : [];
+  return taps ? [...taps, { type: "suspend", player: pid, objectId: id }] : null;
 }

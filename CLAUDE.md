@@ -33,6 +33,11 @@ card unsupported. Cite the CR number in a comment where the code implements a ru
 
 ## Commands
 
+- Card data isn't in git. In a cloud session, unpack it from the project's shared folder:
+  `mkdir -p data/generated && for f in cards rulings; do gunzip -c /mnt/project-files/commander-clash-data/$f.json.gz > data/generated/$f.json; done`
+  (the Comprehensive Rules text is `/mnt/project-files/commander-clash-data/cr.txt`). The game itself only needs
+  `apps/web/public/data/sample-decks.json`, which is in git.
+
 - `npm run typecheck` (root), `cd packages/engine && npx vitest run`
 - `npm run coverage` (supported card count), `npm run blockers`, `npm run simulate -- 20` (bot games)
 - `npm run dev`; play-test URL params `?hand=A|B&board=C&yard=D` (cards must be in your deck)

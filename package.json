@@ -12,7 +12,8 @@
     "typecheck": "tsc -p packages/engine && tsc -p apps/web",
     "dev": "npm run dev -w @cc/web",
     "simulate": "tsx tools/simulate.ts",
-    "coverage": "tsx tools/coverage.ts"
+    "coverage": "tsx tools/coverage.ts",
+    "blockers": "tsx tools/blockers.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0",

@@ -5,6 +5,7 @@ import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes } from "../modes";
 import type { CardDef } from "../types";
+import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
 import { parseManaAbility } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine } from "./keyword-abilities";
@@ -308,12 +309,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Clones: "You may have ~ enter as a copy of any creature on the battlefield[, except ...]." (CR 707.5)
-    const clone = /^You may have ~ enter as a copy of (?:any |an? )?(.+?)(?:, except (.+?))?\.?$/.exec(line);
-    if (clone && !/graveyard|\bcard\b/.test(clone[1]!)) {
+    // Cursed Mirror: "As ~ enters, you may have it become a copy of any creature on the battlefield until end of
+    // turn, except it has haste" also becomes the copy as it enters (rulings), for the rest of the turn.
+    const clone = /^(?:You may have ~ enter as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
+    if (clone && !/graveyard|\bcard\b/.test(clone[1]!) && !(clone[2] && line.startsWith("You may"))) {
       const filter = parseTargetPhrase(clone[1]!.replace(/ on the battlefield$/, ""));
-      const except = clone[2] ? parseCopyExcept(clone[2]) : undefined;
-      if (filter?.kind === "object" && except !== null) {
-        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}) };
+      const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
+      if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}) };
         continue;
       }
     }
@@ -387,13 +390,13 @@ export function compile(d: CardDef): CompiledCard {
     const trig = parseTrigger(line);
     if (trig) {
       if (trig === "fail") out.unsupported.push(raw);
-      else out.triggers.push(trig);
+      else out.triggers.push(bindThisAbility(trig, line));
       continue;
     }
     const act = parseActivated(line);
     if (act) {
       if (act === "fail") out.unsupported.push(raw);
-      else out.activated.push(act);
+      else out.activated.push(bindThisAbility(act, line));
       continue;
     }
     if (isSpell) spellLines.push(line);
@@ -412,7 +415,27 @@ export function compile(d: CardDef): CompiledCard {
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
   linkExile(out);
+  if (JSON.stringify(out).includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   return out;
+}
+
+/**
+ * "Becomes a copy of ..., except it has this ability": the copy gets this ability's own text (CR 707.9a), which
+ * refers to itself with "~" like any rules text, so the copy's own name takes its place.
+ */
+function bindThisAbility<T extends object>(ability: T, line: string): T {
+  const visit = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(visit);
+    if (!v || typeof v !== "object") return;
+    const o = v as Record<string, unknown>;
+    if (o.type === "becomeCopy" && (o.except as CopyExcept | undefined)?.thisAbility) {
+      const { thisAbility: _, ...except } = o.except as CopyExcept;
+      o.except = { ...except, text: [...(except.text ?? []), line] };
+    }
+    Object.values(o).forEach(visit);
+  };
+  visit(ability);
+  return ability;
 }
 
 /**

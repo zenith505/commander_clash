@@ -6,7 +6,12 @@ import { parseSearchFilter } from "./search";
 import { pickFilter } from "./targets";
 import { parseStaticCondition } from "./statics";
 
-export function parseActivated(line: string): ActivatedAbility | "fail" | null {
+/** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
+const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
+
+export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
+  const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
+  const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
   const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
@@ -70,7 +75,7 @@ export function parseActivated(line: string): ActivatedAbility | "fail" | null {
     sacrificeSelf: /Sacrifice ~/.test(costs),
     sorcerySpeed,
     body,
-    text: line,
+    text: raw,
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),

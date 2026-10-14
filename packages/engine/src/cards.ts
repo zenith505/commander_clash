@@ -41,16 +41,28 @@ const faceDownCard = (oracleId: string, ward: boolean): CardDef => ({
 export const FACE_DOWN = faceDownCard("face-down", false);
 export const FACE_DOWN_WARD = faceDownCard("face-down-ward", true);
 
-/** The card definition an object uses right now: its own, or a face-down one (CR 708.2). */
-/** Its definition's key: face-down values, or what it's a copy of (CR 707.2), or its own card. */
-export const cardIdOf = (o: GameObject): string => (o.faceDown ? (o.faceDown === "disguise" ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : (o.copyOf ?? o.cardId));
+/**
+ * Its copiable values before face-down status (CR 613.2a): the latest copy effect that began after it entered
+ * (CR 707.4), or what it entered as a copy of (CR 707.5), or its own card.
+ */
+const copiedId = (o: GameObject): string => o.copyEffects?.[o.copyEffects.length - 1]?.key ?? o.copyOf ?? o.cardId;
 
+/** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? (o.faceDown === "disguise" ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : copiedId(o));
+
+/** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
   if (o.faceDown) return o.faceDown === "disguise" ? FACE_DOWN_WARD : FACE_DOWN;
-  const d = s.cards[o.copyOf ?? o.cardId];
-  if (!d) throw new Error(`missing card def ${o.copyOf ?? o.cardId}`);
+  const d = s.cards[copiedId(o)];
+  if (!d) throw new Error(`missing card def ${copiedId(o)}`);
   return d;
 };
+
+/**
+ * What a face-down permanent will be once turned face up: its card, or what a copy effect made it a copy of while
+ * face down, whose morph cost (if any) turns it face up (CR 707.3, examples).
+ */
+export const faceUpDefOf = (s: GameState, o: GameObject): CardDef => s.cards[copiedId(o)]!;
 
 /** The card itself, face up: what its owner (or controller, while it's face down, CR 708.5) sees. */
 export const realDefOf = (s: GameState, o: GameObject): CardDef => s.cards[o.cardId]!;

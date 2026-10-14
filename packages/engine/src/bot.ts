@@ -1,6 +1,6 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planTurnFaceUp } from "./autopay";
-import { abilitiesOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaActionAbility } from "./manaabilities";
 import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
@@ -295,7 +295,16 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimate = allEffects(body.effects).some((e) => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
-    const preferred = reanimate ? all : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)));
+    // "Becomes a copy of target creature": the best one anywhere, but not a legendary one of ours (the legend rule
+    // would cost us one of them) or the source itself; what becomes the copy is our weakest.
+    const copies = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "becomeCopy" }> => e.type === "becomeCopy");
+    const copied = copies.some((e) => e.of.ref === "target" && e.of.index === i);
+    const copying = copies.some((e) => e.what.ref === "target" && e.what.index === i);
+    const preferred = copied
+      ? all.filter((t) => t.kind !== "object" || (t.id !== sourceId && !(isMine(s, pid, t) && objIsLegendary(s, t.id))))
+      : reanimate
+        ? all
+        : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)));
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
     const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
     if (!pool.length) {
@@ -303,7 +312,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
       out.push({ kind: "none" });
       continue;
     }
-    out.push(best(s, pid, pool, harm[i]!, damageTo(body, i, x) + fightDamage(i)));
+    out.push(copying ? worst(s, pid, pool) : best(s, pid, pool, harm[i]!, damageTo(body, i, x) + fightDamage(i)));
   }
   // Only "up to" targets, none of them worth choosing: not worth doing.
   if (!forced && out.length && out.every((t) => t.kind === "none")) return null;
@@ -527,6 +536,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   const follows = then?.type === "if" && then.cond.kind === "youDid" ? then.effects : [];
   for (const inner of allEffects([...e.effects, ...follows])) {
     if (inner.type === "may") continue;
+    if (inner.type === "becomeCopy") {
+      v += copyGain(s, pid, inner) >= 0 ? 1 : -2;
+      continue;
+    }
     const i = targetIndexOf(inner);
     if (i !== undefined) {
       const t = targets[i];
@@ -541,6 +554,32 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     else v += 1;
   }
   return v >= 0;
+}
+
+/** A permanent's printed worth, to compare what a copy effect would make it: size for creatures, else mana value. */
+const defWorth = (d: CardDef) => (isType(d, "Creature") ? 3 * basePower(d) + baseToughness(d) : manaValue(parseManaCost(d.manaCost)));
+
+/**
+ * How much the resolving ability's source gains by becoming a copy ("you may have ~ become a copy of ..."): worse
+ * when the copy is smaller, or a legendary permanent we already control (the legend rule, CR 704.5j).
+ */
+function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becomeCopy" }>): number {
+  const item = s.resolving!.item;
+  const me = item.sourceId ? s.objects[item.sourceId] : undefined;
+  if (e.what.ref !== "self" || me?.zone !== "battlefield") return 0;
+  const t = e.of.ref === "target" ? item.targets?.[e.of.index] : undefined;
+  const sub = item.subject && s.objects[item.subject.id];
+  const d =
+    t?.kind === "object"
+      ? defOf(s, obj(s, t.id))
+      : e.of.ref === "subject" && sub
+        ? defOf(s, sub)
+        : e.of.ref === "subjectCard" && item.lki?.copyKey
+          ? s.cards[item.lki.copyKey]
+          : undefined;
+  if (!d) return 0;
+  const legend = d.supertypes.includes("Legendary") && s.battlefield.some((id) => id !== me.id && controllerOf(s, obj(s, id)) === pid && defOf(s, obj(s, id)).name === d.name);
+  return legend ? -1 : defWorth(d) - defWorth(defOf(s, me));
 }
 
 /**
@@ -775,23 +814,32 @@ function wantOnTop(s: GameState, pid: PlayerId, id: string): boolean {
   return isType(defOf(s, obj(s, id)), "Land") ? lands < 6 : mv(s, id) <= lands + 2;
 }
 
+const objIsLegendary = (s: GameState, id: ObjectId) => s.objects[id]?.zone === "battlefield" && characteristics(s, obj(s, id)).supertypes.includes("Legendary");
+
+/** The least valuable of these targets: what a copy effect should change ("target Shapeshifter becomes a copy of ..."). */
+function worst(s: GameState, pid: PlayerId, pool: ChosenTarget[]): ChosenTarget {
+  return [...pool].sort((a, b) => targetWorth(s, pid, a, false, 0) - targetWorth(s, pid, b, false, 0))[0]!;
+}
+
+/** How much a target is worth aiming at: for harmful effects, the biggest threat; for helpful ones, the most valuable. */
+function targetWorth(s: GameState, pid: PlayerId, t: ChosenTarget, harmful: boolean, damage: number): number {
+  if (t.kind === "player") return harmful ? 100 - player(s, t.id).life : player(s, t.id).life === 0 ? 0 : 1;
+  if (t.kind === "stack") return 50;
+  const o = obj(s, t.id);
+  const d = defOf(s, o);
+  // A card in a graveyard: what it would be worth back in play.
+  if (o.zone !== "battlefield") return manaValue(parseManaCost(d.manaCost)) + (isType(d, "Creature") ? 2 * (Number.parseInt(d.power ?? "0", 10) || 0) : 0) + (o.isCommander ? 10 : 0);
+  if (!objIsType(s, o, "Creature")) return 5 + manaValue(parseManaCost(d.manaCost)) - (harmful && wardCosts(s, pid, [t]).length ? 15 : 0);
+  let n = power(s, o) * 3 + toughness(s, o) + (o.isCommander ? 10 : 0);
+  if (harmful && damage > 0) n += lethalDamage(s, o) <= damage ? 50 : -100; // only burn what dies
+  if (!harmful && o.attacking !== undefined) n += 20;
+  if (harmful && wardCosts(s, pid, [t]).length) n -= 15; // ward makes it cost more
+  return n;
+}
+
 function best(s: GameState, pid: PlayerId, pool: ChosenTarget[], harmful: boolean, damage: number): ChosenTarget {
-  const threat = (t: ChosenTarget) => {
-    if (t.kind === "player") return harmful ? 100 - player(s, t.id).life : player(s, t.id).life === 0 ? 0 : 1;
-    if (t.kind === "stack") return 50;
-    const o = obj(s, t.id);
-    const d = defOf(s, o);
-    // A card in a graveyard: what it would be worth back in play.
-    if (o.zone !== "battlefield") return manaValue(parseManaCost(d.manaCost)) + (isType(d, "Creature") ? 2 * (Number.parseInt(d.power ?? "0", 10) || 0) : 0) + (o.isCommander ? 10 : 0);
-    if (!objIsType(s, o, "Creature")) return 5 + manaValue(parseManaCost(d.manaCost)) - (harmful && wardCosts(s, pid, [t]).length ? 15 : 0);
-    let n = power(s, o) * 3 + toughness(s, o) + (o.isCommander ? 10 : 0);
-    if (harmful && damage > 0) n += lethalDamage(s, o) <= damage ? 50 : -100; // only burn what dies
-    if (!harmful && o.attacking !== undefined) n += 20;
-    if (harmful && wardCosts(s, pid, [t]).length) n -= 15; // ward makes it cost more
-    return n;
-  };
   // Burn goes face only when it can't kill anything worthwhile.
-  return [...pool].sort((a, b) => threat(b) - threat(a))[0]!;
+  return [...pool].sort((a, b) => targetWorth(s, pid, b, harmful, damage) - targetWorth(s, pid, a, harmful, damage))[0]!;
 }
 
 function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {

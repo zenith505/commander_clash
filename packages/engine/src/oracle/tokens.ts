@@ -65,16 +65,24 @@ export function parseCopyExcept(text: string): CopyExcept | null {
   for (const p of parts) {
     let m: RegExpExecArray | null;
     if (/^(?:isn't|aren't|is not|are not) legendary$/.test(p)) out.notLegendary = true;
-    else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're) legendary$/.test(p)) out.legendary = true;
-    else if ((m = /^(?:is|are|it's|they're) (?:an? )?(?:(\d+)\/(\d+) )?((?:(?:white|blue|black|red|green|colorless) )*)(?:and (?:white|blue|black|red|green) )?(.+?) in addition to (?:its|their) other (?:creature )?types$/.exec(p))) {
+    else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're|he's|she's) legendary$/.test(p)) out.legendary = true;
+    // "It doesn't copy that creature's color": it keeps its own (CR 707.9c).
+    else if (/^(?:doesn't|does not) copy that creature's colou?r$/.test(p)) out.keepColors = true;
+    else if ((m = /^(?:is|are|it's|they're|he's|she's) (?:an? )?(?:(\d+)\/(\d+) )?((?:(?:white|blue|black|red|green|colorless) )*)(?:and (?:white|blue|black|red|green) )?(.+?) in addition to (?:its|their|his|her) other (?:creature )?types$/.exec(p))) {
       if (m[1]) out.pt = [Number(m[1]), Number(m[2])];
       const colors = (m[3] ?? "").trim().split(" ").filter((c) => c && c !== "colorless");
       if (colors.length) out.colors = colors.map((c) => ({ white: "W", blue: "U", black: "B", red: "R", green: "G" })[c]) as Color[];
       const words = m[4]!.split(" ").map((w) => w.replace(/s$/, "")).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
       if (words.some((w) => !/^[A-Z][a-z]+$/.test(w))) return null;
-      out.addTypes = words.filter((w) => COPY_CARD_TYPES.has(w));
-      out.addSubtypes = words.filter((w) => !COPY_CARD_TYPES.has(w));
-    } else if ((m = /^(?:'s|’s|is|are|it's|they're) (\d+)\/(\d+)$/.exec(p))) out.pt = [Number(m[1]), Number(m[2])];
+      // "It's legendary in addition to its other types": a supertype (CR 205.4). Other supertypes aren't modeled here.
+      if (words[0] === "Legendary") {
+        out.legendary = true;
+        words.shift();
+      }
+      if (words.some((w) => ["Basic", "Snow", "World", "Legendary"].includes(w))) return null;
+      if (words.some((w) => COPY_CARD_TYPES.has(w))) out.addTypes = words.filter((w) => COPY_CARD_TYPES.has(w));
+      if (words.some((w) => !COPY_CARD_TYPES.has(w))) out.addSubtypes = words.filter((w) => !COPY_CARD_TYPES.has(w));
+    } else if ((m = /^(?:'s|’s|is|are|it's|they're|he's|she's) (\d+)\/(\d+)$/.exec(p))) out.pt = [Number(m[1]), Number(m[2])];
     else if ((m = /^(?:has|have) (.+)$/.exec(p))) {
       for (const piece of m[1]!.split(/,? and (?=\u0000)|, (?=\u0000)|(?<=\u0000) and /)) {
         const q = /^\u0000(\d+)\u0000$/.exec(piece.trim());
@@ -83,6 +91,11 @@ export function parseCopyExcept(text: string): CopyExcept | null {
           continue;
         }
         for (const kw of piece.split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean)) {
+          // "Except it has this ability": the copy effect's own ability (CR 707.9a), bound to its text by compile().
+          if (kw === "this ability") {
+            out.thisAbility = true;
+            continue;
+          }
           const simple = parseKeywordList(kw);
           if (simple) (out.keywords ??= []).push(...simple);
           else if (/^[a-z]+(?: [a-z]+)?(?: \d+)?$/.test(kw)) (out.text ??= []).push(capital(kw)); // "dethrone", "vanishing 3"

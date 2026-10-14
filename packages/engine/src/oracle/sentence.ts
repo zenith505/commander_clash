@@ -11,6 +11,7 @@ import { parseZonesSentence } from "./sentences/zones";
 import { parsePermanentsSentence } from "./sentences/permanents";
 import { parseTokensSentence } from "./sentences/tokens";
 import { parseSpellsSentence } from "./sentences/spells";
+import { parseCopiesSentence } from "./sentences/copies";
 
 /**
  * The sentences after "Look at (Reveal) the top N cards of your library": which to take ("Put one of them
@@ -40,7 +41,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
 }
 
 /** The sentence parsers, tried in this order; the first that recognizes the sentence decides (null = can't compile). */
-const SENTENCE_PARSERS = [parseBasicsSentence, parseZonesSentence, parsePermanentsSentence, parseTokensSentence, parseSpellsSentence];
+const SENTENCE_PARSERS = [parseCopiesSentence, parseBasicsSentence, parseZonesSentence, parsePermanentsSentence, parseTokensSentence, parseSpellsSentence];
 
 /** One sentence of an ability's text to effects, or null if it can't be compiled. */
 export function parseSentence(s: string, ctx: Ctx): Effect[] | null {

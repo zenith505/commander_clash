@@ -1,0 +1,21 @@
+// Executes the effect language: legal targets, resolving ability bodies, and the triggered-ability queue.
+//
+//   targeting.ts     legal targets and modes (CR 115, 700.2)
+//   resolve.ts       resolving a spell or ability body step by step; pausing for choices; which objects/players a reference means
+//   run-*.ts         what each effect does, grouped by area (run-basics, run-zones, run-permanents, run-tokens,
+//                    run-spells, run-library, run-choices); resolve.ts dispatches on the effect type
+//   triggers.ts      events, triggered abilities and the trigger queue (CR 603)
+//   describe.ts      text for costs, destinations and changes
+//   heuristics.ts    estimates the bots use (is this harmful, how much damage)
+
+export { objectMatches, bindChosen, ENTERS_COUNTER, choiceOptions, withChoice, sourceQuality, printedMatches, isLegalTarget, legalTargets, sameTarget, canChooseTarget, targetProblem, stampTargets, hasLegalTargets, legalModes, canChooseModes, modesProblem, pickOptions } from "./targeting";
+export { beginResolution, continueResolution, type Resolution } from "./resolve";
+export { becomeMonarch } from "./run-basics";
+export { harmfulCounter } from "./run-permanents";
+export { tokenDef } from "./run-tokens";
+export { unlessCost, addDelayed, kickedMatches } from "./run-spells";
+export { discardCards } from "./run-library";
+export { canPayNow, timesPay } from "./run-choices";
+export { COLOR_NAMES, describePay, describeDest, describeMods } from "./describe";
+export { inCombat, attackDefault, echoDue, evolves, fireEvent, processTriggerQueue, checkStateTriggers, triggerBody, pushTrigger, type TriggerSourceEvent } from "./triggers";
+export { doesNothingNow, harmfulTargets, modsAreHarmful, damageTo, lethalDamage, estimate } from "./heuristics";

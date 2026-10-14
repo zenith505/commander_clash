@@ -4,6 +4,7 @@ import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { pickFilter } from "./targets";
+import { parseStaticCondition } from "./statics";
 
 export function parseActivated(line: string): ActivatedAbility | "fail" | null {
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
@@ -40,6 +41,14 @@ export function parseActivated(line: string): ActivatedAbility | "fail" | null {
     oncePerTurn = limit[1]!.includes("once");
     effectText = effectText.slice(0, limit.index);
   }
+  // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
+  let activateIf: ActivatedAbility["activateIf"];
+  const onlyIf = / Activate only if ([^.]+)\.$/.exec(effectText);
+  if (onlyIf) {
+    activateIf = parseStaticCondition(onlyIf[1]!, { affects: { kind: "self" }, mods: [], text: "" }) ?? undefined;
+    if (!activateIf) return "fail";
+    effectText = effectText.slice(0, onlyIf.index);
+  }
   const life = /Pay (\d+) life/.exec(costs);
   const energy = energyIn(costs);
   if (energy < 0) return "fail";
@@ -63,6 +72,7 @@ export function parseActivated(line: string): ActivatedAbility | "fail" | null {
     body,
     text: line,
     ...(oncePerTurn ? { oncePerTurn } : {}),
+    ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(energy ? { energyCost: energy } : {}),
     ...(extra.length ? { costs: extra } : {}),

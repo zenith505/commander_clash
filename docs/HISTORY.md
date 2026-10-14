@@ -41,3 +41,4 @@ the full write-ups were in `docs/PLAN.md` until the restructure: `git show $(git
 | 2026-10-10 | Copies: clones, token copies, populate, embalm, eternalize | 11,577 | copies.test.ts |
 | 2026-10-11 | Beginning and end of combat, myriad | 11,752 | combat-steps.test.ts |
 | 2026-10-14 | Copying spells: Twincast, storm, replicate, magecraft | 11,802 | spell-copies.test.ts |
+| 2026-10-14 | Split second, devour, exploit, ascend and the city's blessing; "activate only if", "if ..., ... instead" | 11,881 | split-second-devour-exploit-ascend.test.ts |

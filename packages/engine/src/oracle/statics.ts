@@ -50,6 +50,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as ([^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
+  // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
+  // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
+  else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   if (!statement || !cond) return null;
   const st = parseStatic(`${statement.replace(/^(it|this creature|this permanent)\b/i, "~")}.`);
   if (!st || st.condition) return null;
@@ -117,6 +121,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
+  if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
   // "It" is the source only when the ability is about the source itself.
   const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified)$/.exec(text);

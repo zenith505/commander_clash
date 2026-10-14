@@ -1,4 +1,4 @@
-import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
@@ -479,6 +479,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.chosen = undefined;
+  if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   o.counters = {};
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
@@ -541,9 +542,9 @@ function finishEntering(s: GameState, o: GameObject, printed: CompiledCard, opts
   if (opts.escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
-  // Riot and unleash: whether it has a +1/+1 counter is part of how it enters (CR 614.12), so what it
+  // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
-  const options = printed.entersOptions ?? [];
+  const options: EntersOption[] = [...(printed.devour ? (["devour"] as const) : []), ...(printed.entersOptions ?? [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
 }
@@ -978,6 +979,36 @@ export function canActAtSorcerySpeed(s: GameState, pid: PlayerId) {
   return !s.pending && s.activePlayer === pid && s.priority === pid && isMainPhase(s) && s.stack.length === 0;
 }
 
+/**
+ * Split second (CR 702.61a-b): while a spell with it is on the stack, players can't cast spells or activate
+ * abilities that aren't mana abilities. Mana abilities, special actions (turning a face-down creature face up)
+ * and triggered abilities still work; so does a spell's split second only while it's on the stack.
+ */
+export function splitSecondOnStack(s: GameState): boolean {
+  return s.stack.some((x) => x.kind === "spell" && !!x.objectId && !!s.objects[x.objectId] && objHasKeyword(s, s.objects[x.objectId]!, "Split second"));
+}
+
+/**
+ * The city's blessing (CR 702.131): a player who controls ten or more permanents gets it, if a permanent they
+ * control has ascend (`any`: always, for a resolving ascend spell). Once they have it, it's theirs for the rest
+ * of the game. Continuous effects that care see it right away (CR 702.131d).
+ */
+export function giveCitysBlessing(s: GameState, pid: PlayerId, any = false): boolean {
+  const p = player(s, pid);
+  if (p.citysBlessing || p.lost) return false;
+  const mine = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === pid);
+  if (mine.length < 10 || (!any && !mine.some((o) => objHasKeyword(s, o, "Ascend")))) return false;
+  p.citysBlessing = true;
+  invalidateCharacteristics(s);
+  log(s, `${p.name} gets the city's blessing.`);
+  return true;
+}
+
+/** Ascend on permanents (CR 702.131b) isn't a triggered ability: it applies any time its condition is true. */
+export function checkAscend(s: GameState) {
+  for (const p of s.players) giveCitysBlessing(s, p.id);
+}
+
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
   return o.zone === "exile" && o.mayPlay?.player === pid && o.mayPlay.zc === (o.zoneChanges ?? 0);
@@ -1107,6 +1138,8 @@ export function castProblem(
     if (via || free) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
   }
   if (isType(d, "Land")) return "lands are played, not cast";
+  // Also a spell cast as an ability resolves, like cascade's (split second rulings).
+  if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
   const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash");
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
@@ -1530,10 +1563,12 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
   } else if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (s.priority !== pid || s.pending) return "you don't have priority";
+  if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid)) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
+  if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
   if (ab.lifeCost && p.life < ab.lifeCost) return `you can't pay ${ab.lifeCost} life`; // CR 119.4
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
@@ -1700,8 +1735,18 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
-  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("nothing to pick");
-  if (new Set(ids).size !== pend.count || ids.some((id) => !pend.options.includes(id))) throw new RulesError(`choose exactly ${pend.count} of the permanents offered`);
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
+  if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
+  const n = new Set(ids).size;
+  if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
+    throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
+  if (pend.objectId) {
+    s.pending = null;
+    const entry = s.entersChoices?.shift();
+    devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
+    return;
+  }
+  if (!r?.scratch?.queue) throw new RulesError("nothing to pick");
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;
@@ -1739,6 +1784,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
 function chooseOption(s: GameState, p: Player, choice: string) {
   const pend = s.pending;
   if (pend?.kind !== "chooseOption" || pend.player !== p.id) throw new RulesError("nothing to choose");
+  if (pend.what === "devour") throw new RulesError("devour is chosen by picking permanents");
   if (!pend.options.includes(choice)) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : "an option"} you can choose`);
   s.pending = null;
   if (pend.objectId) {
@@ -1770,6 +1816,34 @@ function chooseOption(s: GameState, p: Player, choice: string) {
 }
 
 /**
+ * Devour (CR 702.82a-b): the chosen permanents are sacrificed as it enters, and it enters with N +1/+1 counters
+ * for each (Thromok: X for each, where X is how many). What it devoured is remembered for "for each creature it
+ * devoured". Then it has entered, and its enters abilities trigger.
+ */
+function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x?: number }) {
+  const d = defOf(s, o);
+  const devour = compileCard(d).devour;
+  s.leftTogether = undefined; // sacrificed all at once
+  let n = 0;
+  for (const id of ids) {
+    const x = s.objects[id];
+    if (x?.zone !== "battlefield") continue;
+    log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} to ${d.name}'s devour.`);
+    moveObject(s, id, "graveyard");
+    n++;
+  }
+  s.leftTogether = undefined;
+  o.devoured = n;
+  if (n && devour) {
+    invalidateCharacteristics(s);
+    const put = putCounters(s, o, "+1/+1", n * (devour.n === "devoured" ? n : devour.n), true);
+    log(s, `${d.name} devours ${n} and enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+  }
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
+/**
  * Ask for the next "as ~ enters, choose ..." choice still to be made. It's made as the permanent
  * enters (CR 614.12), so before state-based actions and before its enters triggers go on the stack.
  */
@@ -1781,6 +1855,20 @@ function askEntersChoice(s: GameState): boolean {
     if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== c.zc) {
       q.shift();
       continue;
+    }
+    if (c.what === "devour") {
+      // Devour (CR 702.82a): any number of the other permanents its controller controls that match. It isn't on
+      // the battlefield yet as they're chosen, so it can't devour itself.
+      const devour = compileCard(defOf(s, o)).devour;
+      const you = controllerOf(s, o);
+      const options = devour ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, devour.filter, obj(s, id), you, false)) : [];
+      if (!options.length) {
+        q.shift();
+        devourChosen(s, o, [], c.enters);
+        continue;
+      }
+      s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id };
+      return true;
     }
     if (c.what === "copy") {
       // "You may have ~ enter as a copy of ...": any of them, or none (CR 707.5).
@@ -2135,6 +2223,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
     invalidateCharacteristics(s);
     syncControl(s);
+    checkAscend(s);
     let changed = false;
     for (const p of s.players) {
       if (p.lost) continue;

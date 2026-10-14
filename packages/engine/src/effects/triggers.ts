@@ -1,6 +1,6 @@
 import type { AbilityBody, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { describeTargets, draw, log, obj, opponents, player } from "../game";
+import { checkAscend, describeTargets, draw, log, obj, opponents, player } from "../game";
 import { controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { withModes } from "../modes";
 import { compileCard } from "../oracle";
@@ -73,7 +73,12 @@ export type TriggerSourceEvent =
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   | { type: "targeted"; stackId: string }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
-  | { type: "draw"; player: PlayerId; nth: number };
+  | { type: "draw"; player: PlayerId; nth: number }
+  /**
+   * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
+   * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
+   */
+  | { type: "exploits"; exploiter: ObjectId; controller: PlayerId; victim: GameObject; chars: Characteristics; watchers: { id: ObjectId; triggers: TriggeredAbility[] }[] };
 
 /**
  * Echo (CR 702.30a): "if this permanent came under your control since the beginning of your last
@@ -171,6 +176,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   if (ev.type === "enters") {
     // Static effects apply as it enters, before checking what triggers (CR 611.3c).
     invalidateCharacteristics(s);
+    // So does ascend: the tenth permanent gives the city's blessing before anything else happens (CR 702.131b, d).
+    checkAscend(s);
     const entering = obj(s, ev.id);
     const you = controllerOf(s, entering);
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
@@ -345,6 +352,23 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (!o || o.zone !== "battlefield") continue;
       const you = controllerOf(s, o);
       add(o, you, (e) => (e === "becomesTargetOfOpponent" && you !== item!.controller) || e === "selfBecomesTarget", undefined, ev.stackId);
+    }
+  } else if (ev.type === "exploits") {
+    const lki = { power: ev.chars.power, toughness: ev.chars.toughness };
+    for (const w of ev.watchers) {
+      const o = s.objects[w.id];
+      if (!o) continue;
+      add(
+        o,
+        ev.controller,
+        (e, t) =>
+          (e === "selfExploits" && w.id === ev.exploiter) ||
+          (e === "creatureYouControlExploits" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, ev.victim, ev.controller, false, undefined, ev.chars))),
+        w.triggers,
+        undefined,
+        ev.victim,
+        lki,
+      );
     }
   } else if (ev.type === "draw") {
     for (const id of s.battlefield) {

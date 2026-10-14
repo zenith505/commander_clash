@@ -1,5 +1,5 @@
 import type { CounterKind, Effect } from "../abilities";
-import { defOf, isPermanentCard } from "../cards";
+import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
 import { auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
@@ -8,7 +8,7 @@ import { pickOptions } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { tokenCopies } from "./run-tokens";
 import { addDelayed } from "./run-spells";
-import { inCombat } from "./triggers";
+import { fireEvent, inCombat } from "./triggers";
 
 /** Put an exiled card onto the battlefield; an Aura needs something to enchant, or it stays in exile (CR 303.4f-g). */
 function returnFromExile(s: GameState, c: GameObject, controller: PlayerId, src: string, counter?: CounterKind) {
@@ -69,9 +69,45 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     }
 }
 
+/**
+ * Exploit (CR 702.110a-b): its controller may sacrifice a creature, chosen as this resolves (rulings), the
+ * exploiting creature itself included. Only a source still on the battlefield exploits it. Abilities that
+ * trigger on that look back in time, as for any sacrifice (CR 603.10a): the sacrificed creature's own count.
+ */
+function exploit(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const pid = ctx.controller;
+  if (!sc.queue) {
+    const options = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+    if (!options.length) return;
+    sc.queue = [pid];
+    sc.chosen = {};
+    s.pending = { kind: "pickPermanents", player: pid, source: src, action: "sacrifice", what: "creature", options, count: 1, min: 0 };
+    return "paused";
+  }
+  const victim = s.objects[sc.chosen?.[pid]?.[0] ?? ""];
+  if (victim?.zone !== "battlefield") {
+    log(s, `${player(s, pid).name} doesn't sacrifice a creature to ${src}'s exploit.`);
+    return;
+  }
+  const exploiter = objects(s, { ref: "self" }, ctx)[0];
+  const watchers = s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => controllerOf(s, o) === pid)
+    .map((o) => ({ id: o.id, triggers: abilitiesOf(s, o).triggers }))
+    .filter((w) => w.triggers.some((t) => t.event === "selfExploits" || t.event === "creatureYouControlExploits"));
+  const snapshot: GameObject = { ...victim, counters: { ...victim.counters } };
+  const chars = characteristics(s, victim);
+  log(s, `${player(s, pid).name} sacrifices ${defOf(s, victim).name} (${src}'s exploit).`);
+  moveObject(s, victim.id, "graveyard");
+  if (exploiter) fireEvent(s, { type: "exploits", exploiter: exploiter.id, controller: pid, victim: snapshot, chars, watchers });
+}
+
 /** Moving permanents and cards between zones: destroy, exile, bounce, reanimate, flicker, sacrifice, ninjutsu, impulse draw. */
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "exploit":
+      return exploit(s, ctx, src);
     case "returnToBattlefield": {
       // Persist and undying return the card that was put into the graveyard, if it's still there as that
       // same object (CR 400.7), under its owner's control.

@@ -200,6 +200,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
+    // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
+    const insteadOf = ifState && !/^(it|~)\b/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    if (ifState && insteadOf) {
+      const previous = effects.slice(prevStart);
+      const t = ifState[2]!.replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "");
+      const before = ctx.targets.length;
+      const inner = parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+      // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
+      // instead would leave nothing done on a "no").
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => PAUSING.has(e.type))) return null;
+      effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: inner, otherwise: previous });
+      continue;
+    }
     if (ifState && stateCond) {
       const inner = parseOne(ifState[2]!.charAt(0).toUpperCase() + ifState[2]!.slice(1), ctx);
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.

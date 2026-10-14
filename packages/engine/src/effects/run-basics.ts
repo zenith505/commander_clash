@@ -1,6 +1,6 @@
 import type { Effect } from "../abilities";
 import { defOf, objIsType, power, toughness } from "../cards";
-import { draw, gainLife, log, player } from "../game";
+import { draw, gainLife, giveCitysBlessing, log, player } from "../game";
 import { MONARCH } from "../oracle";
 import { dealDamage, objectSource } from "../damage";
 import type { GameObject, GameState, PlayerId } from "../types";
@@ -10,6 +10,9 @@ import { fireEvent } from "./triggers";
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "ascend":
+      giveCitysBlessing(s, ctx.controller, true); // CR 702.131a
+      return;
     case "damage": {
       const amount = amountNow(s, e.amount, ctx);
       const all = [e.to, ...(e.also ?? [])].map((to) => damageRecipients(s, to, ctx));

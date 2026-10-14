@@ -29,7 +29,7 @@ import {
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
 import { castingBody, compileCard } from "./oracle";
-import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PlayerId } from "./types";
+import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_PROTECTION } from "./keywords";
 
@@ -85,6 +85,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
+    if (pend.kind === "pickPermanents" && pend.min !== undefined) return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
       // Riot: haste when it can still attack this turn, the counter otherwise. Unleash: the counter, unless we need blockers.
@@ -486,6 +487,21 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);
   };
   return [...options].sort((a, b) => cost(a) - cost(b)).slice(0, count);
+}
+
+/**
+ * Devour (any number) and exploit (none or one): sacrifice only what's worth less than what we get. Devour N gives
+ * +N/+N for each, so tokens up to that size go; exploit's payoff is worth a small token or a small creature.
+ */
+function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "pickPermanents" }>): ObjectId[] {
+  const ok = pend.options.map((id) => obj(s, id)).filter((o) => !o.isCommander && !objIsType(s, o, "Land"));
+  if (pend.objectId) {
+    const n = compileCard(defOf(s, obj(s, pend.objectId))).devour?.n;
+    const per = typeof n === "number" ? n : 2;
+    return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2 * per).map((o) => o.id).slice(0, pend.count);
+  }
+  const cheapest = ok.sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+  return cheapest && (cheapest.isToken || worth(s, pid, cheapest) <= 3) ? [cheapest.id] : [];
 }
 
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;

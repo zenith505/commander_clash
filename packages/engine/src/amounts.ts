@@ -100,6 +100,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).filter((i) => c.which === undefined || i === c.which).length;
     case "wasKicked":
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
+    case "devoured": {
+      // "For each creature it devoured" (CR 702.82b): the source, also after it left the battlefield (CR 608.2h).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o) return 0;
+      const zc = o.zoneChanges ?? 0;
+      const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
+      return same ? (o.devoured ?? 0) : 0;
+    }
     case "power":
     case "toughness":
     case "manaValue": {

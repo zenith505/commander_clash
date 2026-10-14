@@ -117,6 +117,8 @@ export interface GameObject {
   exileIfLeaves?: ZoneName;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
+  /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
+  devoured?: number;
 }
 
 export interface Player {
@@ -150,6 +152,8 @@ export interface Player {
   draws?: { turn: number; n: number };
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
+  /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
+  citysBlessing?: boolean;
   isBot: boolean;
 }
 
@@ -334,9 +338,11 @@ export type PendingDecision =
   | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption; options: string[]; labels?: string[]; objectId?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
-   * (your own permanents) as a spell or ability resolves.
+   * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
+   * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
+   * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId }
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
   /**
    * A copy of a spell may get new targets (CR 707.10c): keep them all, or choose new legal ones. `copyOf` is the

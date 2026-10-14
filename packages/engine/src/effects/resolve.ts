@@ -291,6 +291,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "draw":
     case "getEnergy":
     case "becomeMonarch":
+    case "ascend":
     case "gainLife":
     case "loseLife":
     case "fight":
@@ -312,6 +313,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnExiled":
     case "exileIfDies":
     case "sacrifice":
+    case "exploit":
     case "ninjutsu":
     case "impulse":
       return runZonesEffect(s, e, ctx, src);

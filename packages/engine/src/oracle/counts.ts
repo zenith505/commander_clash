@@ -55,6 +55,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "devotion", colors: [m[1]!, m[2]].filter(Boolean).map((w) => COLOR_WORDS[w!.toLowerCase()]!) });
   // Domain.
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
+  // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
+  if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
   // Multikicker: "for each time it was kicked", "the number of times ~ was kicked" (CR 702.33d).
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".

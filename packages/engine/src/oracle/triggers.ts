@@ -39,13 +39,14 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of each player's draw step, (.+)$/, "eachDrawStep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
+  [/^When(?:ever)? ~ exploits a creature, (.+)$/, "selfExploits"],
   // Heroic (an ability word): "Whenever you cast a spell that targets ~".
   [/^Whenever you cast a spell that targets ~, (.+)$/, "selfTargetedByYourSpell"],
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
-  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved",
+  "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
 ];
 
@@ -204,6 +205,18 @@ function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}) }, body };
 }
 
+/** "Whenever a creature you control exploits a nontoken creature" (CR 702.110b): the exploited creature is the subject. */
+function parseExploitsTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever a creature you control exploits an? (.+?), (.+)$/.exec(line);
+  if (!m) return null;
+  const filter = m[1] === "creature" ? undefined : parseTargetPhrase(m[1]!);
+  if (filter === null || (filter && filter.kind !== "object")) return "fail";
+  if (/\bexploited\b/.test(m[2]!)) return "fail"; // "the exploited creature" isn't modeled
+  const body = parseBody(m[2]!);
+  if (!body) return "fail";
+  return { event: "creatureYouControlExploits", body, ...(filter ? { subjectFilter: { ...filter, text: m[1]! } } : {}) };
+}
+
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
@@ -236,6 +249,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (dies) return dies;
   const group = parseGroupTrigger(line);
   if (group) return group;
+  const exploits = parseExploitsTrigger(line);
+  if (exploits) return exploits;
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
   const st = /^When (you control no .+?), (.+)$/.exec(line);
   if (st) {

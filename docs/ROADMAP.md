@@ -1,6 +1,6 @@
 # Roadmap
 
-11,802 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+11,881 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,13 +14,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. **Split second, exploit, devour, ascend.** Devour alone blocks 10 cards.
-2. **Soulbond, Choose a Background, "can block an additional creature".** Backgrounds are an unsupported subtype
+1. **Soulbond, Choose a Background, "can block an additional creature".** Backgrounds are an unsupported subtype
    today (`UNSUPPORTED_SUBTYPES` in `oracle/compile.ts`).
-3. **"Becomes a copy"** (CR 707.4, layer 1), and copying double-faced or face-down permanents.
-4. **Madness, suspend, bestow, dredge, casualty.**
-5. **CR 732 loop shortcuts.**
-6. Then by `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
+2. **"Becomes a copy"** (CR 707.4, layer 1), and copying double-faced or face-down permanents.
+3. **Madness, suspend, bestow, dredge, casualty.**
+4. **CR 732 loop shortcuts.**
+5. Then by `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
    "assign combat damage as though it weren't blocked", flash with a cleanup sacrifice, Start your engines!.
 
 ## Known gaps (from earlier rounds)
@@ -37,6 +36,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".
 - "Copy target activated or triggered ability" (Strionic Resonator).
+- Split second granted or conditional (Samut, Molten Disaster's "if it was kicked", Shadow the Hedgehog).
+- Exploit granted to other creatures (Colonel Autumn, Henry Wu), "the exploited creature", "if it exploited that
+  creature"; devour on tokens (Dragon Broodmother), "the number of Goblins it devoured".
+- City's blessing text: "those creatures get +2/+2 instead", "half the creatures they control", "has hexproof and
+  can't be blocked", "exile those tokens unless you have the city's blessing".
 
 ## Later
 

@@ -957,7 +957,7 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 - **Populate** (CR 701.36): copy a creature token you control (not targeted; you choose if you have several).
 - **Embalm and eternalize** (CR 702.128, 702.129): from your graveyard, at sorcery speed, exile the card to create a
   token copy of it: white Zombie with no mana cost, or 4/4 black Zombie.
-- Not yet: "becomes a copy" (CR 707.4), copying spells (Twincast, storm), copying double-faced or
+- Not yet: "becomes a copy" (CR 707.4), copying double-faced or
   face-down permanents.
 
 **11,577 cards are fully supported.** Rules tests: `test/copies.test.ts`.
@@ -981,6 +981,23 @@ discard, fight, Treasure/Food tokens, scry, proliferate, "counter unless its con
 - Play-testing: `?board=Card A|Card B` in the URL starts those cards (from your deck) on your battlefield.
 
 **11,752 cards are fully supported.** Rules tests: `test/combat-steps.test.ts`.
+
+### Copying spells: Twincast, storm, replicate, magecraft (added 2026-10-14)
+
+- **"Copy target instant or sorcery spell"** (CR 707.10): the copy goes on the stack above the original with the same
+  choices (targets, X, kicker, modes). It isn't cast, so "whenever you cast" abilities don't trigger, and it ceases
+  to exist when it leaves the stack (707.10a). "You may choose new targets for the copy" (707.10c) asks the copy's
+  controller to keep the targets or pick new legal ones; in the game a bar shows the copied spell.
+- **A copy of a permanent spell** becomes a token as it resolves (CR 608.3f).
+- **Storm** (CR 702.40): when you cast it, copy it for each other spell cast before it this turn, by anyone.
+- **Replicate** (CR 702.56): pay the replicate cost any number of times; copy it that many times.
+- **"Whenever you cast an instant or sorcery spell, copy it"** and **"when you cast this spell, copy it"**.
+- **Magecraft, "whenever you cast or copy"**: triggers for copies too.
+- **"When you next cast an instant or sorcery spell this turn, copy that spell"** (Doublecast): a delayed trigger
+  (CR 603.7) that happens once, then is gone; it ends with the turn.
+- Not yet: casualty, "copy target activated or triggered ability" (Strionic Resonator).
+
+**11,802 cards are fully supported.** Rules tests: `test/spell-copies.test.ts`.
 
 ## Roadmap
 

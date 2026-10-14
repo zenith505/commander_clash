@@ -1,7 +1,7 @@
 // Copies of spells (CR 707.10): Twincast, storm (702.40), replicate (702.56), "whenever you cast ..., copy it".
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, mountain, passUntil, putOnBattlefield, setup } from "./helpers";
 import { isFullySupported, planCast, waitingOn, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.oracleText).toBe(true));
@@ -105,5 +105,45 @@ describe("copying spells", () => {
     expect(bears).toHaveLength(2);
     expect(bears.filter((x) => s.objects[x]!.isToken)).toHaveLength(1);
     void lives;
+  });
+  it("magecraft ('cast or copy') triggers for copies too; a plain cast trigger doesn't", () => {
+    const mage = card("Magecraft Test", "Creature — Human Wizard", "{1}{R}", { power: "1", toughness: "1", oracleText: "Whenever you cast or copy an instant or sorcery spell, put a +1/+1 counter on this creature." });
+    const plain = card("Plain Cast Test", "Creature — Human Wizard", "{1}{R}", { power: "1", toughness: "1", oracleText: "Whenever you cast an instant or sorcery spell, put a +1/+1 counter on this creature." });
+    supported(mage, plain);
+    const { s: s0, ap, opp, ids } = setup([shock, twincast]);
+    const m = putOnBattlefield(s0, ap, mage);
+    const p = putOnBattlefield(s0, ap, plain);
+    let s = castOnly(s0, ap, ids[0]!, [player(opp)]);
+    s = castOnly(s, ap, ids[1]!, [{ kind: "stack", id: s.stack.find((x) => x.description === "Shock Test")!.id }]);
+    s = settle(s);
+    s = settle(act(s, { type: "copyTargets", player: ap }));
+    expect(s.objects[m]!.counters["+1/+1"]).toBe(3); // Shock, Twincast, the copy
+    expect(s.objects[p]!.counters["+1/+1"]).toBe(2);
+  });
+
+  it("'when you next cast an instant or sorcery spell this turn, copy that spell' (Doublecast) applies once", () => {
+    const doublecast = card("Doublecast Test", "Sorcery", "{R}{R}", { oracleText: "When you next cast an instant or sorcery spell this turn, copy that spell. You may choose new targets for the copy." });
+    supported(doublecast);
+    const { s: s0, ap, opp, ids } = setup([doublecast, shock, shock]);
+    putOnBattlefield(s0, ap, mountain);
+    let s = settle(castOnly(s0, ap, ids[0]!));
+    expect(s.pending).toBeFalsy(); // it doesn't copy itself
+    s = settle(castOnly(s, ap, ids[1]!, [player(opp)]));
+    expect(s.pending?.kind).toBe("copyTargets");
+    s = settle(act(s, { type: "copyTargets", player: ap }));
+    expect(s.players[opp]!.life).toBe(40 - 4);
+    s = settle(castOnly(s, ap, ids[2]!, [player(opp)]));
+    expect(s.pending).toBeFalsy();
+    expect(s.players[opp]!.life).toBe(40 - 6);
+  });
+
+  it("a delayed 'next cast' from an earlier turn expires", () => {
+    const doublecast = card("Doublecast Test", "Sorcery", "{R}{R}", { oracleText: "When you next cast an instant or sorcery spell this turn, copy that spell." });
+    const { s: s0, ap, opp, ids } = setup([doublecast, shock]);
+    let s = settle(castOnly(s0, ap, ids[0]!));
+    expect(s.nextCast).toHaveLength(1);
+    s = passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % s.turnOrder.length]!);
+    expect(s.nextCast ?? []).toHaveLength(0);
+    void opp;
   });
 });

@@ -489,6 +489,11 @@ function compile(d: CardDef): CompiledCard {
       out.statics.push(st);
       continue;
     }
+    // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
+    if (isSpell && /^When you next cast /.test(line)) {
+      spellLines.push(line);
+      continue;
+    }
     const trig = parseTrigger(line);
     if (trig) {
       if (trig === "fail") out.unsupported.push(raw);

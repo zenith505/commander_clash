@@ -36,6 +36,8 @@ import {
   blockRequirementProblem,
   maxBlocks,
   pairedWith,
+  cardIdOf,
+  realDefOf,
   legalTargets,
   characteristics,
   modifications,
@@ -1256,6 +1258,9 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
     .join("\n");
   const stolen = c.controller !== o.owner;
   const paired = pairedWith(s, o);
+  // A copy (CR 707): it looks like what it copies, so say what it really is.
+  const copying = !o.faceDown && cardIdOf(o) !== o.cardId ? cardOf(s, o.id) : undefined;
+  const copyEnds = o.copyEffects?.[o.copyEffects.length - 1]?.until;
   return (
     <>
       {(m.grantedKeywords.length > 0 || m.grantedAbilities.length > 0 || m.lostKeywords.length > 0 || m.lostAllAbilities) && (
@@ -1309,6 +1314,14 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {paired && (
           <span className="chip other" title={`Paired with ${cardOf(s, paired.id).name} (soulbond).`}>
             Paired
+          </span>
+        )}
+        {copying && (
+          <span
+            className={`chip ${copyEnds ? "temp" : "other"}`}
+            title={`${realDefOf(s, o).name}, a copy of ${copying.name}${copyEnds === "endOfTurn" ? " until end of turn" : copyEnds ? ` until ${s.players[copyEnds.turnOf]!.name}'s next turn` : ""}.`}
+          >
+            Copy
           </span>
         )}
       </span>

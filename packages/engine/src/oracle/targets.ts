@@ -83,6 +83,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
   if (x === "~") return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
   if (ctx.subjectIt && /^that (land|artifact|enchantment|token|[A-Z][a-z]+)$/.test(x) && ctx.lastObjectTarget === undefined) return { ref: "subject" };
+  // A legendary character's "him" or "her" is the card itself ("Then put a +1/+1 counter on her").
+  if (/^(him|her)$/i.test(x) && !ctx.spell) return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && /^it$/i.test(x)) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
@@ -302,7 +304,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   const notSubtypes: string[] = [];
   const subtypes: string[] = [];
   const SUPERTYPE_WORDS: Record<string, string> = { basic: "Basic", legendary: "Legendary", snow: "Snow" };
-  const alts = p ? p.split(/ or |, /) : [];
+  const alts = p ? p.split(/,? or |, /) : [];
   // "artifact creature" is one object with both types; "artifact or creature" is either.
   const typeWords = alts.map((alt) => alt.trim().split(/\s+/).filter((w) => TYPE_WORDS[w]).length);
   if (typeWords.some((n) => n > 1) && alts.length > 1) return null;
@@ -319,9 +321,11 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
         if (COLOR_WORDS[rest]) notColors.push(COLOR_WORDS[rest]!);
         else if (TYPE_WORDS[rest]) notTypes.push(TYPE_WORDS[rest]!);
         else if (SUPERTYPE_WORDS[rest]) notSupertypes.push(SUPERTYPE_WORDS[rest]!);
-        else if (alts.length === 1 && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall"
+        else if (alts.length === 1 && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura"
         else return null;
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
+      // "Nonlegendary attacking creature": attacking after a supertype.
+      else if ((w === "attacking" || w === "blocking") && alts.length === 1 && !extra.combat) extra.combat = w;
       else if (CREATURE_TYPES.has(capital(w)) || BASIC_TYPES.includes(capital(w))) subtypes.push(capital(w));
       else if (COLOR_WORDS[w]) colors.push(COLOR_WORDS[w]!);
       else if (SUPERTYPE_WORDS[w]) supertypes.push(SUPERTYPE_WORDS[w]!);

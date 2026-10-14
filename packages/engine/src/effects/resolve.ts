@@ -12,6 +12,7 @@ import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
 import { runTokensEffect, createToken } from "./run-tokens";
+import { runCopiesEffect } from "./run-copies";
 import { runSpellsEffect, addDelayed } from "./run-spells";
 import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
@@ -339,6 +340,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "continuous":
     case "attach":
       return runPermanentsEffect(s, e, ctx, src);
+    case "becomeCopy":
+      return runCopiesEffect(s, e, ctx);
     case "myriad":
     case "createTokenCopy":
     case "createToken":

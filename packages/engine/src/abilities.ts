@@ -455,6 +455,12 @@ export type Effect =
   /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
   /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
   | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean }
+  /**
+   * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
+   * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with
+   * the exceptions (CR 707.9), for the rest of the game, until end of turn, or until its controller's next turn.
+   */
+  | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" }
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
   | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean }
   | { type: "mill"; who: PlayerRef; n: Amount }
@@ -816,8 +822,11 @@ export interface CompiledCard {
    * a +1/+1 counter. Chosen as it enters, by its controller.
    */
   entersOptions?: EntersOption[];
-  /** "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept };
+  /**
+   * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
+   * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
+   */
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */

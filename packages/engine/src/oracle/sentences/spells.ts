@@ -1,0 +1,84 @@
+// Sentences about sacrificing, milling, discarding, scry/surveil, fighting, counterspells, and copying spells.
+
+import type { Effect } from "../../abilities";
+import { NUMX, amt, isGroup, isSeveral } from "../words";
+import { parseUnlessPays, addTarget } from "../body";
+import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
+import { parseSentence } from "../sentence";
+import type { Ctx } from "../body";
+
+/** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
+export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
+  let m: RegExpExecArray | null;
+
+  // Sacrificing (CR 701.21): "sacrifice ~", "sacrifice it" (the permanent itself)
+  if ((m = /^Sacrifice (~|it)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "self" ? [{ type: "sacrifice", what }] : null;
+  }
+  // Mill
+  if ((m = new RegExp(`^Mill ${NUMX} cards?$`, "i").exec(s))) return [{ type: "mill", who: { ref: "you" }, n: amt(m[1]!) }];
+  if ((m = new RegExp(`^(.+?) mills? ${NUMX} cards?$`, "i").exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
+  }
+  // Discarding (CR 701.9): "Target player discards two cards", "Each opponent discards a card at random", "Discard a card"
+  if ((m = new RegExp(`^Discard ${NUMX} cards?( at random)?$`, "i").exec(s))) return [{ type: "discard", who: { ref: "you" }, n: amt(m[1]!), random: !!m[2] }];
+  if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;
+  }
+  // Scry and surveil (CR 701.22, 701.25)
+  if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
+  // Fighting (CR 701.14) and "deals damage equal to its power to"
+  if ((m = /^(.+?) fights (.+)$/i.exec(s))) {
+    const a = parseObject(m[1]!, ctx);
+    const b = a && parseObject(m[2]!, ctx);
+    return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) && !isSeveral(b) ? [{ type: "fight", a, b }] : null;
+  }
+  if ((m = /^(.+?) deals damage to itself equal to its power$/i.exec(s)) && m[1] !== "~") {
+    // The creature is the source of damage to itself (its deathtouch, lifelink, infect apply).
+    const a = parseObject(m[1]!, ctx);
+    return a && !isGroup(a) && !isSeveral(a) ? [{ type: "bite", a, b: a }] : null;
+  }
+  if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
+    // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
+    // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).
+    if (m[1] === "~") {
+      const to = parseDamageRecipient(m[2]!, ctx);
+      return to ? [{ type: "damage", amount: { count: { kind: "power", of: { ref: "self" } } }, to }] : null;
+    }
+    const a = parseObject(m[1]!, ctx);
+    const b = a && parseObject(m[2]!, ctx);
+    return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) ? [{ type: "bite", a, b }] : null;
+  }
+  // Counterspells, maybe "unless its controller pays {2}" (CR 118.12)
+  // "When you next cast an instant or sorcery spell this turn, copy that spell" (a delayed trigger, CR 603.7).
+  if ((m = /^[Ww]hen you next cast (an? .+?) this turn, (.+?)(?:,? and you may choose new targets for the cop(?:y|ies))?$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    if (filter?.kind !== "spell") return null;
+    const before = ctx.targets.length;
+    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true });
+    if (!inner || ctx.targets.length !== before) return null;
+    if (/choose new targets/.test(s)) for (const y of inner) if (y.type === "copySpell") y.newTargets = true;
+    return [{ type: "nextCast", filter, effects: inner, text: m[2]! }];
+  }
+  // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
+  if ((m = /^Copy target (.*?spell(?: you control)?)$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }] : null;
+  }
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] ? 2 : 1, newTargets: false }];
+  if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
+    const spec = parseTargetPhrase(`${m[1]}spell`);
+    const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
+    if (!spec || unless === null) return null;
+    return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
+  }
+  // "Whenever a player casts a spell, counter it unless that player pays {1}."
+  if (ctx.castSpell && (m = /^Counter (?:it|that spell) unless (?:that player|its controller) pays (.+)$/i.exec(s))) {
+    const unless = parseUnlessPays(m[1]!, ctx);
+    return unless && [{ type: "counterUnlessPays", unless }];
+  }
+  return undefined;
+}

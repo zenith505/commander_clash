@@ -1,0 +1,117 @@
+import type { AmountExpr, Count, ObjRef, PlayerRef } from "../abilities";
+import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
+import { Ctx, addTarget } from "./body";
+import { parseTargetPhrase } from "./targets";
+
+/**
+ * A count: "the number of creatures you control", "cards in your hand", "~'s power", "your
+ * devotion to black", "twice the number of ...", "1 plus the number of ...". With `each`, the
+ * singular form after "for each": "creature you control", "card in your graveyard".
+ * `ctx` is the ability being read (null for a static ability, where "it" is the permanent itself).
+ */
+export function parseCount(text: string, ctx: Ctx | null, each = false): AmountExpr | null {
+  let p = text.trim().replace(/\.$/, "");
+  let m: RegExpExecArray | null;
+  // Arithmetic around a count.
+  if ((m = /^twice (.+)$/i.exec(p))) {
+    const c = parseCount(m[1]!, ctx);
+    return c && { ...c, times: 2 * (c.times ?? 1), ...(c.plus ? { plus: 2 * c.plus } : {}) };
+  }
+  if ((m = new RegExp(`^${NUM} plus (.+)$`, "i").exec(p))) {
+    const c = parseCount(m[2]!, ctx);
+    return c && { ...c, plus: (c.plus ?? 0) + num(m[1]!) };
+  }
+  if ((m = new RegExp(`^${NUM} minus (.+)$`, "i").exec(p))) {
+    const c = parseCount(m[2]!, ctx);
+    return c && { count: c.count, times: -(c.times ?? 1), plus: num(m[1]!) - (c.plus ?? 0) };
+  }
+  if ((m = new RegExp(`^(.+) (plus|minus) ${NUM}$`, "i").exec(p))) {
+    const c = parseCount(m[1]!, ctx);
+    const n = num(m[3]!) * (m[2]!.toLowerCase() === "minus" ? -1 : 1);
+    return c && { ...c, plus: (c.plus ?? 0) + n };
+  }
+  if (!each) {
+    const nb = /^the number of (.+)$/i.exec(p);
+    if (nb) return parseCount(nb[1]!, ctx, true);
+  }
+  const count = (c: Count): AmountExpr => ({ count: c });
+  // Life and hands.
+  if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
+  if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
+    const who = whosePlayer(m[1]!, ctx);
+    return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });
+  }
+  // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
+  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their) graveyards?$/i.exec(p))) {
+    const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : whosePlayer(m[2]!, ctx);
+    if (!who) return null;
+    const kinds = m[1]!.trim().replace(/ and /g, " or ");
+    if (!kinds) return count({ kind: "cardsInGraveyard", who });
+    const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    return spec?.kind === "card" ? count({ kind: "cardsInGraveyard", who, filter: { ...spec, text: `${kinds} card` } }) : null;
+  }
+  // Devotion (CR 700.5): "your devotion to black", "your devotion to black and red".
+  if ((m = /^your devotion to (white|blue|black|red|green)(?: and (white|blue|black|red|green))?$/i.exec(p)))
+    return count({ kind: "devotion", colors: [m[1]!, m[2]].filter(Boolean).map((w) => COLOR_WORDS[w!.toLowerCase()]!) });
+  // Domain.
+  if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
+  // Multikicker: "for each time it was kicked", "the number of times ~ was kicked" (CR 702.33d).
+  if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
+  // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
+  if ((m = /^(~'s|its|that creature's|that permanent's|the sacrificed (?:creature|artifact|permanent)'s) (power|toughness|mana value)$/i.exec(p))) {
+    const of = whoseObject(m[1]!, ctx);
+    const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
+    return of && count({ kind, of });
+  }
+  // "Charge counter on ~", "+1/+1 counters on it".
+  if ((m = new RegExp(`^${COUNTER} counters? on (~|it|that creature)$`).exec(p))) {
+    const of = whoseObject(m[2] === "~" ? "~'s" : m[2] === "it" ? "its" : "that creature's", ctx);
+    return of && count({ kind: "counters", counter: counterKind(m[1]!), of });
+  }
+  // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
+  if ((m = /^(Aura|Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
+    return count({ kind: "attachedToSelf", subtypes: [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls)(?: ((?:with|of the chosen|of that|that aren't) .+))?$/i.exec(p))) {
+    const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
+    const who = m[3]!.toLowerCase();
+    const suffix = who === "you control" ? " you control" : who === "on the battlefield" ? "" : " an opponent controls";
+    const spec = parseTargetPhrase(`${words}${suffix}${m[4] ? ` ${m[4]}` : ""}`, { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return count({ kind: "permanents", filter: { ...spec, text: `${m[1] ?? ""}${m[2]} ${m[3]}` }, ...(m[1] ? { other: true } : {}) });
+  }
+  // "attacking creature", "tapped creature": any controller.
+  if ((m = /^(attacking|blocking|tapped) (creatures?)$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[1]} creature`);
+    return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p } }) : null;
+  }
+  return null;
+}
+
+function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
+  const x = w.toLowerCase();
+  if (x === "your") return { ref: "you" };
+  if (!ctx) return null;
+  if (x === "target player's" || x === "target opponent's") {
+    const i = addTarget(ctx, { kind: "player", opponent: x === "target opponent's", text: x.replace(/'s$/, "") });
+    ctx.lastPlayerTarget = i;
+    return { ref: "target", index: i };
+  }
+  if ((x === "that player's" || x === "their") && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
+  return null;
+}
+
+function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
+  const x = w.toLowerCase();
+  if (x === "~'s") return { ref: "self" };
+  // What was sacrificed to cast the spell, as it last existed (CR 608.2h); compile() checks there's such a cost.
+  if (/^the sacrificed (creature|artifact|permanent)'s$/.test(x)) return ctx ? { ref: "sacrificed" } : null;
+  if (!ctx) return x === "its" ? { ref: "self" } : null;
+  if (x === "its" || x === "that creature's" || x === "that permanent's") {
+    if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
+    if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };
+    // The permanent itself; after it left the battlefield, as it last existed (CR 608.2h).
+    if (x === "its" && (ctx.selfIt || ctx.selfCard || ctx.activated)) return { ref: "self" };
+  }
+  return null;
+}

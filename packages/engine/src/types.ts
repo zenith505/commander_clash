@@ -65,6 +65,8 @@ export interface GameObject {
   counters: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
+  /** A copy of a spell (CR 707.10): not a card; it ceases to exist off the stack (707.10a), or becomes a token (608.3f). */
+  spellCopy?: boolean;
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
   regenShields?: number;
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
@@ -197,6 +199,10 @@ export interface StackItem {
   sacrificed?: LastKnown[];
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
   ifCond?: StaticCondition;
+  /** For a spell: how many spells were cast before it this turn (storm, CR 702.40a). */
+  castNth?: number;
+  /** A copy of a spell (CR 707.10), not cast. */
+  copy?: boolean;
 }
 
 /**
@@ -332,6 +338,11 @@ export type PendingDecision =
    */
   | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind }
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
+  /**
+   * A copy of a spell may get new targets (CR 707.10c): keep them all, or choose new legal ones. `copyOf` is the
+   * spell's description; `left` counts this copy and the ones after it.
+   */
+  | { kind: "copyTargets"; player: PlayerId; source: string; copyOf: string; specs: TargetSpec[]; current: TargetChoice[]; left: number }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
   | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] };
 
@@ -349,6 +360,12 @@ export interface GameState {
   leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
+  /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number }[];
+  /** Spells cast this turn, by anyone (storm, CR 702.40a). */
+  spellsCastThisTurn?: number;
+  /** Each spell cast this turn as it was cast, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
+  castItems?: Record<string, StackItem>;
   seed: number;
   rngState: number;
   turn: number;
@@ -456,6 +473,7 @@ export interface Resolving {
     found?: ObjectId[]; // the cards a library search found
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
+    copies?: { of: string; left: number; targets?: TargetChoice[] }; // spell copies still to make, and the next one's targets
   };
 }
 
@@ -476,6 +494,8 @@ export type Action =
   | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices }
   | { type: "chooseModes"; player: PlayerId; modes: number[] }
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
+  /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */
+  | { type: "copyTargets"; player: PlayerId; targets?: TargetChoice[] }
   | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId }[] }
   | { type: "declareBlockers"; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[] }
   | { type: "discard"; player: PlayerId; objectIds: ObjectId[] }

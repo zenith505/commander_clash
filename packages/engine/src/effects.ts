@@ -466,6 +466,26 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     }
 }
 
+/**
+ * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
+ * it (modes, X, kicker, what was sacrificed), with these targets. It isn't cast.
+ */
+function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined) {
+  const card = orig.objectId ? s.objects[orig.objectId] : undefined;
+  if (!card) return;
+  const o = newObject(s, s.cards[cardIdOf(card)]!, controller, "stack");
+  o.spellCopy = true;
+  o.kicked = card.kicked;
+  o.castAlt = card.castAlt;
+  const name = orig.description.replace(/ \(copy\)$/, "");
+  const id = `s${s.nextId++}`;
+  const { castNth: _, ...rest } = structuredClone(orig);
+  s.stack.push({ ...rest, id, objectId: o.id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
+  log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
+  fireEvent(s, { type: "cast", stackId: id, controller, card: defOf(s, o), copy: true }); // magecraft: "cast or copy"
+  fireEvent(s, { type: "targeted", stackId: id });
+}
+
 /** Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). */
 function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
   const key = copyKey(s, base, opts.except);
@@ -1019,6 +1039,49 @@ function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | vo
       const put = putCounters(s, to, e.counter, 1);
       invalidateCharacteristics(s);
       log(s, `${characteristics(s, from).name} moves a ${e.counter} counter onto ${characteristics(s, to).name}${put > 1 ? ` (${put} counters are put on it)` : ""}.`);
+      return;
+    }
+    case "copySpell": {
+      // Copies of a spell go on the stack one at a time, each with its targets chosen first (CR 707.10, 707.10c).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.copies) {
+        const i = e.spell === "cause" ? -1 : e.spell.target;
+        const t = i >= 0 ? ctx.targets[i] : undefined;
+        const id = i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
+        const orig = id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id]) : undefined;
+        if (!orig || orig.kind !== "spell") return;
+        const n = e.n === "storm" ? (orig.castNth ?? 0) : e.n === "kicked" ? (orig.kicked?.length ?? 0) : amountNow(s, e.n, ctx);
+        if (n <= 0) return;
+        sc.copies = { of: id!, left: n };
+      }
+      const c = sc.copies;
+      // As it is now, or as it was cast if it has left the stack.
+      const orig = s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of];
+      const specs = orig?.body?.targets ?? [];
+      while (orig && c.left > 0) {
+        if (e.newTargets && specs.length && c.targets === undefined) {
+          s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
+          return "paused";
+        }
+        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
+        c.targets = undefined;
+        c.left--;
+      }
+      return;
+    }
+    case "nextCast": {
+      const item = s.resolving?.item;
+      const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
+      const o = id ? s.objects[id] : undefined;
+      (s.nextCast ??= []).push({
+        controller: ctx.controller,
+        filter: e.filter,
+        sourceId: id ?? "",
+        sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
+        body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
+        turn: s.turn,
+      });
       return;
     }
     case "myriad": {
@@ -1793,7 +1856,7 @@ export type TriggerSourceEvent =
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
   | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
-  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef }
+  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   | { type: "targeted"; stackId: string }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
@@ -2035,19 +2098,25 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When you cast this spell" abilities work from the stack (CR 702.85a, 603.2).
     const item = s.stack.find((x) => x.id === ev.stackId);
     const spell = item?.objectId ? s.objects[item.objectId] : undefined;
-    if (spell) add(spell, ev.controller, (e) => e === "selfCast", compileCard(defOf(s, spell)).triggers);
+    // "When you next cast ... this turn": once, for the first such spell (CR 603.7c).
+    for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
+      if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card)) continue;
+      s.nextCast = s.nextCast!.filter((x) => x !== d);
+      s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
+    }
+    if (spell && !ev.copy) add(spell, ev.controller, (e) => e === "selfCast", compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       add(o, you, (e, t) => {
-        if (e !== "castSpell" || !t.cast) return false;
+        if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you)) return false;
         return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
       }, undefined, ev.stackId); // "counter it unless that player pays" acts on the spell cast
     }
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.
-    const targeted = new Set((item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
+    const targeted = new Set(ev.copy ? [] : (item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
     for (const id of targeted) {
       const o = s.objects[id];
       if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e) => e === "selfTargetedByYourSpell", undefined, ev.stackId);

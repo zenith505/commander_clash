@@ -147,7 +147,9 @@ type ZoneView = { pid: PlayerId; zone: "graveyard" | "exile" };
 type Targeting =
   | { mode: "cast"; draft: CastDraft; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   | { mode: "activate"; objectId: string; index: number; specs: TargetSpec[]; chosen: TargetChoice[]; label: string; modes?: number[]; x?: number }
-  | { mode: "trigger"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string };
+  | { mode: "trigger"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
+  /** New targets for a copy of a spell (CR 707.10c), or keep the old ones. */
+  | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string };
 
 /** The human is choosing modes for a modal spell or activated ability they're casting (CR 700.2a). */
 type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
@@ -266,8 +268,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setDiscards([]);
     setTapPick(null);
     if (pending?.kind === "chooseTargets") setTargeting({ mode: "trigger", specs: pending.specs, chosen: [], label: pending.description });
-    else setTargeting((t) => (t?.mode === "trigger" ? null : t));
-  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : ""]);
+    else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: [], label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
+    else setTargeting((t) => (t?.mode === "trigger" || t?.mode === "copy" ? null : t));
+  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
 
@@ -288,7 +291,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setCostPick(null);
         setAim(null);
         setBlocker(null);
-        setTargeting((t) => (t?.mode === "trigger" ? t : null));
+        setTargeting((t) => (t?.mode === "trigger" || t?.mode === "copy" ? t : null));
       } else if (e.key === " " && k.s && !k.targeting && !k.modePick && !k.tapPick && !k.picking && !k.pending && waitingOn(k.s) === HUMAN) {
         e.preventDefault();
         k.dispatch([{ type: "passPriority", player: HUMAN }]);
@@ -327,6 +330,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (chosen.length < targeting.specs.length) return setTargeting({ ...targeting, chosen });
     setTargeting(null);
     if (targeting.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
+    if (targeting.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
     if (targeting.mode === "cast") return continueCast({ ...targeting.draft, targets: chosen });
     continueActivate({ objectId: targeting.objectId, index: targeting.index, modes: targeting.modes, x: targeting.x, targets: chosen });
   }
@@ -665,7 +669,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 {nextSpec?.optional ? `(optional, up to ${optionalLeft(targeting.specs, targeting.chosen.length)} more)` : `(${targeting.chosen.length + 1}/${targeting.specs.length})`}
               </span>
               {nextSpec?.optional && <button onClick={skipTargets}>{targeting.chosen.some((c) => c.kind !== "none") ? "Done" : "Choose none"}</button>}
-              {targeting.mode !== "trigger" && <button onClick={() => setTargeting(null)}>Cancel</button>}
+              {targeting.mode === "copy" && pending?.kind === "copyTargets" && (
+                <button
+                  onClick={() => {
+                    setTargeting(null);
+                    dispatch([{ type: "copyTargets", player: HUMAN }]);
+                  }}
+                >
+                  Keep {pending.current.length === 1 ? "target" : "targets"}
+                  {describeTargets(s, pending.current).replace(/^ targeting /, ": ")}
+                </button>
+              )}
+              {targeting.mode !== "trigger" && targeting.mode !== "copy" && <button onClick={() => setTargeting(null)}>Cancel</button>}
             </div>
           )}
           {targeting && nextSpec?.kind === "card" && (
@@ -677,7 +692,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onSkip={nextSpec.optional ? skipTargets : undefined}
               onHover={setHover}
               onPick={(id) => pickTarget({ kind: "object", id })}
-              onCancel={targeting.mode === "trigger" ? undefined : () => setTargeting(null)}
+              onCancel={targeting.mode === "trigger" || targeting.mode === "copy" ? undefined : () => setTargeting(null)}
             />
           )}
           {(modePick || pending?.kind === "chooseModes") && (
@@ -2386,8 +2401,8 @@ function GameLog({ s }: { s: GameState }) {
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
   if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand|next turn)\b/g, " your $1");
-  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses)\b/g, (_, pre: string, v: string) =>
-    `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v === "amasses" ? "amass" : v.slice(0, -1)}`,
+  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses|copies)\b/g, (_, pre: string, v: string) =>
+    `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v === "amasses" ? "amass" : v === "copies" ? "copy" : v.slice(0, -1)}`,
   );
 }
 
@@ -2446,7 +2461,7 @@ function targetingArrows(s: GameState, targeting: Targeting | null, intent: Retu
     intent.targets.forEach((t, i) => out.push({ key: `intent:${i}`, from, to: targetSelectors(t), color: playerColor(intent.player), aiming: true }));
   }
   if (targeting) {
-    const sourceId = targeting.mode === "trigger" ? (s.pending?.kind === "chooseTargets" ? s.pending.sourceId : undefined) : targeting.mode === "cast" ? targeting.draft.objectId : targeting.objectId;
+    const sourceId = targeting.mode === "trigger" ? (s.pending?.kind === "chooseTargets" ? s.pending.sourceId : undefined) : targeting.mode === "copy" ? undefined : targeting.mode === "cast" ? targeting.draft.objectId : targeting.objectId;
     const from = [...(sourceId ? [`[data-obj="${sourceId}"]`] : []), `[data-player="${HUMAN}"]`];
     const color = playerColor(HUMAN);
     targeting.chosen.forEach((t, i) => out.push({ key: `mine:${i}`, from, to: targetSelectors(t), color }));

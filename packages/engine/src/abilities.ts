@@ -397,6 +397,14 @@ export type Effect =
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /** CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player). */
   | { type: "myriad" }
+  /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string }
+  /**
+   * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
+   * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
+   * `newTargets`: "you may choose new targets for the copy" (707.10c).
+   */
+  | { type: "copySpell"; spell: "cause" | { target: number }; n: Amount | "storm" | "kicked"; newTargets: boolean }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
   | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
@@ -569,7 +577,8 @@ export interface TriggeredAbility {
   /** For "state": the game state that triggers it, checked whenever state-based actions are (CR 603.8). */
   state?: StaticCondition;
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
-  cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec };
+  /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
+  cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec; orCopy?: boolean };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
@@ -797,7 +806,8 @@ export interface CompiledCard {
    * Kicker (CR 702.33): the optional additional costs, each payable once; multikicker's can be paid
    * any number of times (702.33c).
    */
-  kicker?: { costs: string[]; multi?: boolean };
+  /** `replicate`: it's really replicate (CR 702.56a), paid like multikicker. */
+  kicker?: { costs: string[]; multi?: boolean; replicate?: boolean };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];
   /** Flashback, jump-start, retrace, escape: casting it from your graveyard. */

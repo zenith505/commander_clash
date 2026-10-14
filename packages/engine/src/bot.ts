@@ -52,6 +52,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const body = withModes(triggerBody(s, t), t.modes);
       return [{ type: "chooseTargets", player: pid, targets: chooseTargets(s, pid, body, true, t.sourceId)! }];
     }
+    if (pend.kind === "copyTargets") {
+      // New targets for a spell copy: the best ones for us, or keep the old ones (CR 707.10c).
+      const sc = s.resolving?.scratch?.copies;
+      const orig = sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of]) : undefined;
+      const best = orig?.body ? chooseTargets(s, pid, orig.body, false) : null;
+      return [{ type: "copyTargets", player: pid, ...(best ? { targets: best } : {}) }];
+    }
     if (pend.kind === "castFree") {
       const plan = castPlan(s, pid, pend.objectId, true);
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];

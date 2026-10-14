@@ -1,7 +1,7 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { addDelayed, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
@@ -270,6 +270,9 @@ export function applyAction(state: GameState, action: Action): GameState {
     case "chooseTargets":
       chooseTriggerTargets(s, p, action.targets);
       break;
+    case "copyTargets":
+      chooseCopyTargets(s, p, action.targets);
+      break;
     case "declareAttackers":
       declareAttackers(s, p, action.attacks);
       break;
@@ -404,6 +407,11 @@ export function moveObject(
 ) {
   const o = obj(s, id);
   const fromZone = o.zone;
+  // A copy of a spell anywhere but the stack ceases to exist (CR 707.10a); it isn't a card, so nothing sees it arrive.
+  if (o.spellCopy && to !== "stack" && to !== "battlefield") {
+    delete s.objects[id];
+    return;
+  }
   // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
   o.exileIfLeaves = undefined;
@@ -772,6 +780,9 @@ function startNextTurn(s: GameState) {
   for (const p of s.players) p.landsPlayedThisTurn = 0;
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
   s.damagedThisTurn = undefined;
+  s.spellsCastThisTurn = undefined;
+  s.nextCast = undefined;
+  s.castItems = undefined;
   s.lastKnown = undefined;
   log(s, `— Turn ${s.turn}: ${player(s, s.activePlayer).name} —`);
   beginStep(s, "untap");
@@ -910,6 +921,11 @@ function resolveTop(s: GameState) {
   if (!item.objectId) return;
   const o = obj(s, item.objectId);
   const d = defOf(s, o);
+  if (isPermanentCard(d) && o.spellCopy) {
+    // A copy of a permanent spell becomes a token as it resolves (CR 608.3f, 111.12).
+    o.spellCopy = undefined;
+    o.isToken = true;
+  }
   if (isPermanentCard(d)) {
     const enchant = compileCard(d).enchant;
     if (enchant) {
@@ -1352,6 +1368,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const sacrificed = payAdditionalCosts(s, p, d, choices, via?.costs ?? []);
   if (sacrificed.length) item.sacrificed = sacrificed;
+  // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
+  item.castNth = s.spellsCastThisTurn ?? 0;
+  s.spellsCastThisTurn = item.castNth + 1;
+  (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d });
   fireEvent(s, { type: "targeted", stackId });
@@ -1630,6 +1650,25 @@ function chooseTriggerModes(s: GameState, p: Player, modes: number[]) {
   if (problem && !(modes.length === 0 && pend.min === 0)) throw new RulesError(problem);
   t.modes = modes;
   s.pending = null;
+}
+
+/** A spell copy's targets (CR 707.10c): any it keeps may be illegal now; any it changes must be legal. */
+function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
+  const pend = s.pending;
+  const sc = s.resolving?.scratch?.copies;
+  if (pend?.kind !== "copyTargets" || pend.player !== p.id || !sc) throw new RulesError("no copy to choose targets for");
+  if (targets) {
+    if (targets.length !== pend.specs.length) throw new RulesError(`choose ${pend.specs.length} target${pend.specs.length === 1 ? "" : "s"}`);
+    const key = (t: TargetChoice | undefined) => (t ? (t.kind === "none" ? "none" : `${t.kind}:${t.id}`) : "");
+    const changed = targets.map((t, i) => key(t) !== key(pend.current[i]));
+    const kept = targets.map((t, i) => (changed[i] ? t : pend.current[i]!));
+    for (let i = 0; i < targets.length; i++)
+      if (changed[i] && !canChooseTarget(s, pend.specs, kept, i, targets[i]!, p.id)) throw new RulesError("that isn't a legal new target");
+    targets = kept;
+  }
+  sc.targets = targets ?? pend.current;
+  s.pending = null;
+  continueResolution(s);
 }
 
 function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) {

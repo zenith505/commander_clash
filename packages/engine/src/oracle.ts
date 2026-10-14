@@ -362,6 +362,17 @@ function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Replicate (CR 702.56a): an additional cost paid any number of times, like multikicker, and "when you cast this
+    // spell, if a replicate cost was paid for it, copy it for each time its replicate cost was paid".
+    const replicate = /^Replicate ((?:\{[^}]+\})+)$/.exec(line);
+    if (replicate) {
+      if (out.kicker || !plainMana(replicate[1]!)) out.unsupported.push(raw);
+      else {
+        out.kicker = { costs: [replicate[1]!], multi: true, replicate: true };
+        out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "kicked", newTargets: true }], text: "Replicate: copy ~ for each time its replicate cost was paid." } });
+      }
+      continue;
+    }
     // Kicker (CR 702.33a-c): "Kicker {2}{R}", "Kicker {1}{U} and/or {2}{B}", "Multikicker {1}{G}".
     const kicker = /^(Multikicker|Kicker) ((?:\{[^}]+\})+)(?: and\/or ((?:\{[^}]+\})+))?$/.exec(line);
     if (kicker) {
@@ -847,7 +858,11 @@ function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
       });
     } else if (/^convoke$/i.test(p)) out.convoke = true;
     else if (/^improvise$/i.test(p)) out.improvise = true;
-    else if (/^cascade$/i.test(p)) {
+    else if (/^storm$/i.test(p)) {
+      // CR 702.40a: "When you cast this spell, copy it for each other spell that was cast before it this turn. If the
+      // spell has any targets, you may choose new targets for any of the copies."
+      out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." } });
+    } else if (/^cascade$/i.test(p)) {
       // CR 702.85a: "When you cast this spell, exile cards from the top of your library until you exile a nonland card
       // whose mana value is less than this spell's mana value. You may cast that card without paying its mana cost if
       // the resulting spell's mana value is less than this spell's mana value. Then put all cards exiled this way that
@@ -1292,6 +1307,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
   [/^When(?:ever)? ~ becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget"],
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
+  [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
   [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
   // The beginning of combat step (CR 507) and end of combat step (CR 511).
@@ -1355,22 +1371,21 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
 
 /**
  * "Whenever you cast a noncreature spell", "Whenever an opponent casts a creature spell",
- * "Whenever a player casts a spell". Nothing copies spells in the engine yet, so "cast or copy"
- * (magecraft) is the same as "cast".
+ * "Whenever a player casts a spell", magecraft's "whenever you cast or copy an instant or sorcery spell".
  */
-const CAST_TRIGGER = /^Whenever (you|an opponent|a player) casts? (?:or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
+const CAST_TRIGGER = /^Whenever (you|an opponent|a player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
 const CAST_BY = { you: "you", "an opponent": "opponent", "a player": "any" } as const;
 
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
-  const what = m[2]!.replace(/^an? /, "");
+  const what = m[3]!.replace(/^an? /, "");
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   const spell = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
   if (!spell || spell.kind !== "spell") return "fail";
-  const body = parseBody(m[3]!, { castSpell: true });
+  const body = parseBody(m[4]!, { castSpell: true });
   if (!body) return "fail";
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` } }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}) }, body };
 }
 
 /**
@@ -1576,7 +1591,7 @@ function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep", defending: event === "selfAttacks" || event === "selfBecomesBlocked" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
     }
@@ -1865,6 +1880,8 @@ interface Ctx {
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
   castSpell?: boolean;
+  /** In a "when you cast this spell" ability: "copy it" is the spell itself. */
+  selfCastSpell?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
   /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
@@ -1897,7 +1914,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) return parseModal(modal[1]!, modal[2]!, text.trim(), opts.spell);
   if (text.includes("•")) return null; // modes with text before them, or a kind of choice we don't support
@@ -1913,6 +1930,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.castSpell ? { castSpell: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
+    ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
   };
   const effects: Effect[] = [];
   const sentences = splitSentences(text.trim())
@@ -2009,6 +2027,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       if (prev?.type !== "exile" || prev.until || prev.linked || isGroup(prev.what) || effects.length - 1 < 0) return null;
       const under = (later[1] ?? later[2]) === "your" ? "you" : "owner";
       effects[effects.length - 1] = { type: "flicker", what: prev.what, under, at: "nextEndStep", ...(later[3] ? { counter: "+1/+1" as const } : {}) };
+      continue;
+    }
+    if (/^You may choose new targets for the cop(?:y|ies)$/i.test(s)) {
+      const prev = effects[effects.length - 1];
+      const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev;
+      if (copy?.type !== "copySpell") return null;
+      copy.newTargets = true;
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
@@ -2758,6 +2783,22 @@ function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) ? [{ type: "bite", a, b }] : null;
   }
   // Counterspells, maybe "unless its controller pays {2}" (CR 118.12)
+  // "When you next cast an instant or sorcery spell this turn, copy that spell" (a delayed trigger, CR 603.7).
+  if ((m = /^[Ww]hen you next cast (an? .+?) this turn, (.+?)(?:,? and you may choose new targets for the cop(?:y|ies))?$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    if (filter?.kind !== "spell") return null;
+    const before = ctx.targets.length;
+    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true });
+    if (!inner || ctx.targets.length !== before) return null;
+    if (/choose new targets/.test(s)) for (const y of inner) if (y.type === "copySpell") y.newTargets = true;
+    return [{ type: "nextCast", filter, effects: inner, text: m[2]! }];
+  }
+  // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
+  if ((m = /^Copy target (.*?spell(?: you control)?)$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }] : null;
+  }
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] ? 2 : 1, newTargets: false }];
   if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(`${m[1]}spell`);
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);

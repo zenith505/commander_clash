@@ -47,11 +47,19 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   let statement: string | undefined;
   let cond: string | undefined;
   let m: RegExpExecArray | null;
+  // Soulbond (CR 702.95b): "As long as ~ is paired with another creature, each of those creatures gets +2/+2",
+  // "... both creatures have lifelink": the pair, while it lasts.
+  if ((m = /^As long as ~ is paired with another creature, (?:each of those creatures|both creatures) (.+)$/.exec(text))) {
+    const mods = parseStaticMods(m[1]!);
+    return mods ? { affects: { kind: "paired" }, mods, text: line } : null;
+  }
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as ([^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
+  // Flowering Lumberknot: "~ can't attack or block unless it's paired with a creature with soulbond".
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   if (!statement || !cond) return null;
@@ -121,6 +129,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
+  if (/^no opponent has more life than that player$/.test(text)) return { kind: "defenderMostLife" };
+  if ((m = /^(?:~|it)(?:'s| is) (not )?paired with (another creature|a creature with soulbond)$/.exec(text)) && st.affects.kind === "self")
+    return { kind: "paired", ...(m[2] === "a creature with soulbond" ? { withKeyword: "Soulbond" } : {}), ...(m[1] ? { not: true as const } : {}) };
   if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
@@ -187,14 +199,35 @@ function parseAffected(subject: string): Affects | null {
   m = /^(Other )?([A-Z][a-z]+) you control$/.exec(x);
   if (m && CREATURE_TYPES.has(singular(m[2]!))) return { kind: "filter", types: ["Creature"], subtypes: [singular(m[2]!)], controller: "you", other: !!m[1] };
   if (/^(All creatures|Each creature)$/i.test(x)) return { kind: "filter", types: ["Creature"] };
+  // A Background's "Commander creatures you own": whoever controls them (rulings).
+  if (/^Commander creatures you own$/.test(x)) return { kind: "filter", types: ["Creature"], ownedCommanders: true };
   // Anything else a group can say: "Each creature you control with a +1/+1 counter on it", "Creatures of the chosen type".
   const g = parseGroup(x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;
 }
 
+/**
+ * "Can block an additional creature each combat", "an additional seven creatures", "any number of creatures"
+ * (CR 509.1a). "This turn" is the same for an effect that lasts until the turn ends.
+ */
+export function parseExtraBlocks(text: string): Modification | null {
+  let m: RegExpExecArray | null;
+  if (/^can block any number of creatures(?: each combat| this turn)?$/.test(text)) return { kind: "blockAny" };
+  if (/^can block an additional creature(?: each combat| this turn)$/.test(text)) return { kind: "blockAdditional", n: 1 };
+  if ((m = new RegExp(`^can block (?:up to )?(?:an additional ${NUM}|${NUM} additional) creatures(?: each combat| this turn)$`).exec(text))) return { kind: "blockAdditional", n: num(m[1] ?? m[2]!) };
+  return null;
+}
+
 /** "get +1/+1", "have flying and vigilance", "get +2/+0 and have first strike", "can't block". */
 function parseStaticMods(rest: string): Modification[] | null {
   let m: RegExpExecArray | null;
+  // "Gets +0/+3 and can block an additional creature each combat", "gets +2/+2, has vigilance, and can block ...".
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?)(?:,? and|, (?:has|have) (.+?),? and) (can block .+)$`).exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const grants = m[4] ? parseGrants(m[4]) : [];
+    const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
+    return first && grants && more ? [...first, ...grants, more] : null;
+  }
   if ((m = new RegExp(`^gets? ${PT}/${PT}(?: and (?:has|have) (.+))?$`).exec(rest))) {
     const mods: Modification[] = [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }];
     if (m[3]) {
@@ -205,6 +238,10 @@ function parseStaticMods(rest: string): Modification[] | null {
     return mods;
   }
   if ((m = /^(?:has|have) (.+)$/.exec(rest))) return parseGrants(m[1]!);
+  if (/^can block (?:an additional|any number|up to|\w+ additional)/.test(rest)) {
+    const more = parseExtraBlocks(rest);
+    return more && !/ this turn$/.test(rest) ? [more] : null;
+  }
   if (/^can't attack or block$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }];
   // CR 506.5: alone means the only creature declared as an attacker (or blocker) that combat.
   if (/^can't attack or block alone$/.test(rest)) return [{ kind: "cantAttackAlone" }, { kind: "cantBlockAlone" }];
@@ -246,7 +283,7 @@ export function parseStatic(line: string): StaticAbility | null {
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
   if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block only .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

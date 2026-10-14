@@ -9,6 +9,7 @@ import {
   returnCandidates,
   attackProblem,
   blockProblem,
+  maxBlocks,
   canEnterUntapped,
   conditionHolds,
   isSummoningSick,
@@ -85,6 +86,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
+    // Soulbond: always pair, with the best creature (the bonus lands on both).
+    if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined) return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
@@ -481,7 +484,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
-  if (action === "populate" || (action === "counters" && (counter === "+1/+1" || counter === "shield"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
+  if (action === "populate" || action === "pair" || (action === "counters" && (counter === "+1/+1" || counter === "shield"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   const cost = (id: ObjectId) => {
     const o = obj(s, id);
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);
@@ -933,7 +936,7 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
       const c = regenerates(s, o, ab.body);
       if (!c || controllerOf(s, c) !== pid || (c.regenShields ?? 0) > 0) continue;
       const aimedAt = !!top && top.controller !== pid && top.targets?.some((t) => t.kind === "object" && t.id === c.id);
-      const foes = s.step === "declareBlockers" && !top ? (c.blocking ? [c.blocking] : c.attacking !== undefined ? (c.blockedBy ?? []) : []) : [];
+      const foes = s.step === "declareBlockers" && !top ? (c.blocking ? c.blocking : c.attacking !== undefined ? (c.blockedBy ?? []) : []) : [];
       const losing = foes.reduce((n, f) => n + (s.objects[f] ? power(s, obj(s, f)) : 0), 0) >= Math.max(1, lethalDamage(s, c));
       if (!aimedAt && !losing) continue;
       if (abilityProblem(s, pid, id, i) && !/not enough mana/.test(abilityProblem(s, pid, id, i)!)) continue;
@@ -1119,6 +1122,14 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
       used.add(pick.id);
       blocks.push({ blocker: pick.id, attacker: at.id });
     }
+  }
+  // A creature that can block more than one creature (CR 509.1a) also takes on attackers nobody blocks, as long
+  // as it survives all of them together.
+  const hurt = (b: GameObject) => blocks.filter((x) => x.blocker === b.id).reduce((n, x) => n + (objHasKeyword(s, obj(s, x.attacker), "Deathtouch") ? Infinity : Math.max(0, power(s, obj(s, x.attacker)))), 0);
+  for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
+    if (blocks.some((b) => b.attacker === at.id) || objHasKeyword(s, at, "Menace") || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
+    const extra = mine.find((b) => used.has(b.id) && blocks.filter((x) => x.blocker === b.id).length < maxBlocks(s, b) && !blockProblem(s, b, at) && toughness(s, b) > hurt(b) + power(s, at));
+    if (extra) blocks.push({ blocker: extra.id, attacker: at.id });
   }
   // One that can't block alone doesn't block by itself (CR 506.5).
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);

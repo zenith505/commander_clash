@@ -6,14 +6,14 @@ import { applyAction, botActions, createGame, waitingOn, type CardDef } from "..
 
 const ROOT = resolve(import.meta.dirname, "..");
 const bundle = JSON.parse(readFileSync(join(ROOT, "apps/web/public/data/sample-decks.json"), "utf8")) as {
-  decks: { name: string; commander: string; cards: string[] }[];
+  decks: { name: string; commander: string; secondCommander?: string; cards: string[] }[];
   cards: CardDef[];
 };
 const byName = new Map(bundle.cards.map((c) => [c.name, c]));
 const games = Number(process.argv[2] ?? 5);
 for (let g = 0; g < games; g++) {
   let s = createGame(
-    bundle.decks.slice(0, 4).map((d) => ({ name: d.name, commander: byName.get(d.commander)!, deck: d.cards.map((n) => byName.get(n)!), isBot: true })),
+    bundle.decks.slice(0, 4).map((d) => ({ name: d.name, commander: byName.get(d.commander)!, ...(d.secondCommander ? { secondCommander: byName.get(d.secondCommander)! } : {}), deck: d.cards.map((n) => byName.get(n)!), isBot: true })),
     g + 1,
     { mulligans: true },
   );

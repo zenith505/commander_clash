@@ -63,7 +63,7 @@ const MONARCH_TRIGGERS: TriggeredAbility[] = [
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Planeswalker", "Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege", "Background", "Spacecraft"];
+const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege", "Spacecraft"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be

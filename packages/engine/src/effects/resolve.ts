@@ -1,5 +1,5 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
-import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
+import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
@@ -146,6 +146,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "subjectCard") {
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
     return o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
+  }
+  if (ref.ref === "pairedWithTarget") {
+    const t = objects(s, { ref: "target", index: ref.index }, ctx)[0];
+    const other = t && pairedWith(s, t);
+    return other ? [other] : [];
   }
   if (ref.ref === "damagedThisWay") return (s.resolving?.damagedThisWay ?? []).map((id) => obj(s, id)).filter((o) => o.zone === "battlefield");
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
@@ -314,6 +319,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileIfDies":
     case "sacrifice":
     case "exploit":
+    case "soulbond":
     case "ninjutsu":
     case "impulse":
       return runZonesEffect(s, e, ctx, src);

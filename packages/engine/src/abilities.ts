@@ -18,7 +18,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
 /** "populate": create a token that's a copy of the picked creature token (CR 701.36). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -194,6 +194,8 @@ export type ObjRef =
   | { ref: "allCreatures"; controller?: "you" | "opponent"; other?: boolean; attacking?: boolean }
   /** "Enchanted creature", "equipped creature": the permanent the source is attached to, while it's still that source. */
   | { ref: "attached" }
+  /** Joint Assault's "if it's paired with a creature, that creature": what target `index` is paired with as this resolves (CR 702.95b). */
+  | { ref: "pairedWithTarget"; index: number }
   /** "all creatures", "each artifact and enchantment", "other creatures you control": every permanent that matches, not targeted. */
   | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number };
 
@@ -271,12 +273,20 @@ export type Modification =
   | { kind: "cantBlockAlone" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked" }
-  | { kind: "allMustBlock" };
+  | { kind: "allMustBlock" }
+  /**
+   * "Can block an additional creature each combat", "an additional seven creatures", "any number of creatures":
+   * how many attackers it may block (CR 509.1a). Additional ones add up (rulings).
+   */
+  | { kind: "blockAdditional"; n: number }
+  | { kind: "blockAny" };
 
 /** What a static ability's effect applies to. */
 export type Affects =
   | { kind: "self" }
   | { kind: "attached" } // "enchanted creature", "equipped creature"
+  /** Soulbond's "each of those creatures" / "both creatures": the source and the creature it's paired with (CR 702.95b). */
+  | { kind: "paired" }
   | {
       kind: "filter";
       types: string[]; // all of these card types, e.g. ["Creature"]
@@ -284,6 +294,8 @@ export type Affects =
       colors?: Color[]; // any of these colors
       controller?: "you" | "opponent";
       other?: boolean; // "other creatures ..." excludes the source
+      /** Backgrounds' "Commander creatures you own" (CR 903.3): commanders owned by the source's controller. */
+      ownedCommanders?: boolean;
       /** Anything more the group says: "with a +1/+1 counter on it", "of the chosen type", "with flying". */
       spec?: TargetSpec;
     };
@@ -314,6 +326,15 @@ export type StaticCondition =
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
+  /** "As long as you're the monarch" (CR 725). */
+  | { kind: "monarch" }
+  /**
+   * "Whenever ~ attacks a player, if no opponent has more life than that player": none of the attacking player's
+   * opponents has more life than the attacked player (rulings; the attacker's own life isn't compared).
+   */
+  | { kind: "defenderMostLife" }
+  /** "Unless it's paired with a creature with soulbond" (CR 702.95b): `not` for "unless". */
+  | { kind: "paired"; withKeyword?: string; not?: true }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
   /**
@@ -383,6 +404,11 @@ export type Effect =
    * resolves, it "exploits" the sacrificed creature, which its "when ~ exploits a creature" abilities see.
    */
   | { type: "exploit" }
+  /**
+   * Soulbond (CR 702.95a): "you may pair this creature with another unpaired creature you control", or, from the
+   * trigger of another creature entering, "you may pair that creature with this creature" (the subject).
+   */
+  | { type: "soulbond" }
   /** Ascend on an instant or sorcery (CR 702.131a): "If you control ten or more permanents and you don't have the city's blessing, you get the city's blessing for the rest of the game." */
   | { type: "ascend" }
   /** The source explores (CR 701.44a): a land on top goes to hand; otherwise a +1/+1 counter, and the card may be milled. */
@@ -633,6 +659,8 @@ export interface TriggeredAbility {
   ifEvoked?: boolean;
   /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
   ifEcho?: boolean;
+  /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
+  ifSoulbond?: boolean;
 }
 
 export interface ActivatedAbility {

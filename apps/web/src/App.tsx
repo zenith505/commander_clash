@@ -34,6 +34,8 @@ import {
   attackProblem,
   blockProblem,
   blockRequirementProblem,
+  maxBlocks,
+  pairedWith,
   legalTargets,
   characteristics,
   modifications,
@@ -235,7 +237,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [attacks, setAttacks] = useState<Record<string, PlayerId>>({});
   /** The creature you've clicked to attack with, waiting for you to click the player it attacks. */
   const [aim, setAim] = useState<string | null>(null);
-  const [blocks, setBlocks] = useState<Record<string, string>>({});
+  const [blocks, setBlocks] = useState<Record<string, string[]>>({});
   const [blocker, setBlocker] = useState<string | null>(null);
   const [discards, setDiscards] = useState<string[]>([]);
   const [viewing, setViewing] = useState<ZoneView | null>(null);
@@ -530,18 +532,25 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       else setAim(aim === o.id ? null : o.id);
       return;
     }
-    // Blocking: click one of your untapped creatures, then the attacker it blocks.
+    // Blocking: click one of your untapped creatures, then the attacker it blocks. One that can block more
+    // than one creature (CR 509.1a) stays picked until it's full; clicking one of its attackers again unblocks it.
     if (pending?.kind === "declareBlockers") {
       if (controllerOf(s, o) === HUMAN && o.zone === "battlefield" && isCreature(s, o.id) && !o.tapped) {
-        if (blocks[o.id]) {
+        const mine = blocks[o.id] ?? [];
+        if (blocker === o.id) setBlocker(null);
+        else if (mine.length && mine.length >= maxBlocks(s, o)) {
           const next = { ...blocks };
           delete next[o.id];
           setBlocks(next);
           setBlocker(null);
-        } else setBlocker(blocker === o.id ? null : o.id);
+        } else setBlocker(o.id);
       } else if (blocker && o.attacking === HUMAN) {
-        setBlocks({ ...blocks, [blocker]: o.id });
-        setBlocker(null);
+        const mine = blocks[blocker] ?? [];
+        const now = mine.includes(o.id) ? mine.filter((a) => a !== o.id) : [...mine, o.id];
+        const next = { ...blocks, [blocker]: now };
+        if (!now.length) delete next[blocker];
+        setBlocks(next);
+        if (now.length >= maxBlocks(s, s.objects[blocker]!)) setBlocker(null);
       }
       return;
     }
@@ -578,7 +587,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackers = pending?.kind === "declareAttackers" ? new Set(potentialAttackers(s, HUMAN).map((a) => a.id)) : null;
   const attackingMe = s.battlefield.map((id) => s.objects[id]!).filter((o) => o.attacking === HUMAN);
   const canBlockWith = (o: GameObject) =>
-    pending?.kind === "declareBlockers" && controllerOf(s, o) === HUMAN && o.zone === "battlefield" && !blocks[o.id] &&
+    pending?.kind === "declareBlockers" && controllerOf(s, o) === HUMAN && o.zone === "battlefield" && (blocks[o.id]?.length ?? 0) < maxBlocks(s, o) &&
     attackingMe.some((a) => !blockProblem(s, o, a));
   // Only attackers this blocker could legally block (flying, menace's partner aside) light up.
   const blockable = (id: string) => {
@@ -1168,7 +1177,7 @@ interface CardProps {
   onClick: (o: GameObject) => void;
   onHover: (d: CardDef | null) => void;
   attacks: Record<string, PlayerId>;
-  blocks: Record<string, string>;
+  blocks: Record<string, string[]>;
   blocker: string | null;
   discards: string[];
 }
@@ -1246,6 +1255,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
     .filter(Boolean)
     .join("\n");
   const stolen = c.controller !== o.owner;
+  const paired = pairedWith(s, o);
   return (
     <>
       {(m.grantedKeywords.length > 0 || m.grantedAbilities.length > 0 || m.lostKeywords.length > 0 || m.lostAllAbilities) && (
@@ -1294,6 +1304,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {(o.preventNext ?? 0) > 0 && (
           <span className="chip shield" title={`The next ${o.preventNext} damage that would be dealt to it this turn is prevented.`}>
             Prevent {o.preventNext}
+          </span>
+        )}
+        {paired && (
+          <span className="chip other" title={`Paired with ${cardOf(s, paired.id).name} (soulbond).`}>
+            Paired
           </span>
         )}
       </span>
@@ -2120,7 +2135,7 @@ function Controls({
   pending: GameState["pending"];
   attacks: Record<string, PlayerId>;
   aim: string | null;
-  blocks: Record<string, string>;
+  blocks: Record<string, string[]>;
   blocker: string | null;
   discards: string[];
   dispatch: ReturnType<typeof useGame>["dispatch"];
@@ -2181,15 +2196,17 @@ function Controls({
   }
   if (pending?.kind === "declareBlockers") {
     // Blocking requirements and "can't block alone" (CR 509.1c, 506.5): say what's still needed.
-    const list = Object.entries(blocks).map(([b, attacker]) => ({ blocker: b, attacker }));
+    const list = Object.entries(blocks).flatMap(([b, atts]) => atts.map((attacker) => ({ blocker: b, attacker })));
     const earlier = s.battlefield.some((id) => s.objects[id]!.blocking !== undefined);
-    const alone = list.length === 1 && !earlier && characteristics(s, s.objects[list[0]!.blocker]!).cantBlockAlone ? `${cardOf(s, list[0]!.blocker).name} can't block alone.` : null;
+    const alone = Object.keys(blocks).length === 1 && !earlier && characteristics(s, s.objects[list[0]!.blocker]!).cantBlockAlone ? `${cardOf(s, list[0]!.blocker).name} can't block alone.` : null;
     const needed = alone ?? blockRequirementProblem(s, HUMAN, list);
     return (
       <div className="controls">
         <span>
           {blocker
-            ? `Now click the attacker ${cardOf(s, blocker).name} blocks.`
+            ? maxBlocks(s, s.objects[blocker]!) > 1
+              ? `Now click the attackers ${cardOf(s, blocker).name} blocks (${maxBlocks(s, s.objects[blocker]!) === Infinity ? "any number" : `up to ${maxBlocks(s, s.objects[blocker]!)}`}), then confirm.`
+              : `Now click the attacker ${cardOf(s, blocker).name} blocks.`
             : needed
               ? `${needed.charAt(0).toUpperCase()}${needed.slice(1)}.`
               : "Click one of your untapped creatures, then the attacker it blocks."}
@@ -2201,7 +2218,7 @@ function Controls({
               {
                 type: "declareBlockers",
                 player: HUMAN,
-                blocks: Object.entries(blocks).map(([b, attacker]) => ({ blocker: b, attacker })),
+                blocks: list,
               },
             ])
           }
@@ -2235,10 +2252,11 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> click {what} of yours to {verb}.
+          <strong>{pending.source}:</strong>{" "}
+          {pending.action === "pair" ? (pending.options.length === 1 ? `click ${cardOf(s, pending.options[0]!).name} to pair the two (soulbond), if you want.` : "click a creature of yours to pair it with (soulbond), if you want.") : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.min !== undefined && n === 0 ? "Sacrifice none" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );
@@ -2420,7 +2438,7 @@ function youGrammar(text: string) {
 interface Combat {
   attacks: Record<string, PlayerId>;
   aim: string | null;
-  blocks: Record<string, string>;
+  blocks: Record<string, string[]>;
   blocker: string | null;
   /** Creatures picked to crew a Vehicle, shown as arrows into it. */
   crew?: { vehicle: string; chosen: string[] };
@@ -2439,12 +2457,12 @@ function targetingArrows(s: GameState, targeting: Targeting | null, intent: Retu
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     if (o.attacking !== undefined) out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [`[data-player="${o.attacking}"]`], color: ATTACK_COLOR });
-    if (o.blocking) out.push({ key: `blk:${id}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${o.blocking}"]`], color: BLOCK_COLOR });
+    for (const a of o.blocking ?? []) out.push({ key: `blk:${id}:${a}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${a}"]`], color: BLOCK_COLOR });
   }
   for (const [id, pid] of Object.entries(combat.attacks))
     out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [`[data-player="${pid}"]`], color: ATTACK_COLOR });
-  for (const [id, att] of Object.entries(combat.blocks))
-    out.push({ key: `blk:${id}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${att}"]`], color: BLOCK_COLOR });
+  for (const [id, atts] of Object.entries(combat.blocks))
+    for (const att of atts) out.push({ key: `blk:${id}:${att}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${att}"]`], color: BLOCK_COLOR });
   if (combat.aim) out.push({ key: "aim", from: [`[data-obj="${combat.aim}"]`], to: "cursor", color: ATTACK_COLOR, aiming: true });
   if (combat.blocker) out.push({ key: "aim", from: [`[data-obj="${combat.blocker}"]`], to: "cursor", color: BLOCK_COLOR, aiming: true });
   for (const id of combat.crew?.chosen ?? [])

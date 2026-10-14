@@ -42,11 +42,12 @@ export const SUPPORTED_KEYWORDS = [
   "Umbra armor",
   "Totem armor",
   // Characteristic-defining / no in-game effect: Devoid's colorlessness is already in the
-  // card data (CR 702.114a); Changeling gives every creature type (CR 702.73a); Partner only
-  // matters for deck building (CR 702.124).
+  // card data (CR 702.114a); Changeling gives every creature type (CR 702.73a); Partner and
+  // "Choose a Background" only matter for deck building (CR 702.124h, 702.124k; see validateCommanderDeck).
   "Devoid",
   "Changeling",
   "Partner",
+  "Choose a Background",
   // CR 702.61a: "As long as this spell is on the stack, players can't cast other spells or activate abilities that
   // aren't mana abilities." See splitSecondOnStack.
   "Split second",

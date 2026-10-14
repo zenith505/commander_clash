@@ -4,6 +4,14 @@ import { compileCard, compileGranted } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType } from "./types";
 import { parseManaCost } from "./mana";
 
+/** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
+export function pairedWith(s: GameState, o: GameObject): GameObject | undefined {
+  const p = o.paired;
+  if (!p || o.zone !== "battlefield") return undefined;
+  const other = s.objects[p.id];
+  return other && other.zone === "battlefield" && (other.zoneChanges ?? 0) === p.zc && other.paired?.id === o.id ? other : undefined;
+}
+
 export { SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keywords";
 import { canonicalKeyword, SUPPORTED_KEYWORDS, stripReminder, type SupportedKeyword } from "./keywords";
 

@@ -88,7 +88,8 @@ export interface GameObject {
   mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn"; turn: number };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
-  blocking?: ObjectId;
+  /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
+  blocking?: ObjectId[];
   blockedBy?: ObjectId[];
   /** Set when a commander lands in graveyard/exile; consumed by the SBA in CR 903.9a. */
   justMovedForCommander?: boolean;
@@ -119,6 +120,8 @@ export interface GameObject {
   chosen?: Chosen;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
   devoured?: number;
+  /** Soulbond (CR 702.95b): the creature it's paired with (that object, by its zone changes) and who paired them. */
+  paired?: { id: ObjectId; zc: number; by: PlayerId };
 }
 
 export interface Player {

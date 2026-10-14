@@ -75,6 +75,8 @@ export type Count =
   | { kind: "wasKicked"; which?: number }
   /** "That much", "that many" in a triggered ability: the damage its event dealt. */
   | { kind: "eventAmount" }
+  /** "For each creature it devoured" (CR 702.82b). */
+  | { kind: "devoured" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef };
 
@@ -307,8 +309,10 @@ export type StaticCondition =
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
-  /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" }
+  /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" }
+  /** "As long as you have the city's blessing" (CR 702.131c). */
+  | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
@@ -374,6 +378,13 @@ export type Effect =
   | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1" }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   | { type: "sacrifice"; what: ObjRef }
+  /**
+   * Exploit (CR 702.110a-b): "you may sacrifice a creature". If the source is still on the battlefield as this
+   * resolves, it "exploits" the sacrificed creature, which its "when ~ exploits a creature" abilities see.
+   */
+  | { type: "exploit" }
+  /** Ascend on an instant or sorcery (CR 702.131a): "If you control ten or more permanents and you don't have the city's blessing, you get the city's blessing for the rest of the game." */
+  | { type: "ascend" }
   /** The source explores (CR 701.44a): a land on top goes to hand; otherwise a +1/+1 counter, and the card may be milled. */
   | { type: "explore" }
   /** Renown N (CR 702.112a): if it isn't renowned, N +1/+1 counters and it becomes renowned. */
@@ -489,7 +500,7 @@ export type Effect =
 export type ChoiceKind = "creatureType" | "color";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
@@ -565,6 +576,10 @@ export type TriggerEvent =
   | "playerDraws"
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
+  /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
+  | "selfExploits"
+  /** "Whenever a creature you control exploits a nontoken creature": see TriggeredAbility.subjectFilter. */
+  | "creatureYouControlExploits"
   /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
@@ -635,6 +650,8 @@ export interface ActivatedAbility {
   crew?: number;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
+  /** "Activate only if you have the city's blessing" (CR 602.5b). */
+  activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
   lifeCost?: number;
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
@@ -777,6 +794,12 @@ export interface CompiledCard {
   entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
+  /**
+   * Devour N (CR 702.82a, c): "As this object enters, you may sacrifice any number of [creatures]. This permanent
+   * enters with N +1/+1 counters on it for each [one] sacrificed this way." `n: "devoured"`: Thromok's "Devour X,
+   * where X is the number of creatures devoured this way".
+   */
+  devour?: { n: number | "devoured"; filter: TargetSpec };
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */

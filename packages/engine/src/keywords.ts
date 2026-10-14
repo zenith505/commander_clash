@@ -47,6 +47,13 @@ export const SUPPORTED_KEYWORDS = [
   "Devoid",
   "Changeling",
   "Partner",
+  // CR 702.61a: "As long as this spell is on the stack, players can't cast other spells or activate abilities that
+  // aren't mana abilities." See splitSecondOnStack.
+  "Split second",
+  // CR 702.131b: on a permanent, "any time you control ten or more permanents and you don't have the city's
+  // blessing, you get the city's blessing for the rest of the game." See checkAscend. On an instant or sorcery
+  // it's a spell ability instead (702.131a), compiled into the spell.
+  "Ascend",
 ] as const;
 export type SupportedKeyword = (typeof SUPPORTED_KEYWORDS)[number];
 

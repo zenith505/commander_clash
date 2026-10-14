@@ -1448,6 +1448,11 @@ function Seat({
             👑 Monarch
           </span>
         )}
+        {p.citysBlessing && (
+          <span className="monarch blessing" title="The city's blessing (ascend): kept for the rest of the game.">
+            🏙 City's blessing
+          </span>
+        )}
         {(p.energy ?? 0) > 0 && (
           <span className="energy" title={`${p.energy} energy counter${p.energy === 1 ? "" : "s"}, spent to pay {E} costs.`}>
             ⚡ {p.energy}
@@ -2222,13 +2227,18 @@ function Controls({
     );
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
     const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : "return to your hand";
+    const an = `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
+    // Devour: any number of them; exploit: none or one (pending.min).
+    const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
+    const n = discards.length;
+    const ok = pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count;
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> click {pending.count === 1 ? `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}` : `${pending.count} (${pending.what})`} of yours to {verb}.
+          <strong>{pending.source}:</strong> click {what} of yours to {verb}.
         </span>
-        <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+        <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
+          {pending.min !== undefined && n === 0 ? "Sacrifice none" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

@@ -257,8 +257,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.activePlayer === you;
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
+    case "citysBlessing":
+      return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {
       if (cond.is === "attacking") return src.attacking !== undefined;
+      if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");
       if (cond.is === "enchanted") return attached.some(aura);

@@ -142,6 +142,7 @@ export function compile(d: CardDef): CompiledCard {
   const out: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
+  let ascendSpell = false;
   const lines = joinModes(normalizeSelf(d).split("\n"));
   for (const [li, raw] of lines.entries()) {
     const line = raw.trim();
@@ -185,6 +186,11 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Ascend on an instant or sorcery is a spell ability, the spell's first instruction (CR 702.131a).
+    if (line === "Ascend" && isSpell) {
+      ascendSpell = true;
+      continue;
+    }
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
     const kwLine = line.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2");
     if (isKeywordLine(kwLine)) {
@@ -215,6 +221,13 @@ export function compile(d: CardDef): CompiledCard {
         out.entersWithCounters = { counter: kw.entersCounter.counter, n: kw.entersCounter.n };
       }
       if (kw.bloodthirst) out.bloodthirst = (out.bloodthirst ?? 0) + kw.bloodthirst;
+      if (kw.devour) {
+        if (out.devour) {
+          out.unsupported.push(raw); // two devour abilities: not modeled
+          continue;
+        }
+        out.devour = kw.devour;
+      }
       if (kw.entersOptions.length) out.entersOptions = [...(out.entersOptions ?? []), ...kw.entersOptions];
       out.statics.push(...kw.statics);
       continue;
@@ -231,6 +244,12 @@ export function compile(d: CardDef): CompiledCard {
         const c = /^an? (creature type|color)(?: other than (\w+))?$/.exec(part)!;
         (out.entersChoose ??= []).push({ what: c[1] === "color" ? "color" : "creatureType", ...(c[2] ? { except: c[2] } : {}) });
       }
+      continue;
+    }
+    // Thromok: "Devour X, where X is the number of creatures devoured this way" (CR 702.82a; X counters for each).
+    if (/^Devour X, where X is the number of creatures devoured this way$/.test(line)) {
+      if (out.devour) out.unsupported.push(raw);
+      else out.devour = { n: "devoured", filter: { kind: "object", types: ["Creature"], text: "creature" } };
       continue;
     }
     // Replicate (CR 702.56a): an additional cost paid any number of times, like multikicker, and "when you cast this
@@ -382,7 +401,8 @@ export function compile(d: CardDef): CompiledCard {
   }
   if (isSpell) {
     const body = spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
-    if (body) out.spell = body;
+    if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
+    else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
   }
   checkX(d, out);

@@ -212,6 +212,7 @@ interface KeywordParts {
   statics: StaticAbility[];
   /** Fading N's fade counters, vanishing N's time counters (CR 702.32a, 702.63a). */
   entersCounter?: { counter: CounterKind; n: number };
+  devour?: { n: number; filter: TargetSpec };
 }
 
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
@@ -383,6 +384,9 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
           text: "Mentor: put a +1/+1 counter on target attacking creature with lesser power.",
         },
       });
+    } else if (/^exploit$/i.test(p)) {
+      // CR 702.110a: "When this creature enters, you may sacrifice a creature."
+      out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "exploit" }], text: "Exploit: you may sacrifice a creature." } });
     } else if (/^riot$/i.test(p)) out.entersOptions.push("riot"); // CR 702.136a; each instance works separately (702.136b)
     else if (/^unleash$/i.test(p)) {
       // CR 702.98a: "You may have this permanent enter with an additional +1/+1 counter on it" and "This
@@ -396,6 +400,17 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       const spirit: TokenSpec = { name: "Spirit", power: 1, toughness: 1, colors: ["W", "B"], types: ["Creature"], subtypes: ["Spirit"], keywords: ["Flying"] };
       out.triggers.push({ event: "selfToGraveyard", body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n, token: spirit }], text: `Afterlife ${n}: create ${n === 1 ? "a" : n} 1/1 white and black Spirit creature token${n > 1 ? "s" : ""} with flying.` } });
     } else if ((m = /^bloodthirst (\d+)$/i.exec(p))) out.bloodthirst += Number(m[1]); // CR 702.54a
+    else if ((m = /^devour(?: (artifact|food|land))? (\d+)$/i.exec(p))) {
+      // CR 702.82a, c: "Devour [quality] N": as it enters, sacrifice any number of [quality] permanents (creatures).
+      if (out.devour) return null;
+      const q = m[1]?.toLowerCase();
+      const filter: TargetSpec =
+        q === "artifact" ? { kind: "object", types: ["Artifact"], text: "artifact" }
+        : q === "food" ? { kind: "object", subtypes: ["Food"], text: "Food" }
+        : q === "land" ? { kind: "object", types: ["Land"], text: "land" }
+        : { kind: "object", types: ["Creature"], text: "creature" };
+      out.devour = { n: Number(m[2]), filter };
+    }
     else if ((m = /^soulshift (\d+)$/i.exec(p))) {
       // CR 702.46a: "When this permanent is put into a graveyard from the battlefield, you may return target
       // Spirit card with mana value N or less from your graveyard to your hand."

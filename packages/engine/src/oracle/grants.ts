@@ -74,7 +74,8 @@ const describeGrants = (kws: string[], mods: Modification[]) =>
  */
 export function parseGrants(text: string): Modification[] | null {
   const out: Modification[] = [];
-  const quoted = [...text.matchAll(/"([^"]+)"/g)].map((q) => q[1]!);
+  // A comma that separates the list can sit inside the quotes: 'flying, deathtouch, "Ward—Pay 3 life," and "..."'.
+  const quoted = [...text.matchAll(/"([^"]+)"/g)].map((q) => q[1]!.replace(/,$/, ""));
   // "Protection from black and from red" is two protection abilities (CR 702.16g).
   const words = text.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2").replace(/"[^"]+"/g, "\u0000").split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean);
   const kws: string[] = [];

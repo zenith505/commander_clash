@@ -387,6 +387,14 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
     } else if (/^exploit$/i.test(p)) {
       // CR 702.110a: "When this creature enters, you may sacrifice a creature."
       out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "exploit" }], text: "Exploit: you may sacrifice a creature." } });
+    } else if (/^soulbond$/i.test(p)) {
+      // CR 702.95a: "When this creature enters, if you control both this creature and another creature and both are
+      // unpaired, you may pair this creature with another unpaired creature you control for as long as both remain
+      // creatures on the battlefield under your control" and "Whenever another creature you control enters, if you
+      // control both that creature and this one and both are unpaired, you may pair that creature with this creature
+      // for as long as both remain creatures on the battlefield under your control."
+      out.triggers.push({ event: "selfEnters", ifSoulbond: true, body: { targets: [], effects: [{ type: "soulbond" }], text: "Soulbond: you may pair ~ with another unpaired creature you control." } });
+      out.triggers.push({ event: "anotherCreatureYouControlEnters", ifSoulbond: true, body: { targets: [], effects: [{ type: "soulbond" }], text: "Soulbond: you may pair that creature with ~." } });
     } else if (/^riot$/i.test(p)) out.entersOptions.push("riot"); // CR 702.136a; each instance works separately (702.136b)
     else if (/^unleash$/i.test(p)) {
       // CR 702.98a: "You may have this permanent enter with an additional +1/+1 counter on it" and "This

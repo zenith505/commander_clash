@@ -19,7 +19,7 @@
 import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec } from "./abilities";
 import { evalAmount } from "./amounts";
 import { bindChosen, objectMatches } from "./effects";
-import { basePower, baseToughness, defOf } from "./cards";
+import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { bindChosenKeywords, subtypeSet } from "./keywords";
 import { compileCard } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
@@ -102,6 +102,9 @@ export interface Characteristics {
   cantBlockAlone: boolean;
   mustBeBlocked: boolean;
   allMustBlock: boolean;
+  /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
+  extraBlocks: number;
+  blockAny: boolean;
 }
 
 /**
@@ -147,6 +150,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBlockAlone: false,
     mustBeBlocked: false,
     allMustBlock: false,
+    extraBlocks: 0,
+    blockAny: false,
   };
 }
 
@@ -241,7 +246,7 @@ const PERMANENT_CARD_TYPES = ["Artifact", "Battle", "Creature", "Enchantment", "
  * Is an "as long as" condition true? Whatever it looks at on the battlefield is seen as the layers
  * applied so far have left it, so an effect that changes that waits for it (CR 613.8a).
  */
-function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap): boolean {
+function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
@@ -255,6 +260,19 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (src.counters[cond.counter] ?? 0) > 0;
     case "yourTurn":
       return s.activePlayer === you;
+    case "monarch":
+      return s.monarch === you;
+    case "defenderMostLife": {
+      // The player it attacked: from the trigger event, or the one it's attacking as it triggers.
+      const that = eventPlayer ?? src.attacking;
+      if (that === undefined) return false;
+      return s.turnOrder.every((p) => p === you || s.players[p]!.lost || s.players[p]!.life <= s.players[that]!.life);
+    }
+    case "paired": {
+      const other = pairedWith(s, src);
+      const ok = !!other && (!cond.withKeyword || !!chars.get(other.id)?.keywords.some((k) => sameCI(k, cond.withKeyword!)));
+      return ok !== !!cond.not;
+    }
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
     case "citysBlessing":
@@ -288,9 +306,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
 }
 
 /** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
-export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId): boolean {
+export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId): boolean {
   const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
-  return conditionMet(s, cond, sourceId, you, chars);
+  return conditionMet(s, cond, sourceId, you, chars, eventPlayer);
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {
@@ -307,6 +325,10 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     const host = s.objects[e.sourceId!]!.attachedTo;
     return host && chars.has(host) ? [host] : [];
   }
+  if (a.kind === "paired") {
+    const other = pairedWith(s, s.objects[e.sourceId!]!);
+    return other && chars.has(other.id) ? [e.sourceId!, other.id] : [];
+  }
   const you = controllerOfInst(e, chars);
   const out: ObjectId[] = [];
   // "Creatures you control of the chosen type": the choice made as the source entered.
@@ -318,6 +340,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (a.colors?.length && !a.colors.some((col) => c.colors.includes(col))) continue;
     if (a.controller === "you" && c.controller !== you) continue;
     if (a.controller === "opponent" && c.controller === you) continue;
+    if (a.ownedCommanders && !(s.objects[id]!.isCommander && s.objects[id]!.owner === you)) continue;
     if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c)) continue;
     out.push(id);
   }
@@ -436,6 +459,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "mustBeBlocked":
     case "allMustBlock":
       c[m.kind] = true;
+      return;
+    case "blockAdditional":
+      c.extraBlocks += m.n;
+      return;
+    case "blockAny":
+      c.blockAny = true;
       return;
   }
 }

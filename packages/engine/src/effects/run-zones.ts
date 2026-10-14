@@ -1,6 +1,6 @@
 import type { CounterKind, Effect } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
-import { auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, player } from "../game";
+import { auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -103,11 +103,38 @@ function exploit(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
   if (exploiter) fireEvent(s, { type: "exploits", exploiter: exploiter.id, controller: pid, victim: snapshot, chars, watchers });
 }
 
+/**
+ * Soulbond (CR 702.95a, c): pair the source with another unpaired creature its controller picks, or with the
+ * creature whose entering triggered it. Both have to still be creatures on the battlefield under that player's
+ * control, and unpaired; otherwise neither becomes paired.
+ */
+function soulbond(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const pid = ctx.controller;
+  const self = objects(s, { ref: "self" }, ctx)[0];
+  const sub = ctx.subject && s.objects[ctx.subject.id];
+  const subject = sub && (sub.zoneChanges ?? 0) === ctx.subject!.zc ? sub : undefined;
+  if (!sc.queue) {
+    if (!self) return;
+    const options = ctx.subject ? (subject && pairable(s, self, subject, pid) ? [subject.id] : []) : pairCandidates(s, self, pid).map((o) => o.id);
+    if (!options.length) return;
+    sc.queue = [pid];
+    sc.chosen = {};
+    s.pending = { kind: "pickPermanents", player: pid, source: src, action: "pair", what: "creature", options, count: 1, min: 0 };
+    return "paused";
+  }
+  const other = s.objects[sc.chosen?.[pid]?.[0] ?? ""];
+  if (!self || !other || !pairable(s, self, other, pid)) return;
+  pairCreatures(s, self, other, pid);
+}
+
 /** Moving permanents and cards between zones: destroy, exile, bounce, reanimate, flicker, sacrifice, ninjutsu, impulse draw. */
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
     case "exploit":
       return exploit(s, ctx, src);
+    case "soulbond":
+      return soulbond(s, ctx, src);
     case "returnToBattlefield": {
       // Persist and undying return the card that was put into the graveyard, if it's still there as that
       // same object (CR 400.7), under its owner's control.

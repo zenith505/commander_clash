@@ -34,7 +34,8 @@ const BOT_DELAY_MS = 120;
 const STACK_DELAY_MS = 450;
 
 export interface DeckBundle {
-  decks: { name: string; commander: string; cards: string[] }[];
+  /** `secondCommander`: a partner or a Background (CR 702.124). */
+  decks: { name: string; commander: string; secondCommander?: string; cards: string[] }[];
   cards: CardDef[];
 }
 
@@ -49,7 +50,7 @@ export function newGame(bundle: DeckBundle, humanDeck: number, seed = Date.now()
   const s = createGame(
     order.map((di, seat) => {
       const d = bundle.decks[di]!;
-      return { name: seat === HUMAN ? "You" : d.commander.split(",")[0]!, commander: get(d.commander), deck: d.cards.map(get), isBot: seat !== HUMAN };
+      return { name: seat === HUMAN ? "You" : d.commander.split(",")[0]!, commander: get(d.commander), ...(d.secondCommander ? { secondCommander: get(d.secondCommander) } : {}), deck: d.cards.map(get), isBot: seat !== HUMAN };
     }),
     seed,
     { mulligans: true },

@@ -1,6 +1,6 @@
 import type { AbilityBody, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, describeTargets, draw, log, obj, opponents, player } from "../game";
+import { checkAscend, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player } from "../game";
 import { controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { withModes } from "../modes";
 import { compileCard } from "../oracle";
@@ -186,7 +186,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(
       entering,
       you,
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifEvoked || entering.castAlt === "evoke"),
+      // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -200,7 +201,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (id === ev.id || controllerOf(s, obj(s, id)) !== you) continue;
         const o = obj(s, id);
         // Evolve only triggers if the new creature is bigger in some way (CR 702.100a, 603.4).
-        add(o, you, (e, t) => e === "anotherCreatureYouControlEnters" && (!t.ifEvolves || evolves(s, o, lki)), undefined, undefined, entering, lki);
+        add(o, you, (e, t) => e === "anotherCreatureYouControlEnters" && (!t.ifEvolves || evolves(s, o, lki)) && (!t.ifSoulbond || pairable(s, o, entering, you)), undefined, undefined, entering, lki);
       }
     }
     // Landfall. The land itself sees itself enter too (CR 603.6a).
@@ -253,9 +254,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       if (o.blocking) {
+        // Blocking several creatures, "blocks" still triggers once; "blocks a creature" once for each (CR 509.3a-b).
         add(o, you, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
-        const at = s.objects[o.blocking];
-        if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
+        for (const a of o.blocking) {
+          const at = s.objects[a];
+          if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
+        }
       }
       if (o.attacking !== undefined && o.blockedBy?.length) {
         // "Defending player" (afflict) is the player it's attacking.

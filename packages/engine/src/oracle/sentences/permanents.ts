@@ -4,6 +4,7 @@ import type { Effect, ObjRef } from "../../abilities";
 import { NUMX, COUNTER, counterKind, amt, isGroup } from "../words";
 import { pickFilter, parseObject } from "../targets";
 import { parseChanges } from "../sentence";
+import { parseExtraBlocks } from "../statics";
 import type { Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -69,6 +70,22 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Switch (.+?)'s? power and toughness until end of turn$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "switchPT" }], duration: "endOfTurn" }] : null;
+  }
+  // Joint Assault: "If it's paired with a creature, that creature also gets +2/+2 until end of turn", checked as it
+  // resolves (rulings, CR 702.95b).
+  if ((m = /^If it's paired with a creature, that creature also ((?:gets?|gains?) .+) until end of turn$/i.exec(s))) {
+    const it = parseObject("it", ctx);
+    const mods = parseChanges(m[1]!);
+    return it?.ref === "target" && mods ? [{ type: "continuous", what: { ref: "pairedWithTarget", index: it.index }, mods, duration: "endOfTurn" }] : null;
+  }
+  // "Target creature can block any number of creatures this turn", "~ can block an additional creature this
+  // turn", "It gets +2/+2 until end of turn and can block an additional creature this turn" (CR 509.1a).
+  if ((m = /^(.+?) (can block .+ this turn)$/i.exec(s))) {
+    const extra = parseExtraBlocks(m[2]!);
+    const head = /^(.+?) ((?:gets?|gains?) .+) until end of turn and$/i.exec(m[1]!);
+    const what = parseObject(head ? head[1]! : m[1]!, ctx);
+    const mods = head ? parseChanges(head[2]!) : [];
+    return extra && what && mods ? [{ type: "continuous", what, mods: [...mods, extra], duration: "endOfTurn" }] : null;
   }
   // Continuous changes until end of turn: "X gets +2/+2 and gains flying", "X loses all abilities
   // and becomes a blue Frog with base power and toughness 1/1", "X has base power and toughness 0/1".

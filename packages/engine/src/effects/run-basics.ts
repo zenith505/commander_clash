@@ -2,6 +2,7 @@ import type { Effect } from "../abilities";
 import { defOf, objIsType, power, toughness } from "../cards";
 import { draw, gainLife, giveCitysBlessing, log, player } from "../game";
 import { MONARCH } from "../oracle";
+import { invalidateCharacteristics } from "../layers";
 import { dealDamage, objectSource } from "../damage";
 import type { GameObject, GameState, PlayerId } from "../types";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
@@ -144,5 +145,6 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
   if (p.lost || s.monarch === pid) return;
   s.cards[MONARCH.oracleId] ??= MONARCH;
   s.monarch = pid;
+  invalidateCharacteristics(s); // "as long as you're the monarch"
   log(s, `${p.name} becomes the monarch.`);
 }

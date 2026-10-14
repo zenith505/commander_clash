@@ -13,6 +13,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
   [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
+  // Only players can be attacked here (planeswalkers and battles aren't supported as attack targets).
+  [/^Whenever ~ attacks a player, (.+)$/, "selfAttacks"],
   [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
   // The beginning of combat step (CR 507) and end of combat step (CR 511).
   [/^At the beginning of combat on your turn, (.+)$/, "yourBeginCombat"],
@@ -227,6 +229,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "If it's attacking" is about the source only in an ability about the source itself.
   const aboutIt = intervening && /^(it|~)\b/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!);
   const ifCond = intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "That player" is the attacked player only in "Whenever ~ attacks a player".
+  if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
     const t = parseTrigger(`${intervening[1]}, ${intervening[3]}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";

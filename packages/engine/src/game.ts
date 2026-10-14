@@ -1,5 +1,5 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, cardIdOf, defOf, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
@@ -35,7 +35,9 @@ export const MAX_HAND_SIZE = 7; // CR 402.2
 export interface PlayerSetup {
   name: string;
   commander: CardDef;
-  /** The other 99 cards. */
+  /** A second commander: partners, or a Background beside a "choose a Background" creature (CR 702.124). */
+  secondCommander?: CardDef;
+  /** The rest of the 100 cards (98 with two commanders, CR 702.124b). */
   deck: CardDef[];
   isBot?: boolean;
 }
@@ -88,10 +90,13 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
       isBot: !!p.isBot,
     };
     s.players.push(player);
-    const cmd = newObject(s, p.commander, pid, "command");
-    cmd.isCommander = true;
-    player.command.push(cmd.id);
-    player.commanderCasts[cmd.id] = 0;
+    // Both commanders start in the command zone, and each is tracked on its own: tax, damage (CR 702.124b, d).
+    for (const c of p.secondCommander ? [p.commander, p.secondCommander] : [p.commander]) {
+      const cmd = newObject(s, c, pid, "command");
+      cmd.isCommander = true;
+      player.command.push(cmd.id);
+      player.commanderCasts[cmd.id] = 0;
+    }
     for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
     shuffle(s, player.library);
   });
@@ -455,7 +460,13 @@ export function moveObject(
     const i = from.indexOf(id);
     if (i >= 0) from.splice(i, 1);
   }
-  if (o.zone === "battlefield") removeFromCombat(s, o);
+  if (o.zone === "battlefield") {
+    removeFromCombat(s, o);
+    // Leaving the battlefield breaks a soulbond pair (CR 702.95e).
+    const partner = pairedWith(s, o);
+    if (partner) partner.paired = undefined;
+    o.paired = undefined;
+  }
   // Whether it was kicked stays with a spell that becomes a permanent, and nothing else (CR 400.7).
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
@@ -724,12 +735,51 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   return true;
 }
 
+/** Could `pid` pair these two now (CR 702.95a, 702.95c): two different creatures on the battlefield under their control, both unpaired. */
+export function pairable(s: GameState, a: GameObject, b: GameObject, pid: PlayerId): boolean {
+  return a.id !== b.id && [a, b].every((o) => o.zone === "battlefield" && objIsType(s, o, "Creature") && controllerOf(s, o) === pid && !pairedWith(s, o));
+}
+
+/** The creatures `pid` could pair `o` with. */
+export const pairCandidates = (s: GameState, o: GameObject, pid: PlayerId) => s.battlefield.map((id) => obj(s, id)).filter((x) => pairable(s, o, x, pid));
+
+export function pairCreatures(s: GameState, a: GameObject, b: GameObject, pid: PlayerId) {
+  a.paired = { id: b.id, zc: b.zoneChanges ?? 0, by: pid };
+  b.paired = { id: a.id, zc: a.zoneChanges ?? 0, by: pid };
+  invalidateCharacteristics(s);
+  log(s, `${characteristics(s, a).name} and ${characteristics(s, b).name} are paired.`);
+}
+
+/**
+ * A paired creature becomes unpaired if another player gains control of it or the creature it's paired with, or
+ * either stops being a creature or leaves the battlefield (CR 702.95e). Leaving is handled as it happens.
+ */
+function checkPairs(s: GameState) {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (!o.paired) continue;
+    const other = pairedWith(s, o);
+    const ok = (x: GameObject) => controllerOf(s, x) === o.paired!.by && objIsType(s, x, "Creature");
+    if (other && ok(o) && ok(other)) continue;
+    o.paired = undefined;
+    if (other) {
+      other.paired = undefined;
+      log(s, `${characteristics(s, o).name} and ${characteristics(s, other).name} are no longer paired.`);
+    }
+    invalidateCharacteristics(s);
+  }
+}
+
 function removeFromCombat(s: GameState, o: GameObject) {
-  if (o.blocking) {
-    const att = s.objects[o.blocking];
+  for (const a of o.blocking ?? []) {
+    const att = s.objects[a];
     if (att?.blockedBy) att.blockedBy = att.blockedBy.filter((b) => b !== o.id);
   }
-  if (o.blockedBy) for (const b of o.blockedBy) if (s.objects[b]) s.objects[b]!.blocking = undefined;
+  // A creature blocking it is still a blocking creature, blocking whatever else it blocks (CR 506.4, 510.1d).
+  for (const b of o.blockedBy ?? []) {
+    const bl = s.objects[b];
+    if (bl?.blocking) bl.blocking = bl.blocking.filter((a) => a !== o.id);
+  }
 }
 
 export function draw(s: GameState, pid: PlayerId, n = 1) {
@@ -912,7 +962,7 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller)) {
+    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player)) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -2027,10 +2077,19 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
 }
 
+/**
+ * How many attackers a creature may block (CR 509.1a): one, plus each "can block an additional creature"
+ * (they add up, rulings), or any number.
+ */
+export function maxBlocks(s: GameState, o: GameObject): number {
+  const c = characteristics(s, o);
+  return c.blockAny ? Infinity : 1 + Math.max(0, c.extraBlocks);
+}
+
 function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[]) {
   const pend = s.pending;
   if (pend?.kind !== "declareBlockers" || pend.player !== p.id) throw new RulesError("not declaring blockers now");
-  const seen = new Set<ObjectId>();
+  const seen = new Map<ObjectId, ObjectId[]>();
   const count: Record<ObjectId, number> = {};
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
@@ -2039,11 +2098,14 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     const ad = defOf(s, at);
     if (controllerOf(s, bl) !== p.id || bl.zone !== "battlefield" || !objIsType(s, bl, "Creature") || bl.tapped)
       throw new RulesError(`${bd.name} can't block`);
-    if (seen.has(bl.id)) throw new RulesError(`${bd.name} can only block one creature`);
+    const already = seen.get(bl.id) ?? [];
+    if (already.includes(at.id)) throw new RulesError(`${bd.name} already blocks ${ad.name}`);
+    const max = maxBlocks(s, bl);
+    if (already.length >= max) throw new RulesError(`${bd.name} can only block ${max === 1 ? "one creature" : `${max} creatures`}`);
     if (at.attacking !== p.id) throw new RulesError(`${ad.name} isn't attacking you`);
     const problem = blockProblem(s, bl, at);
     if (problem) throw new RulesError(problem);
-    seen.add(bl.id);
+    seen.set(bl.id, [...already, at.id]);
     count[at.id] = (count[at.id] ?? 0) + 1;
   }
   for (const [atId, n] of Object.entries(count)) {
@@ -2052,13 +2114,13 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
   }
   // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
   const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
-  if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
+  if (seen.size === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
   const req = blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
     const at = obj(s, b.attacker);
-    bl.blocking = at.id;
+    (bl.blocking ??= []).push(at.id);
     (at.blockedBy ??= []).push(bl.id);
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}.`);
   }
@@ -2081,23 +2143,25 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked);
   if (!demanding.length) return null;
-  const blocking = new Map(blocks.map((b) => [b.blocker, b.attacker]));
+  const blocking = new Map<ObjectId, ObjectId[]>();
+  for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
-  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !characteristics(s, o).cantBlock && !(characteristics(s, o).cantBlockAlone && !earlier && blocks.length <= 1 && !blocking.has(o.id)));
-  const obeys = (b: GameObject) => {
-    const at = blocking.get(b.id);
-    return at !== undefined && demanding.some((a) => a.id === at);
+  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !characteristics(s, o).cantBlock && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
+  // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
+  const full = (b: GameObject) => {
+    const at = blocking.get(b.id) ?? [];
+    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x));
   };
   for (const at of demanding) {
     const ac = characteristics(s, at);
     const could = mine.filter((b) => !blockProblem(s, b, at));
     if (could.length < (objHasKeyword(s, at, "Menace") ? 2 : 1)) continue;
     if (ac.allMustBlock && !ac.maxOneBlocker) {
-      const shirk = could.find((b) => !obeys(b));
+      const shirk = could.find((b) => !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));
       if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (all creatures able to block it do so)`;
     }
     const blocked = blocks.some((b) => b.attacker === at.id);
-    if (!blocked && could.some((b) => !obeys(b))) return `${ac.name} must be blocked if able`;
+    if (!blocked && could.some((b) => !full(b))) return `${ac.name} must be blocked if able`;
   }
   return null;
 }
@@ -2168,9 +2232,17 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
   for (const id of s.battlefield) {
     const bl = obj(s, id);
     if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep)) continue;
-    const at = s.objects[bl.blocking];
-    const dmg = power(s, bl);
-    if (at && at.zone === "battlefield" && dmg > 0) hits.push({ source: bl, toObject: at, amount: dmg });
+    const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
+    let dmg = power(s, bl);
+    if (dmg <= 0) continue;
+    // Blocking two or more creatures, its damage is divided among them (CR 510.1d): lethal damage to each in
+    // turn (1 with deathtouch, CR 702.2c), the rest to the last.
+    blocked.forEach((at, i) => {
+      const lethal = objHasKeyword(s, bl, "Deathtouch") ? 1 : Math.max(0, toughness(s, at) - at.damage);
+      const amt = i === blocked.length - 1 ? dmg : Math.min(dmg, lethal);
+      if (amt > 0) hits.push({ source: bl, toObject: at, amount: amt });
+      dmg -= amt;
+    });
   }
   if (s.preventCombatDamage && hits.length) {
     log(s, "All combat damage is prevented.");
@@ -2223,6 +2295,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
     invalidateCharacteristics(s);
     syncControl(s);
+    checkPairs(s);
     checkAscend(s);
     let changed = false;
     for (const p of s.players) {

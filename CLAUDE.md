@@ -39,6 +39,7 @@ card unsupported. Cite the CR number in a comment where the code implements a ru
 
 ## Git
 
-One branch per round (`round/<name>`), committed as Ken (repo-local git config), with the Claude co-author trailer.
-Nothing goes on `main` and nothing is pushed until Ken says so. At the end of a round: tests and typecheck green,
-update `docs/ROADMAP.md` (drop what's done, add what's still missing) and add one line to `docs/HISTORY.md`.
+One branch per round (`round/<name>`) off `main`, committed as Ken (repo-local git config), with the Claude co-author
+trailer. Push the branch to GitHub and open a pull request; Ken merges it. Never push to `main` yourself. At the end
+of a round: tests and typecheck green, update `docs/ROADMAP.md` (drop what's done, add what's still missing) and add
+one line to `docs/HISTORY.md`.

@@ -134,6 +134,11 @@ export interface TargetSpec {
   opponent?: boolean;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
   optional?: boolean;
+  /**
+   * "N damage divided as you choose among one, two, or three targets": this is one of the targets `first` to
+   * `first + n - 1`, which share `total` as their controller chose with the targets, at least 1 each (CR 601.2d).
+   */
+  divided?: { first: number; n: number; total: number };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
   /**
@@ -178,8 +183,9 @@ export interface Range {
  * since, it's a new object and no longer the target (CR 400.7, 608.2b).
  */
 export type TargetChoice =
-  | { kind: "object"; id: ObjectId; zc?: number }
-  | { kind: "player"; id: PlayerId }
+  /** `amount`: what it gets of an amount "divided as you choose" (CR 601.2d). */
+  | { kind: "object"; id: ObjectId; zc?: number; amount?: number }
+  | { kind: "player"; id: PlayerId; amount?: number }
   | { kind: "stack"; id: string }
   /** An "up to N" target left unchosen (CR 115.6, 601.2c). */
   | { kind: "none" };
@@ -258,7 +264,8 @@ export type Modification =
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   | { kind: "setColors"; colors: Color[] } // layer 5
-  | { kind: "addKeywords"; keywords: string[] } // layer 6
+  /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
+  | { kind: "addKeywords"; keywords: string[]; spares?: true }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**
@@ -380,7 +387,8 @@ export type StaticCondition =
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[] }
+  /** `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). */
+  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
@@ -491,6 +499,8 @@ export type Effect =
    */
   | { type: "copySpell"; spell: "cause" | { target: number }; n: Amount | "storm" | "kicked"; newTargets: boolean }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  /** "Put its counters on target creature": as many of each kind (or of `only`) as the source had as it last existed. */
+  | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
   | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
@@ -650,6 +660,8 @@ export type TriggerEvent =
   /** Enlist's trigger (CR 702.154a), "Whenever ~ enlists a creature": the subject is the enlisted creature. */
   | "selfEnlists"
   | "selfDealsCombatDamageToPlayer"
+  /** "Whenever ~ deals damage to a player" (combat or not): once for each player dealt damage (CR 603.2c). */
+  | "selfDealsDamageToPlayer"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
@@ -766,6 +778,14 @@ export interface TriggeredAbility {
   ifOtherBearer?: boolean;
   /** It has the ability only while this is true, like "Max speed — Whenever ..." (CR 702.178a): not an intervening if. */
   activeIf?: StaticCondition;
+  /**
+   * "Whenever enchanted creature deals damage", "whenever equipped creature attacks": a "self" event about the
+   * permanent this Aura or Equipment is attached to, which is the subject ("it", "that creature"). "orSelf": "whenever
+   * ~ or equipped creature ...", about either.
+   */
+  host?: "attached" | "orSelf";
+  /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
+  toOpponent?: true;
 }
 
 export interface ActivatedAbility {
@@ -837,6 +857,31 @@ export interface ManaAbility {
   activeIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
   spendOnly?: ManaSpend;
+}
+
+/**
+ * A triggered mana ability (CR 605.1b) that triggers when a permanent is tapped for mana, that is, when one of its
+ * mana abilities with {T} in the cost resolves and makes mana (CR 106.12-106.12a). It resolves right after that
+ * ability, without the stack (CR 605.4a), and the player who tapped it adds the mana: "its controller adds", "that
+ * player adds", or with "whenever you tap", this ability's controller, who is that player.
+ */
+export interface ManaTrigger {
+  text: string;
+  /** "Enchanted land", "fortified land": the permanent this is attached to (and it matches `filter`). */
+  attached?: true;
+  /** What's tapped: "a land", "a Swamp", "a creature", "a basic land". */
+  filter?: TargetSpec;
+  /** "Whenever you tap ...": only when this ability's controller taps it. */
+  you?: true;
+  /** "... is tapped for mana of the chosen color": only when it made mana of the color chosen for this permanent. */
+  ofChosen?: true;
+  /**
+   * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
+   * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
+   * any type that land produced" (picking one of them if it made several, rulings on Mana Flare). The mana has none
+   * of the riders of the mana that permanent made (rulings on Mana Flare).
+   */
+  adds: { kind: "fixed"; mana: ManaType[] } | { kind: "anyColor"; n: number } | { kind: "chosenColor" } | { kind: "produced" };
 }
 
 /**
@@ -912,7 +957,8 @@ export type AdditionalCost =
  * Alternative costs (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a), bestow (CR 702.103a) and blitz (CR 702.152a);
  * warp (CR 702.185a) only from your hand; madness (CR 702.35a) only as its trigger resolves, from exile.
  */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp";
+/** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative";
 
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
 export interface CastFromGraveyard {
@@ -995,8 +1041,15 @@ export interface CompiledCard {
   phantom?: boolean;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
+  /**
+   * "Each player can't cast more than one spell each turn" (Rule of Law), "... one noncreature spell": counting every
+   * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
+   */
+  castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /** "Whenever enchanted land is tapped for mana, its controller adds an additional {G}" and the like (CR 605.1b). */
+  manaTriggers?: ManaTrigger[];
   countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;
@@ -1015,6 +1068,8 @@ export interface CompiledCard {
   costLessIf?: { n: number; cond: StaticCondition }[];
   /** "This spell costs {3} less to cast if it targets a tapped creature" (CR 601.2f). */
   costLessIfTargets?: { n: number; filter: TargetSpec }[];
+  /** "Spells your opponents cast that target ~ cost {2} more to cast": once per spell however often it targets it (rulings). */
+  targetTax?: number;
   /**
    * A permanent's static abilities that make spells cost more or less: "Creature spells you cast cost
    * {1} less to cast", "Noncreature spells cost {1} more to cast" (CR 601.2f).
@@ -1040,7 +1095,7 @@ export interface CompiledCard {
   /** Rebound (CR 702.88). */
   rebound?: boolean;
   /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
-  altCosts?: { kind: AltCostKind; mana: string }[];
+  altCosts?: { kind: AltCostKind; mana: string; /** Paid along with it: a Borderpost's "return a basic land you control to its owner's hand". */ costs?: AdditionalCost[] }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */

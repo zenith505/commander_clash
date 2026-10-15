@@ -477,6 +477,8 @@ export interface GameState {
   nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
+  /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
+  castThisTurn?: { player: PlayerId; card: string }[];
   /** Each spell cast this turn as it was cast, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
   castItems?: Record<string, StackItem>;
   seed: number;
@@ -623,7 +625,8 @@ export type Action =
    * one that makes `mana`), `mana` is the choice for one that offers several.
    */
   /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[] }
+  /** `extra`: the mana picked for the triggered mana abilities tapping it triggers ("one mana of any color", CR 605.4a). */
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[]; extra?: ManaType[] }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */

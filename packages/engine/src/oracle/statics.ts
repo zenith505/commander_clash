@@ -78,9 +78,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | "fail" | null {
   const text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
+  if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
     const c = parseCount(m[2]!, null, true);
     return c ? { less: { ...c, times: (c.times ?? 1) * Number(m[1]) } } : "fail";

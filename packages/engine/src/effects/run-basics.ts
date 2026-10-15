@@ -1,4 +1,4 @@
-import type { Effect } from "../abilities";
+import type { DamageRecipient, Effect } from "../abilities";
 import { defOf, objIsType, power, toughness } from "../cards";
 import { draw, gainLife, giveCitysBlessing, log, loseLife, player } from "../game";
 import { MONARCH } from "../oracle";
@@ -17,19 +17,27 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "damage": {
       const amount = amountNow(s, e.amount, ctx);
-      const all = [e.to, ...(e.also ?? [])].map((to) => damageRecipients(s, to, ctx));
-      const objs = all.flatMap((x) => x.objs);
-      const pids = all.flatMap((x) => x.pids);
+      // "Divided as you choose": each target is dealt its part; a part for an illegal target isn't dealt (CR 608.2b,
+      // rulings on Arc Lightning).
+      const parts = (to: DamageRecipient) =>
+        e.divided && to.ref === "anyTarget"
+          ? Array.from({ length: to.n ?? 1 }, (_, k) => {
+              const t = ctx.targets[to.index + k];
+              return { ...damageRecipients(s, { ref: "anyTarget", index: to.index + k }, ctx), n: t && t.kind !== "none" && t.kind !== "stack" ? (t.amount ?? 0) : 0 };
+            })
+          : [{ ...damageRecipients(s, to, ctx), n: amount }];
+      const all = [e.to, ...(e.also ?? [])].flatMap(parts);
       const from = ctxSource(s, ctx);
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
       let dealt = 0;
-      for (const o of objs) {
-        const n = dealDamage(s, from, { object: o }, amount, { lifelink });
-        dealt += n;
-        if (n > 0 && s.resolving) (s.resolving.damagedThisWay ??= []).push(o.id);
-      }
-      for (const pid of pids) dealt += dealDamage(s, from, { player: pid }, amount, { lifelink });
+      for (const x of all)
+        for (const o of x.objs) {
+          const n = dealDamage(s, from, { object: o }, x.n, { lifelink });
+          dealt += n;
+          if (n > 0 && s.resolving) (s.resolving.damagedThisWay ??= []).push(o.id);
+        }
+      for (const x of all) for (const pid of x.pids) dealt += dealDamage(s, from, { player: pid }, x.n, { lifelink });
       gainLife(s, from.controller, lifelink.n);
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
       return;

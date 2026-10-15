@@ -75,6 +75,11 @@ export interface Characteristics {
   allCreatureTypes: boolean;
   colors: Color[];
   keywords: string[];
+  /**
+   * Keywords (lowercase) it has only from one effect that "doesn't remove" that effect's source (Cho-Manno's Blessing):
+   * that protection doesn't make the source fall off (CR 702.16c), protection from anywhere else does.
+   */
+  sparedBy?: Record<string, ObjectId>;
   /** False once an effect made it lose all abilities: none of its printed abilities work. */
   hasPrintedAbilities: boolean;
   /** Triggered, activated and mana abilities effects gave it, as text ("~" is this object), in layer 6 order. */
@@ -179,6 +184,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   subtypes: [...c.subtypes],
   colors: [...c.colors],
   keywords: [...c.keywords],
+  ...(c.sparedBy ? { sparedBy: { ...c.sparedBy } } : {}),
   grantedAbilities: [...c.grantedAbilities],
   pt: [...c.pt],
   cantBeBlockedBy: [...c.cantBeBlockedBy],
@@ -446,14 +452,22 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined)) if (!c.keywords.some((x) => sameCI(x, k))) c.keywords.push(k);
+      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined)) {
+        const key = k.toLowerCase();
+        if (!c.keywords.some((x) => sameCI(x, k))) {
+          c.keywords.push(k);
+          if (m.spares && e.sourceId) (c.sparedBy ??= {})[key] = e.sourceId;
+        } else if (c.sparedBy?.[key] !== undefined && !(m.spares && c.sparedBy[key] === e.sourceId)) delete c.sparedBy[key]; // it has it from elsewhere too
+      }
       return;
     case "removeKeywords":
       c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k)));
+      for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
       return;
     case "loseAllAbilities":
       // Abilities granted before this (earlier timestamps) go too; later ones stay (CR 613.7).
       c.keywords = [];
+      c.sparedBy = undefined;
       c.hasPrintedAbilities = false;
       c.grantedAbilities = [];
       c.unblockedDamage = false;

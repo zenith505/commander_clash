@@ -202,12 +202,32 @@ export function targetProblem(s: GameState, specs: TargetSpec[], targets: Target
   const t = targets ?? [];
   if (t.length !== specs.length) return `choose ${specs.length} target(s): ${specs.map((x) => x.text).join(", ")}`;
   for (let i = 0; i < specs.length; i++) if (!canChooseTarget(s, specs, t, i, t[i]!, controller, src, sourceId)) return `illegal target for ${specs[i]!.text}`;
+  return divisionProblem(specs, t);
+}
+
+/** "Divided as you choose" (CR 601.2d): each target chosen gets at least 1, and the parts add up to the amount. */
+export function divisionProblem(specs: TargetSpec[], t: TargetChoice[]): string | null {
+  const part = (c: TargetChoice | undefined) => (c && (c.kind === "object" || c.kind === "player") ? c.amount : undefined);
+  for (let i = 0; i < specs.length; i++) {
+    const d = specs[i]!.divided;
+    const n = part(t[i]);
+    if (!d) {
+      if (n !== undefined) return `nothing is divided among ${specs[i]!.text}`;
+      continue;
+    }
+    if (t[i]?.kind !== "none" && (n === undefined || !Number.isInteger(n) || n < 1)) return `each target must get at least 1 of the ${d.total}`;
+    if (i === d.first) {
+      let sum = 0;
+      for (let k = d.first; k < d.first + d.n; k++) sum += part(t[k]) ?? 0;
+      if (sum !== d.total) return `divide ${d.total} among the targets`;
+    }
+  }
   return null;
 }
 
 /** Remember which object each target is right now, so a later zone change makes it a different object (CR 400.7). */
 export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined): TargetChoice[] | undefined =>
-  targets?.map((t) => (t.kind === "object" ? { kind: "object", id: t.id, zc: s.objects[t.id]?.zoneChanges ?? 0 } : t));
+  targets?.map((t) => (t.kind === "object" ? { kind: "object", id: t.id, zc: s.objects[t.id]?.zoneChanges ?? 0, ...(t.amount !== undefined ? { amount: t.amount } : {}) } : t));
 
 /**
  * Could legal targets be chosen for all of `specs` (CR 601.2c, 603.3d)? "Up to" targets can be left

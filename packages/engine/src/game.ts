@@ -1,7 +1,7 @@
 import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
-import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
@@ -271,7 +271,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
       // And while helping to pay for a spell with assist, or paying the rest of it (CR 702.132a).
       if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -1003,6 +1003,7 @@ function startNextTurn(s: GameState) {
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
   s.damagedThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
+  s.castThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
   s.lastKnown = undefined;
@@ -1351,7 +1352,7 @@ export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[]) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = []) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
@@ -1362,6 +1363,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
   const adds = manaProduced(s, o, ab, mana);
+  // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
+  const triggered = manaTriggerResults(s, p.id, o, ab, adds);
+  const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
+  if (!picked) throw new RulesError(triggered.length > 1 ? `choose the mana that tapping ${name} also adds` : `${name} adds no other mana to choose`);
   const src = objectSource(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
@@ -1377,6 +1382,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     moveObject(s, id, "graveyard");
   }
   addMana(s, p.id, adds, ab.spendOnly);
+  // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
+  addMana(s, p.id, picked.adds);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
 }
@@ -1451,6 +1458,8 @@ export function castProblem(
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
   if (isType(d, "Land")) return "lands are played, not cast";
+  const limit = castLimitProblem(s, pid, d);
+  if (limit) return limit;
   // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
   if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
@@ -1509,6 +1518,11 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "");
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
+  // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
+  for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
+    const t = s.objects[id];
+    if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
+  }
   // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
   // increases (CR 118.9d, 601.2f).
   const madness = madnessCastOf(s, pid, o.id);
@@ -1766,7 +1780,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
-  const sacrificed = payAdditionalCosts(s, p, d, choices, via?.costs ?? []);
+  const sacrificed = payAdditionalCosts(s, p, d, choices, [...(via?.costs ?? []), ...(altCost(d, choices.alt)?.costs ?? [])]);
   if (sacrificed.length) item.sacrificed = sacrificed;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
@@ -1777,10 +1791,26 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
+  s.cards[d.oracleId] ??= d;
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d });
   fireEvent(s, { type: "targeted", stackId });
+}
+
+/** "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2). */
+function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    for (const l of abilitiesOf(s, o).castLimits ?? []) {
+      if (l.who === "you" && controllerOf(s, o) !== pid) continue;
+      if (l.filter && !printedMatches(l.filter, d)) continue;
+      if ((s.castThisTurn ?? []).some((c) => c.player === pid && (!l.filter || printedMatches(l.filter, s.cards[c.card]!))))
+        return `${characteristics(s, o).name}: ${l.text.replace(/~/g, characteristics(s, o).name).replace(/\.$/, "")}`;
+    }
+  }
+  return null;
 }
 
 /** The card's way of being cast from a graveyard of this kind, if it has one. */
@@ -1835,7 +1865,12 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
 function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, choices?.via)?.costs ?? [])], choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, choices), choices, `cast ${d.name}`);
+}
+
+/** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt">): AdditionalCost[] {
+  return [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
 }
 
 /**
@@ -1956,7 +1991,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
 export function describeTargets(s: GameState, targets?: TargetChoice[]): string {
   if (!targets?.length) return "";
   const names = targets.flatMap((t) =>
-    t.kind === "none" ? [] : t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell"),
+    t.kind === "none"
+      ? []
+      : (t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell")) +
+        (t.kind !== "stack" && t.amount !== undefined ? ` (${t.amount})` : ""),
   );
   return names.length ? ` targeting ${names.join(", ")}` : "";
 }
@@ -2113,7 +2151,10 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     if (targets.length !== pend.specs.length) throw new RulesError(`choose ${pend.specs.length} target${pend.specs.length === 1 ? "" : "s"}`);
     const key = (t: TargetChoice | undefined) => (t ? (t.kind === "none" ? "none" : `${t.kind}:${t.id}`) : "");
     const changed = targets.map((t, i) => key(t) !== key(pend.current[i]));
-    const kept = targets.map((t, i) => (changed[i] ? t : pend.current[i]!));
+    // A divided amount stays as it was: the number of targets and the division can't change (rulings on Pyrotechnics).
+    const part = (t: TargetChoice | undefined) => (t && (t.kind === "object" || t.kind === "player") ? t.amount : undefined);
+    if (targets.some((t, i) => changed[i] && pend.specs[i]?.divided && (t.kind === "none" || pend.current[i]?.kind === "none"))) throw new RulesError("the number of targets of a divided amount can't change");
+    const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
     for (let i = 0; i < targets.length; i++)
       if (changed[i] && !canChooseTarget(s, pend.specs, kept, i, targets[i]!, p.id)) throw new RulesError("that isn't a legal new target");
     targets = kept;
@@ -3042,8 +3083,11 @@ function attachmentSBAs(s: GameState): boolean {
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     if (c.subtypes.includes("Aura")) {
       const enchant = compileCard(defOf(s, o)).enchant;
-      // Protection from the Aura's color makes it illegal too (CR 702.16c).
-      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false, c);
+      // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
+      // effect that "doesn't remove" this Aura.
+      const hc = host && characteristics(s, host);
+      const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id) : [];
+      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false) && !protectedFrom(shielding, c);
       if (!legal && o.bestowed) {
         // A bestowed Aura becomes unattached and stops being bestowed: it's an enchantment creature (CR 702.103f).
         o.attachedTo = undefined;
@@ -3214,10 +3258,11 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid) continue;
+    const options = manaOptions(s, o);
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
       const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
-      for (const m of manaChoices(s, o, ab)) out.push({ type: "activateMana", player: pid, objectId: id, mana: m, ability: i, ...(tap ? { tap } : {}) });
+      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}) });
     });
   }
   return out;

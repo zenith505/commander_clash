@@ -5,8 +5,8 @@ import { planMana } from "../autopay";
 import { draw, log, player } from "../game";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
-import { choiceOptions } from "./targeting";
-import { ResolveCtx, objects, runEffect } from "./resolve";
+import { choiceOptions, pickOptions } from "./targeting";
+import { ResolveCtx, objects, runEffect, amountNow } from "./resolve";
 import { kickedMatches } from "./run-spells";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
@@ -115,6 +115,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "discard" && e.who.ref === "you" && !player(s, ctx.controller).hand.length) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).length) return false;
+    // "Unless you return a non-Lair land you control": you can't if you have none.
+    if (e.type === "pick" && e.who.ref === "you" && pickOptions(s, e, ctx.controller).length < amountNow(s, e.n, ctx)) return false;
   }
   return true;
 }

@@ -9,6 +9,7 @@ import {
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
+  castExtraCosts,
   mayPlayFromExile,
   mayPlayLandFromGraveyard,
   assistedRemaining,
@@ -19,6 +20,7 @@ import {
   describeTargets,
   describeCount,
   canChooseTarget,
+  divisionProblem,
   legalModes,
   spellModes,
   withModes,
@@ -170,6 +172,23 @@ type Targeting =
   /** New targets for a copy of a spell (CR 707.10c), or keep the old ones. */
   | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string };
 
+/** Targets chosen for damage "divided as you choose" (CR 601.2d): how much each gets, at least 1 each. */
+type Dividing = { targeting: Targeting; chosen: TargetChoice[] };
+
+/** Each chosen target of a divided amount gets an even part to start with, the first ones any remainder. */
+function evenDivision(specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice[] {
+  const out = [...chosen];
+  for (let i = 0; i < specs.length; i++) {
+    const d = specs[i]!.divided;
+    if (d?.first !== i) continue;
+    const slots = Array.from({ length: d.n }, (_, k) => d.first + k).filter((k) => out[k]?.kind === "object" || out[k]?.kind === "player");
+    slots.forEach((k, j) => {
+      out[k] = { ...(out[k] as Extract<TargetChoice, { kind: "object" | "player" }>), amount: Math.floor(d.total / slots.length) + (j < d.total % slots.length ? 1 : 0) };
+    });
+  }
+  return out;
+}
+
 /** The human is choosing modes for a modal spell or activated ability they're casting (CR 700.2a). */
 type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
 
@@ -190,6 +209,8 @@ type CastDraft = {
   sacrifice?: string[];
   discard?: string[];
   exileCards?: string[];
+  /** A Borderpost's basic land returned to hand. */
+  returnToHand?: string[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
@@ -213,7 +234,7 @@ type BuybackPick = { draft: CastDraft; label: string; cost: string };
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[] };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType }; draft?: undefined; activate?: undefined }) & {
+type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
   kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "tap";
   label: string;
   what: string;
@@ -263,6 +284,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [discards, setDiscards] = useState<string[]>([]);
   const [viewing, setViewing] = useState<ZoneView | null>(null);
   const [targeting, setTargeting] = useState<Targeting | null>(null);
+  const [dividing, setDividing] = useState<Dividing | null>(null);
   const [modePick, setModePick] = useState<ModePick | null>(null);
   const [menu, setMenu] = useState<string | null>(null); // permanent (or card in hand) whose abilities are shown
   const [tapPick, setTapPick] = useState<TapPick | null>(null);
@@ -298,7 +320,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || delvePick);
+  const picking = !!(xPick || kickPick || costPick || delvePick || dividing);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -315,6 +337,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setAim(null);
         setBlocker(null);
         setTargeting((t) => (t?.mode === "trigger" || t?.mode === "copy" ? t : null));
+        setDividing((d) => (d?.targeting.mode === "trigger" ? d : null));
       } else if (e.key === " " && k.s && !k.targeting && !k.modePick && !k.tapPick && !k.picking && !k.pending && waitingOn(k.s) === HUMAN) {
         e.preventDefault();
         k.dispatch([{ type: "passPriority", player: HUMAN }]);
@@ -348,14 +371,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     finishTargets(chosen);
   }
 
-  function finishTargets(chosen: TargetChoice[]) {
-    if (!targeting) return;
-    if (chosen.length < targeting.specs.length) return setTargeting({ ...targeting, chosen });
+  function finishTargets(chosen: TargetChoice[], divided?: Targeting) {
+    const tg = divided ?? targeting;
+    if (!tg) return;
+    if (chosen.length < tg.specs.length) return setTargeting({ ...tg, chosen });
     setTargeting(null);
-    if (targeting.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
-    if (targeting.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
-    if (targeting.mode === "cast") return continueCast({ ...targeting.draft, targets: chosen });
-    continueActivate({ objectId: targeting.objectId, index: targeting.index, modes: targeting.modes, x: targeting.x, targets: chosen });
+    setDividing(null);
+    // Then how a divided amount is split among them (CR 601.2d); a copy keeps the division it has.
+    if (!divided && tg.mode !== "copy" && tg.specs.some((x) => x.divided)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
+    if (tg.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
+    if (tg.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
+    if (tg.mode === "cast") return continueCast({ ...tg.draft, targets: chosen });
+    continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, targets: chosen });
   }
 
   function useAbility(objectId: string, index: number, modes?: number[], x?: number) {
@@ -414,12 +441,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setCostPick(null);
     if (pick.mana) {
       // A mana ability that taps other permanents too (Springleaf Drum).
-      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen);
+      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen, pick.mana.extra);
       if (plan) dispatch(plan);
       return;
     }
     if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
-    else if (pick.kind !== "returnToHand" && pick.kind !== "tap") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
+    else if (pick.kind !== "tap") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
   /**
@@ -443,10 +470,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     const specs = spellTargets(s, d.objectId, d.modes, d.alt);
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: [], label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
-    for (const c of [...(compiled.additionalCosts ?? []), ...(graveyardCast(card, d.via)?.costs ?? [])]) {
-      if (c.kind === "payLife" || c.kind === "returnToHand" || c.kind === "tap") continue; // no spell asks to return or tap a permanent yet
+    for (const c of castExtraCosts(card, d)) {
+      if (c.kind === "payLife" || c.kind === "tap") continue; // no spell asks to tap a permanent yet
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
+      if (c.kind === "returnToHand")
+        return setCostPick({ draft: d, kind: "returnToHand", label: card.name, what: `return ${c.n === 1 ? "a" : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
       const me = s.players[HUMAN]!;
       const candidates =
         c.kind === "sacrifice"
@@ -470,6 +499,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
+      ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -620,7 +650,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
       if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0)) return setMenu(o.id);
-      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana);
+      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra);
       if (plan) dispatch(plan);
     }
   }
@@ -734,6 +764,33 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               {targeting.mode !== "trigger" && targeting.mode !== "copy" && <button onClick={() => setTargeting(null)}>Cancel</button>}
             </div>
           )}
+          {dividing && (
+            <div className="targeting">
+              <span>
+                <strong>{dividing.targeting.label}</strong>: divide the damage
+              </span>
+              {dividing.chosen.map((c, i) => {
+                if ((c.kind !== "object" && c.kind !== "player") || c.amount === undefined) return null;
+                const set = (n: number) => setDividing({ ...dividing, chosen: dividing.chosen.map((x, j) => (j === i ? { ...c, amount: n } : x)) });
+                return (
+                  <span key={i} className="divide">
+                    {c.kind === "player" ? s.players[c.id]!.name : cardOf(s, c.id).name}{" "}
+                    <button className="ghost" disabled={c.amount <= 1} onClick={() => set(c.amount! - 1)}>
+                      −
+                    </button>
+                    <strong>{c.amount}</strong>
+                    <button className="ghost" onClick={() => set(c.amount! + 1)}>
+                      +
+                    </button>
+                  </span>
+                );
+              })}
+              <button disabled={divisionProblem(dividing.targeting.specs, dividing.chosen) !== null} onClick={() => finishTargets(dividing.chosen, dividing.targeting)}>
+                {divisionProblem(dividing.targeting.specs, dividing.chosen) ?? "Done"}
+              </button>
+              {dividing.targeting.mode !== "trigger" && <button onClick={() => setDividing(null)}>Cancel</button>}
+            </div>
+          )}
           {targeting && nextSpec?.kind === "card" && (
             <GraveyardPicker
               s={s}
@@ -792,9 +849,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 const tapCost = manaAbilitiesOn(s, s.objects[menu]!)[x.ability]?.tapCost;
                 if (tapCost) {
                   const candidates = tapCostCandidates(s, HUMAN, s.objects[menu]!, tapCost);
-                  return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
+                  return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
                 }
-                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana);
+                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra);
                 if (plan) dispatch(plan);
               }}
               onPlay={(untapped) => {
@@ -958,7 +1015,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp" };
+const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -966,6 +1023,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   madness: "",
   blitz: "haste, and you draw a card when it dies; sacrificed at the end step",
   warp: "exiled at the end step; you may cast it from exile on a later turn",
+  alternative: "an alternative cost: it's still the same spell, with the same mana value",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape" };
@@ -2266,7 +2324,7 @@ function AbilityMenu({
           const ab = manaAbilitiesOn(s, o)[x.ability]!;
           const cost = ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it");
           return (
-            <button key={`${x.ability}-${x.mana}`} className="ghost" onClick={() => onMana(x)}>
+            <button key={`${x.ability}-${x.mana}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>

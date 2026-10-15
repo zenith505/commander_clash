@@ -32,6 +32,7 @@ import {
   exilePlayable,
   castDef,
   casualtyCandidates,
+  castExtraCosts,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
@@ -361,6 +362,13 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
   };
   for (let i = 0; i < body.targets.length; i++) {
     const spec = body.targets[i]!;
+    if (spec.divided?.first === i) {
+      const picks = divideDamage(s, pid, body, i, out, forced, sourceId);
+      if (!picks) return null;
+      out.push(...picks);
+      i += spec.divided.n - 1;
+      continue;
+    }
     // The source's colors matter for protection (CR 702.16b): a spell's card, or the ability's source.
     // Bots never pick the same thing twice, which also keeps "another target" apart.
     const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
@@ -397,6 +405,42 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
   // Only "up to" targets, none of them worth choosing: not worth doing.
   if (!forced && out.length && out.every((t) => t.kind === "none")) return null;
   return out;
+}
+
+/**
+ * Targets and their parts for damage "divided as you choose" among the targets from `first` (CR 601.2d): just enough to
+ * kill each of the opponents' creatures and planeswalkers worth the most, the rest at the opponent lowest on life, or
+ * onto one of the others.
+ */
+function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: number, before: TargetChoice[], forced: boolean, sourceId?: string): TargetChoice[] | null {
+  const spec = body.targets[first]!;
+  const { n, total } = spec.divided!;
+  const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
+    (t) => !before.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
+  );
+  const foes = all.filter((t) => !isMine(s, pid, t));
+  const need = (t: ChosenTarget) => {
+    if (t.kind !== "object") return Infinity;
+    const o = obj(s, t.id);
+    return objIsType(s, o, "Creature") ? Math.max(1, lethalDamage(s, o)) : objIsType(s, o, "Planeswalker") ? Math.max(1, o.counters.loyalty ?? 0) : Infinity;
+  };
+  const picks: { t: ChosenTarget; n: number }[] = [];
+  let left = total;
+  const killable = foes.filter((t) => need(t) <= total).sort((a, b) => targetWorth(s, pid, b, true, need(b)) - targetWorth(s, pid, a, true, need(a)));
+  for (const t of killable)
+    if (picks.length < n && need(t) <= left) {
+      picks.push({ t, n: need(t) });
+      left -= need(t);
+    }
+  if (left > 0) {
+    const face = foes.filter((t) => t.kind === "player").sort((a, b) => player(s, a.id as PlayerId).life - player(s, b.id as PlayerId).life)[0];
+    if (face && picks.length < n) picks.push({ t: face, n: left });
+    else if (picks.length) picks[0]!.n += left;
+    else if (foes.length) picks.push({ t: best(s, pid, foes, true, left), n: left });
+    else if (forced && all.length) picks.push({ t: worst(s, pid, all), n: left });
+  }
+  if (!picks.length) return null;
+  return Array.from({ length: n }, (_, k): TargetChoice => (picks[k] ? { ...picks[k]!.t, amount: picks[k]!.n } as TargetChoice : { kind: "none" }));
 }
 
 /** Is this target ours: our permanent or spell, a card we own, or us? */
@@ -549,7 +593,7 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
-  const extra = chooseExtraCosts(s, pid, id, targets ?? [], via);
+  const extra = chooseExtraCosts(s, pid, id, targets ?? [], via, alt);
   if (extra) {
     // Casualty: a token or a cheap creature for a copy of the spell (CR 702.153a).
     const victim = casualtyCandidates(s, pid, castDef(s, id, alt))
@@ -600,12 +644,21 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): nu
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, via)?.costs ?? [])]) {
-    if (c.kind === "payLife") {
+  for (const c of castExtraCosts(d, { via, alt })) {
+    if (c.kind === "returnToHand") {
+      // A Borderpost's basic land: a tapped one (its mana may already be paying for this), and only with lands to spare.
+      const pool = returnCandidates(s, pid, c)
+        .map((x) => obj(s, x))
+        .filter((o) => !targeted.has(o.id))
+        .sort((a, b) => Number(b.tapped) - Number(a.tapped));
+      if (pool.length < c.n || lands(s, pid) < 4) return null;
+      out.returnToHand = pool.slice(0, c.n).map((o) => o.id);
+    } else if (c.kind === "tap") return null; // no spell asks for that
+    else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
     } else if (c.kind === "sacrifice") {
       const value = (o: GameObject) => (o.isToken ? 0 : 1 + mv(s, o.id));

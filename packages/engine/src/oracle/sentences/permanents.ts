@@ -78,6 +78,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
   }
+  // "When ~ dies, put its counters on target creature you control": as many of each kind as it had as it last
+  // existed, put on, not moved (rulings on Dockworker Drone); "its +1/+1 counters" only that kind.
+  if ((m = new RegExp(`^Put its (?:${COUNTER} )?counters on (.+)$`, "i").exec(s)) && ctx.selfCard) {
+    const what = parseObject(m[2]!, ctx);
+    return what && !isGroup(what) ? [{ type: "lastKnownCounters", what, ...(m[1] ? { only: counterKind(m[1]) } : {}) }] : null;
+  }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;

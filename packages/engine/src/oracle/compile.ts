@@ -7,7 +7,7 @@ import { withModes } from "../modes";
 import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
-import { parseManaAbility } from "./mana-abilities";
+import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
@@ -250,6 +250,12 @@ export function compile(d: CardDef): CompiledCard {
     const manaAb = parseManaAbility(line);
     if (manaAb) {
       out.mana.push(manaAb);
+      continue;
+    }
+    const manaTrigger = parseManaTrigger(line);
+    if (manaTrigger) {
+      if (manaTrigger === "fail") out.unsupported.push(raw);
+      else (out.manaTriggers ??= []).push(manaTrigger);
       continue;
     }
     const backup = /^Backup (\d+)((?:, backup \d+)*)$/.exec(line);
@@ -519,6 +525,15 @@ export function compile(d: CardDef): CompiledCard {
       (out.countMods ??= []).push(countMod);
       continue;
     }
+    // "Each player can't cast more than one spell each turn", "... more than one noncreature spell", Ethersworn Canonist's
+    // "Each player who has cast a nonartifact spell this turn can't cast additional nonartifact spells" (the same rule).
+    const limit = /^(Each player|You) can't cast more than one (?:(.+?) )?spell each turn\.$/.exec(line) ?? /^(Each player) who has cast an? (.+?) spell this turn can't cast additional \2 spells\.$/.exec(line);
+    if (limit) {
+      const filter = limit[2] ? parseTargetPhrase(`${limit[2]} spell`) : undefined;
+      if (filter === null || (filter && filter.kind !== "spell")) out.unsupported.push(raw);
+      else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;
@@ -607,7 +622,17 @@ export function compile(d: CardDef): CompiledCard {
       else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod];
       else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
+      else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
       else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
+      continue;
+    }
+    // "Enchanted creature has protection from the chosen color. This effect doesn't remove ~." (Cho-Manno's Blessing)
+    const spare = /^(Enchanted creature has protection from .+?\.) This effect doesn't remove ~\.$/.exec(line);
+    if (spare) {
+      const st = parseStatic(spare[1]!);
+      const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.every((m) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k)));
+      if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => ({ ...m, spares: true as const })) as typeof st.mods, text: line });
+      else out.unsupported.push(raw);
       continue;
     }
     const st = parseStatic(line) ?? parseConditionalStatic(line);

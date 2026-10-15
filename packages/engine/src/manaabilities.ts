@@ -1,15 +1,15 @@
 // Mana abilities (CR 605) as they are on the battlefield: what each one can make right now,
 // whether it can be activated, and which one to use for a given mana.
 
-import type { ManaAbility } from "./abilities";
-import { basicLandManaAbility, defOf, objIsType } from "./cards";
+import type { ManaAbility, ManaTrigger } from "./abilities";
+import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
 import { isSummoningSick, obj, player, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { canPayFromPool } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
-import { COLORS, type Action, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
+import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
 export const MANA_ABILITY_OFFSET = 1000;
@@ -56,15 +56,70 @@ export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choic
   return Array.from({ length: n }, () => p.mana).flat();
 }
 
-/** A way to make mana with this object: one ability, one choice. */
+/**
+ * A way to make mana with this object: one ability, one choice, and what the triggered mana abilities it triggers
+ * add with it. `extra`: the mana picked for those, in battlefield order ("one mana of any color").
+ */
 export interface ManaOption {
   ability: number;
   mana: ManaType;
   adds: ManaType[];
+  extra?: ManaType[];
+}
+
+/** The triggered mana abilities on the battlefield (CR 605.1b) and their sources. */
+function manaTriggerSources(s: GameState): { src: GameObject; t: ManaTrigger }[] {
+  return s.battlefield.flatMap((id) => {
+    const src = obj(s, id);
+    return (abilitiesOf(s, src).manaTriggers ?? []).map((t) => ({ src, t }));
+  });
+}
+
+/**
+ * What the triggered mana abilities add when `pid` taps `o` for mana with `ab`, making `made`: one entry per way to
+ * pick their mana (`extra`, the picks). Tapping it for mana is activating a mana ability of it with {T} in the cost
+ * (CR 106.12; not tapping it for another permanent's cost, rulings on Leyline of Abundance), and they trigger only
+ * when that makes mana (106.12a). They resolve right after it (CR 605.4a), each adding its mana.
+ */
+export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility, made: ManaType[], sources = manaTriggerSources(s)): { extra: ManaType[]; adds: ManaType[] }[] {
+  let results: { extra: ManaType[]; adds: ManaType[] }[] = [{ extra: [], adds: [] }];
+  if (!ab.tap || !made.length) return results;
+  for (const { src, t } of sources) {
+    const ctl = controllerOf(s, src);
+    const chosen = src.chosen?.color;
+    if (t.you && ctl !== pid) continue;
+    if (t.attached && src.attachedTo !== o.id) continue;
+    if (t.filter && !objectMatches(s, t.filter, o, ctl, false)) continue;
+    if ((t.ofChosen || t.adds.kind === "chosenColor") && !chosen) continue; // no color chosen: it never triggers (rulings on Gauntlet of Power)
+    if (t.ofChosen && !made.includes(chosen!)) continue;
+    let picks: { extra: ManaType[]; adds: ManaType[] }[];
+    const a = t.adds;
+    if (a.kind === "fixed") picks = [{ extra: [], adds: a.mana }];
+    else if (a.kind === "chosenColor") picks = [{ extra: [], adds: [chosen!] }];
+    else if (a.kind === "produced") {
+      // One of the types it made, picked if it made several (rulings on Mana Flare).
+      const types = [...new Set(made)];
+      picks = types.length === 1 ? [{ extra: [], adds: types }] : types.map((m) => ({ extra: [m], adds: [m] }));
+    } else {
+      // n mana in any combination of colors: each combination once.
+      let combos: Color[][] = [[]];
+      for (let i = 0; i < a.n; i++) combos = combos.flatMap((c) => COLORS.filter((x) => !c.length || COLORS.indexOf(x) >= COLORS.indexOf(c[c.length - 1]!)).map((x) => [...c, x]));
+      picks = combos.map((c) => ({ extra: c, adds: c }));
+    }
+    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds] })));
+  }
+  return results;
 }
 
 export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaAbilitiesOn(s, o).flatMap((ab, ability) => manaChoices(s, o, ab).map((mana) => ({ ability, mana, adds: manaProduced(s, o, ab, mana) })));
+  const pid = controllerOf(s, o);
+  const sources = manaTriggerSources(s);
+  return manaAbilitiesOn(s, o).flatMap((ab, ability) =>
+    manaChoices(s, o, ab).flatMap((mana) => {
+      const adds = manaProduced(s, o, ab, mana);
+      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}) }));
+    }),
+  );
 }
 
 /**

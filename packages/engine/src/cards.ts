@@ -2,7 +2,7 @@ import type { CompiledCard, ManaAbility } from "./abilities";
 import { characteristics, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType } from "./types";
-import { parseManaCost } from "./mana";
+import { manaValue, parseManaCost } from "./mana";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
 export function pairedWith(s: GameState, o: GameObject): GameObject | undefined {
@@ -55,8 +55,26 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   if (o.faceDown) return o.faceDown === "disguise" ? FACE_DOWN_WARD : FACE_DOWN;
   const d = s.cards[copiedId(o)];
   if (!d) throw new Error(`missing card def ${copiedId(o)}`);
-  return o.bestowed ? bestowedDef(d) : d;
+  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : d;
 };
+
+const prototyped = new Map<string, CardDef>();
+
+/**
+ * A prototyped spell or permanent (CR 718.3b): the card with its alternative mana cost, power and toughness, and the
+ * colors of that mana cost (CR 105.2). These are copiable values (718.2a), so copies of it are the same.
+ */
+export function prototypedDef(d: CardDef): CardDef {
+  const hit = prototyped.get(d.oracleId);
+  if (hit) return hit;
+  const m = /^Prototype ((?:\{[^}]+\})+) — (\d+)\/(\d+)/m.exec(d.oracleText);
+  if (!m) return d;
+  const cost = m[1]!;
+  const colors = (["W", "U", "B", "R", "G"] as Color[]).filter((c) => [...cost.matchAll(/\{([^}]+)\}/g)].some((x) => x[1]!.split("/").includes(c)));
+  const out: CardDef = { ...d, oracleId: `${d.oracleId}|prototyped`, manaCost: cost, cmc: manaValue(parseManaCost(cost)), power: m[2]!, toughness: m[3]!, colors };
+  prototyped.set(d.oracleId, out);
+  return out;
+}
 
 const bestowed = new Map<string, CardDef>();
 

@@ -243,7 +243,8 @@ function parseStaticMods(rest: string): Modification[] | null {
     return first && grants && more ? [...first, ...grants, more] : null;
   }
   // "Gets +2/+2 and can't block" (Childhood Horror), "gets +1/+1 and attacks each combat if able".
-  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|must be blocked if able)$`).exec(rest))) {
+  // "Gets +1/+1 and is goaded" (the Impetus Auras, CR 701.15), "gets -2/-0 and loses all abilities" (Mystic Subdual).
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|must be blocked if able|is goaded|loses all abilities)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
@@ -263,6 +264,14 @@ function parseStaticMods(rest: string): Modification[] | null {
     return more && !/ this turn$/.test(rest) ? [more] : null;
   }
   if (/^can't attack or block$/.test(rest)) return [{ kind: "cantAttack" }, { kind: "cantBlock" }];
+  // "Can't block and can't be blocked" (Changeling Outcast).
+  if ((m = /^(can't [^,]+?) and (can't .+)$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[2]!);
+    return first && second ? [...first, ...second] : null;
+  }
+  // Goaded by the static's controller (CR 701.15a): "Enchanted creature ... is goaded".
+  if (/^is goaded$/.test(rest)) return [{ kind: "goad" }];
   // CR 506.5: alone means the only creature declared as an attacker (or blocker) that combat.
   if (/^can't attack or block alone$/.test(rest)) return [{ kind: "cantAttackAlone" }, { kind: "cantBlockAlone" }];
   if (/^can't attack alone$/.test(rest)) return [{ kind: "cantAttackAlone" }];
@@ -300,6 +309,12 @@ function parseStaticMods(rest: string): Modification[] | null {
 
 export function parseStatic(line: string): StaticAbility | null {
   let text = line.replace(/\.$/, "");
+  // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
+  const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);
+  if (silenced) {
+    const affects = parseAffected(silenced[1]!.replace(/^./, (c) => c.toUpperCase()));
+    return affects && affects.kind === "filter" ? { affects, mods: [{ kind: "cantActivate", ...(silenced[2] ? { exceptMana: true as const } : {}) }], text: line } : null;
+  }
   const noAbilities = /^Enchanted (creature|permanent|artifact|land)'s activated abilities can't be activated( unless they're mana abilities)?$/.exec(text);
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
   // "You control enchanted creature." (Mind Control)

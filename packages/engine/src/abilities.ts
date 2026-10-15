@@ -22,7 +22,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "band": attacking creatures declared to be in a band (CR 702.22c). */
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -170,6 +170,11 @@ export interface TargetSpec {
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
   chosen?: "type" | "notType" | "color" | "notColor";
+  /**
+   * "Target spell with a single target": a spell that targets exactly one thing once, whether or not that target is
+   * still legal (rulings on Deflection).
+   */
+  singleTarget?: boolean;
   /** Original text, for display. */
   text: string;
 }
@@ -589,6 +594,15 @@ export type Effect =
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   | { type: "exileTop"; who: PlayerRef; n: Amount }
+  /**
+   * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
+   * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
+   */
+  | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean } }
+  /** Champion's first ability (CR 702.72a): "sacrifice it unless you exile another [object] you control". */
+  | { type: "champion"; filter: TargetSpec }
+  /** Champion's second: "When this permanent leaves the battlefield, return the exiled card to the battlefield under its owner's control." */
+  | { type: "returnChampioned" }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
@@ -605,8 +619,16 @@ export type Effect =
   | { type: "shuffle"; who: PlayerRef }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   | { type: "bite"; a: ObjRef; b: ObjRef } // a deals damage equal to its power to b
-  /** Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead". */
-  | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean }
+  /**
+   * Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead", "put it on
+   * top of its owner's library instead".
+   */
+  | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean }
+  /**
+   * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
+   * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
+   */
+  | { type: "changeTarget"; index: number; unless?: UnlessPays }
   /**
    * Counter the spell or ability that triggered this unless its controller pays: ward (CR 702.21a),
    * "Whenever a player casts a spell, counter it unless that player pays {1}".
@@ -834,6 +856,8 @@ export interface TriggeredAbility {
   dealer?: { filter: TargetSpec; other?: boolean };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
+  /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
+  minAttackers?: number;
   /**
    * For "permanentEnters": what has to enter (the subject, "that creature"), relative to this permanent's
    * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without
@@ -864,6 +888,8 @@ export interface TriggeredAbility {
   attacksMostLife?: boolean;
   /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
   attacksPlayer?: boolean;
+  /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
+  withOthers?: number;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
@@ -1081,7 +1107,8 @@ export type AdditionalCost =
  * warp (CR 702.185a) only from your hand; madness (CR 702.35a) only as its trigger resolves, from exile.
  */
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative";
+/** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype";
 
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem";
 export interface CastFromGraveyard {
@@ -1181,6 +1208,18 @@ export interface CompiledCard {
   youHave?: "hexproof" | "shroud";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /**
+   * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield
+   * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).
+   */
+  discardedToBattlefield?: boolean;
+  /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
+  skipDrawStep?: boolean;
+  /**
+   * "You may cast spells as though they had flash", "... sorcery spells ...", "... creature spells ..." (CR 702.8a): its
+   * controller may cast spells like these any time they could cast an instant.
+   */
+  flashFor?: TargetSpec[];
   /** "Whenever enchanted land is tapped for mana, its controller adds an additional {G}" and the like (CR 605.1b). */
   manaTriggers?: ManaTrigger[];
   countMods?: CountMod[];

@@ -340,6 +340,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "lookAtHand":
     case "sacrifice":
     case "exploit":
+    case "champion":
+    case "returnChampioned":
     case "soulbond":
     case "ninjutsu":
     case "impulse":
@@ -387,9 +389,11 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cascade":
     case "counterUnlessPays":
     case "counterSpell":
+    case "changeTarget":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
     case "exileTop":
+    case "revealTopToHand":
     case "discard":
     case "scry":
     case "clash":

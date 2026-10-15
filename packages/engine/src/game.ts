@@ -1,9 +1,9 @@
 import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
+import { abilitiesOf, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -356,6 +356,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "chooseOption":
       chooseOption(s, p, action.choice);
       break;
+    case "changeTarget":
+      chooseNewTarget(s, p, action.target);
+      break;
     case "payUnless":
       payUnless(s, p, action.pay);
       break;
@@ -576,6 +579,7 @@ export function moveObject(
     o.colorsSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
+    o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
     o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
     // A face-down spell becomes a face-down permanent (CR 708.4); anywhere else, it's revealed (CR 708.9).
     if (o.faceDown) {
@@ -1140,6 +1144,11 @@ function beginStep(s: GameState, step: Step): void {
       break;
     }
     case "draw":
+      // "Skip your draw step" replaces the whole step (CR 614.10): no draw, no triggers, no priority.
+      if (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === ap && abilitiesOf(s, obj(s, id)).skipDrawStep)) {
+        log(s, `${player(s, ap).name} skips their draw step.`);
+        return advanceStep(s);
+      }
       if (!draw(s, ap, 1, "drawStep")) return; // CR 504.1 (no one skips in multiplayer, CR 103.8c); dredge may replace it
       fireEvent(s, { type: "step", step: "draw", active: ap }); // "at the beginning of the draw step" triggers after it (CR 504.2)
       break;
@@ -1536,6 +1545,16 @@ export function castProblem(
     }
   }
   if (o.faceDown && !choices?.faceDown) return "a face-down card can't be cast";
+  if (choices?.alt === "prototype" && !o.prototyped) {
+    // Cast prototyped, only its alternative characteristics are looked at (CR 718.3a).
+    if (!altCost(defOf(s, o), "prototype")) return `${defOf(s, o).name} doesn't have prototype`;
+    o.prototyped = true;
+    try {
+      return castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices);
+    } finally {
+      o.prototyped = undefined;
+    }
+  }
   if (choices?.alt === "bestow" && !o.bestowed) {
     // Cast bestowed, only its characteristics as an Aura spell are looked at (CR 702.103d).
     if (!altCost(defOf(s, o), "bestow")) return `${defOf(s, o).name} doesn't have bestow`;
@@ -1578,7 +1597,7 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice;
+  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || flashGranted(s, pid, d);
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
@@ -1785,7 +1804,20 @@ const convokeProblem = (s: GameState, pid: PlayerId, ids: ObjectId[]) => tapCrea
 export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind) => spellTargetSpecs(castDef(s, id, alt), modes);
 
 /** What casting this card puts on the stack: the card, or for a bestowed cast, the Aura it is then (CR 702.103b, d). */
-export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef => (alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id)));
+export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
+  alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
+
+/**
+ * "You may cast sorcery spells as though they had flash" (Hypersonic Dragon), "... spells ..." (Vedalken Orrery): a
+ * permanent `pid` controls lets them cast this card any time they could cast an instant (CR 702.8a). It's a spell then,
+ * so it's matched as one.
+ */
+export function flashGranted(s: GameState, pid: PlayerId, d: CardDef): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d));
+  });
+}
 
 /** A modal spell's choices, if this card is one (CR 700.2). */
 export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, obj(s, id))).spell?.modal;
@@ -1796,6 +1828,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
     o.faceDown = compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
+  }
+  if (choices.alt === "prototype" && !o.prototyped) {
+    const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
+    if (problem) throw new RulesError(problem);
+    o.prototyped = true; // a prototyped spell from the moment it's cast (CR 718.3b)
   }
   if (choices.alt === "bestow" && !o.bestowed) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
@@ -1819,7 +1856,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
-  const flashSacrifice = !!compileCard(d).flashSacrifice && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
+  const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   const paid = spendFromPool(s, p.id, cost.cost, { spell: d }, cost.extra, p.life, { spreadColors: sunburst })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
@@ -1887,7 +1924,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
@@ -2111,7 +2148,7 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
   const names = targets.flatMap((t) =>
     t.kind === "none"
       ? []
-      : (t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell")) +
+      : (t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : ((s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined))?.description ?? "a spell")) +
         (t.kind !== "stack" && t.amount !== undefined ? ` (${t.amount})` : ""),
   );
   return names.length ? ` targeting ${names.join(", ")}` : "";
@@ -2294,6 +2331,18 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     targets = kept;
   }
   sc.targets = targets ?? pend.current;
+  s.pending = null;
+  continueResolution(s);
+}
+
+/** The new target of a spell whose target is being changed (CR 115.7a): one of the legal ones offered. */
+function chooseNewTarget(s: GameState, p: Player, target: TargetChoice) {
+  const pend = s.pending;
+  const sc = s.resolving?.scratch ?? (s.resolving ? (s.resolving.scratch = {}) : undefined);
+  if (pend?.kind !== "changeTarget" || pend.player !== p.id || !sc) throw new RulesError("no target to change");
+  const t = pend.options.find((o) => sameTarget(o, target));
+  if (!t) throw new RulesError("that isn't a legal new target");
+  sc.newTarget = t;
   s.pending = null;
   continueResolution(s);
 }
@@ -3558,7 +3607,8 @@ export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): strin
   if (!sus) return `${d.name} doesn't have suspend`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
-  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash");
+  // Whenever they could begin to cast it (CR 702.62a), with "as though it had flash" too.
+  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || flashGranted(s, pid, d);
   if (!instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be suspended when you could cast it (sorcery speed)`;
   if (!canPayFromPool(s, pid, parseManaCost(sus.cost), "other")) return `not enough mana to suspend ${d.name} (${sus.cost})`;
   return null;

@@ -1,4 +1,4 @@
-import type { Amount, CounterKind, Effect, TokenSpec } from "../abilities";
+import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
 import { attackedName, attackedPlaneswalker, auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -152,6 +152,36 @@ function exploit(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
 }
 
 /**
+ * Champion (CR 702.72a): "sacrifice it unless you exile another [object] you control". Its controller may exile one
+ * even after the champion has left; then its leaves trigger has come and gone, and the card stays exiled (CR 607.2a).
+ */
+function champion(s: GameState, filter: TargetSpec, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const pid = ctx.controller;
+  if (!sc.queue) {
+    const options = s.battlefield.filter((id) => id !== ctx.sourceId && controllerOf(s, obj(s, id)) === pid && objectMatches(s, filter, obj(s, id), pid, false));
+    sc.queue = [pid];
+    sc.chosen = {};
+    if (options.length) {
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: "champion", what: filter.text.replace(/^another /, "").replace(/ you control$/, ""), options, count: 1, min: 0 };
+      return "paused";
+    }
+  }
+  const pick = s.objects[sc.chosen?.[pid]?.[0] ?? ""];
+  if (pick?.zone === "battlefield") {
+    log(s, `${player(s, pid).name} exiles ${defOf(s, pick).name} (${src}'s champion).`);
+    moveObject(s, pick.id, "exile");
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    if (me) me.championed = { id: pick.id, zc: pick.zoneChanges ?? 0, by: ctx.sourceZc ?? 0 };
+    return;
+  }
+  const here = objects(s, { ref: "self" }, ctx)[0];
+  if (!here || controllerOf(s, here) !== pid) return;
+  log(s, `${player(s, pid).name} sacrifices ${src} (champion).`);
+  moveObject(s, here.id, "graveyard", { sacrificed: true });
+}
+
+/**
  * Soulbond (CR 702.95a, c): pair the source with another unpaired creature its controller picks, or with the
  * creature whose entering triggered it. Both have to still be creatures on the battlefield under that player's
  * control, and unpaired; otherwise neither becomes paired.
@@ -181,6 +211,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
   switch (e.type) {
     case "exploit":
       return exploit(s, ctx, src);
+    case "champion":
+      return champion(s, e.filter, ctx, src);
+    case "returnChampioned": {
+      // Only the card this permanent exiled, while it's still that card in exile (CR 400.7, 607.2a).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const link = me?.championed;
+      if (!me || !link || link.by !== (ctx.sourceZc ?? 0) - 1) return;
+      me.championed = undefined;
+      const c = s.objects[link.id];
+      if (c?.zone !== "exile" || (c.zoneChanges ?? 0) !== link.zc) return;
+      log(s, `${defOf(s, c).name} returns to the battlefield (${src}).`);
+      moveObject(s, c.id, "battlefield", { controller: c.owner });
+      return;
+    }
     case "soulbond":
       return soulbond(s, ctx, src);
     case "returnToBattlefield": {

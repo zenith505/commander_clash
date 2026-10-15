@@ -2,7 +2,7 @@ import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget,
 import { autoCrew, planActivate, planCast, planMana, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
   abilityProblem,
@@ -69,6 +69,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = orig?.body ? chooseTargets(s, pid, orig.body, false) : null;
       return [{ type: "copyTargets", player: pid, ...(best ? { targets: best } : {}) }];
     }
+    if (pend.kind === "changeTarget") return [{ type: "changeTarget", player: pid, target: newTargetFor(s, pid, pend) }];
     if (pend.kind === "castFree") {
       const plan = castPlan(s, pid, pend.objectId, true);
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
@@ -113,6 +114,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
     if (pend.kind === "pickPermanents" && pend.action === "reveal") return [{ type: "pickPermanents", player: pid, ids: pend.options }];
+    // Champion: exile our least useful one (it comes back when the champion leaves), unless the champion is gone already.
+    if (pend.kind === "pickPermanents" && pend.action === "champion") {
+      const r = s.resolving?.item;
+      const me = r?.sourceId ? s.objects[r.sourceId] : undefined;
+      const here = !!me && me.zone === "battlefield" && (me.zoneChanges ?? 0) === r?.sourceZc;
+      return [{ type: "pickPermanents", player: pid, ids: here ? choosePicks(s, pid, pend.options, 1, "sacrifice") : [] }];
+    }
     if (pend.kind === "pickPermanents" && pend.min !== undefined) return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
@@ -165,6 +173,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "discard", player: pid, objectIds: hand.slice(0, pend.count) }];
     }
   }
+  const deflect = chooseDeflection(s, pid);
+  if (deflect) return deflect;
   // Respond to an opponent's spell with a counterspell if we have one: from hand, or an ability
   // like Spiketail Hatchling's. "Unless its controller pays" only if they can't pay.
   const top = s.stack[s.stack.length - 1];
@@ -456,10 +466,51 @@ function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: num
   return Array.from({ length: n }, (_, k): TargetChoice => (picks[k] ? { ...picks[k]!.t, amount: picks[k]!.n } as TargetChoice : { kind: "none" }));
 }
 
+/**
+ * Turn an opponent's spell aimed at us or ours onto one of theirs (Deflection, CR 115.7a), when there's one it could
+ * go to. "Unless that spell's controller pays" only if they can't.
+ */
+function chooseDeflection(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  if (!top || top.kind !== "spell" || top.controller === pid || !top.objectId) return null;
+  const chosen = (top.targets ?? []).filter((t) => t.kind !== "none");
+  const j = (top.targets ?? []).findIndex((t) => t.kind !== "none");
+  const current = top.targets?.[j];
+  if (chosen.length !== 1 || !current || current.kind === "none" || !isMine(s, pid, current)) return null;
+  const body = top.body ?? castingBody(defOf(s, obj(s, top.objectId)));
+  const spec = body?.targets[j];
+  if (!body || !spec || !harmfulTargets(body)[j]) return null;
+  if (!changeTargetOptions(s, top, spec, current).some((t) => t.kind !== "none" && !isMine(s, pid, t))) return null;
+  for (const id of player(s, pid).hand) {
+    const spell = compileCard(defOf(s, obj(s, id))).spell;
+    const e = spell?.effects.find((x) => x.type === "changeTarget");
+    if (!spell || e?.type !== "changeTarget" || spell.targets.length !== 1) continue;
+    if (e.unless && canPayUnless(s, top.controller, e.unless, pid, id, 0)) continue;
+    const plan = planCast(s, pid, id, [{ kind: "stack", id: top.id }], undefined, "auto");
+    if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  return null;
+}
+
+/**
+ * A spell's new target as our spell changes it: its effect at one of theirs if it hurts, at ours if it helps. A
+ * counterspell can be turned onto the spell changing it (rulings on Deflection), which leaves the stack first.
+ */
+function newTargetFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "changeTarget" }>): TargetChoice {
+  const item = s.stack.find((x) => x.id === pend.stackId);
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  const body = item?.body ?? (o ? castingBody(defOf(s, o)) : undefined);
+  const harm = !!body && !!harmfulTargets(body)[pend.index];
+  const options = pend.options.filter((t): t is ChosenTarget => t.kind !== "none");
+  const preferred = options.filter((t) => (harm ? !isMine(s, pid, t) : isMine(s, pid, t)));
+  if (preferred.length) return best(s, pid, preferred, harm, body ? damageTo(body, pend.index, item?.x ?? 0) : 0);
+  return options.find((t) => t.kind === "stack" && t.id === s.resolving?.item.id) ?? (harm ? worst(s, pid, options) : best(s, pid, options, false, 0));
+}
+
 /** Is this target ours: our permanent or spell, a card we own, or us? */
 function isMine(s: GameState, pid: PlayerId, t: ChosenTarget): boolean {
   if (t.kind === "player") return t.id === pid;
-  if (t.kind === "stack") return s.stack.find((x) => x.id === t.id)?.controller === pid;
+  if (t.kind === "stack") return (s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined))?.controller === pid;
   const o = obj(s, t.id);
   return o.zone === "battlefield" ? controllerOf(s, o) === pid : o.owner === pid;
 }

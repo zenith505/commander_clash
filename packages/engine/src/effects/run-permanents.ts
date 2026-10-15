@@ -129,7 +129,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const ids = sc.chosen![pid] ?? [];
       const nonland = ids.filter((x) => !defOf(s, obj(s, x)).types.includes("Land")).length;
-      discardCards(s, pid, ids);
+      discardCards(s, pid, ids, "", false, false, ctx.controller);
       if (e.type === "recruit") {
         if (!nonland) return;
         const soldier: TokenSpec = { name: "Human Soldier", power: 1, toughness: 1, colors: ["W"], types: ["Creature"], subtypes: ["Human", "Soldier"], keywords: [] };

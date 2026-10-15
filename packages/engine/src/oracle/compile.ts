@@ -575,6 +575,28 @@ export function compile(d: CardDef): CompiledCard {
       out.noMaxHandSize = true;
       continue;
     }
+    const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
+    if (flashFor) {
+      const spec = parseTargetPhrase(`${flashFor[1]}spell`);
+      if (spec?.kind === "spell" && !spec.controller) {
+        (out.flashFor ??= []).push({ ...spec, text: `${flashFor[1]}spells` });
+        continue;
+      }
+    }
+    if (line === "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield instead of putting it into your graveyard.") {
+      out.discardedToBattlefield = true;
+      continue;
+    }
+    // Prototype (CR 702.160a, 718): cast it with the alternative mana cost, color, power and toughness (see prototypedDef).
+    const proto = /^Prototype ((?:\{[^}]+\})+) — (\d+)\/(\d+)$/.exec(line);
+    if (proto && parseManaCost(proto[1]!).supported && !parseManaCost(proto[1]!).hasX) {
+      (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
+      continue;
+    }
+    if (line === "Skip your draw step.") {
+      out.skipDrawStep = true;
+      continue;
+    }
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
     if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
       out.phantom = true;

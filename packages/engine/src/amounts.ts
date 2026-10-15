@@ -135,7 +135,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind !== "manaValue") return Math.max(0, ctx.lki?.[c.kind] ?? 0);
         return 0;
       }
-      if (c.kind === "manaValue") return manaValue(parseManaCost(defOf(s, o).manaCost));
+      if (c.kind === "manaValue") {
+        // On the stack, X is the value chosen for it (CR 202.3e).
+        const cost = parseManaCost(defOf(s, o).manaCost);
+        const item = o.zone === "stack" ? (s.stack.find((x) => x.objectId === o.id) ?? (s.resolving?.item.objectId === o.id ? s.resolving.item : undefined)) : undefined;
+        return manaValue(cost) + (item?.x ?? 0) * cost.symbols.filter((x) => x.kind === "x").length;
+      }
       if (o.zone !== "battlefield") {
         // It left the battlefield on its last move (destroyed by an earlier part of this effect): as it last existed there.
         const lk = s.lastKnown?.[o.id];

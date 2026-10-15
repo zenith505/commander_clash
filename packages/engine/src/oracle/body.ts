@@ -134,6 +134,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       }
       continue;
     }
+    // Dark Confidant: "Reveal the top card of your library and put that card into your hand. You lose life equal to
+    // its mana value."
+    if (/^[Rr]eveal the top card of your library and put (?:that card|it) into your hand$/.test(s)) {
+      const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      effects.push({ type: "revealTopToHand", ...(life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
+      if (life) si++;
+      continue;
+    }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
     if (look && !dig) {
       dig = { type: "dig", n: amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
@@ -323,11 +331,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       last.noRegen = true;
       continue;
     }
-    // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a).
-    if (/^If that spell is countered this way, exile it instead of putting it into its owner's graveyard$/i.test(s)) {
+    // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a),
+    // "... put it on top of its owner's library instead of into that player's graveyard" (Memory Lapse).
+    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put it on top of its owner's library instead of into that player's graveyard)$/i.exec(s);
+    if (lapse) {
       const last = effects[effects.length - 1];
-      if (last?.type !== "counterSpell" || !last.unless) return null;
-      last.exile = true;
+      if (last?.type !== "counterSpell") return null;
+      if (lapse[1]) last.exile = true;
+      else last.top = true;
       continue;
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).

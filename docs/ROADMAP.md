@@ -1,6 +1,6 @@
 # Roadmap
 
-14,275 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+14,569 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,15 +14,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (a long tail of 3-card lines): "~ is also a Cleric, Rogue, Warrior, and Wizard",
-   "at the beginning of the end step, if no creatures are on the battlefield, sacrifice ~", "equip abilities you
-   activate that target ~ cost {N} less", "during your turn, equipped creature gets +N/+N and has first strike",
-   "other colorless creatures you control get +N/+N", "at the beginning of the upkeep of enchanted creature's
-   controller, ~ deals N damage to that player", "as an additional cost, discard a card at random", "activate only
-   during your turn, before attackers are declared", "damage that would reduce your life total to less than N",
-   "when ~ enters, sacrifice it unless you discard a card at random", "destroy all Islands", "put target creature
-   into its owner's library second from the top", "~ costs {N} less if a creature died this turn", "prevent all
-   damage that would be dealt by enchanted creature", "if ~ would die, exile it instead".
+1. By `npm run blockers` (a long tail of 3-card lines): "~ enters tapped unless you control a legendary creature",
+   "equip abilities you activate that target ~ cost {N} less", "when ~ enters, manifest dread, then attach ~ to that
+   creature", "if you would draw a card except the first one you draw in each of your draw steps", "damage that would
+   reduce your life total to less than N reduces it to N instead", "Put a -N/-N counter on ~: Untap ~", "~ becomes
+   the color of your choice until end of turn", "if you descended this turn", "when ~ enters, add one mana of any
+   color", "whenever ~ attacks and isn't blocked, defending player gets a poison counter", "exile up to three target
+   cards from a single graveyard", "sacrifice a creature or pay {N}{B}", "creatures without flying can't block this
+   turn", "destroy target creature an opponent controls that was dealt damage this turn", "activate no more than
+   twice each turn", "each opponent sacrifices a permanent of their choice unless they pay {N}".
 
 ## Known gaps (from earlier rounds)
 
@@ -51,8 +51,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Vorinclex (counters on players, halving), Academy Manufactor.
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".
-- "Copy target activated or triggered ability" (Strionic Resonator). Changing the target of a spell or ability
-  (Bolt Bend, Redirect Lightning, Willbender), or of a spell with more than one target; Misdirection's pitch cost.
+- "Copy target activated or triggered ability" (Strionic Resonator). Changing the target of a spell with more than one
+  target; Redirect Lightning's "pay 5 life or pay {2}"; Misdirection's pitch cost. Counters with a mixed target ("triggered
+  ability or colorless spell", Consign to Memory, Tale's End) and Mirrorshell Crab's channel ability.
+- "Activate only during your turn, before attackers are declared" assumes one combat per turn (the engine has no
+  extra combats). Random discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with
+  something else ("create a 2/2 black Zombie", Kalitas). "Prevent all damage that would be dealt by target instant or
+  sorcery spell" (Hidden Retreat).
 - "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat; Pain Seer's "becomes
   untapped"; Ivory Gargoyle.
 - Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed"); reinforce X;
@@ -130,7 +135,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "Multicolored creatures you control have ..." and other statics on multicolored or colorless permanents (Maze
   Glider, Glass of the Guildpact), "hexproof from monocolored", "for each of that spell's colors".
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each
-  turn", "draw that many cards"; "players can't gain life" and life-gain replacement effects other than doubling.
+  turn", "draw that many cards"; life-gain replacement effects other than doubling.
 - Discarding: "whenever you discard one or more cards" (once per batch, "that many"), "draw that many cards" after "you
   may discard your hand. If you do" (Book Devourer), Hollow One's "for each card you've cycled or discarded this turn",
   "when you discard ~" (Bartered Cow); Ward—Discard a card at random and other ward costs (sacrifice, blight).

@@ -91,6 +91,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       s.preventCombatDamage = true;
       log(s, `${src}: all combat damage will be prevented this turn.`);
       return;
+    case "noLifeGain":
+      (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
+      log(s, `${src}: ${e.players === "all" ? "players" : `${player(s, ctx.controller).name}'s opponents`} can't gain life this turn.`);
+      return;
+    case "noPrevention":
+      s.noPreventionTurn = s.turn;
+      log(s, `${src}: damage can't be prevented this turn.`);
+      return;
     case "pumpPerBlocker":
       for (const o of objects(s, e.what, ctx)) {
         // Counted as it resolves (CR 702.23b).

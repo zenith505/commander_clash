@@ -317,6 +317,8 @@ export interface StackItem {
   casualty?: boolean;
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
+  /** A triggered ability (CR 603), not an activated one (CR 602). */
+  triggered?: true;
 }
 
 /**
@@ -551,6 +553,16 @@ export interface GameState {
    * the damage as assigned, and the options picked so far (see damage.ts planShields).
    */
   damageBatch?: { events: DamageEvent[]; answers: number[] };
+  /** The controllers of the creatures that died this turn, one entry per creature (morbid, CR 700.4). */
+  diedThisTurn?: PlayerId[];
+  /** Creatures declared as attackers this turn ("for each creature that attacked this turn"). */
+  attackersThisTurn?: number;
+  /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
+  noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
+  /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
+  noPreventionTurn?: number;
+  /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
+  lostLifeThisTurn?: PlayerId[];
   /** Players dealt damage this turn, for bloodthirst (CR 702.54a). */
   damagedThisTurn?: PlayerId[];
   /**

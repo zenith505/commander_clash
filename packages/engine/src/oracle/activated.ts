@@ -19,7 +19,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -40,10 +40,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = pickFilter(c[2]!);
       if (!filter) return "fail";
       extra.push({ kind: "tap", filter: { ...filter, text: `untapped ${filter.text} you control` }, n: num(c[1]!), ...(/\{T\}/.test(costs) ? { other: true } : {}) });
-    } else if ((c = new RegExp(`^Discard ${NUM} (?:(.+?) )?cards?$`).exec(part))) {
+    } else if ((c = new RegExp(`^Discard ${NUM} (?:(.+?) )?cards?( at random)?$`).exec(part))) {
       const filter = c[2] ? parseSearchFilter(`${c[2]} card`) : undefined;
-      if (filter === null) return "fail";
-      extra.push({ kind: "discard", n: num(c[1]!), ...(filter ? { filter } : {}) });
+      if (filter === null || (filter && c[3])) return "fail";
+      extra.push({ kind: "discard", n: num(c[1]!), ...(filter ? { filter } : {}), ...(c[3] ? { random: true as const } : {}) });
     }
   }
   let effectText = m[2]!;
@@ -58,8 +58,16 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   }
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
   let activateIf: ActivatedAbility["activateIf"];
+  // "Activate only during your turn[, before attackers are declared]." (CR 602.5b)
+  const turn = / Activate only during your turn(, before attackers are declared)?( and only once each turn)?\.$/.exec(effectText);
+  if (turn) {
+    activateIf = { kind: turn[1] ? "beforeAttackers" : "yourTurn" };
+    if (turn[2]) oncePerTurn = true;
+    effectText = effectText.slice(0, turn.index);
+  }
   const onlyIf = / Activate only if ([^.]+)\.$/.exec(effectText);
   if (onlyIf) {
+    if (activateIf) return "fail";
     activateIf = parseStaticCondition(onlyIf[1]!, { affects: { kind: "self" }, mods: [], text: "" }) ?? undefined;
     if (!activateIf) return "fail";
     effectText = effectText.slice(0, onlyIf.index);

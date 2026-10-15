@@ -22,6 +22,12 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
   endCombat: ["yourEndCombat", "eachEndCombat"], // "at end of combat" (CR 511.2)
 };
 
+/** Who controls the permanent `o` is attached to, if it's attached to one on the battlefield. */
+function hostController(s: GameState, o: GameObject): PlayerId | undefined {
+  const host = o.zone === "battlefield" && o.attachedTo ? s.objects[o.attachedTo] : undefined;
+  return host?.zone === "battlefield" ? controllerOf(s, host) : undefined;
+}
+
 /** From the declare attackers step to the end of combat step: when creatures can be attacking (CR 506.1). */
 export const inCombat = (s: GameState) => ["declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
 
@@ -631,7 +637,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || e === each, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
   }
@@ -739,6 +745,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoi
     body,
     targets: stampTargets(s, targets),
     modes: t.modes,
+    triggered: true,
     ...(t.cause ? { cause: t.cause } : {}),
     ...(t.subject ? { subject: t.subject } : {}),
     ...(t.lki ? { lki: t.lki } : {}),

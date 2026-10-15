@@ -385,6 +385,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // "At the beginning of the upkeep of enchanted creature's controller, ~ deals 1 damage to that player": "that player"
+  // is that controller, whose upkeep it is; "that creature" is the enchanted creature.
+  const hostUpkeep = /^At the beginning of the upkeep of (enchanted|equipped) creature's controller, (.+)$/.exec(line);
+  if (hostUpkeep) {
+    const t = parseTrigger(`At the beginning of each player's upkeep, ${hostUpkeep[2]!.replace(/\bthat creature\b/g, `${hostUpkeep[1]} creature`)}`);
+    return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
+  }
   // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
   const battalion = /^Whenever ~ and at least (one|two|three) other creatures attack, (.+)$/.exec(line);
   if (battalion) {

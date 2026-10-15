@@ -9,7 +9,7 @@ import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending } from "./keyword-abilities";
-import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic } from "./statics";
+import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import { parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
@@ -518,6 +518,15 @@ export function compile(d: CardDef): CompiledCard {
       out.exileWhatItDamaged = kumano[1] === "~" ? "self" : "attached";
       continue;
     }
+    // "If ~ would die, exile it instead." "If a creature an opponent controls would die, exile it instead." (CR 614.1a)
+    const exileDies = /^If (~|a|an|another) (.+? )?would die, exile it instead\.$/.exec(line);
+    if (exileDies) {
+      const filter = exileDies[1] === "~" ? undefined : parseTargetPhrase(exileDies[2]!.trim());
+      if (exileDies[1] === "~" && !exileDies[2]) out.exileInsteadOfDying = { self: true };
+      else if (filter?.kind === "object" && !filter.combat) out.exileInsteadOfDying = { filter, ...(exileDies[1] === "another" ? { other: true as const } : {}) };
+      else out.unsupported.push(raw);
+      continue;
+    }
     // Darksteel Colossus: a replacement effect that works from every zone (CR 614.1a, 113.6c-style "from anywhere").
     if (/^If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead\.$/.test(line)) {
       out.shuffleInsteadOfGraveyard = true;
@@ -556,6 +565,15 @@ export function compile(d: CardDef): CompiledCard {
       const filter = limit[2] ? parseTargetPhrase(`${limit[2]} spell`) : undefined;
       if (filter === null || (filter && filter.kind !== "spell")) out.unsupported.push(raw);
       else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
+      continue;
+    }
+    const noGain = /^(Players|Your opponents) can't gain life\.$/.exec(line);
+    if (noGain) {
+      out.cantGainLife = noGain[1] === "Players" ? "all" : "opponents";
+      continue;
+    }
+    if (line === "Damage can't be prevented.") {
+      out.damageCantBePrevented = true;
       continue;
     }
     if (line === "If you would gain life, you gain twice that much life instead.") {
@@ -606,17 +624,20 @@ export function compile(d: CardDef): CompiledCard {
       out.cantBeCountered = true;
       continue;
     }
-    const ewc = new RegExp(`^(?:Raid — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (you attacked this turn)| if (you cast it from your hand))?\\.$`).exec(line);
+    const ewc = new RegExp(`^(?:(?:Raid|Morbid) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
-      // "~ enters tapped with three stun counters on it."
-      const [, tapped, count, kind, each, where, raid, fromHand] = ewc;
+      // "~ enters tapped with three stun counters on it." "... if you attacked this turn" (raid), "... if a creature
+      // died this turn" (morbid), "... if you cast it from your hand": checked as it enters.
+      const [, tapped, count, kind, each, where, ifText] = ewc;
+      const fromHand = ifText === "you cast it from your hand";
+      const cond = ifText && !fromHand ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
       const per = each ? parseCount(each, null, true) : null;
       const def = where ? parseCount(where, null) : null;
       const n = per ? scaleAmount(amt(count!), per) : def ? substituteX(amt(count!), def) : amt(count!);
-      if ((each && !per) || (where && !def) || !n || out.entersWithCounters) out.unsupported.push(raw);
+      if ((each && !per) || (where && !def) || cond === null || !n || out.entersWithCounters) out.unsupported.push(raw);
       else {
-        out.entersWithCounters = { counter: counterKind(kind!), n, ...(raid ? { if: { kind: "attackedThisTurn" as const } } : {}), ...(fromHand ? { castFromHand: true as const } : {}) };
+        out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}) };
         if (tapped) out.entersTapped = true;
       }
       continue;

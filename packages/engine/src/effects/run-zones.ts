@@ -446,6 +446,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           position = sc.topOrBottom as "top" | "bottom";
           sc.topOrBottom = undefined;
         }
+        if (position === "second") {
+          log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} into their library second from the top.`);
+          moveObject(s, o.id, "library", { top: true });
+          // Under the top card, if there is one (a commander may have gone to the command zone instead).
+          const lib = player(s, o.owner).library;
+          if (o.zone === "library" && lib[0] === o.id && lib.length > 1) [lib[0], lib[1]] = [lib[1]!, lib[0]!];
+          continue;
+        }
         log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
         moveObject(s, o.id, "library", { top: position === "top" });
       }

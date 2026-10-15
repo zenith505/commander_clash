@@ -63,7 +63,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   if (!statement || !cond) return null;
-  const st = parseStatic(`${statement.replace(/^(it|this creature|this permanent)\b/i, "~")}.`);
+  // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
+  const st = parseStatic(`${statement.replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
   // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
@@ -140,6 +141,14 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
+  if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
+    return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
+  if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
+  // Pestilence: "if no creatures are on the battlefield".
+  if ((m = /^no (.+) (?:are|is) on the battlefield$/.exec(text))) {
+    const g = parseGroup(`all ${m[1]}`);
+    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, max: 0 } : null;
+  }
   // "It" is the source only when the ability is about the source itself.
   const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" };
@@ -166,6 +175,22 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
 }
 
 /**
+ * "Prevent all [combat|noncombat] damage that would be dealt (to|by|to and dealt by) X [by creatures|by artifact
+ * sources]": X as written, and what's prevented (CR 615.1).
+ */
+export function parsePreventAll(text: string): { subject: string; mod: Extract<Modification, { kind: "preventDamage" }> } | null {
+  const m = /^Prevent all (combat |noncombat )?damage that would be dealt (to and dealt by|to|by) (.+?)(?: by (creatures|artifact creatures|artifact sources))?$/i.exec(text);
+  if (!m) return null;
+  const fromTypes = m[4] === "creatures" ? ["Creature"] : m[4] === "artifact creatures" ? ["Artifact", "Creature"] : m[4] === "artifact sources" ? ["Artifact"] : undefined;
+  if (fromTypes && m[2] !== "to") return null;
+  const combat = m[1] === "combat " ? ("only" as const) : m[1] === "noncombat " ? ("non" as const) : undefined;
+  return {
+    subject: m[3]!,
+    mod: { kind: "preventDamage", ...(m[2] !== "by" ? { to: true as const } : {}), ...(m[2] !== "to" ? { by: true as const } : {}), ...(combat ? { combat } : {}), ...(fromTypes ? { fromTypes } : {}) },
+  };
+}
+
+/**
  * The group a static ability talks about: "creatures you control", "other Elves you
  * control", "white creatures you control", "enchanted creature", "equipped creature", "~".
  */
@@ -180,6 +205,7 @@ function parseAffected(subject: string): Affects | null {
     const subtypes: string[] = [];
     const types = ["Creature"];
     let combat: "attacking" | "blocking" | undefined;
+    let colorless = false;
     for (const w of words) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
       // "Artifact creatures you control get +1/+1": both card types.
@@ -187,6 +213,7 @@ function parseAffected(subject: string): Affects | null {
       else if (CREATURE_TYPES.has(w)) subtypes.push(w);
       // "Attacking creatures you control get +1/+0": whichever are attacking right now (CR 611.3a).
       else if ((w.toLowerCase() === "attacking" || w.toLowerCase() === "blocking") && !combat) combat = w.toLowerCase() as "attacking" | "blocking";
+      else if (w.toLowerCase() === "colorless" && !colorless) colorless = true; // CR 105.2c
       else return null; // "Enchanted creatures", ...: not supported yet
     }
     return {
@@ -194,7 +221,7 @@ function parseAffected(subject: string): Affects | null {
       types,
       subtypes: subtypes.length ? subtypes : undefined,
       colors: colors.length ? colors : undefined,
-      ...(combat ? { spec: { kind: "object" as const, combat, text: `${combat} creature` } } : {}),
+      ...(combat ? { spec: { kind: "object" as const, combat, ...(colorless ? { colorCount: "colorless" as const } : {}), text: `${combat} creature` } } : colorless ? { spec: { kind: "object" as const, colorCount: "colorless" as const, text: "colorless creature" } } : {}),
       controller: m[3]!.toLowerCase() === "you control" ? "you" : "opponent",
       other: !!m[1],
     };
@@ -292,6 +319,22 @@ function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't be blocked$/.test(rest)) return [{ kind: "cantBeBlocked" }];
   if (/^can't be blocked by more than one creature$/.test(rest)) return [{ kind: "maxOneBlocker" }];
   if ((m = new RegExp(`^can't be blocked except by ${NUM} or more creatures$`).exec(rest)) && num(m[1]!) >= 2) return [{ kind: "minBlockers", n: num(m[1]!) }];
+  // "Can't be blocked except by creatures with flying or reach", "... except by black creatures", "... except by
+  // Walls and/or creatures with flying" (CR 509.1b).
+  if ((m = /^can't be blocked except by (.+)$/.exec(rest))) {
+    const filters: TargetSpec[] = [];
+    for (const part of m[1]!.split(" and/or ")) {
+      const kw = /^creatures with (\w+) or (\w+)$/.exec(part);
+      for (const p of kw ? [`creatures with ${kw[1]}`, `creatures with ${kw[2]}`] : [part]) {
+        const [head, ...tail] = p.split(/ (?=with )/);
+        const filter = parseTargetPhrase([head!.split(" ").map(singular).join(" "), ...tail].join(" "));
+        if (filter?.kind !== "object" || filter.controller || filter.combat) return null;
+        filters.push({ ...filter, text: p });
+      }
+    }
+    return [{ kind: "blockableOnlyBy", filters, text: m[1]! }];
+  }
+  if (/^can't be blocked by creatures with greater power$/.test(rest)) return [{ kind: "cantBeBlockedByGreaterPower" }];
   if ((m = /^can't be blocked by (.+)$/.exec(rest))) {
     // "creatures with power 2 or less", "Walls", "blue creatures", "artifact creatures" (CR 509.1b)
     // In the singular, as parseTargetPhrase reads it: "creature with power 2 or less", "Wall", "blue creature".
@@ -329,6 +372,19 @@ export function parseStatic(line: string): StaticAbility | null {
     const affects = untaps[1] === "~" ? { kind: "self" as const } : parseAffected(untaps[2] ? `${untaps[2].charAt(0).toUpperCase()}${untaps[2].slice(1)} you control` : `Each ${untaps[3]}`);
     if (!affects || (affects.kind === "filter" && affects.controller !== "you" && affects.spec?.controller !== "you")) return null;
     return { affects, mods: [{ kind: "untapsDuringOthers" }], text: line };
+  }
+  // Prevention (CR 615.1): "Prevent all combat damage that would be dealt to ~", "Prevent all damage that would be dealt
+  // by enchanted creature", "... to and dealt by enchanted creature", "... to ~ by creatures".
+  const prevent = parsePreventAll(text);
+  if (prevent) {
+    const affects = prevent.subject === "~" ? ({ kind: "self" } as const) : parseAffected(prevent.subject.replace(/^./, (c) => c.toUpperCase()));
+    return affects ? { affects, mods: [prevent.mod], text: line } : null;
+  }
+  // "~ is also a Cleric, Rogue, Warrior, and Wizard" (party, CR 700.8): creature types it has in addition (layer 4).
+  const also = /^~ is also an? (.+)$/.exec(text);
+  if (also) {
+    const types = also[1]!.replace(/,? and /, ", ").split(", ");
+    return types.every((t) => CREATURE_TYPES.has(t)) ? { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: types, supertypes: [] }], text: line } : null;
   }
   const cda = parseDefinedPT(text);
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };

@@ -77,6 +77,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
     return [{ type: "putInLibrary", what, position: "ownersChoice" }];
   }
+  // "Put target creature into its owner's library second from the top" (Bury in Books).
+  if ((m = /^Put (target .+?|~) into its owner's library second from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
+    const what = parseObject(m[1]!, ctx);
+    return what && (what.ref === "target" || what.ref === "self") ? [{ type: "putInLibrary", what, position: "second" }] : null;
+  }
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   if ((m = /^Put (target .+?|~) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);

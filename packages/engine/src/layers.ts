@@ -108,6 +108,10 @@ export interface Characteristics {
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
+  /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }[];
+  /** "Can't be blocked except by ...": each entry is a group a blocker has to belong to (CR 509.1b). */
+  blockableOnlyBy?: { filters: TargetSpec[]; text: string }[];
   /** Attackers it can't block. */
   cantBlockCreatures: TargetSpec[];
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
@@ -319,6 +323,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (src.counters[cond.counter] ?? 0) > 0;
     case "yourTurn":
       return s.activePlayer === you;
+    case "beforeAttackers":
+      return s.activePlayer === you && ["untap", "upkeep", "draw", "main1", "beginCombat"].includes(s.step);
     case "monarch":
       return s.monarch === you;
     case "fullParty":
@@ -345,6 +351,15 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
+    case "creatureDied":
+      return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
+    case "onBattlefield": {
+      let n = 0;
+      for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
+      return n <= cond.max;
+    }
+    case "opponentLostLife":
+      return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
     case "increment": {
       const c = chars.get(sourceId);
       return !!c && c.types.includes("Creature") && eventAmount !== undefined && (eventAmount > c.power || eventAmount > c.toughness);
@@ -548,6 +563,14 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBeBlockedBy":
       c.cantBeBlockedBy.push(m.filter);
+      return;
+    case "preventDamage": {
+      const { kind: _, ...p } = m;
+      c.preventDamage = [...(c.preventDamage ?? []), p];
+      return;
+    }
+    case "blockableOnlyBy":
+      c.blockableOnlyBy = [...(c.blockableOnlyBy ?? []), { filters: m.filters, text: m.text }];
       return;
     case "cantBlockCreatures":
       c.cantBlockCreatures.push(m.filter);

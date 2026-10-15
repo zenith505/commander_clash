@@ -52,7 +52,8 @@ export type TriggerSourceEvent =
   | { type: "enters"; id: ObjectId; x?: number }
   /** `counters`: the counters it had on the battlefield (last known information, for persist and undying). */
   /** It left the battlefield for `to` (only a graveyard makes it "die"). */
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
+  /** `sacrificed`: its controller sacrificed it (CR 701.21a). */
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -312,6 +313,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!src) continue;
         if (src.zone === "battlefield") continue; // it already came back as a new object
         consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+      }
+    }
+    // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
+    // the same time (CR 603.10a), whatever zone it went to.
+    if (ev.sacrificed && ev.snapshot && ev.chars) {
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const dying = { o: ev.snapshot, c: ev.chars };
+      const consider = (src: GameObject, triggers?: TriggeredAbility[]) =>
+        add(src, ev.controller, (e, t) => e === "youSacrifice" && !!t.sacrifices && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki);
+      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) consider(obj(s, id));
+      for (const left of s.leftTogether ?? []) {
+        const src = s.objects[left.id];
+        if (!src || src.zone === "battlefield" || left.controller !== ev.controller) continue;
+        consider(src, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
     }
   } else if (ev.type === "blocksDeclared") {

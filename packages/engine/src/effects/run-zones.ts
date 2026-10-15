@@ -71,7 +71,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         continue;
       }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
-      moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand");
+      moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
     }
 }
 
@@ -147,7 +147,7 @@ function exploit(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
   const snapshot: GameObject = { ...victim, counters: { ...victim.counters } };
   const chars = characteristics(s, victim);
   log(s, `${player(s, pid).name} sacrifices ${defOf(s, victim).name} (${src}'s exploit).`);
-  moveObject(s, victim.id, "graveyard");
+  moveObject(s, victim.id, "graveyard", { sacrificed: true });
   if (exploiter) fireEvent(s, { type: "exploits", exploiter: exploiter.id, controller: pid, victim: snapshot, chars, watchers });
 }
 
@@ -442,7 +442,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const by = controllerOf(s, o);
         if (by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
         log(s, `${player(s, by).name} sacrifices ${characteristics(s, o).name}.`);
-        moveObject(s, o.id, "graveyard");
+        moveObject(s, o.id, "graveyard", { sacrificed: true });
       }
       return;
     case "ninjutsu": {

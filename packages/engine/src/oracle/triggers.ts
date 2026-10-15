@@ -237,6 +237,29 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 /**
+ * "Whenever you sacrifice another permanent", "Whenever you sacrifice a Food", "Whenever you sacrifice ~ or another
+ * creature", "... a nontoken permanent during your turn": once for each permanent its controller sacrifices (CR 701.21a).
+ * "It" and "that card" are the card where it went. "One or more" (once per batch) isn't modeled.
+ */
+function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
+  if (!m) return null;
+  const phrase = m[2]!.replace(/ or (?=[a-z])/g, " or ");
+  const filter = parseTargetPhrase(phrase);
+  if (!filter || filter.kind !== "object" || filter.controller) return "fail";
+  const body = parseBody(m[4]!, { subjectIt: true, subjectLeft: true });
+  if (!body) return "fail";
+  const kind = m[1]!.toLowerCase();
+  return {
+    event: "youSacrifice",
+    sacrifices: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
+    body,
+    // Only while it's your turn: whether it triggers at all, not an intervening if.
+    ...(m[3] ? { activeIf: { kind: "yourTurn" as const } } : {}),
+  };
+}
+
+/**
  * "Whenever you draw a card", "whenever an opponent draws a card", "whenever a player draws a card",
  * "whenever you draw your second card each turn" (the count includes cards drawn before the source
  * was on the battlefield). "That player" is whoever drew.
@@ -395,6 +418,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (draws) return draws;
   const dies = parseDiesTrigger(line);
   if (dies) return dies;
+  const sacrifices = parseSacrificeTrigger(line);
+  if (sacrifices) return sacrifices;
   const group = parseGroupTrigger(line);
   if (group) return group;
   const exploits = parseExploitsTrigger(line);

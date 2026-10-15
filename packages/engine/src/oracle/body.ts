@@ -391,7 +391,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
   if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
-  const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
+  const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
   if (fx) {
     ctx.lastCreated = (last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1;
@@ -566,6 +566,22 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
     out.push(...fx);
   }
   return out;
+}
+
+/**
+ * "Target player draws two cards and loses 2 life", "You draw a card and lose 1 life": one subject doing two things in
+ * order. A target is chosen once; the second verb is about the same player ("that player").
+ */
+function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
+  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?)`;
+  const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+)$`).exec(s);
+  if (!m) return null;
+  const subject = m[1]!;
+  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
+  if (!again) return null;
+  const first = parseSentence(`${subject} ${m[2]}`, ctx);
+  const second = first && parseSentence(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`, ctx);
+  return first && second ? [...first, ...second] : null;
 }
 
 export function addTarget(ctx: Ctx, spec: TargetSpec): number {

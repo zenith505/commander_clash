@@ -485,6 +485,8 @@ export function moveObject(
     untapped?: boolean;
     /** The X of the spell it was, for "enters with X counters" and its enters triggers (CR 107.3m). */
     x?: number;
+    /** Its controller is sacrificing it (CR 701.21a), for "whenever you sacrifice" triggers. */
+    sacrificed?: boolean;
   } = {},
 ) {
   const o = obj(s, id);
@@ -634,7 +636,7 @@ export function moveObject(
   // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
   // triggers say "put into a graveyard" or "leaves the battlefield".
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
   if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
@@ -1457,7 +1459,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
-    moveObject(s, id, "graveyard");
+    moveObject(s, id, "graveyard", { sacrificed: true });
   }
   addMana(s, p.id, adds, ab.spendOnly);
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
@@ -1865,7 +1867,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
-    moveObject(s, choices.casualty, "graveyard");
+    moveObject(s, choices.casualty, "graveyard", { sacrificed: true });
     item.casualty = true;
   }
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
@@ -2059,7 +2061,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         const ch = characteristics(s, o);
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
-        moveObject(s, id, "graveyard");
+        moveObject(s, id, "graveyard", { sacrificed: true });
       }
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
     else {
@@ -2199,7 +2201,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
-  if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
+  if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
@@ -2441,7 +2443,7 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
     const x = s.objects[id];
     if (x?.zone !== "battlefield") continue;
     log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} to ${d.name}'s devour.`);
-    moveObject(s, id, "graveyard");
+    moveObject(s, id, "graveyard", { sacrificed: true });
     n++;
   }
   s.leftTogether = undefined;

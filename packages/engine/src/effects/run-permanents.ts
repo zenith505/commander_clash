@@ -221,7 +221,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (had === 1 && e.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       } else if (e.orSacrifice && controllerOf(s, o) === ctx.controller) {
         log(s, `${player(s, ctx.controller).name} sacrifices ${name}: it has no ${e.counter} counters left.`);
-        moveObject(s, o.id, "graveyard");
+        moveObject(s, o.id, "graveyard", { sacrificed: true });
       }
       return;
     }

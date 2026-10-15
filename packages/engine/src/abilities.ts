@@ -743,6 +743,8 @@ export type TriggerEvent =
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
+  /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
+  | "youSacrifice"
   /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
   | "playerDiscards"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
@@ -797,6 +799,11 @@ export interface TriggeredAbility {
    * Equipment is attached to; `damagedBySelf`: "a creature dealt damage by ~ this turn".
    */
   dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean };
+  /**
+   * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
+   * went. The card is the subject ("exile it").
+   */
+  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information. */
   ifNoCounter?: "+1/+1" | "-1/-1";
   /**
@@ -885,9 +892,13 @@ export interface ActivatedAbility {
  * "commanderIdentity": one mana of a color in its controller's commander's color identity
  * (none if that identity is colorless, CR 903.4f).
  */
+/**
+ * `n`: "Add an amount of {G} equal to ~'s power", "Add X mana of any one color, where X is the number of Elves on the
+ * battlefield": the mana (or the one chosen color) that many times, counted as the ability resolves (CR 106.1, 605.3).
+ */
 export type ManaProduce =
-  | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec }
-  | { kind: "oneOf"; options: ManaType[]; amount: number }
+  | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec; n?: AmountExpr }
+  | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
   | { kind: "chosenColor"; also?: ManaType }

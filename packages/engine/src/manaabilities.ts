@@ -7,6 +7,7 @@ import { objectMatches } from "./effects";
 import { isSummoningSick, obj, player, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
+import { evalAmount } from "./amounts";
 import { canPayFromPool } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
 import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -71,6 +72,11 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
 /** Exactly what activating it with `choice` adds to the pool. */
 export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType): ManaType[] {
   const p = ab.produces;
+  if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {
+    // CR 106.1: worked out as the ability resolves, with the permanent as "~" and its controller as "you".
+    const n = evalAmount(s, p.n, { controller: controllerOf(s, o), sourceId: o.id });
+    return Array<ManaType>(n).fill(p.kind === "oneOf" ? choice : p.mana[0]!);
+  }
   if (p.kind === "oneOf") return Array<ManaType>(p.amount).fill(choice);
   if (p.kind === "commanderIdentity" || p.kind === "chosenColor" || p.kind === "landsCouldProduce") return [choice];
   if (!p.count) return p.mana;

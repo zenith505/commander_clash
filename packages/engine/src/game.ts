@@ -532,6 +532,7 @@ export function moveObject(
   // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
+  o.discardedTurn = undefined;
   if (fromZone === "stack") {
     o.castFrom = undefined;
     o.castVia = undefined;
@@ -1546,6 +1547,7 @@ export function castProblem(
   const via = graveyardCast(d, choices?.via);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
+  if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
@@ -2745,6 +2747,14 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const best = Math.max(0, ...opps.filter((d) => !attackProblem(s, o, d)).map(obeyed));
     if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
       throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
+  }
+  // "Attacks that opponent this turn if able" (encore): it attacks one of those players, not a planeswalker, if it can
+  // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).
+  for (const o of potentialAttackers(s, p.id)) {
+    const able = characteristics(s, o).mustAttack.filter((d) => opps.includes(d) && !attackProblem(s, o, d));
+    if (!able.length) continue;
+    const a = attacks.find((x) => x.attacker === o.id);
+    if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
   }
   for (const a of attacks) {
     const o = obj(s, a.attacker);

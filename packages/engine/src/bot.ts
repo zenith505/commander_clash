@@ -1472,7 +1472,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
     if (atPlayer(owner) >= player(s, owner).life) continue;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && !b.tapped && objIsType(s, b, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !attackProblem(s, obj(s, a.attacker), owner))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), owner))
       .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
       .sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)));
     let need = pw.counters.loyalty ?? 0;
@@ -1521,6 +1521,12 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
     const other = opps.find((d) => !by.includes(d) && !attackProblem(s, o, d));
     return other !== undefined ? { ...a, defender: other } : a;
   });
+  // A token that has to attack a particular opponent (encore) attacks them if it can (CR 508.1d).
+  for (const o of potentialAttackers(s, pid)) {
+    const d = characteristics(s, o).mustAttack.find((x) => opps.includes(x) && !attackProblem(s, o, x));
+    if (d === undefined) continue;
+    attacks = [...attacks.filter((a) => a.attacker !== o.id), { attacker: o.id, defender: d }];
+  }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   return { type: "declareAttackers", player: pid, attacks: attackPlaneswalkers(s, pid, attacks) };

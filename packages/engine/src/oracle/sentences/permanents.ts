@@ -35,6 +35,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
     return what && !isGroup(what) ? [{ type: "connive", what, n: m[2] ? amt(m[2]) : 1 }] : null;
   }
+  // Recruit (CR 701.70a): "recruit", "you recruit".
+  if (/^(?:you )?recruit$/i.test(s)) return [{ type: "recruit" }];
   // "If that creature would die this turn, exile it instead" (CR 614.1a), for what an earlier sentence targeted
   // or damaged: "If a creature dealt damage this way would die this turn, exile it instead".
   if ((m = /^If (that creature|that permanent|that creature or planeswalker|that planeswalker|an? (?:creature|permanent) dealt damage this way) would die this turn, exile it instead$/i.exec(s))) {

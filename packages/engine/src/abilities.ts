@@ -300,6 +300,8 @@ export type Modification =
   | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
   /** Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able. */
   | { kind: "goad" }
+  /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
+  | { kind: "mustAttackPlayer"; player: PlayerId }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
@@ -455,6 +457,11 @@ export type Effect =
   | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
+  /**
+   * Recruit (CR 701.70a): "Draw a card, then discard a card. If you discarded a nonland card this way, create a 1/1
+   * white Human Soldier creature token."
+   */
+  | { type: "recruit" }
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   | { type: "exileIfDies"; what: ObjRef }
   /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
@@ -517,6 +524,11 @@ export type Effect =
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /** CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player). */
   | { type: "myriad" }
+  /**
+   * Encore (CR 702.141a): for each opponent, a token copy of this card that attacks that opponent this turn if able.
+   * The tokens gain haste. (The sacrifice at the next end step is a separate delayed trigger about each token.)
+   */
+  | { type: "encore" }
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string }
   /**
@@ -1048,7 +1060,7 @@ export type AdditionalCost =
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
 export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative";
 
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   mana?: string;

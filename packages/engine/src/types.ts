@@ -154,6 +154,8 @@ export interface GameObject {
   castFrom?: ZoneName;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
+  discardedTurn?: number;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
   castAlt?: AltCostKind;
   /**

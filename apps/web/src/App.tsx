@@ -1044,7 +1044,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   alternative: "an alternative cost: it's still the same spell, with the same mana value",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
@@ -2465,6 +2465,12 @@ function Controls({
   if (pending?.kind === "declareAttackers") {
     // Creatures that attack each combat if able have to be declared (CR 508.1d).
     const must = potentialAttackers(s, HUMAN).filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks));
+    // Encore tokens attack their opponent if able (CR 508.1d).
+    const bound = potentialAttackers(s, HUMAN).flatMap((o) => {
+      const able = characteristics(s, o).mustAttack.filter((d) => opponents(s, HUMAN).includes(d) && !attackProblem(s, o, d));
+      const a = attacks[o.id];
+      return able.length && (!a || a.planeswalker || !able.includes(a.defender)) ? [`${cardOf(s, o.id).name} must attack ${able.map((d) => s.players[d]!.name).join(" or ")}.`] : [];
+    });
     // "Can't attack alone" (CR 506.5).
     const ids = Object.keys(attacks);
     const alone = ids.length === 1 && characteristics(s, s.objects[ids[0]!]!).cantAttackAlone ? `${cardOf(s, ids[0]!).name} can't attack alone.` : null;
@@ -2473,6 +2479,8 @@ function Controls({
         <span>
           {alone && !aim
             ? alone
+            : bound.length && !aim
+            ? bound[0]
             : must.length && !aim
             ? `${must.map((o) => cardOf(s, o.id).name).join(" and ")} attack${must.length === 1 ? "s" : ""} each combat if able: click ${must.length === 1 ? "it" : "them"}, then a player.`
             : aim
@@ -2482,7 +2490,7 @@ function Controls({
               : "Click a creature, then the player it attacks. Click an attacker again to take it back."}
         </span>
         <button
-          disabled={must.length > 0 || !!alone}
+          disabled={must.length > 0 || bound.length > 0 || !!alone}
           onClick={() =>
             dispatch([
               {

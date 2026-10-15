@@ -100,6 +100,8 @@ export interface Characteristics {
   blocksOnlyFlyers: boolean;
   /** "Attacks each combat if able" (CR 508.1d). */
   attacksIfAble: boolean;
+  /** Players it has to attack if able (encore). */
+  mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
@@ -160,6 +162,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     doesntUntap: false,
     blocksOnlyFlyers: false,
     attacksIfAble: false,
+    mustAttack: [],
     cantBeBlockedBy: [],
     maxOneBlocker: false,
     minBlockers: 0,
@@ -190,6 +193,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   cantBeBlockedBy: [...c.cantBeBlockedBy],
   attackUnless: [...c.attackUnless],
   goadedBy: [...c.goadedBy],
+  mustAttack: [...c.mustAttack],
 });
 
 type CharMap = Map<ObjectId, Characteristics>;
@@ -522,6 +526,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "attacksIfAble":
       c.attacksIfAble = true;
+      return;
+    case "mustAttackPlayer":
+      if (!c.mustAttack.includes(m.player)) c.mustAttack.push(m.player);
       return;
     case "cantBeBlockedBy":
       c.cantBeBlockedBy.push(m.filter);

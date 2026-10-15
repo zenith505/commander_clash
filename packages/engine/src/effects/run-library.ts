@@ -278,6 +278,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
     const madness = compileCard(defOf(s, o)).madness;
     if (!madness) {
       moveObject(s, id, "graveyard");
+      if (o.zone === "graveyard") o.discardedTurn = s.turn; // mayhem (CR 702.187b)
       continue;
     }
     moveObject(s, id, "exile");

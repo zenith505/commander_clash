@@ -358,6 +358,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "proliferate":
     case "amass":
     case "connive":
+    case "recruit":
     case "skipUntap":
     case "counters":
     case "lastKnownCounters":
@@ -376,6 +377,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomeCopy":
       return runCopiesEffect(s, e, ctx);
     case "myriad":
+    case "encore":
     case "createTokenCopy":
     case "createToken":
       return runTokensEffect(s, e, ctx, src);

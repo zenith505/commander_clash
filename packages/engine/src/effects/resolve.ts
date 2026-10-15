@@ -207,7 +207,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const other = t && pairedWith(s, t);
     return other ? [other] : [];
   }
-  if (ref.ref === "damagedThisWay") return (s.resolving?.damagedThisWay ?? []).map((id) => obj(s, id)).filter((o) => o.zone === "battlefield");
+  if (ref.ref === "damagedThisWay") return [...new Set(s.resolving?.damagedThisWay ?? [])].map((id) => obj(s, id)).filter((o) => o.zone === "battlefield" && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)));
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
   if (ref.ref === "attached") {
@@ -274,6 +274,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? []).filter((p) => !player(s, p).lost);
+    case "damagedThisWay":
+      return (s.resolving?.playersDamagedThisWay ?? []).filter((p) => !player(s, p).lost);
     case "giftee": {
       const p = gifteeOf(s, ctx);
       return p !== undefined && !player(s, p).lost ? [p] : [];
@@ -386,6 +388,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "redirectNext":
     case "preventCombatDamage":
     case "noLifeGain":
+    case "cantCast":
     case "noPrevention":
     case "pumpPerBlocker":
     case "draw":
@@ -400,6 +403,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "addCombatMana":
     case "addMana":
     case "cantBlockRule":
+    case "cantAttackRule":
     case "fight":
     case "bite":
     case "extraTurn":

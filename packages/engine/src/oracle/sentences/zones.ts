@@ -180,6 +180,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = parseTargetPhrase(m[1] ? "creature without flying" : "creature");
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;
   }
+  if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
   if ((m = /^(.+?) can't (block|attack|attack or block|be blocked) (this turn|until your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods: Modification[] =

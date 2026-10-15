@@ -1359,9 +1359,11 @@ function startNextTurn(s: GameState) {
   s.voidThisTurn = undefined;
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
+  s.cantCastThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
+  s.cantAttackThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
   s.lastKnown = undefined;
@@ -2423,6 +2425,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
 
 /** "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2). */
 function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
+  // "Your opponents can't cast spells this turn" (Silence) and the like.
+  for (const c of s.cantCastThisTurn ?? [])
+    if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
   for (const id of s.battlefield) {
     const o = obj(s, id);
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
@@ -3526,6 +3531,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !isSummoningSick(s, o) &&
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
       !characteristics(s, o).cantAttack &&
+      !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       (!characteristics(s, o).attackUnless.length || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
@@ -4532,6 +4538,9 @@ export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): strin
   // Whenever they could begin to cast it (CR 702.62a), with "as though it had flash" too.
   const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || flashGranted(s, pid, d);
   if (!instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be suspended when you could cast it (sorcery speed)`;
+  // Only if you could begin to cast it: not under Silence or Rule of Law (CR 702.62a, rulings on Silence).
+  const limit = castLimitProblem(s, pid, d);
+  if (limit) return limit;
   if (!canPayFromPool(s, pid, parseManaCost(sus.cost), "other")) return `not enough mana to suspend ${d.name} (${sus.cost})`;
   return null;
 }

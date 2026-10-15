@@ -282,7 +282,8 @@ export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
   | { ref: "target"; index: number; n?: number }
   | { ref: "self" } // the source permanent ("this creature")
-  | { ref: "damagedThisWay" }
+  /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
+  | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
   | { ref: "subjectCard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
@@ -319,7 +320,9 @@ export type PlayerRef =
   /** The players who chose to in the "each player may ..." being resolved (see the eachMay effect). */
   | { ref: "choseThisWay" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
-  | { ref: "giftee" };
+  | { ref: "giftee" }
+  /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
+  | { ref: "damagedThisWay" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -890,6 +893,8 @@ export type Effect =
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec }
+  /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
+  | { type: "cantAttackRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
   | { type: "shuffle"; who: PlayerRef }
   /**
@@ -974,6 +979,12 @@ export type Effect =
   | { type: "preventCombatDamage" }
   /** "Players can't gain life this turn", "Your opponents can't gain life this turn" (CR 119.7). */
   | { type: "noLifeGain"; players: "all" | "opponents" }
+  /**
+   * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
+   * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
+   * is the kind of spell.
+   */
+  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec }
   /** "Damage can't be prevented this turn" (CR 615.12). */
   | { type: "noPrevention" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */

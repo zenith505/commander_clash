@@ -283,6 +283,17 @@ export function parseStatic(line: string): StaticAbility | null {
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
   if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
+  // "You may have ~ assign its combat damage as though it weren't blocked" (CR 510.1c-d; chosen as it assigns it).
+  const unblocked = [{ kind: "unblockedDamage" }] as const;
+  if (/^You may have ~ assign its combat damage as though it weren't blocked$/.test(text)) return { affects: { kind: "self" }, mods: [...unblocked], text: line };
+  if (/^Enchanted creature's controller may have it assign its combat damage as though it weren't blocked$/.test(text)) return { affects: { kind: "attached" }, mods: [...unblocked], text: line };
+  if (/^As long as ~ is attacking, for each creature you control, you may have that creature assign its combat damage as though it weren't blocked$/.test(text))
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [...unblocked], text: line, condition: { kind: "self", is: "attacking" } };
+  const grantsUnblocked = /^(.+) have "You may have ~ assign its combat damage as though it weren't blocked\."$/.exec(text);
+  if (grantsUnblocked) {
+    const affects = parseAffected(grantsUnblocked[1]!);
+    return affects && affects.kind === "filter" ? { affects, mods: [...unblocked], text: line } : null;
+  }
   const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);

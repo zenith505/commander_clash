@@ -15,6 +15,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
   // Only players can be attacked here (planeswalkers and battles aren't supported as attack targets).
   [/^Whenever ~ attacks a player, (.+)$/, "selfAttacks"],
+  [/^Whenever ~ enlists a creature, (.+)$/, "selfEnlists"], // CR 702.154c
   [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
   // The beginning of combat step (CR 507) and end of combat step (CR 511).
   [/^At the beginning of combat on your turn, (.+)$/, "yourBeginCombat"],

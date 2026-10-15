@@ -1,3 +1,4 @@
+import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
@@ -12,7 +13,9 @@ import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGen
 import { evalAmount } from "./amounts";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
+import { CREATURE_TYPES } from "./keywords";
 import {
+  COLORS,
   RulesError,
   type Action,
   type CardDef,
@@ -499,6 +502,7 @@ export function moveObject(
   // Whether it was kicked stays with a spell that becomes a permanent, and nothing else (CR 400.7).
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
+    o.colorsSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
     o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
@@ -529,6 +533,7 @@ export function moveObject(
   o.attacking = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
+  o.band = undefined;
   o.timestamp = s.nextTimestamp++; // CR 613.7d
   o.attachedTo = to === "battlefield" ? opts.attachTo : undefined;
   if (fromZone === "battlefield") {
@@ -554,7 +559,7 @@ export function moveObject(
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
-    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}), ...(escaped ? { escaped } : {}) };
+    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -567,7 +572,8 @@ export function moveObject(
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
 
-type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean };
+/** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
+type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -583,11 +589,18 @@ function finishEntering(s: GameState, o: GameObject, printed: CompiledCard, opts
   for (const [k, n] of Object.entries(opts.counters ?? {})) putCounters(s, o, k, n, true);
   // "~ escapes with N +1/+1 counters on it" (CR 702.138c).
   if (opts.escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
+  // Sunburst: only a resolving spell, and only for colored mana spent to cast it (CR 702.44b). Whether it enters as a
+  // creature ignores type-changing effects (702.44a): its copiable values decide.
+  if (printed.sunburst && opts.fromStack && o.colorsSpent?.length) {
+    const counter = printed.sunburst.counter ?? (isType(defOf(s, o), "Creature") ? "+1/+1" : "charge");
+    const put = putCounters(s, o, counter, o.colorsSpent.length, true);
+    log(s, `${defOf(s, o).name} enters with ${put} ${counter} counter${put === 1 ? "" : "s"} (sunburst).`);
+  }
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
-  const options: EntersOption[] = [...(printed.devour ? (["devour"] as const) : []), ...(printed.entersOptions ?? [])];
+  const options: EntersOption[] = [...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
 }
@@ -983,9 +996,11 @@ function beginStep(s: GameState, step: Step): void {
     }
     case "firstStrikeDamage":
       if (!attackersAndBlockers(s).some((o) => hasFirstOrDouble(s, o))) return beginStep(s, "combatDamage");
+      if (askUnblocked(s)) return;
       dealCombatDamage(s, true);
       break;
     case "combatDamage":
+      if (askUnblocked(s)) return;
       dealCombatDamage(s, false);
       break;
     case "beginCombat":
@@ -996,6 +1011,9 @@ function beginStep(s: GameState, step: Step): void {
       break;
     case "cleanup": {
       for (const o of attackersAndBlockers(s)) clearCombat(o);
+      // "At the beginning of the next cleanup step" triggers now, and goes on the stack after the discard and
+      // damage removal, when players get priority (CR 514.3a).
+      fireEvent(s, { type: "step", step: "cleanup", active: ap });
       const p = player(s, ap);
       if (p.hand.length > MAX_HAND_SIZE && !hasNoMaxHandSize(s, ap)) {
         s.pending = { kind: "discardToHandSize", player: ap, count: p.hand.length - MAX_HAND_SIZE };
@@ -1322,7 +1340,7 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash");
+  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice;
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
   if (spell?.modal) {
@@ -1544,12 +1562,19 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets }) as { cost: ParsedCost; extra: number };
-  const paid = payFromPool(cost.cost, p.manaPool, cost.extra, p.life)!;
+  const sunburst = !!compileCard(d).sunburst;
+  // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
+  // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
+  const flashSacrifice = !!compileCard(d).flashSacrifice && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
+  const paid = payFromPool(cost.cost, p.manaPool, cost.extra, p.life, { spreadColors: sunburst })!;
+  // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
+  const colorsSpent = COLORS.filter((c) => paid.pool[c] < p.manaPool[c]);
   p.manaPool = paid.pool;
   loseLife(s, p.id, paid.lifePaid);
   for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
+  o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
   const via = graveyardCast(d, choices.via);
@@ -1583,6 +1608,18 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
+  // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
+  // the permanent it becomes as it enters (one more zone change, CR 400.7).
+  if (flashSacrifice)
+    (s.delayed ??= []).push({
+      when: "nextCleanup",
+      controller: p.id,
+      sourceCardId: cardIdOf(o),
+      subject: { id, zc: (o.zoneChanges ?? 0) + 1 },
+      body: { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" }, byController: true }], text: "Its controller sacrifices ~." },
+      turn: s.turn,
+      step: s.step,
+    });
   const convoked =
     (convoke?.length ? `, convoking with ${convoke.map((c) => nameOf(s, c)).join(", ")}` : "") +
     (improvise?.length ? `, improvising with ${improvise.map((c) => nameOf(s, c)).join(", ")}` : "");
@@ -1626,7 +1663,10 @@ export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
 /** ", kicked", ", kicked twice", ", kicked with {1}{U}", for the log. */
 function describeKicks(d: CardDef, kicks: number[]): string {
   const k = compileCard(d).kicker!;
-  if (k.multi || k.costs.length === 1) return kicks.length === 1 ? ", kicked" : `, kicked ${kicks.length === 2 ? "twice" : `${kicks.length} times`}`;
+  const times = kicks.length === 1 ? "" : kicks.length === 2 ? " twice" : ` ${kicks.length} times`;
+  const name = kickerName(k);
+  if (name !== "kicker" && name !== "multikicker") return `, paying its ${name} cost${times}`;
+  if (k.multi || k.costs.length === 1) return kicks.length === 1 ? ", kicked" : `, kicked${times}`;
   return `, kicked with ${kicks.map((i) => k.costs[i]).join(" and ")}`;
 }
 
@@ -1959,15 +1999,33 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
-  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
     throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
+  if (pend.action === "enlist") {
+    enlistChosen(s, pend.objectId!, ids);
+    return;
+  }
+  if (pend.action === "band") {
+    bandChosen(s, ids);
+    return;
+  }
+  if (pend.action === "unblocked") {
+    const c = s.unblockedChoice!;
+    c.asked.push(p.id);
+    c.ids.push(...ids);
+    if (ids.length) log(s, `${p.name} has ${ids.map((id) => nameOf(s, id)).join(", ")} assign combat damage as though not blocked.`);
+    s.pending = null;
+    if (!askUnblocked(s)) dealCombatDamage(s, s.step === "firstStrikeDamage");
+    return;
+  }
   if (pend.objectId) {
     s.pending = null;
     const entry = s.entersChoices?.shift();
-    devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
+    if (pend.action === "reveal") amplifyChosen(s, obj(s, pend.objectId), ids, entry?.enters);
+    else devourChosen(s, obj(s, pend.objectId), ids, entry?.enters);
     return;
   }
   if (!r?.scratch?.queue) throw new RulesError("nothing to pick");
@@ -2008,7 +2066,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
 function chooseOption(s: GameState, p: Player, choice: string) {
   const pend = s.pending;
   if (pend?.kind !== "chooseOption" || pend.player !== p.id) throw new RulesError("nothing to choose");
-  if (pend.what === "devour") throw new RulesError("devour is chosen by picking permanents");
+  if (pend.what === "devour" || pend.what === "amplify") throw new RulesError(`${pend.what} is chosen by picking cards`);
   if (!pend.options.includes(choice)) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : "an option"} you can choose`);
   s.pending = null;
   if (pend.objectId) {
@@ -2067,6 +2125,40 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
   if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
 }
 
+/** The creature types an object has: "all" with changeling (CR 702.73a). On the battlefield, as the layers make it. */
+function creatureTypesOf(s: GameState, o: GameObject): Set<string> | "all" {
+  if (o.zone === "battlefield") {
+    const c = characteristics(s, o);
+    return c.allCreatureTypes ? "all" : new Set(c.subtypes.filter((t) => CREATURE_TYPES.has(t)));
+  }
+  const d = defOf(s, o);
+  return d.keywords.includes("Changeling") ? "all" : new Set(d.subtypes.filter((t) => CREATURE_TYPES.has(t)));
+}
+const shareCreatureType = (a: Set<string> | "all", b: Set<string> | "all") =>
+  a === "all" ? b === "all" || b.size > 0 : b === "all" ? a.size > 0 : [...a].some((t) => b.has(t));
+
+/** Amplify's choice (CR 702.38a): cards in its controller's hand that share a creature type with it. */
+export function amplifyOptions(s: GameState, o: GameObject): ObjectId[] {
+  const mine = creatureTypesOf(s, o);
+  return player(s, controllerOf(s, o)).hand.filter((id) => shareCreatureType(mine, creatureTypesOf(s, obj(s, id))));
+}
+
+/**
+ * Amplify N (CR 702.38a): "As this object enters, reveal any number of cards from your hand that share a creature type
+ * with it. This permanent enters with N +1/+1 counters on it for each card revealed this way." Then it has entered.
+ */
+function amplifyChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x?: number }) {
+  const d = defOf(s, o);
+  const n = compileCard(d).amplify ?? 0;
+  const shown = ids.filter((id) => s.objects[id]?.zone === "hand");
+  if (shown.length && n) {
+    const put = putCounters(s, o, "+1/+1", n * shown.length, true);
+    log(s, `${player(s, controllerOf(s, o)).name} reveals ${shown.map((id) => nameOf(s, id)).join(", ")}: ${d.name} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"} (amplify).`);
+  }
+  invalidateCharacteristics(s);
+  if (enters) fireEvent(s, { type: "enters", id: o.id, ...enters });
+}
+
 /**
  * Ask for the next "as ~ enters, choose ..." choice still to be made. It's made as the permanent
  * enters (CR 614.12), so before state-based actions and before its enters triggers go on the stack.
@@ -2092,6 +2184,17 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "pickPermanents", player: you, source: defOf(s, o).name, action: "sacrifice", what: devour!.filter.text, options, count: options.length, min: 0, objectId: o.id };
+      return true;
+    }
+    if (c.what === "amplify") {
+      // The card itself isn't in the hand, nor is anything entering with it (CR 702.38a).
+      const options = amplifyOptions(s, o);
+      if (!options.length) {
+        q.shift();
+        amplifyChosen(s, o, [], c.enters);
+        continue;
+      }
+      s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: "card that shares a creature type with it", options, count: options.length, min: 0, objectId: o.id };
       return true;
     }
     if (c.what === "copy") {
@@ -2206,6 +2309,7 @@ function clearCombat(o: GameObject) {
   o.attacking = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
+  o.band = undefined; // CR 702.22f
 }
 
 function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId }[]) {
@@ -2235,14 +2339,101 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     log(s, `${defOf(s, o).name} attacks ${player(s, a.defender).name}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
-  for (const a of attacks) fireEvent(s, { type: "attacks", id: a.attacker }); // CR 508.3a
-  if (attacks.length) fireEvent(s, { type: "groupAttack", controller: p.id, ids: attacks.map((a) => a.attacker) });
-  if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]!.attacker }); // CR 506.5
   s.pending = null;
   if (attacks.length === 0) {
     log(s, `${p.name} declares no attackers.`);
     beginStep(s, "endCombat"); // CR 508.8
+    return;
   }
+  // Optional costs to attack, like enlist's, are chosen as the attackers are tapped (CR 508.1g; enlist rulings).
+  const ids = attacks.map((a) => a.attacker);
+  s.declaring = { ids, bands: canBand(s, ids), enlist: ids.filter((id) => objHasKeyword(s, obj(s, id), "Enlist") && abilitiesOf(s, obj(s, id)).enlist), enlisted: [] };
+  finishAttacks(s);
+}
+
+/** Attackers not in a band yet that could form one: one with banding and another attacking the same player (CR 702.22c-d). */
+function bandOptions(s: GameState, ids: ObjectId[]): ObjectId[] {
+  const free = ids.filter((id) => s.objects[id]?.attacking !== undefined && !obj(s, id).band);
+  const bands = (id: ObjectId) => objHasKeyword(s, obj(s, id), "Banding");
+  return free.filter((id) => free.some((x) => x !== id && obj(s, x).attacking === obj(s, id).attacking && (bands(id) || bands(x))));
+}
+const canBand = (s: GameState, ids: ObjectId[]) => bandOptions(s, ids).length > 0;
+
+/** Why these attackers can't be a band (CR 702.22c-d): one or more with banding, up to one without, attacking the same player. */
+export function bandProblem(s: GameState, ids: ObjectId[]): string | null {
+  const options = bandOptions(s, s.declaring?.ids ?? []);
+  if (ids.length < 2) return "a band needs two or more attacking creatures";
+  if (ids.some((id) => !options.includes(id))) return "choose attacking creatures that aren't in a band yet";
+  if (ids.filter((id) => !objHasKeyword(s, obj(s, id), "Banding")).length > 1) return "a band can have only one creature without banding";
+  if (new Set(ids.map((id) => obj(s, id).attacking)).size > 1) return "all creatures in a band must attack the same player";
+  return null;
+}
+
+/** The active player puts these attackers in a band, or (none) declares no more bands. */
+function bandChosen(s: GameState, ids: ObjectId[]) {
+  const d = s.declaring!;
+  const why = ids.length ? bandProblem(s, ids) : null;
+  if (why) throw new RulesError(why);
+  s.pending = null;
+  if (!ids.length) d.bands = false;
+  else {
+    const band = `band${s.nextId++}`;
+    for (const id of ids) obj(s, id).band = band;
+    log(s, `${ids.map((id) => nameOf(s, id)).join(", ")} attack in a band.`);
+    d.bands = canBand(s, d.ids);
+  }
+  finishAttacks(s);
+}
+
+/** Creatures an attacker could enlist (CR 702.154a): untapped, not attacking, able to tap (haste or controlled since the turn began), and not tapped for another enlist ability (rulings). */
+export function enlistCandidates(s: GameState, attackerId: ObjectId): ObjectId[] {
+  const at = obj(s, attackerId);
+  const you = controllerOf(s, at);
+  return s.battlefield.filter((id) => {
+    const o = obj(s, id);
+    return id !== attackerId && controllerOf(s, o) === you && objIsType(s, o, "Creature") && !o.tapped && o.attacking === undefined && !isSummoningSick(s, o);
+  });
+}
+
+/** Each attacker's enlist choice, then attackers have been declared: "whenever ~ attacks" triggers (CR 508.3a). */
+function finishAttacks(s: GameState) {
+  const d = s.declaring!;
+  // Bands first (CR 508.1e), then optional costs like enlist (508.1g).
+  if (d.bands) {
+    const options = bandOptions(s, d.ids);
+    s.pending = { kind: "pickPermanents", player: s.activePlayer, source: "Banding", action: "band", what: "attacking creatures to band together", options, count: options.length, min: 0 };
+    return;
+  }
+  while (d.enlist.length) {
+    const at = d.enlist[0]!;
+    const options = enlistCandidates(s, at);
+    if (!options.length) {
+      d.enlist.shift();
+      continue;
+    }
+    s.pending = { kind: "pickPermanents", player: controllerOf(s, obj(s, at)), source: nameOf(s, at), action: "enlist", what: "creature to enlist", options, count: 1, min: 0, objectId: at };
+    return;
+  }
+  s.declaring = undefined;
+  const attacks = d.ids.filter((id) => s.objects[id]?.attacking !== undefined);
+  for (const id of attacks) fireEvent(s, { type: "attacks", id }); // CR 508.3a
+  if (attacks.length) fireEvent(s, { type: "groupAttack", controller: s.activePlayer, ids: attacks });
+  if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]! }); // CR 506.5
+  for (const [at, enlisted] of d.enlisted) fireEvent(s, { type: "enlists", id: at, enlisted });
+}
+
+/** An attacker enlists the chosen creature (or none): tap it as the cost (CR 702.154a, c). */
+function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
+  const d = s.declaring!;
+  d.enlist.shift();
+  const c = ids[0];
+  if (c) {
+    obj(s, c).tapped = true;
+    d.enlisted.push([at, c]);
+    log(s, `${nameOf(s, at)} enlists ${nameOf(s, c)}.`);
+  }
+  s.pending = null;
+  finishAttacks(s);
 }
 
 /**
@@ -2291,6 +2482,18 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     (bl.blocking ??= []).push(at.id);
     (at.blockedBy ??= []).push(bl.id);
     log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}.`);
+  }
+  // Blocking one creature in a band blocks every creature in it (CR 702.22h).
+  for (const b of blocks) {
+    const bl = obj(s, b.blocker);
+    const band = obj(s, b.attacker).band;
+    if (!band) continue;
+    for (const m of attackers(s)) {
+      if (m.band !== band || bl.blocking!.includes(m.id)) continue;
+      bl.blocking!.push(m.id);
+      (m.blockedBy ??= []).push(bl.id);
+      log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
+    }
   }
   const [next, ...rest] = pend.remaining;
   s.pending = next !== undefined ? { kind: "declareBlockers", player: next, remaining: rest } : null;
@@ -2370,6 +2573,61 @@ function dealsDamageThisStep(s: GameState, o: GameObject, firstStrikeStep: boole
   return firstStrikeStep ? fs || ds : !fs || ds;
 }
 
+/**
+ * Blocked creatures that may assign their combat damage as though they weren't blocked, by who decides: their
+ * controller, the active player (CR 510.1), or the defending player if a creature with banding blocks it (CR 702.22k).
+ */
+export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
+  const out = new Map<PlayerId, ObjectId[]>();
+  const fs = s.step === "firstStrikeDamage";
+  for (const at of attackers(s)) {
+    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || !dealsDamageThisStep(s, at, fs) || power(s, at) <= 0) continue;
+    const banded = at.blockedBy.some((id) => s.objects[id] && objHasKeyword(s, obj(s, id), "Banding"));
+    const who = banded ? at.attacking : controllerOf(s, at);
+    out.set(who, [...(out.get(who) ?? []), at.id]);
+  }
+  return out;
+}
+
+/** Ask the next player who decides whether blocked creatures assign combat damage as though unblocked; true if asked. */
+function askUnblocked(s: GameState): boolean {
+  let c = s.unblockedChoice;
+  if (!c || c.turn !== s.turn || c.step !== s.step) c = s.unblockedChoice = { turn: s.turn, step: s.step, asked: [], ids: [] };
+  const cands = unblockedCandidates(s);
+  // The active player announces how attacking creatures assign their damage first (CR 510.1).
+  for (const pid of turnOrderFrom(s, s.activePlayer)) {
+    const ids = cands.get(pid);
+    if (!ids?.length || c.asked.includes(pid)) continue;
+    s.pending = { kind: "pickPermanents", player: pid, source: "Combat damage", action: "unblocked", what: "blocked creature to assign its combat damage as though it weren't blocked", options: ids, count: ids.length, min: 0 };
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Banding's division of a creature's combat damage by the player whose creatures take it (CR 702.22j-k): as few of
+ * them die as possible. Each takes what it survives, the one with protection from the source or indestructible
+ * all of it; the rest goes on the least valuable one.
+ */
+function bandSplit(s: GameState, source: GameObject, targets: GameObject[], dmg: number): [GameObject, number][] {
+  const src = objectSource(s, source);
+  const deathtouch = objHasKeyword(s, source, "Deathtouch");
+  const room = (t: GameObject) =>
+    protectedFrom(characteristics(s, t).keywords, src) || objHasKeyword(s, t, "Indestructible") ? Infinity : deathtouch ? 0 : Math.max(0, toughness(s, t) - t.damage - 1);
+  const out = new Map<GameObject, number>();
+  let left = dmg;
+  for (const t of [...targets].sort((a, b) => room(b) - room(a))) {
+    const n = Math.min(left, room(t));
+    if (n > 0) out.set(t, n);
+    left -= n;
+  }
+  if (left > 0) {
+    const victim = [...targets].sort((a, b) => power(s, a) + toughness(s, a) - (power(s, b) + toughness(s, b)))[0]!;
+    out.set(victim, (out.get(victim) ?? 0) + left);
+  }
+  return [...out];
+}
+
 /** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. */
 function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
@@ -2378,13 +2636,21 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
     if (!dealsDamageThisStep(s, at, firstStrikeStep)) continue;
     let dmg = power(s, at);
     if (dmg <= 0) continue;
-    if (!at.blockedBy) {
+    // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
+    const unblocked = s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id);
+    if (!at.blockedBy || unblocked) {
       hits.push({ source: at, toPlayer: at.attacking!, amount: dmg });
       continue;
     }
     const blockers = at.blockedBy.map((id) => obj(s, id));
     if (blockers.length === 0) {
       if (objHasKeyword(s, at, "Trample")) hits.push({ source: at, toPlayer: at.attacking!, amount: dmg }); // CR 702.19e
+      continue;
+    }
+    // Blocked by a creature with banding, the defending player divides its damage among the blockers as they
+    // choose (CR 702.22j), none to themselves even with trample.
+    if (blockers.some((bl) => objHasKeyword(s, bl, "Banding"))) {
+      for (const [bl, amount] of bandSplit(s, at, blockers, dmg)) hits.push({ source: at, toObject: bl, amount });
       continue;
     }
     // Assign lethal damage in blocker order (CR 510.1c); deathtouch makes 1 lethal (CR 702.2c).
@@ -2403,6 +2669,11 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
     const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
     let dmg = power(s, bl);
     if (dmg <= 0) continue;
+    // Blocking a creature with banding, the active player divides its damage among those it blocks (CR 702.22k).
+    if (blocked.length > 1 && blocked.some((at) => objHasKeyword(s, at, "Banding"))) {
+      for (const [at, amount] of bandSplit(s, bl, blocked, dmg)) hits.push({ source: bl, toObject: at, amount });
+      continue;
+    }
     // Blocking two or more creatures, its damage is divided among them (CR 510.1d): lethal damage to each in
     // turn (1 with deathtouch, CR 702.2c), the rest to the last.
     blocked.forEach((at, i) => {
@@ -2476,6 +2747,13 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         if (fatal) changed = playerLoses(s, p.id, `took 21 combat damage from ${nameOf(s, fatal[0])}`) || changed; // 704.5u
       }
     }
+    // Start your engines!: a player with no speed who controls a permanent with it gets speed 1 (704.5aa).
+    for (const p of s.players)
+      if (!p.lost && p.speed === undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === p.id && abilitiesOf(s, obj(s, id)).startYourEngines)) {
+        p.speed = 1;
+        log(s, `${p.name} starts their engines: speed 1.`);
+        changed = true;
+      }
     for (const id of [...s.battlefield]) {
       const o = s.objects[id];
       if (!o || o.zone !== "battlefield") continue;

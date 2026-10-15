@@ -1,6 +1,6 @@
 # Roadmap
 
-12,188 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+12,380 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,8 +14,9 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
-   "assign combat damage as though it weren't blocked", flash with a cleanup sacrifice, Start your engines!.
+1. By `npm run blockers`: firebending, assist, provoke, phasing, support, "the Ring tempts you", the initiative,
+   converge (the colors spent are now recorded, see sunburst), Phantom creatures' "prevent that damage, remove a
+   counter", "Tap an untapped creature you control: Add one mana", "put them back in any order".
 
 ## Known gaps (from earlier rounds)
 
@@ -67,6 +68,17 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   stops after one round; the UI only repeats a loop that ends in the step it began in. A mandatory loop is recognized
   when the game state repeats with everyone only passing; one that needs a choice each time (a target) or grows a
   number forever is a draw only after 5,000 resolutions in a row.
+- Banding: "bands with other", "creatures banded with ~" (Icatian Skirmishers, Camel, Urza's Engine). Bots never
+  form bands. Banding's damage division (702.22j-k) is done automatically for the player who divides it, keeping as
+  many of their creatures alive as possible.
+- Enlist: two instances on one creature (702.154d), "if it enlisted a creature this combat" (Aradesh), Guardian of New
+  Benalia's "Tap it." Offspring and squad: non-mana costs, granting them. Sunburst: Engineered Explosives.
+- Speed: "creature or Vehicle" choices (Gas Guzzler, Perilous Snare, Pride of the Road, Kickoff Celebrations),
+  Hazoret's "unless you have max speed", max speed replacement effects and cost reductions (Vnwxt, Far Fortune,
+  Racers' Scoreboard, Lightwheel Enhancements), "where X is your speed" in The Speed Demon, Samut and Point the Way,
+  Outpace Oblivion.
+- "As though it weren't blocked" from an effect rather than an ability (Predatory Focus, Outmaneuver), Ruxa,
+  Gurzigost. "At the beginning of the next cleanup step" for counters (Bounty of the Hunt), Cunning, Necromancy.
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each
   turn", "draw that many cards"; "players can't gain life" and life-gain replacement effects.
 

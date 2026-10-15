@@ -338,8 +338,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     case "sacrifice":
       for (const o of objects(s, e.what, ctx)) {
-        if (controllerOf(s, o) !== ctx.controller) continue; // only your own permanents (CR 701.21a)
-        log(s, `${player(s, ctx.controller).name} sacrifices ${characteristics(s, o).name}.`);
+        const by = controllerOf(s, o);
+        if (by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
+        log(s, `${player(s, by).name} sacrifices ${characteristics(s, o).name}.`);
         moveObject(s, o.id, "graveyard");
       }
       return;

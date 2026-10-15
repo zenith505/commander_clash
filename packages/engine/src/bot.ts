@@ -94,6 +94,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
+    // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
+    if (pend.kind === "pickPermanents" && pend.action === "band") return [{ type: "pickPermanents", player: pid, ids: [] }];
+    if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
+    if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
+    // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
+    if (pend.kind === "pickPermanents" && pend.action === "reveal") return [{ type: "pickPermanents", player: pid, ids: pend.options }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined) return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
@@ -201,6 +207,32 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
   }
   return [{ type: "passPriority", player: pid }];
+}
+
+/**
+ * Enlist (CR 702.154a): tap the creature with the most power for the bonus, unless we're low on life and it's the
+ * last creature we have left to block with.
+ */
+function chooseEnlist(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  const best = [...options].sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0];
+  if (!best || power(s, obj(s, best)) <= 0) return [];
+  const blockers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature") && !obj(s, id).tapped);
+  return player(s, pid).life <= 8 && blockers.length <= 1 ? [] : [best];
+}
+
+/**
+ * Blocked attackers to assign combat damage as though they weren't blocked (CR 510.1). Their controller sends it to
+ * the player unless it can kill a blocker and the player wouldn't die anyway; a defending player choosing (banding)
+ * takes it themselves only to save a blocker, with life to spare.
+ */
+function chooseUnblocked(s: GameState, pid: PlayerId, ids: ObjectId[]): ObjectId[] {
+  return ids.filter((id) => {
+    const at = obj(s, id);
+    const dmg = power(s, at);
+    const life = player(s, at.attacking!).life;
+    const kills = (at.blockedBy ?? []).some((b) => s.objects[b]?.zone === "battlefield" && (objHasKeyword(s, at, "Deathtouch") || toughness(s, obj(s, b)) - obj(s, b).damage <= dmg));
+    return controllerOf(s, at) === pid ? !kills || life <= dmg : kills && life > dmg + 5;
+  });
 }
 
 /**

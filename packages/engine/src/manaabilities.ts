@@ -5,7 +5,7 @@ import type { ManaAbility } from "./abilities";
 import { basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
 import { isSummoningSick, obj, player } from "./game";
-import { characteristics, controllerOf } from "./layers";
+import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost, payFromPool } from "./mana";
 import { compileCard, compileGranted } from "./oracle";
 import { COLORS, type Action, type GameObject, type GameState, type ManaType, type PlayerId } from "./types";
@@ -78,6 +78,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
+  if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
   const p = player(s, pid);
   if (ab.lifeCost && p.life < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14

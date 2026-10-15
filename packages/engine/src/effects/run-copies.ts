@@ -11,7 +11,7 @@ import { ResolveCtx, objects } from "./resolve";
  * target that left the battlefield, the ability's own source. A token is copied as the effect that made it said
  * (rulings).
  */
-function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDef | undefined {
+export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDef | undefined {
   const key = (k?: string) => (k ? s.cards[k] : undefined);
   if (ref.ref === "sacrificed") return key(ctx.sacrificed?.[0]?.copyKey);
   if (ref.ref === "subjectCard" && ctx.lki?.copyKey) return key(ctx.lki.copyKey);

@@ -4,8 +4,8 @@ import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import type { TargetChoice } from "./abilities";
-import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, xCount, type ManaPool, type ParsedCost } from "./mana";
-import type { Action, CardDef, CostChoices, GameObject, GameState, ManaType, ObjectId, PlayerId } from "./types";
+import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
+import { COLORS, type Action, type CardDef, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** One way to make mana with a permanent, for planning. */
 interface Option {
@@ -167,7 +167,12 @@ export function planCast(
   // "Costs {3} less if it targets a tapped creature" is worked out before mana abilities (CR 601.2f-g):
   // tapping the target for mana first mustn't make it count.
   const targetIds = compileCard(d).costLessIfTargets ? (targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])) : [];
-  let taps = planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]);
+  // Sunburst counts the colors of mana spent (CR 702.44a): pay its generic mana with as many other colors as we can.
+  const pool = player(s, pid).manaPool;
+  const rainbow = compileCard(d).sunburst && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
+  let taps: Action[] | null = null;
+  for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]))) break;
+  taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
   // So when the cost depends on the board, don't sacrifice permanents for its mana.
@@ -183,6 +188,25 @@ export function planCast(
   if (!compileCard(d).convoke) return null;
   const auto = autoConvoke(s, pid, cost, extra);
   return auto ? cast(auto.taps, auto.creatures) : null;
+}
+
+/**
+ * The cost with some of its generic mana asked for as colors it doesn't name, most colors first (and among those, the
+ * ones using the mana already in the pool): paying that, the pool holds those colors when the spell is cast, and the
+ * payment spends them (see payFromPool's spreadColors).
+ */
+function rainbowCosts(cost: ParsedCost, extra: number, pool: ManaPool): { cost: ParsedCost; extra: number }[] {
+  const g = splitGeneric(cost, extra);
+  const named = namedColors(cost);
+  const fresh = COLORS.filter((c) => !named.has(c));
+  const out: { cost: ParsedCost; extra: number }[] = [];
+  for (let n = Math.min(g.extra, fresh.length); n > 0; n--)
+    for (let mask = 0; mask < 1 << fresh.length; mask++) {
+      const pick = fresh.filter((_, i) => mask & (1 << i));
+      if (pick.length === n) out.push({ cost: { ...g.cost, symbols: [...g.cost.symbols, ...pick.map((color) => ({ kind: "colored" as const, color }))] }, extra: g.extra - n });
+    }
+  const inPool = (c: ParsedCost) => c.symbols.filter((sym) => sym.kind === "colored" && pool[sym.color] > 0).length;
+  return out.sort((a, b) => a.extra - b.extra || inPool(b.cost) - inPool(a.cost));
 }
 
 /** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */

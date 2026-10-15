@@ -157,6 +157,11 @@ function trains(s: GameState, o: GameObject): boolean {
   return s.battlefield.some((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature") && power(s, s.objects[id]!) > mine);
 }
 
+/** The other creatures attacking along with it (battalion): those just declared as attackers with it. */
+function othersAttacking(s: GameState, o: GameObject): number {
+  return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature")).length;
+}
+
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;
@@ -404,7 +409,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.training || trains(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
@@ -416,9 +421,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const t of abilitiesOf(s, o).triggers) {
         if (t.event !== want) continue;
         const hit = fits(t);
-        if (!hit.length) continue;
+        if (hit.length < (t.minAttackers ?? 1)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group);
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers;
         add(o, ev.controller, (_, tt) => same(tt), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount } : undefined);
       }
     };

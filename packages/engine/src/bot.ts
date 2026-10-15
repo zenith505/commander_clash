@@ -114,6 +114,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
     if (pend.kind === "pickPermanents" && pend.action === "reveal") return [{ type: "pickPermanents", player: pid, ids: pend.options }];
+    // Champion: exile our least useful one (it comes back when the champion leaves), unless the champion is gone already.
+    if (pend.kind === "pickPermanents" && pend.action === "champion") {
+      const r = s.resolving?.item;
+      const me = r?.sourceId ? s.objects[r.sourceId] : undefined;
+      const here = !!me && me.zone === "battlefield" && (me.zoneChanges ?? 0) === r?.sourceZc;
+      return [{ type: "pickPermanents", player: pid, ids: here ? choosePicks(s, pid, pend.options, 1, "sacrifice") : [] }];
+    }
     if (pend.kind === "pickPermanents" && pend.min !== undefined) return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {

@@ -551,6 +551,14 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
           text: "Mentor: put a +1/+1 counter on target attacking creature with lesser power.",
         },
       });
+    } else if ((m = /^champion an? (.+)$/i.exec(p))) {
+      // CR 702.72a: "When this permanent enters, sacrifice it unless you exile another [object] you control" and "When
+      // this permanent leaves the battlefield, return the exiled card to the battlefield under its owner's control."
+      const spec = parseTargetPhrase(`${m[1]} you control`);
+      if (spec?.kind !== "object") return null;
+      const what = `${/^[aeiou]/i.test(m[1]!) ? "an" : "a"} ${m[1]}`;
+      out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "champion", filter: { ...spec, text: `another ${m[1]} you control` } }], text: `Champion ${what}: sacrifice ~ unless you exile another ${m[1]} you control.` } });
+      out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "returnChampioned" }], text: "Champion: return the exiled card to the battlefield under its owner's control." } });
     } else if (/^exploit$/i.test(p)) {
       // CR 702.110a: "When this creature enters, you may sacrifice a creature."
       out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "exploit" }], text: "Exploit: you may sacrifice a creature." } });
@@ -675,6 +683,19 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         cycling: true,
         body: { targets: [], effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "Draw a card." },
         text: `Cycling ${m[1]}`,
+      });
+    } else if ((m = /^reinforce (\d+)—((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
+      // CR 702.77a: "[Cost], Discard this card: Put N +1/+1 counters on target creature." Only from a hand (702.77b).
+      const n = Number(m[1]);
+      out.activated.push({
+        manaCost: m[2]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: false,
+        zone: "hand",
+        discardSelf: true,
+        body: { targets: [{ kind: "object", types: ["Creature"], text: "target creature" }], effects: [plus(n, { ref: "target", index: 0 })], text: `Put ${n === 1 ? "a +1/+1 counter" : `${n} +1/+1 counters`} on target creature.` },
+        text: `Reinforce ${n}—${m[2]}`,
       });
     } else if ((m = /^transmute ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
       // CR 702.53a: "[Cost], Discard this card: Search your library for a card with the same mana value as the discarded

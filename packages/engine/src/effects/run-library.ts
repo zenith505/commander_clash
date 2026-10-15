@@ -2,7 +2,7 @@ import type { Effect } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
-import { log, moveObject, obj, opponents, player } from "../game";
+import { gainLife, log, loseLife, moveObject, obj, opponents, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { printedMatches } from "./targeting";
@@ -30,6 +30,23 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
       }
       return;
+    case "revealTopToHand": {
+      const p = player(s, ctx.controller);
+      const id = p.library[0];
+      // An empty library: nothing is revealed, and the life is 0.
+      if (!id) return;
+      const d = defOf(s, obj(s, id));
+      log(s, `${p.name} reveals ${d.name} and puts it into their hand.`);
+      moveObject(s, id, "hand");
+      const n = manaValue(parseManaCost(d.manaCost));
+      if (!e.life || n <= 0) return;
+      for (const pid of players(s, e.life.who, ctx)) {
+        if (e.life.gain) gainLife(s, pid, n);
+        else loseLife(s, pid, n);
+        log(s, `${player(s, pid).name} ${e.life.gain ? "gains" : "loses"} ${n} life.`);
+      }
+      return;
+    }
     case "discard": {
       const who = players(s, e.who, ctx);
       // Worked out once, before anyone discards.
@@ -41,7 +58,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const picked: ObjectId[] = [];
           const pool = [...hand];
           for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
-          discardCards(s, pid, picked, " at random");
+          discardCards(s, pid, picked, " at random", false, false, ctx.controller);
         }
         return;
       }
@@ -62,7 +79,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.chosen![pid] = [...hand]; // no choice to make: the whole hand
         sc.queue.shift();
       }
-      for (const pid of apnap(s, who)) discardCards(s, pid, sc.chosen![pid] ?? []);
+      for (const pid of apnap(s, who)) discardCards(s, pid, sc.chosen![pid] ?? [], "", false, false, ctx.controller);
       return;
     }
     case "scry":
@@ -267,7 +284,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
  * Move cards from a player's hand to their graveyard (CR 701.9a). A card with madness is exiled instead, and its
  * madness ability triggers (CR 702.35a): it's still discarded. `quiet`: the caller says what happened (cycling).
  */
-export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false) {
+/** `cause`: the controller of the spell or ability that made them discard, if one did. */
+export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false, cause?: PlayerId) {
   if (!ids.length) return;
   if (s.resolving) (s.resolving.discarded ??= {})[pid] = (s.resolving.discarded[pid] ?? 0) + ids.length;
   const names = ids.map((id) => defOf(s, obj(s, id)).name);
@@ -275,7 +293,14 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   const cards = ids.map((id) => defOf(s, obj(s, id)));
   for (const id of ids) {
     const o = obj(s, id);
-    const madness = compileCard(defOf(s, o)).madness;
+    const c = compileCard(defOf(s, o));
+    // Obstinate Baloth: its owner picks this replacement over madness or a graveyard one (CR 616.1, rulings).
+    if (c.discardedToBattlefield && cause !== undefined && cause !== pid) {
+      log(s, `${defOf(s, o).name} is put onto the battlefield instead.`);
+      moveObject(s, id, "battlefield", { controller: pid });
+      continue;
+    }
+    const madness = c.madness;
     if (!madness) {
       moveObject(s, id, "graveyard");
       if (o.zone === "graveyard") o.discardedTurn = s.turn; // mayhem (CR 702.187b)

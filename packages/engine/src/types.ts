@@ -165,6 +165,13 @@ export interface GameObject {
   faceDown?: FaceDownKind;
   /** Cards this permanent exiled "until ~ leaves the battlefield" (CR 610.3), as they are in exile. */
   exiledUntilLeaves?: { id: ObjectId; zc: number }[];
+  /** Cast as a prototyped spell (CR 718.3): its alternative mana cost, color, power and toughness, on the stack and the battlefield. */
+  prototyped?: boolean;
+  /**
+   * The card this champion exiled (CR 702.72a), as it is in exile, and the champion's zoneChanges on the battlefield
+   * then: its leaves-the-battlefield trigger returns it only if that's the permanent that left (CR 607.2a).
+   */
+  championed?: { id: ObjectId; zc: number; by: number };
   /** A replacement effect: if it would leave this zone, it's exiled instead (flashback, CR 702.34a; unearth, 702.84a). */
   exileIfLeaves?: ZoneName;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */

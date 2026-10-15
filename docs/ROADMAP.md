@@ -1,6 +1,6 @@
 # Roadmap
 
-14,166 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+14,275 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,12 +14,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (now a long tail of 3-card lines): "skip your draw step", "enchanted creature gets +N/+N
-   and is goaded", "change the target of target spell with a single target", "~ can't block and can't be blocked",
-   "whenever you attack with two or more creatures", "enchanted creature gets -N/-N and loses all abilities", "you may
-   cast sorcery spells as though they had flash", "activated abilities of artifacts can't be activated" (Null Rod),
-   Dark Confidant's reveal, "counter target spell; exile it instead" (Dissipate), battalion, champion, prototype,
-   reinforce, "if a spell or ability an opponent controls causes you to discard ~" (Obstinate Baloth).
+1. By `npm run blockers` (a long tail of 3-card lines): "~ is also a Cleric, Rogue, Warrior, and Wizard",
+   "at the beginning of the end step, if no creatures are on the battlefield, sacrifice ~", "equip abilities you
+   activate that target ~ cost {N} less", "during your turn, equipped creature gets +N/+N and has first strike",
+   "other colorless creatures you control get +N/+N", "at the beginning of the upkeep of enchanted creature's
+   controller, ~ deals N damage to that player", "as an additional cost, discard a card at random", "activate only
+   during your turn, before attackers are declared", "damage that would reduce your life total to less than N",
+   "when ~ enters, sacrifice it unless you discard a card at random", "destroy all Islands", "put target creature
+   into its owner's library second from the top", "~ costs {N} less if a creature died this turn", "prevent all
+   damage that would be dealt by enchanted creature", "if ~ would die, exile it instead".
 
 ## Known gaps (from earlier rounds)
 
@@ -48,7 +51,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Vorinclex (counters on players, halving), Academy Manufactor.
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".
-- "Copy target activated or triggered ability" (Strionic Resonator).
+- "Copy target activated or triggered ability" (Strionic Resonator). Changing the target of a spell or ability
+  (Bolt Bend, Redirect Lightning, Willbender), or of a spell with more than one target; Misdirection's pitch cost.
+- "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat; Pain Seer's "becomes
+  untapped"; Ivory Gargoyle.
+- Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed"); reinforce X;
+  Dodecapod's "with two +1/+1 counters". Prototype can't be chosen for free casts ("without paying its mana
+  cost") yet.
 - Blocking: "whenever ~ blocks two or more creatures" (Lairwatch Giant), "for each creature it's blocking" (Guardian
   of the Gateless), "an additional creature for each Equipment attached" (Kemba's Legion), Yare's "creature
   defending player controls". A blocker's damage among several attackers is divided automatically, like an

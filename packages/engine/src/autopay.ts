@@ -1,4 +1,4 @@
-import { abilitiesOf, bestowedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
+import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
@@ -178,7 +178,7 @@ export function planCast(
   const o = obj(s, objectId);
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
   // The spell as it will be on the stack, for mana that can only be spent on some spells (CR 106.6).
-  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : d };
+  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" ? prototypedDef(d) : d };
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets });

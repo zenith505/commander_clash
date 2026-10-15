@@ -22,6 +22,7 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   o.kicked = card.kicked;
   o.castAlt = card.castAlt;
   o.bestowed = card.bestowed; // a copy of a bestowed Aura spell is one too (CR 702.103c)
+  o.prototyped = card.prototyped; // and of a prototyped spell (CR 718.3c)
   const name = orig.description.replace(/ \(copy\)$/, "");
   const id = `s${s.nextId++}`;
   const { castNth: _, ...rest } = structuredClone(orig);
@@ -141,7 +142,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "counterSpell": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
-      return counterOnStack(s, ctx, t.id, src, e.unless, e.exile);
+      return counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : undefined);
     }
   }
 }
@@ -150,9 +151,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
  * Counter a spell or ability on the stack (CR 701.6a), or with `unless`, only if its controller
  * doesn't pay (CR 118.12): they choose as this resolves, and may activate mana abilities to pay
  * (CR 605.3a). A spell that can't be countered stays, paid for or not (CR 101.2). A countered spell
- * goes to its owner's graveyard, or into exile with "exile it instead".
+ * goes to its owner's graveyard, or where "instead" says (CR 701.6a).
  */
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, exile?: boolean): "paused" | void {
+function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop"): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack
@@ -167,8 +168,8 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     if (paid) return;
   }
   s.stack.splice(i, 1);
-  if (item.objectId) moveObject(s, item.objectId, exile ? "exile" : "graveyard");
-  log(s, `${by} counters ${what}${exile && item.objectId ? " and exiles it" : ""}.`);
+  if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead ? "library" : "graveyard", instead === "libraryTop" ? { top: true } : {});
+  log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead ? " and puts it on top of its owner's library" : ""}.`);
 }
 
 /**

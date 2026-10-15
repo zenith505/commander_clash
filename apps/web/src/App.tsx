@@ -1057,7 +1057,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for" };
+const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1066,6 +1066,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   blitz: "haste, and you draw a card when it dies; sacrificed at the end step",
   warp: "exiled at the end step; you may cast it from exile on a later turn",
   alternative: "an alternative cost: it's still the same spell, with the same mana value",
+  prototype: "the smaller version: the prototype's mana cost, color, power and toughness",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
@@ -2615,10 +2616,12 @@ function Controls({
                 ? `enlist a creature that isn't attacking, if you want: click it to tap it, and ${pending.source} gets +X/+0 until end of turn, where X is its power.`
                 : pending.action === "unblocked"
                 ? `click the blocked attackers that assign their combat damage to the player they're attacking, as though they weren't blocked (the rest damage their blockers).`
+                : pending.action === "champion"
+                ? `champion: click another ${pending.what} of yours to exile until ${pending.source} leaves the battlefield, or exile none and sacrifice ${pending.source}.`
                 : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

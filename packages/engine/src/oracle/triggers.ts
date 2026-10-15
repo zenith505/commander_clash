@@ -1,5 +1,5 @@
 import type { TriggeredAbility, SpellCondition, TargetSpec, TriggerEvent } from "../abilities";
-import { X, singularWord } from "./words";
+import { X, num, singularWord } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseTargetPhrase } from "./targets";
@@ -304,10 +304,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let event: TriggerEvent;
   let phrase: string | undefined;
   let bodyText: string;
-  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with one or more (.+?)|you attack)(?: a player)?, (.+)$/.exec(line))) {
+  let min: number | undefined;
+  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack)(?: a player)?, (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
-    phrase = m[1] ?? m[2];
-    bodyText = m[3]!;
+    phrase = m[1] ?? m[3];
+    bodyText = m[4]!;
+    const n = m[2] ? num(m[2]) : 1;
+    if (n > 1) min = n;
   } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (?:a player|an opponent|one or more players), (.+)$/.exec(line))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
@@ -330,7 +333,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, bodyText) };
-  return { event, body, ...(group ? { group } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}) };
 }
 
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -382,6 +385,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
+  const battalion = /^Whenever ~ and at least (one|two|three) other creatures attack, (.+)$/.exec(line);
+  if (battalion) {
+    const t = parseTrigger(`Whenever ~ attacks, ${battalion[2]}`);
+    return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!) } : "fail";
+  }
   // The Enduring cycle: "When ~ dies, if it was a creature, return it to the battlefield under its owner's control.
   // It's an enchantment. (It's not a creature.)" Only a creature dies here (CR 700.4), so the intervening if (CR 603.4)
   // holds whenever it triggers. It enters as an enchantment only, without its creature types (rulings, CR 205.1b).

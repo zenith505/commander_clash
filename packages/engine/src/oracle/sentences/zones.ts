@@ -95,15 +95,15 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
       w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" || w === "all opponents'" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s?$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
-  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+ graveyard)$/i.exec(s))) {
+  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx, true);
     return what ? [{ type: "exile", what }] : null;
   }
-  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+ graveyard) to (your|its owner's) hand$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) to (your|its owner's) hand$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?$/i.exec(s))) {
+  if ((m = /^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?$/i.exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control.
     const underYou = !!m[4];
@@ -122,7 +122,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3]!.toLowerCase() === "its owner's" ? { owner: true } : {}) }] : null;
   }
-  if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+ graveyard) on (top|the bottom) of (your|its owner's) library$/i.exec(s))) {
+  if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) on (top|the bottom) of (your|its owner's) library$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }

@@ -1,4 +1,4 @@
-import { allEffects, refCovers, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, refCovers, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
@@ -43,6 +43,7 @@ import {
   casualtyCandidates,
   bargainCandidates,
   castExtraCosts,
+  costsHaveX,
   bothModes,
   teamworkCandidates,
   teamworkPower,
@@ -634,7 +635,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     const gain = added - manaValue(cost);
     if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
   }
-  const xs = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
+  let xs: (number | undefined)[] = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
+  // "Pay X life", "sacrifice X creatures" (CR 107.3a): no bigger an X than we'd pay that way too.
+  if (costsHaveX(d, { via, alt })) {
+    const most = costXRoom(s, pid, id, castExtraCosts(d, { via, alt }));
+    xs = cost.hasX ? xs.filter((x) => x! <= most) : xChoices(most, 1);
+  }
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
     if (plan) return plan;
@@ -814,6 +820,30 @@ function xChoices(mana: number, perX: number): number[] {
   return out;
 }
 
+/**
+ * The most X we'd pay costs like "pay X life", "discard X cards", "sacrifice X lands" with (see chooseExtraCosts):
+ * life to spare, the cards in hand besides this one, our cheap permanents, the cards in our graveyard.
+ */
+function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCost[]): number {
+  const p = player(s, pid);
+  let most = Infinity;
+  for (const c of costs) {
+    if (!("x" in c) || !c.x) continue;
+    const room =
+      c.kind === "payLife"
+        ? p.life - 15
+        : c.kind === "discard"
+          ? p.hand.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
+          : c.kind === "exileFromGraveyard"
+            ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
+            : c.kind === "sacrifice"
+              ? sacrificePool(s, pid, c, new Set()).length
+              : returnCandidates(s, pid, c).length;
+    most = Math.min(most, room);
+  }
+  return Math.max(0, most === Infinity ? 0 : most);
+}
+
 /** What casting it costs apart from X: its mana value plus commander tax, less reductions. */
 function totalWithoutX(s: GameState, pid: PlayerId, id: string, via?: CastFromGraveyardKind, alt?: AltCostKind): number {
   const { cost, extra } = spellCost(s, pid, obj(s, id), 0, [], { via, alt });
@@ -884,7 +914,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const ors = compileCard(defOf(s, obj(s, id))).costOr?.map((_, i) => i) ?? [undefined];
   let extra: CostChoices | null = null;
   for (const costOr of ors) {
-    const e = chooseExtraCosts(s, pid, id, targets ?? [], via, alt, costOr);
+    const e = chooseExtraCosts(s, pid, id, targets ?? [], via, alt, costOr, x ?? 0);
     if (!e) continue;
     if (costOr !== undefined) e.costOr = costOr;
     if (costOr === undefined || planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...e, ...(via ? { via } : {}), ...(alt ? { alt } : {}) })) {
@@ -967,11 +997,12 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): nu
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt, costOr })) {
+  for (const c of castExtraCosts(d, { via, alt, costOr }, x)) {
+    if (!c.n && "x" in c && c.x) continue; // "pay X life" with X = 0
     if (c.kind === "returnToHand" && c.unblockedAttacker) {
       // Sneak: the least valuable unblocked attacker that isn't our commander (see chooseSneak).
       const pool = returnCandidates(s, pid, c)
@@ -997,13 +1028,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
     } else if (c.kind === "sacrifice") {
-      const value = (o: GameObject) => (o.isToken ? 0 : 1 + mv(s, o.id));
-      const pool = s.battlefield
-        .map((x) => obj(s, x))
-        .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false))
-        .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
-        // Emerge: the creature's mana value comes off the cost (CR 702.119a), so a small creature that cost a lot.
-        .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
+      const pool = sacrificePool(s, pid, c, targeted, alt);
       if (pool.length < c.n) return null;
       out.sacrifice = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "discard" && c.filter) {
@@ -1025,6 +1050,20 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
   }
   return out;
+}
+
+/**
+ * What we'd sacrifice for a spell's cost: tokens and cheap permanents (lands once we have plenty), never our commander
+ * or something the spell targets; the least valuable first. Emerge: a small creature that cost a lot, as its mana
+ * value comes off the cost (CR 702.119a).
+ */
+function sacrificePool(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, { kind: "sacrifice" }>, targeted: Set<string | number>, alt?: AltCostKind): GameObject[] {
+  const value = (o: GameObject) => (o.isToken ? 0 : 1 + mv(s, o.id));
+  return s.battlefield
+    .map((x) => obj(s, x))
+    .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false))
+    .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
+    .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
 }
 
 /**

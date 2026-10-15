@@ -1971,11 +1971,15 @@ export function castProblem(
     if (tp) return tp;
   }
   const tax = fromCommand ? commanderTax(p, o) : 0;
-  const xp = xProblem(parseManaCost(d.manaCost), x);
+  // "Pay X life", "discard X cards": X can be in an additional cost, or the flashback cost paid, too (CR 107.3a).
+  const manaX = parseManaCost(d.manaCost).hasX;
+  const costX = costsHaveX(d, choices);
+  const xp = xProblem(costX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
   if (xp) return xp;
-  // Cast without paying its mana cost, the only choice for X is 0 (CR 107.3b).
-  if ((free || plotted) && !madness && x) return "X is 0 when a spell is cast without paying its mana cost";
-  if (madness && x && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
+  // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
+  // additional cost (Toxic Deluge's rulings).
+  if ((free || plotted) && !madness && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
+  if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
   const or = compileCard(d).costOr;
@@ -1983,8 +1987,8 @@ export function castProblem(
   // Not chosen yet: one of the ways has to be possible (a mana one is, as far as the mana check below goes).
   if (or && choices?.costOr === undefined && or.every((c) => c.cost && extraCostProblem(s, pid, o, [c.cost], undefined, `cast ${d.name}`)))
     return `you can't pay ${d.name}'s additional cost (${or.map((c) => c.text).join(" or ")})`;
-  if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
-  const ap = additionalCostProblem(s, pid, o, choices);
+  if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
+  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0);
   if (ap) return ap;
   const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
@@ -2310,7 +2314,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const chosen = spell?.modal ? modes : undefined;
   const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
-  const hasX = parseManaCost(d.manaCost).hasX;
+  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices);
   s.stack.push({
     id: `s${s.nextId++}`,
     kind: "spell",
@@ -2353,7 +2357,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices), choices, returned);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices, x ?? 0), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
@@ -2564,15 +2568,24 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 }
 
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
-function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices): string | null {
+function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, choices), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, choices, x), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
-  return [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
+  // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a).
+  return costs.map((c) => (xCost(c) ? { ...c, n: x } : c));
+}
+
+const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
+
+/** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
+export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {
+  return castExtraCosts(d, choices).some(xCost);
 }
 
 /** "Sacrifice a creature or pay {3}{B}": the extra mana of the way chosen to pay it, if that's mana (CR 601.2f). */
@@ -2677,6 +2690,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of ids) tapPermanent(s, obj(s, id));
       log(s, `${p.name} taps ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
+      if (!c.n) continue; // "pay X life" with X = 0
       loseLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "sacrifice") {
@@ -2697,6 +2711,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else {
       const ids = choices.exileCards ?? [];
+      if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
     }

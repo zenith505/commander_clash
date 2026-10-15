@@ -225,8 +225,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "bite": {
       // CR 701.14b: if either creature is gone, isn't a creature, or is an illegal target, no damage is dealt.
       const a = objects(s, e.a, ctx)[0];
-      // "Deals damage equal to its power to each of two other target creatures": each one that's still a creature.
-      const bs = (e.type === "bite" ? objects(s, e.b, ctx) : objects(s, e.b, ctx).slice(0, 1)).filter((b) => objIsType(s, b, "Creature"));
+      // "Deals damage equal to its power to each of two other target creatures": each one still a legal target, a
+      // planeswalker too where it could be targeted (Bite Down). Only fighting needs both to be creatures (CR 701.14b).
+      const bs = e.type === "bite" ? objects(s, e.b, ctx).filter((b) => ["Creature", "Planeswalker", "Battle"].some((t) => objIsType(s, b, t))) : objects(s, e.b, ctx).slice(0, 1).filter((b) => objIsType(s, b, "Creature"));
       if (!a || !bs.length || !objIsType(s, a, "Creature")) {
         log(s, `${src}: no damage is dealt.`);
         return;

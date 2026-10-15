@@ -241,11 +241,11 @@ export interface TargetSpec {
   /** Set by `gateTargets` for a target the spell is cast as if it didn't have: nothing ({ kind: "none" }) is chosen. */
   skip?: true;
   /**
-   * "Any number of target creatures" ("any"), "up to X target artifacts" ("x"): a variable number of targets, announced
-   * as it's cast (CR 601.2c), any number from 0 (115.6), or up to X. This one entry stands for all of them until then;
+   * "Any number of target creatures" ("any"), "up to X target artifacts" ("x"), "X target creatures" ("exactX"): a
+   * variable number of targets, announced as it's cast (CR 601.2c), any number from 0 (115.6), up to X, or exactly X. This one entry stands for all of them until then;
    * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
    */
-  many?: "any" | "x";
+  many?: "any" | "x" | "exactX";
   /** Original text, for display. */
   text: string;
 }
@@ -1456,15 +1456,19 @@ export interface CostMod {
 
 /** Everything the engine knows how to do with one card. */
 /** A cost paid along with a spell's mana cost (CR 118.8). */
+/**
+ * `x` (on a spell's costs): "pay X life", "discard X cards", "sacrifice X lands": as many as the X announced as it's
+ * cast (CR 107.3a, 601.2b); `n` is that X once `castExtraCosts` has it.
+ */
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
-  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true }
-  | { kind: "payLife"; n: number }
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number }
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true }
+  | { kind: "payLife"; n: number; x?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
-  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean }
+  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**
    * "Tap an untapped creature you control", "tap two untapped Wizards you control" (CR 602.2b). Any of them, summoning
    * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.

@@ -552,7 +552,7 @@ export function compile(d: CardDef): CompiledCard {
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
     if (extra) {
-      const cost = parseAdditionalCost(extra[1]!);
+      const cost = parseAdditionalCost(extra[1]!, true);
       const or = cost ? null : parseCostOr(extra[1]!);
       if (cost) (out.additionalCosts ??= []).push(cost);
       else if (or && !out.costOr) out.costOr = or;
@@ -1154,7 +1154,8 @@ function checkCastingLinks(out: CompiledCard) {
  * Text that uses an X with no value is a reading we can't trust, so the card isn't supported.
  */
 function checkX(d: CardDef, out: CompiledCard) {
-  const cardX = parseManaCost(d.manaCost).hasX;
+  // Or in an additional cost: "As an additional cost to cast this spell, pay X life" (CR 107.3a).
+  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x);
   const bad = (what: string) => out.unsupported.push(what);
   if (out.spell && usesX(out.spell) && !cardX) {
     bad(out.spell.text);

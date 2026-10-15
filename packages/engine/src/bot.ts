@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
-import { manaActionAbility } from "./manaabilities";
+import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
@@ -10,6 +10,7 @@ import {
   attackProblem,
   blockProblem,
   provokerOf,
+  tapCostCandidates,
   maxBlocks,
   canEnterUntapped,
   conditionHolds,
@@ -1067,6 +1068,18 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
       if (pool.length < c.n) return null;
       out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+    } else if (c.kind === "tap") {
+      // Tap creatures only once they're done for the turn (after our combat), anything else any time; the least
+      // valuable first, and never one already paying a cost or a target.
+      const late = s.activePlayer === pid && ["main2", "end"].includes(s.step);
+      const pool = tapCostCandidates(s, pid, o, c)
+        .map((x) => obj(s, x))
+        .filter((x) => x.id !== keep && !targeted.has(x.id) && !out.sacrifice?.includes(x.id) && !out.tap?.includes(x.id))
+        .filter((x) => late || !objIsType(s, x, "Creature"))
+        .filter((x) => !manaAbilitiesOn(s, x).some((m) => m.tap) || late)
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+      if (pool.length < c.n) return null;
+      out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
     } else if (c.kind === "discard") {
       const hand = player(s, pid).hand.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
       if (hand.length < c.n || player(s, pid).hand.length < c.n + 4) return null;

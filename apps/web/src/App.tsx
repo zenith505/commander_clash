@@ -60,10 +60,12 @@ import {
   crewPower,
   potentialAttackers,
   returnCandidates,
+  tapCostCandidates,
   power,
   toughness,
   waitingOn,
   type CardDef,
+  type ManaType,
   type GameObject,
   type GameState,
   type PlayerId,
@@ -202,8 +204,8 @@ type BuybackPick = { draft: CastDraft; label: string; cost: string };
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[] };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = ({ draft: CastDraft; activate?: undefined } | { activate: ActivateDraft; draft?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty";
+type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType }; draft?: undefined; activate?: undefined }) & {
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "tap";
   label: string;
   what: string;
   n: number;
@@ -212,7 +214,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined } | { activate: Activa
 };
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[] };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
@@ -375,6 +377,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.returnToHand !== undefined) continue;
         return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `return ${c.n === 1 ? "an" : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
       }
+      if (c.kind === "tap") {
+        // "Tap an untapped creature you control": click what to tap (CR 602.2b).
+        if (d.tap !== undefined) continue;
+        return setCostPick({ activate: d, kind: "tap", label: cardOf(s, d.objectId).name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+      }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
       if (d[c.kind] !== undefined) continue;
       const candidates =
@@ -385,7 +392,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs },
@@ -396,8 +403,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   /** Done picking what to sacrifice, discard or exile: carry on casting or activating. */
   function finishCostPick(pick: CostPick) {
     setCostPick(null);
+    if (pick.mana) {
+      // A mana ability that taps other permanents too (Springleaf Drum).
+      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen);
+      if (plan) dispatch(plan);
+      return;
+    }
     if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
-    else if (pick.kind !== "returnToHand") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
+    else if (pick.kind !== "returnToHand" && pick.kind !== "tap") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
   /**
@@ -422,7 +435,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const specs = spellTargets(s, d.objectId, d.modes, d.alt);
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: [], label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of [...(compiled.additionalCosts ?? []), ...(graveyardCast(card, d.via)?.costs ?? [])]) {
-      if (c.kind === "payLife" || c.kind === "returnToHand") continue; // no spell asks to return a permanent yet
+      if (c.kind === "payLife" || c.kind === "returnToHand" || c.kind === "tap") continue; // no spell asks to return or tap a permanent yet
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       const me = s.players[HUMAN]!;
@@ -763,6 +776,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onUse={useAbility}
               onMana={(x) => {
                 setMenu(null);
+                // "{T}, Tap an untapped creature you control: Add ...": pick what to tap first.
+                const tapCost = manaAbilitiesOn(s, s.objects[menu]!)[x.ability]?.tapCost;
+                if (tapCost) {
+                  const candidates = tapCostCandidates(s, HUMAN, s.objects[menu]!, tapCost);
+                  return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
+                }
                 const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana);
                 if (plan) dispatch(plan);
               }}
@@ -835,7 +854,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty") && (
+          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "tap") && (
             <CostPickBar
               pick={costPick}
               onDone={() => finishCostPick(costPick)}
@@ -1101,7 +1120,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "returnToHand" ? "Return and activate" : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
+        {pick.kind === "returnToHand" ? "Return and activate" : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>

@@ -769,6 +769,8 @@ export interface ManaAbility {
   energyCost?: number;
   /** "{T}, Remove a charge counter from ~: Add one mana of any color." */
   removeCounters?: { counter: CounterKind; n: number };
+  /** "{T}, Tap an untapped creature you control: Add one mana of any color." (Springleaf Drum) */
+  tapCost?: Extract<AdditionalCost, { kind: "tap" }>;
   produces: ManaProduce;
   /** Painlands: "~ deals 1 damage to you." */
   selfDamage?: number;
@@ -822,7 +824,12 @@ export type AdditionalCost =
   | { kind: "payLife"; n: number }
   | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
-  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean };
+  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean }
+  /**
+   * "Tap an untapped creature you control", "tap two untapped Wizards you control" (CR 602.2b). Any of them, summoning
+   * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.
+   */
+  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean };
 
 /**
  * Ways to cast a card from a graveyard (CR 601.3e): flashback (702.34), jump-start (702.133) and

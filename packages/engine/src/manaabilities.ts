@@ -4,11 +4,11 @@
 import type { ManaAbility } from "./abilities";
 import { basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
-import { isSummoningSick, obj, player } from "./game";
+import { isSummoningSick, obj, player, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost, payFromPool } from "./mana";
 import { compileCard, compileGranted } from "./oracle";
-import { COLORS, type Action, type GameObject, type GameState, type ManaType, type PlayerId } from "./types";
+import { COLORS, type Action, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
 export const MANA_ABILITY_OFFSET = 1000;
@@ -70,7 +70,7 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
  * Why `pid` can't activate this mana ability right now, or null if they can, paying any mana
  * part of the cost from their pool. With `ignorePool`, the mana part isn't checked.
  */
-export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, index: number, ignorePool = false): string | null {
+export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, index: number, ignorePool = false, tap?: ObjectId[]): string | null {
   const ab = manaAbilitiesOn(s, o)[index];
   const name = characteristics(s, o).name;
   if (!ab) return `${name} has no such mana ability`;
@@ -84,12 +84,18 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (!ignorePool && ab.manaCost && !payFromPool(parseManaCost(ab.manaCost), p.manaPool)) return "not enough mana";
+  // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
+  if (ab.tapCost) {
+    const can = tapCostCandidates(s, pid, o, ab.tapCost);
+    if (!tap) return can.length >= ab.tapCost.n ? null : `you need to tap ${ab.tapCost.n === 1 ? "an" : ab.tapCost.n} ${ab.tapCost.filter.text}`;
+    if (tap.length !== ab.tapCost.n || new Set(tap).size !== tap.length || tap.some((id) => !can.includes(id))) return `choose ${ab.tapCost.n === 1 ? "an" : ab.tapCost.n} ${ab.tapCost.filter.text} to tap`;
+  } else if (tap?.length) return "that ability doesn't tap other permanents";
   return null;
 }
 
 /** How much a player gives up by using it, beyond the tap: lower is better. */
 export function manaPenalty(ab: ManaAbility): number {
-  return (ab.sacrificeSelf ? 8 : 0) + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters ? 2 : 0) + (ab.skipNextUntap ? 1 : 0);
+  return (ab.sacrificeSelf ? 8 : 0) + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap ? 1 : 0);
 }
 
 /**
@@ -100,7 +106,7 @@ export function pickManaAbility(s: GameState, pid: PlayerId, o: GameObject, mana
   const abs = manaAbilitiesOn(s, o);
   return abs
     .map((ab, i) => ({ ab, i }))
-    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i))
+    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost)
     .sort((a, b) => manaPenalty(a.ab) - manaPenalty(b.ab))[0]?.i;
 }
 

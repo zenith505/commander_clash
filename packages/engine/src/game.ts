@@ -268,7 +268,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
       // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
       if (s.pending?.kind !== "payUnless" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap);
       break;
     case "castSpell":
       if (freeCastOf(s, p.id) === action.objectId) {
@@ -1254,14 +1254,14 @@ export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[]) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
   if (i === undefined) throw new RulesError(`${name} can't produce {${mana}} right now`);
-  const problem = manaAbilityProblem(s, p.id, o, i);
-  if (problem) throw new RulesError(problem);
   const ab = manaAbilitiesOn(s, o)[i]!;
+  const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
+  if (problem) throw new RulesError(problem);
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
   const adds = manaProduced(s, o, ab, mana);
@@ -1269,6 +1269,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) p.manaPool = payFromPool(parseManaCost(ab.manaCost), p.manaPool)!.pool;
   if (ab.tap) o.tapped = true;
+  for (const t of tap ?? []) obj(s, t).tapped = true;
+  if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -1727,9 +1729,11 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string): string | null {
   const d = defOf(s, o);
   const p = player(s, pid);
-  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand") => choices?.[k];
-  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k}`;
+  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap") => choices?.[k];
+  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap"] as const)
+    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k}`;
+  const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
+  if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
   for (const c of costs) {
     if (c.kind === "payLife") {
       if (p.life < c.n) return `you can't pay ${c.n} life`; // CR 119.4
@@ -1738,20 +1742,22 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const pool =
       c.kind === "sacrifice"
         ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id) && objectMatches(s, c.filter, obj(s, id), pid, false))
+        : c.kind === "tap"
+          ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"
           ? returnCandidates(s, pid, c)
           : c.kind === "discard"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
-      c.kind === "sacrifice"
-        ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
+      c.kind === "sacrifice" || c.kind === "tap"
+        ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
         : c.kind === "discard"
           ? c.filter
             ? `${c.n === 1 ? "a" : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : "exile";
+    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     if (!chosen) {
       if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
@@ -1760,6 +1766,17 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id))) return `choose ${what} to ${verb}`;
   }
   return null;
+}
+
+/**
+ * What can be tapped for "Tap an untapped creature you control": untapped ones you control, summoning sick or not
+ * (CR 302.6 restricts only {T} and {Q}). Not the source when the ability's {T} taps it already.
+ */
+export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "tap" }>): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const x = obj(s, id);
+    return !x.tapped && controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, c.filter, x, pid, false);
+  });
 }
 
 /**
@@ -1793,6 +1810,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
         moveObject(s, id, "hand");
       }
+    } else if (c.kind === "tap") {
+      const ids = choices.tap ?? [];
+      for (const id of ids) obj(s, id).tapped = true;
+      log(s, `${p.name} taps ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
       loseLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
@@ -1864,7 +1885,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const tp = targets ? targetProblem(s, body.targets, targets, pid, src, id) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
-  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length) {
+  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
     const cp = extraCostProblem(s, pid, o, ab.costs ?? [], costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
@@ -1905,7 +1926,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose creatures to crew with");
-  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard" || c.kind === "returnToHand") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard" || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
@@ -3018,7 +3039,8 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     if (controllerOf(s, o) !== pid) continue;
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
-      for (const m of manaChoices(s, o, ab)) out.push({ type: "activateMana", player: pid, objectId: id, mana: m, ability: i });
+      const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
+      for (const m of manaChoices(s, o, ab)) out.push({ type: "activateMana", player: pid, objectId: id, mana: m, ability: i, ...(tap ? { tap } : {}) });
     });
   }
   return out;

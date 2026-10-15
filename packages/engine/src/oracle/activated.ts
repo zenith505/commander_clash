@@ -13,7 +13,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -30,6 +30,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = pickFilter(c[3]!); // NUM is a group of its own
       if (!filter) return "fail";
       extra.push({ kind: "sacrifice", filter, n: c[1] === "another" ? 1 : num(c[1]!), ...(c[1] === "another" ? { other: true } : {}) });
+    } else if ((c = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(part))) {
+      const filter = pickFilter(c[2]!);
+      if (!filter) return "fail";
+      extra.push({ kind: "tap", filter: { ...filter, text: `untapped ${filter.text} you control` }, n: num(c[1]!), ...(/\{T\}/.test(costs) ? { other: true } : {}) });
     } else if ((c = new RegExp(`^Discard ${NUM} (?:(.+?) )?cards?$`).exec(part))) {
       const filter = c[2] ? parseSearchFilter(`${c[2]} card`) : undefined;
       if (filter === null) return "fail";

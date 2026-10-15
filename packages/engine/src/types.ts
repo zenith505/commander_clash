@@ -321,6 +321,8 @@ export interface CostChoices {
   sacrifice?: ObjectId[];
   discard?: ObjectId[];
   exileCards?: ObjectId[];
+  /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
+  tap?: ObjectId[];
   /** Permanents to return to their owner's hand: ninjutsu's unblocked attacker (CR 702.49a). */
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
@@ -561,7 +563,8 @@ export type Action =
    * Activate a mana ability (CR 605.3): `ability` indexes manaAbilitiesOn (unset: the cheapest
    * one that makes `mana`), `mana` is the choice for one that offers several.
    */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number }
+  /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[] }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */

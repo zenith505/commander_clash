@@ -92,6 +92,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
     if (pend.kind === "chooseMay" && pend.clash) return [{ type: "chooseMay", player: pid, yes: !wantOnTop(s, pid, pend.card!) }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? millExplored(s, pid, pend.card) : wantsMay(s, pid) }];
+    if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting.
       const taps = planMana(s, pid, parseManaCost(pend.cost));

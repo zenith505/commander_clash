@@ -2747,11 +2747,19 @@ function Controls({
   if (pending?.kind === "payUnless") {
     // You can tap mana by hand first (CR 605.3a); Pay taps whatever else is needed.
     const life = pending.life ?? 0;
-    const taps = s.players[HUMAN]!.life >= life ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    const discard = pending.discard ?? 0;
+    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> pay <ManaCost cost={pending.cost} size="sm" />
+          <strong>{pending.source}:</strong>{" "}
+          {discard ? (
+            `discard ${discard === 1 ? "a card" : `${discard} cards`}`
+          ) : (
+            <>
+              pay <ManaCost cost={pending.cost} size="sm" />
+            </>
+          )}
           {life ? ` and ${life} life` : ""} or {pending.what} is countered.
         </span>
         <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>

@@ -801,6 +801,12 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
 /** A player gains life (CR 119.3): one life-gain event, which "whenever you gain life" abilities see (CR 119.10). */
 export function gainLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
+  // "If you would gain life, you gain twice that much life instead" (CR 614.1a): each one doubles it again (rulings).
+  const doublers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).doubleLifeGain).length;
+  if (doublers) {
+    n *= 2 ** doublers;
+    log(s, `${player(s, pid).name} gains twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
+  }
   player(s, pid).life += n;
   fireEvent(s, { type: "lifeGained", player: pid, amount: n });
 }
@@ -1223,7 +1229,7 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player)) {
+    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount)) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -1784,6 +1790,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
+  // The amount of mana spent to cast it, by anyone (increment, CR 702.191a).
+  const manaSpent = Object.values(paid.spent).reduce((a, b) => a + b, 0) + (choices.assisted && choices.assist !== undefined ? choices.assisted : 0);
   if (choices.assisted && choices.assist !== undefined) {
     const helper = player(s, choices.assist);
     spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
@@ -1867,7 +1875,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
-  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d });
+  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent });
   fireEvent(s, { type: "targeted", stackId });
 }
 
@@ -2192,7 +2200,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
-  if (ab.discardSelf) discardCards(s, p.id, [id], "", true, true);
+  if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
   s.stack.push({
@@ -2210,7 +2218,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
   });
-  if (ab.discardSelf) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
+  if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
+  else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
   else if (ab.crew !== undefined) log(s, `${p.name} crews ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
   else {
     // Say which ability: its cost and, for a modal one, the chosen modes.
@@ -2579,6 +2588,19 @@ function payUnless(s: GameState, p: Player, pay: boolean) {
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
     loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
+    if (pend.discard) {
+      // Then which cards to discard; the cards are discarded as the counter effect carries on (see counterOnStack).
+      if (p.hand.length < pend.discard) throw new RulesError(`you don't have ${pend.discard} card${pend.discard === 1 ? "" : "s"} to discard`);
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: {} };
+      if (p.hand.length > pend.discard) {
+        s.pending = { kind: "discard", player: p.id, count: pend.discard, source: pend.source };
+        return;
+      }
+      r.scratch.chosen![p.id] = [...p.hand];
+      s.pending = null;
+      continueResolution(s);
+      return;
+    }
   }
   (r.scratch ??= {}).paid = pay;
   s.pending = null;

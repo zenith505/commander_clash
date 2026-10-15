@@ -39,6 +39,8 @@ export interface UnlessPays {
   cost: string;
   generic?: Amount;
   life?: number;
+  /** "Ward—Discard a card": discard this many cards (of their choice) as the payment. */
+  discard?: number;
 }
 
 /**
@@ -387,6 +389,8 @@ export type StaticCondition =
   | { kind: "paired"; withKeyword?: string; not?: true }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
+  /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
+  | { kind: "increment" }
   /**
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
@@ -480,7 +484,8 @@ export type Effect =
   /** Ascend on an instant or sorcery (CR 702.131a): "If you control ten or more permanents and you don't have the city's blessing, you get the city's blessing for the rest of the game." */
   | { type: "ascend" }
   /** The source explores (CR 701.44a): a land on top goes to hand; otherwise a +1/+1 counter, and the card may be milled. */
-  | { type: "explore" }
+  /** Explore (CR 701.44a): `what` explores ("target creature you control explores"), by default this permanent. */
+  | { type: "explore"; what?: ObjRef }
   /** Renown N (CR 702.112a): if it isn't renowned, N +1/+1 counters and it becomes renowned. */
   | { type: "renown"; n: number }
   /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */
@@ -845,8 +850,10 @@ export interface ActivatedAbility {
   text: string;
   /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a). Otherwise on the battlefield. */
   zone?: "hand" | "graveyard";
-  /** "Discard this card" is part of the cost (cycling). */
+  /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
+  /** It's a cycling ability (CR 702.29a, 702.29f): discarding this card to pay for it is cycling it. */
+  cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
   crew?: number;
   /** "Activate only once each turn" (CR 602.5b). */
@@ -1111,6 +1118,8 @@ export interface CompiledCard {
   castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
   /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
   beginOnBattlefield?: boolean;
+  /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
+  doubleLifeGain?: boolean;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
   youHave?: "hexproof" | "shroud";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */

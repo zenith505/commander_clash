@@ -13,6 +13,16 @@ export const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
   Clue: { name: "Clue", colors: [], types: ["Artifact"], subtypes: ["Clue"], keywords: [], abilities: "{2}, Sacrifice this token: Draw a card." },
   // CR 111.10h
   Powerstone: { name: "Powerstone", colors: [], types: ["Artifact"], subtypes: ["Powerstone"], keywords: [], abilities: "{T}: Add {C}. This mana can't be spent to cast a nonartifact spell." },
+  // CR 111.10c-g, 111.10s-x
+  Gold: { name: "Gold", colors: [], types: ["Artifact"], subtypes: ["Gold"], keywords: [], abilities: "Sacrifice this token: Add one mana of any color." },
+  Shard: { name: "Shard", colors: [], types: ["Enchantment"], subtypes: ["Shard"], keywords: [], abilities: "{2}, Sacrifice this token: Scry 1, then draw a card." },
+  Blood: { name: "Blood", colors: [], types: ["Artifact"], subtypes: ["Blood"], keywords: [], abilities: "{1}, {T}, Discard a card, Sacrifice this token: Draw a card." },
+  Map: { name: "Map", colors: [], types: ["Artifact"], subtypes: ["Map"], keywords: [], abilities: "{1}, {T}, Sacrifice this token: Target creature you control explores. Activate only as a sorcery." },
+  Junk: { name: "Junk", colors: [], types: ["Artifact"], subtypes: ["Junk"], keywords: [], abilities: "{T}, Sacrifice this token: Exile the top card of your library. You may play that card this turn. Activate only as a sorcery." },
+  Lander: { name: "Lander", colors: [], types: ["Artifact"], subtypes: ["Lander"], keywords: [], abilities: "{2}, {T}, Sacrifice this token: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle." },
+  Mutagen: { name: "Mutagen", colors: [], types: ["Artifact"], subtypes: ["Mutagen"], keywords: [], abilities: "{1}, {T}, Sacrifice this token: Put a +1/+1 counter on target creature. Activate only as a sorcery." },
+  Vibranium: { name: "Vibranium", colors: [], types: ["Artifact"], subtypes: ["Vibranium"], keywords: ["Indestructible"], abilities: "{T}: Add {C}. This mana can't be spent to cast a nonartifact spell." },
+  Heartwood: { name: "Heartwood", colors: ["R", "G"], types: ["Artifact"], subtypes: ["Heartwood"], keywords: [], abilities: "{T}: Add {R} or {G}." },
 };
 
 /** An Incubator token (CR 701.53b, 111.10i): a colorless Incubator artifact, and on its back a 0/0 Phyrexian artifact creature. */

@@ -558,6 +558,10 @@ export function compile(d: CardDef): CompiledCard {
       else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
       continue;
     }
+    if (line === "If you would gain life, you gain twice that much life instead.") {
+      out.doubleLifeGain = true;
+      continue;
+    }
     const youHave = /^You have (hexproof|shroud)\.$/.exec(line);
     if (youHave) {
       out.youHave = youHave[1] as "hexproof" | "shroud";

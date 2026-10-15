@@ -8,6 +8,7 @@ import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackIt
 import { stampTargets } from "./targeting";
 import { ResolveCtx, objects, amountNow } from "./resolve";
 import { fireEvent } from "./triggers";
+import { discardCards } from "./run-library";
 
 /**
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
@@ -158,17 +159,23 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (unless) {
     const r = s.resolving!;
     const sc = (r.scratch ??= {});
+    // "Ward—Discard a card": the cards they chose to discard (see payUnless).
+    if (sc.paid === undefined && unless.discard && sc.chosen?.[item.controller]) {
+      discardCards(s, item.controller, sc.chosen[item.controller]!);
+      sc.paid = true;
+    }
     if (sc.paid === undefined) {
       const p = player(s, item.controller);
       // The amount is fixed as the choice is offered (CR 608.2h).
       const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : amountNow(s, unless.generic, ctx));
-      if (p.lost) sc.paid = false;
-      else if (cost === "{0}" && !unless.life) {
+      // A player can't discard more cards than they have (CR 701.9b), so they can't pay that.
+      if (p.lost || (unless.discard && p.hand.length < unless.discard)) sc.paid = false;
+      else if (cost === "{0}" && !unless.life && !unless.discard) {
         // Paying {0} is just saying so (CR 118.5); nobody would refuse.
         log(s, `${p.name} pays {0} for ${by}.`);
         sc.paid = true;
       } else {
-        s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(unless.life ? { life: unless.life } : {}) };
+        s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(unless.life ? { life: unless.life } : {}), ...(unless.discard ? { discard: unless.discard } : {}) };
         return "paused";
       }
     }

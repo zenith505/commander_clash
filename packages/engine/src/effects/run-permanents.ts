@@ -254,7 +254,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});
       if (sc.explored === undefined) {
-        const self = objects(s, { ref: "self" }, ctx)[0];
+        const self = objects(s, e.what ?? { ref: "self" }, ctx)[0];
         const top = p.library[0];
         const name = self ? characteristics(s, self).name : src;
         if (top && isType(defOf(s, obj(s, top)), "Land")) {

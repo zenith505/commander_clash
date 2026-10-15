@@ -307,6 +307,16 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         cast: { by: "you", spell: { kind: "spell", notTypes: ["Creature"], text: "noncreature spell" } },
         body: { targets: [], effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: 1, toughness: 1 }], duration: "endOfTurn" }], text: "Prowess: ~ gets +1/+1 until end of turn." },
       });
+    } else if (/^increment$/i.test(p)) {
+      // CR 702.191a: "Whenever you cast a spell, if this permanent is a creature and the amount of mana spent to cast that
+      // spell is greater than this creature's power or this creature's toughness, put a +1/+1 counter on this creature."
+      // Each instance triggers separately (702.191b); the "if" is checked again as it resolves (CR 603.4).
+      out.triggers.push({
+        event: "castSpell",
+        cast: { by: "you", spell: { kind: "spell", text: "spell" } },
+        ifCond: { kind: "increment" },
+        body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }], text: "Increment: put a +1/+1 counter on ~." },
+      });
     } else if (/^extort$/i.test(p)) {
       // CR 702.101a: "Whenever you cast a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you
       // gain life equal to the total life lost this way." Each instance triggers separately (702.101b).
@@ -568,6 +578,13 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", life }, ward: true }], text: `Ward—Pay ${life} life: counter that spell or ability unless its controller pays ${life} life.` },
       });
+    } else if ((m = /^ward—discard (a|two) cards?\.?$/i.exec(p))) {
+      // CR 702.21a with a discard cost: "counter that spell or ability unless that player discards a card".
+      const n = m[1] === "a" ? 1 : 2;
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", discard: n }, ward: true }], text: `Ward—Discard ${m[1]} card${n === 1 ? "" : "s"}: counter that spell or ability unless its controller discards ${m[1]} card${n === 1 ? "" : "s"}.` },
+      });
     } else if ((m = /^ward ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(p))) {
       // CR 702.21a: "Whenever this permanent becomes the target of a spell or ability an opponent
       // controls, counter that spell or ability unless that player pays [cost]."
@@ -627,8 +644,24 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         sorcerySpeed: false,
         zone: "hand",
         discardSelf: true,
+        cycling: true,
         body: { targets: [], effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "Draw a card." },
         text: `Cycling ${m[1]}`,
+      });
+    } else if ((m = /^transmute ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
+      // CR 702.53a: "[Cost], Discard this card: Search your library for a card with the same mana value as the discarded
+      // card, reveal that card, and put it into your hand. Then shuffle your library. Activate only as a sorcery."
+      // Only in a hand, where a card's mana value is its printed one (CR 202.3).
+      const mv = d.cmc;
+      out.activated.push({
+        manaCost: m[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        zone: "hand",
+        discardSelf: true,
+        body: { targets: [], effects: [{ type: "search", filter: { kind: "card", manaValue: { min: mv, max: mv }, text: `card with mana value ${mv}` }, n: 1, upTo: false, reveal: true, dest: { zone: "hand" } }], text: `Search your library for a card with mana value ${mv}, reveal it, put it into your hand, then shuffle.` },
+        text: `Transmute ${m[1]}`,
       });
     } else if ((m = /^([a-z]+(?: [a-z]+)?)cycling ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
       // CR 702.29e: "[Type]cycling [cost]" means "[Cost], Discard this card: Search your library for a
@@ -646,6 +679,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         sorcerySpeed: false,
         zone: "hand",
         discardSelf: true,
+        cycling: true,
         body: { targets: [], effects: [{ type: "search", filter, n: 1, upTo: false, reveal: true, dest: { zone: "hand" } }], text: `Search your library for a ${filter.text}, reveal it, put it into your hand, then shuffle.` },
         text: `${capital(m[1]!.toLowerCase())}cycling ${m[2]}`,
       });

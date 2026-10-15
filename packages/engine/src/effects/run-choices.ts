@@ -20,7 +20,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (r.scratch ??= {});
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
-        const onSelf = e.effects.every((x) => "what" in x && x.what.ref === "self");
+        const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self");
         if (e.otherwise && onSelf && !objects(s, { ref: "self" }, ctx).length) sc.may = false;
         else if (e.pay && !canPayNow(s, ctx.controller, e.pay)) sc.may = false; // can't pay, so can't do it
         else if (!canDoNow(s, e.effects, ctx)) sc.may = false; // nothing to discard: "if you do" can't happen

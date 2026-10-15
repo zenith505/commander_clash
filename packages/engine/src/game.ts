@@ -708,6 +708,11 @@ export function moveObject(
   }
   // Descend: a permanent card (not a token, CR 700.11) put into its owner's graveyard from anywhere.
   if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o)) && !(s.descendedThisTurn ??= []).includes(o.owner)) s.descendedThisTurn.push(o.owner);
+  // Ravenous Trap: cards put into a graveyard from anywhere, so not tokens or copies of spells (CR 111.1, 707.10).
+  if (to === "graveyard" && !o.isToken && !o.spellCopy) {
+    const yards = ((s.turnLog ??= {}).toGraveyard ??= {});
+    yards[o.owner] = (yards[o.owner] ?? 0) + 1;
+  }
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
@@ -950,6 +955,8 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
     log(s, `${player(s, pid).name} gains twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
   }
   player(s, pid).life += n;
+  const gained = ((s.turnLog ??= {}).gainedLife ??= []);
+  if (!gained.includes(pid)) gained.push(pid);
   fireEvent(s, { type: "lifeGained", player: pid, amount: n });
 }
 
@@ -1053,7 +1060,7 @@ export function useShieldCounter(s: GameState, o: GameObject, what: string): boo
  * regeneration shield replaces it (CR 701.19a): damage is removed, it's tapped, and it
  * leaves combat. Returns true if it went to the graveyard.
  */
-export function destroyPermanent(s: GameState, o: GameObject, message: string, noRegen = false): boolean {
+export function destroyPermanent(s: GameState, o: GameObject, message: string, noRegen = false, /** The controller of the spell or ability destroying it (Cobra Trap). */ by?: PlayerId): boolean {
   if (objHasKeyword(s, o, "Indestructible")) return false;
   if (useShieldCounter(s, o, "it being destroyed")) return false;
   const name = defOf(s, o).name;
@@ -1080,7 +1087,11 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
     return false;
   }
   log(s, message);
+  const noncreature = !objIsType(s, o, "Creature");
+  const controller = controllerOf(s, o);
   moveObject(s, o.id, "graveyard");
+  // Destroyed only if it got there: a replacement that exiles it instead means it wasn't (CR 614.6).
+  if (by !== undefined && noncreature && o.zone === "graveyard") ((s.turnLog ??= {}).destroyed ??= []).push({ controller, by });
   return true;
 }
 
@@ -1336,6 +1347,7 @@ function startNextTurn(s: GameState) {
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
   s.damagedThisTurn = undefined;
   s.damageThisTurn = undefined;
+  s.turnLog = undefined;
   s.diedThisTurn = undefined;
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
@@ -1347,9 +1359,11 @@ function startNextTurn(s: GameState) {
   s.voidThisTurn = undefined;
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
+  s.cantCastThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
+  s.cantAttackThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
   s.lastKnown = undefined;
@@ -1933,6 +1947,9 @@ export function castProblem(
     // "If you control a Swamp, you may pay 4 life rather than pay ~'s mana cost": only while that's true (CR 601.2b).
     const cond = altCost(d, choices.alt)?.if;
     if (cond && !staticConditionNow(s, cond, id, pid)) return `${d.name}'s alternative cost can't be paid now`;
+    // Paying an alternative cost that has no X, X is 0 (CR 107.3b); the Shoals' "a red card with mana value X" has one.
+    const paid = altCost(d, choices.alt, s, pid)!;
+    if (x && parseManaCost(d.manaCost).hasX && !parseManaCost(paid.mana).hasX && !paid.costs?.some((c) => xCost(c) || (c.kind === "exileFromHand" && c.mvX))) return "X is 0 unless the cost you pay has X";
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
@@ -2399,7 +2416,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
   s.cards[d.oracleId] ??= d;
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors] });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent });
@@ -2408,6 +2425,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
 
 /** "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2). */
 function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
+  // "Your opponents can't cast spells this turn" (Silence) and the like.
+  for (const c of s.cantCastThisTurn ?? [])
+    if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
   for (const id of s.battlefield) {
     const o = obj(s, id);
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
@@ -2583,8 +2603,11 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
-  // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a).
-  return costs.map((c) => (xCost(c) ? { ...c, n: x } : c));
+  // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
+  // X", that mana value.
+  return costs.map((c) =>
+    xCost(c) ? { ...c, n: x } : c.kind === "exileFromHand" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x, max: x }, text: c.filter.text.replace(/\bX\b/, String(x)) } } : c,
+  );
 }
 
 const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
@@ -2612,6 +2635,24 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   for (const c of costs) {
     if (c.kind === "payLife") {
       if (p.life < c.n) return `you can't pay ${c.n} life`; // CR 119.4
+      continue;
+    }
+    if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
+    if (c.kind === "giveLife") {
+      // A player who can't gain life can't be had gain life to pay a cost (CR 119.7; Invigorate rulings), though a
+      // replaced life gain (Sulfuric Vortex's) can. Players who left the game aren't players any more (CR 800.4a).
+      const others = opponents(s, pid);
+      if (c.each) {
+        if (others.some((q) => !canGainLife(s, q))) return `every other player must be able to gain life to ${doing} this way`;
+        continue;
+      }
+      const to = choices?.lifeTo;
+      if (to === undefined) {
+        if (!others.some((q) => canGainLife(s, q))) return "no opponent can gain life";
+        continue; // chosen as it's paid
+      }
+      if (!others.includes(to)) return "choose an opponent to gain the life";
+      if (!canGainLife(s, to)) return `${player(s, to).name} can't gain life`;
       continue;
     }
     const pool =
@@ -2642,11 +2683,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
       continue;
     }
+    // "Discard an Island card and another card" (Foil): one of them an Island card.
+    const oneOf = c.kind === "discard" ? c.oneOf : undefined;
+    const fits = (id: ObjectId) => !oneOf || printedMatches(oneOf, defOf(s, obj(s, id)));
+    const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : what;
     if (!chosen) {
-      if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
+      if (pool.length < c.n || !pool.some(fits)) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
-    if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id))) return `choose ${what} to ${verb}`;
+    if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !chosen.some(fits)) return `choose ${full} to ${verb}`;
   }
   return null;
 }
@@ -2715,6 +2760,13 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       discardCards(s, p.id, picked, " at random");
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
+    else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
+    else if (c.kind === "giveLife") {
+      // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
+      const to = c.each ? opponents(s, p.id) : [choices.lifeTo ?? opponents(s, p.id).find((q) => canGainLife(s, q))!];
+      log(s, `${p.name} has ${to.map((q) => player(s, q).name).join(", ")} gain ${c.n} life.`);
+      for (const q of to) gainLife(s, q, c.n);
+    }
     else if (c.kind === "exileFromHand") {
       const ids = choices.exileFromHand ?? [];
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);
@@ -3502,6 +3554,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !isSummoningSick(s, o) &&
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
       !characteristics(s, o).cantAttack &&
+      !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       (!characteristics(s, o).attackUnless.length || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
@@ -4508,6 +4561,9 @@ export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): strin
   // Whenever they could begin to cast it (CR 702.62a), with "as though it had flash" too.
   const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || flashGranted(s, pid, d);
   if (!instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be suspended when you could cast it (sorcery speed)`;
+  // Only if you could begin to cast it: not under Silence or Rule of Law (CR 702.62a, rulings on Silence).
+  const limit = castLimitProblem(s, pid, d);
+  if (limit) return limit;
   if (!canPayFromPool(s, pid, parseManaCost(sus.cost), "other")) return `not enough mana to suspend ${d.name} (${sus.cost})`;
   return null;
 }

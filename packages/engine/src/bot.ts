@@ -26,6 +26,7 @@ import {
   legalActions,
   obj,
   opponents,
+  canGainLife,
   player,
   potentialAttackers,
   foretoldCast,
@@ -1009,6 +1010,15 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
   for (const c of castExtraCosts(d, { via, alt, costOr }, x)) {
+    if (c.kind === "revealHand") continue; // nothing to choose
+    if (c.kind === "giveLife") {
+      // Invigorate: the opponent with the least life gets it (the least threat to us); "each other player": nothing to choose.
+      if (c.each) continue;
+      const to = opponents(s, pid).filter((q) => canGainLife(s, q)).sort((a, b) => player(s, a).life - player(s, b).life)[0];
+      if (to === undefined) return null;
+      out.lifeTo = to;
+      continue;
+    }
     if (!c.n && "x" in c && c.x) continue; // "pay X life" with X = 0
     if (c.kind === "returnToHand" && c.unblockedAttacker) {
       // Sneak: the least valuable unblocked attacker that isn't our commander (see chooseSneak).
@@ -1051,6 +1061,12 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const pool = sacrificePool(s, pid, c, targeted, alt);
       if (pool.length < c.n) return null;
       out.sacrifice = pool.slice(0, c.n).map((o) => o.id);
+    } else if (c.kind === "discard" && c.oneOf) {
+      // Foil's "an Island card and another card": the cheapest of each, with a card left in hand after.
+      const others = player(s, pid).hand.filter((x) => x !== id).sort((a, b) => mv(s, a) - mv(s, b));
+      const first = others.find((x) => printedMatches(c.oneOf!, defOf(s, obj(s, x))));
+      if (!first || others.length < c.n + 1) return null;
+      out.discard = [first, ...others.filter((x) => x !== first).slice(0, c.n - 1)];
     } else if (c.kind === "discard" && c.filter) {
       // Retrace: a spare land card, once we have enough lands out.
       const fits = player(s, pid).hand.filter((x) => x !== id && printedMatches(c.filter!, defOf(s, obj(s, x))));

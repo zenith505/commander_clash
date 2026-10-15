@@ -187,6 +187,11 @@ function othersAttacking(s: GameState, o: GameObject): number {
 }
 
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
+  // The Traps look back at what entered this turn, as it entered (after "as it enters" choices, CR 614.12).
+  if (ev.type === "enters" && s.objects[ev.id]) {
+    const c = characteristics(s, s.objects[ev.id]!);
+    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], colors: [...c.colors] });
+  }
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;
   // While set, `add` is looking at the abilities of a card in a graveyard that work there (CR 113.6m).

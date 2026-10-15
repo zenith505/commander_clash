@@ -106,6 +106,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(they|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
+  // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
+  const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
+  if (dealt) return { ref: "damagedThisWay", ...(dealt[1]!.toLowerCase() !== "permanent" ? { filter: { kind: "object" as const, types: [dealt[1]![0]!.toUpperCase() + dealt[1]!.slice(1).toLowerCase()], text: dealt[1]!.toLowerCase() } } : {}) };
   const several = SEVERAL_TARGETS.exec(x);
   if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).

@@ -154,6 +154,18 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Prevent all combat damage that would be dealt this turn$/i.test(s)) return [{ type: "preventCombatDamage" }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
+  // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller
+  // can't ..." (Render Silent), "defending player can't ..." (Xantid Swarm), "Players can't cast noncreature spells this
+  // turn" (Calamity's Wake), "Players dealt damage this way can't ..." (Aurelia's Fury): a "can't" for those players
+  // until the turn ends, which wins over anything that says they can (CR 101.2).
+  if ((m = /^(.+?) can't cast (?:(noncreature|creature|instant|sorcery|artifact) )?spells this turn$/i.exec(s))) {
+    const w = m[1]!.toLowerCase();
+    const who: PlayerRef | null = w === "players" ? { ref: "eachPlayer" } : w === "your opponents" ? { ref: "eachOpponent" } : w === "players dealt damage this way" ? { ref: "damagedThisWay" } : parsePlayer(w, ctx);
+    if (!who) return null;
+    const filter = m[2] ? parseTargetPhrase(`${m[2].toLowerCase()} spell`) : undefined;
+    if (filter === null || (filter && filter.kind !== "spell")) return null;
+    return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: `${m[2]!.toLowerCase()} spell` } } : {}) }];
+  }
   // "Prevent all combat damage that would be dealt to and dealt by that creature this turn" (Maze of Ith), "Prevent all
   // damage target creature would deal this turn": a prevention effect on that creature until the turn ends (CR 615.1).
   if ((m = /^(Prevent all .+) this turn$/i.exec(s)) || (m = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s))) {

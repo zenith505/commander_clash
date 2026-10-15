@@ -318,6 +318,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const filter = e.filter?.named === "~" ? { ...e.filter, named: src } : e.filter;
       if (!sc.found) {
         const n = (sc.n ??= amountNow(s, e.n, ctx));
+        // They've searched, found something or not (Archive Trap rulings).
+        const searched = ((s.turnLog ??= {}).searched ??= []);
+        if (!searched.includes(p.id)) searched.push(p.id);
         const cards = p.library.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;

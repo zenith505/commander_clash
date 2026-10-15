@@ -1,5 +1,5 @@
 import type { AbilityBody, Effect, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
-import { manaValue, parseManaCost } from "../mana";
+import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf } from "../layers";
 import { shuffle } from "../rng";
@@ -210,6 +210,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "counterSpell": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
+      // Disrupting Shoal: its mana value with the X chosen for it (CR 202.3e) against this spell's X.
+      if (e.ifMvX) {
+        const item = s.stack.find((x) => x.id === t.id);
+        const o = item?.objectId ? s.objects[item.objectId] : undefined;
+        const cost = o && parseManaCost(defOf(s, o).manaCost);
+        const mv = cost ? manaValue(cost) + (item!.x ?? 0) * xCount(cost) : 0;
+        if (!item || item.kind !== "spell" || mv !== (ctx.x ?? 0)) {
+          log(s, `${src} doesn't counter ${item?.description ?? "it"}: its mana value isn't ${ctx.x ?? 0}.`);
+          return;
+        }
+      }
       return counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : undefined);
     }
   }

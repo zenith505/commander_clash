@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   abilityProblem,
   altCost,
+  manaValue,
+  parseManaCost,
   castProblem,
   topPlayable,
   invalidateCharacteristics,
@@ -125,9 +127,14 @@ function hasInstantPlay(s: GameState): boolean {
     if (!(isType(d, "Instant") || d.keywords.includes("Flash"))) continue;
     if (planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
     // "Rather than pay ~'s mana cost" (Force of Will, Daze): with no mana at all (CR 118.9).
-    if (altCost(d, "alternative")) {
-      const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt: "alternative" });
-      if (!problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt: "alternative" }))) return true;
+    const alt = altCost(d, "alternative");
+    if (alt) {
+      // The Shoals: X is the mana value of the card exiled, so each X a card in hand could give (CR 107.3a).
+      const xs = alt.costs?.some((c) => c.kind === "exileFromHand" && c.mvX) ? [...new Set(me.hand.filter((h) => h !== id).map((h) => manaValue(parseManaCost(cardOf(s, h).manaCost))))] : [undefined];
+      for (const x of xs) {
+        const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, x, { alt: "alternative" });
+        if (!problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", x, { alt: "alternative" }))) return true;
+      }
     }
   }
   // Ninjutsu once blockers are declared (CR 702.49a): an ability that works from your hand (cycling doesn't count here).

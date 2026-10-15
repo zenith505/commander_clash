@@ -62,11 +62,13 @@ import {
   characteristics,
   modifications,
   opponents,
+  canGainLife,
   planCast,
   planMana,
   objectMatches,
   printedMatches,
   parseManaCost,
+  manaValue,
   autoConvoke,
   autoCrew,
   casualtyCandidates,
@@ -284,6 +286,8 @@ type CastDraft = {
   conspire?: string[];
   /** The opponent promised the gift (CR 702.174a), or null for no gift. */
   gift?: PlayerId | null;
+  /** Invigorate's "have an opponent gain 3 life": who gains it. */
+  lifeTo?: PlayerId;
 };
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -293,7 +297,8 @@ type CostOrPick = { draft: CastDraft; label: string; options: string[] };
 type DelvePick = { draft: CastDraft; label: string; max: number; candidates: string[]; chosen: string[] };
 
 /** Promising a gift to an opponent, or not (CR 702.174a). */
-type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[] };
+/** Gift's opponent (CR 702.174a), or with `life`, the opponent had gain that much life for an alternative cost (Invigorate). */
+type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[]; life?: number };
 
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string };
@@ -305,6 +310,10 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
   kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire" | "exileFromHand";
   label: string;
+  /** The Shoals: the card picked sets X, its mana value (CR 107.3a). */
+  setsX?: true;
+  /** Foil: one of the cards picked must be this. */
+  oneOf?: TargetSpec;
   what: string;
   n: number;
   candidates: string[];
@@ -556,6 +565,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
+    else if (pick.setsX && s) continueCast({ ...pick.draft, [pick.kind]: pick.chosen, x: manaValue(parseManaCost(cardOf(s, pick.chosen[0]!).manaCost)) });
     else continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
@@ -597,7 +607,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0)) {
-      if (c.kind === "payLife" || (c.kind === "discard" && c.random)) continue;
+      if (c.kind === "payLife" || c.kind === "revealHand" || (c.kind === "discard" && c.random)) continue;
+      // "Have an opponent gain 3 life": pick which (a player who can't gain life can't be picked, CR 119.7).
+      if (c.kind === "giveLife") {
+        if (c.each || d.lifeTo !== undefined) continue;
+        return setGiftPick({ draft: d, label: card.name, what: `have an opponent gain ${c.n} life`, options: opps.filter((p) => canGainLife(s, p)), life: c.n });
+      }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
@@ -613,6 +628,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
             ? me.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))))
             : me.graveyard.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
+      // The Shoals: X is announced as the card is picked, its mana value (CR 107.3a), so any card of that color.
+      const shoal = c.kind === "exileFromHand" && c.mvX && d.x === undefined ? altCost(card, d.alt)?.costs?.find((x) => x.kind === "exileFromHand" && x.mvX) : undefined;
+      if (shoal?.kind === "exileFromHand") {
+        const filter = { ...shoal.filter!, text: shoal.filter!.text.replace(/ with mana value X$/, "") };
+        return setCostPick({ draft: d, kind: "exileFromHand", label: card.name, what: `exile from your hand ${/^[aeiou]/i.test(filter.text) ? "an" : "a"} ${filter.text}: X is its mana value`, n: 1, candidates: me.hand.filter((id) => id !== d.objectId && printedMatches(filter, cardOf(s, id))), chosen: [], setsX: true });
+      }
+      // Foil: "an Island card and another card".
+      if (c.kind === "discard" && c.oneOf)
+        return setCostPick({ draft: d, kind: "discard", label: card.name, what: `discard ${/^[aeiou]/i.test(c.oneOf.text) ? "an" : "a"} ${c.oneOf.text} and another card`, n: c.n, candidates: me.hand.filter((id) => id !== d.objectId), chosen: [], oneOf: c.oneOf });
       const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
       const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? "exile from your hand" : "exile from your graveyard";
       return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
@@ -640,6 +664,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
       ...(d.conspire?.length ? { conspire: d.conspire } : {}),
       ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}),
+      ...(d.lifeTo !== undefined ? { lifeTo: d.lifeTo } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -1101,27 +1126,29 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {giftPick && (
             <div className="targeting gift-pick">
               <span>
-                <strong>{giftPick.label}</strong>: promise an opponent a gift ({giftPick.what})?
+                <strong>{giftPick.label}</strong>: {giftPick.life !== undefined ? giftPick.what : `promise an opponent a gift (${giftPick.what})?`}
               </span>
               {giftPick.options.map((pid) => (
                 <button
                   key={pid}
                   onClick={() => {
                     setGiftPick(null);
-                    continueCast({ ...giftPick.draft, gift: pid });
+                    continueCast(giftPick.life !== undefined ? { ...giftPick.draft, lifeTo: pid } : { ...giftPick.draft, gift: pid });
                   }}
                 >
-                  Gift {s.players[pid]!.name}
+                  {giftPick.life !== undefined ? `${s.players[pid]!.name} gains ${giftPick.life} life` : `Gift ${s.players[pid]!.name}`}
                 </button>
               ))}
-              <button
-                onClick={() => {
-                  setGiftPick(null);
-                  continueCast({ ...giftPick.draft, gift: null });
-                }}
-              >
-                No gift
-              </button>
+              {giftPick.life === undefined && (
+                <button
+                  onClick={() => {
+                    setGiftPick(null);
+                    continueCast({ ...giftPick.draft, gift: null });
+                  }}
+                >
+                  No gift
+                </button>
+              )}
               <button className="ghost" onClick={() => setGiftPick(null)}>
                 Cancel
               </button>
@@ -1223,6 +1250,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               cards={costPick.candidates}
               chosen={costPick.chosen}
               n={costPick.n}
+              valid={!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))}
               onHover={setHover}
               onToggle={(id) =>
                 setCostPick({ ...costPick, chosen: costPick.chosen.includes(id) ? costPick.chosen.filter((x) => x !== id) : [...costPick.chosen, id].slice(-costPick.n) })
@@ -1299,6 +1327,11 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "sacrifice") return `sacrifice ${n(c.n, c.filter.text)}`;
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
+  if (c.kind === "revealHand") return "reveal your hand";
+  if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
+  if (c.kind === "tap") return `tap ${n(c.n, c.filter.text)}`;
+  if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
+  if (c.kind === "exileFromHand") return `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
 }
 
@@ -1350,7 +1383,15 @@ function canCastNowIgnoringMana(s: GameState, id: string) {
 }
 
 /** Could you cast this card from your hand for its evoke or dash cost now, tapping mana as needed? */
-function canCastAlt(s: GameState, id: string, alt: AltCostKind) {
+function canCastAlt(s: GameState, id: string, alt: AltCostKind): boolean {
+  // The Shoals: X is the mana value of the card exiled (CR 107.3a), so each X a card in hand could give.
+  if (altCost(cardOf(s, id), alt)?.costs?.some((c) => c.kind === "exileFromHand" && c.mvX)) {
+    const xs = new Set(s.players[HUMAN]!.hand.filter((h) => h !== id).map((h) => manaValue(parseManaCost(cardOf(s, h).manaCost))));
+    return [...xs].some((x) => {
+      const p = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, x, { alt });
+      return !p || (/not enough mana/.test(p) && planCast(s, HUMAN, id, undefined, undefined, "auto", x, { alt }) !== null);
+    });
+  }
   const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt });
   if (!problem) return true;
   if (!/not enough mana/.test(problem)) return false;
@@ -1510,6 +1551,7 @@ function CardChoice({
   chosen,
   n,
   min,
+  valid = true,
   onHover,
   onToggle,
   onDone,
@@ -1522,6 +1564,8 @@ function CardChoice({
   n: number;
   /** "Up to n": fewer are fine, down to this many. */
   min?: number;
+  /** False while the cards chosen don't make up the cost (Foil's "an Island card and another card"). */
+  valid?: boolean;
   onHover: (d: CardDef | null) => void;
   onToggle: (id: string) => void;
   onDone: () => void;
@@ -1533,7 +1577,7 @@ function CardChoice({
         <header>
           <strong>{title}</strong>
           <span className="muted"> chosen {chosen.length} of {min === undefined ? n : `up to ${n}`}</span>
-          <button disabled={min === undefined ? chosen.length !== n : chosen.length < min || chosen.length > n} onClick={onDone}>
+          <button disabled={!valid || (min === undefined ? chosen.length !== n : chosen.length < min || chosen.length > n)} onClick={onDone}>
             Done
           </button>
           <button className="ghost" onClick={onCancel}>

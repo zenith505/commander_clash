@@ -138,6 +138,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ccba143d-ed9b-4044-bdad-f010a0e38e47",
+  "name": "Blazing Shoal",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "You may exile a red card with mana value X from your hand rather than pay this spell's mana cost.\nTarget creature gets +X/+0 until end of turn.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bok",
+  "releasedAt": "2005-02-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2e5b8973-4f6e-4abe-bbbe-81fdca784997",
   "name": "Blooming Blast",
   "manaCost": "{1}{R}",
@@ -735,6 +763,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7dde4eb6-e9d7-4259-abc2-3af738e0f00f",
+  "name": "Foil",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You may discard an Island card and another card rather than pay this spell's mana cost.\nCounter target spell.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "uma",
+  "releasedAt": "2018-12-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "956381ba-6d37-4a8a-846c-bad79222dbee",
   "name": "Force of Will",
   "manaCost": "{3}{U}{U}",
@@ -1058,6 +1112,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9264c198-76c7-4ac0-9334-37c691de1b54",
+  "name": "Invigorate",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "If you control a Forest, rather than pay this spell's mana cost, you may have an opponent gain 3 life.\nTarget creature gets +4/+4 until end of turn.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slz",
+  "releasedAt": "2026-09-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
   "name": "Island",
   "manaCost": "",
@@ -1147,6 +1227,32 @@
   "set": "lgn",
   "releasedAt": "2003-02-03",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e36f4649-934d-4e8a-bd5f-39f164ea6937",
+  "name": "Land Grant",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "If you have no land cards in hand, you may reveal your hand rather than pay this spell's mana cost.\nSearch your library for a Forest card, reveal that card, put it into your hand, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -1419,6 +1525,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0923ad85-2ea4-4463-8f71-b7d0a162b486",
+  "name": "Mogg Salvage",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "If an opponent controls an Island and you control a Mountain, you may cast this spell without paying its mana cost.\nDestroy target artifact.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nem",
+  "releasedAt": "2000-02-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1b524149-340e-4f94-9520-6a5258fabb00",
   "name": "Monk's Fist",
   "manaCost": "{2}",
@@ -1565,6 +1697,34 @@
   "set": "exp",
   "releasedAt": "2016-01-22",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c8fedb0e-27d5-4fae-8058-3e9666a9661d",
+  "name": "Needlebite Trap",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Instant — Trap",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Trap"
+  ],
+  "oracleText": "If an opponent gained life this turn, you may pay {B} rather than pay this spell's mana cost.\nTarget player loses 5 life and you gain 5 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "zen",
+  "releasedAt": "2009-10-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

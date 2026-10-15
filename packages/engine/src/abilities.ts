@@ -282,7 +282,8 @@ export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
   | { ref: "target"; index: number; n?: number }
   | { ref: "self" } // the source permanent ("this creature")
-  | { ref: "damagedThisWay" }
+  /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
+  | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
   | { ref: "subjectCard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
@@ -319,7 +320,9 @@ export type PlayerRef =
   /** The players who chose to in the "each player may ..." being resolved (see the eachMay effect). */
   | { ref: "choseThisWay" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
-  | { ref: "giftee" };
+  | { ref: "giftee" }
+  /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
+  | { ref: "damagedThisWay" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -551,6 +554,33 @@ export type StaticCondition =
   /** Void: "if a nonland permanent left the battlefield this turn or a spell was warped this turn". */
   | { kind: "void" }
   /**
+   * The Traps' "this turn" conditions (Zendikar), checked as the spell is cast (CR 601.2b) against what happened this
+   * turn (GameState.turnLog): "if an opponent searched their library this turn" (Archive Trap; only an effect that says
+   * "search", rulings).
+   */
+  | { kind: "opponentSearched" }
+  /**
+   * "If an opponent had an artifact enter the battlefield under their control this turn" (Baloth Cage Trap), "two or more
+   * lands" (Lavaball Trap), "a green creature" (Permafrost Trap), "two or more creatures" (Whiplash Trap): permanents
+   * that entered under one opponent's control, as they entered, with all of `types` and `color`.
+   */
+  | { kind: "opponentEntered"; types: string[]; color?: Color; n: number }
+  /**
+   * "If a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled"
+   * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
+   */
+  | { kind: "destroyedByOpponent" }
+  /** "If you've been dealt damage by two or more creatures this turn" (Inferno Trap): different creatures, anyone's (rulings). */
+  | { kind: "damagedByCreatures"; n: number }
+  /** "If an opponent gained life this turn" (Needlebite Trap): whether or not they also lost life (rulings). */
+  | { kind: "opponentGainedLife" }
+  /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
+  | { kind: "opponentCardsToGraveyard"; n: number }
+  /** "If an opponent cast a blue spell this turn" (Ricochet Trap): the spell's colors as it was cast. */
+  | { kind: "opponentCast"; color: Color }
+  /** "If you have no land cards in hand" (Land Grant). */
+  | { kind: "noneInHand"; filter: TargetSpec }
+  /**
    * "As long as you have 25 or more life", fateful hour's "5 or less life", "at least 7 life more than your starting life
    * total", "your life total is greater than or equal to your starting life total" (CR 903.7: 40): your life total now.
    */
@@ -586,7 +616,9 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean };
+  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean }
+  /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
+  | { kind: "allOf"; conds: StaticCondition[] };
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
@@ -863,6 +895,8 @@ export type Effect =
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec }
+  /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
+  | { type: "cantAttackRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
   | { type: "shuffle"; who: PlayerRef }
   /**
@@ -879,7 +913,7 @@ export type Effect =
    * Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead", "put it on
    * top of its owner's library instead".
    */
-  | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean }
+  | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean; /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */ ifMvX?: true }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
    * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
@@ -947,6 +981,12 @@ export type Effect =
   | { type: "preventCombatDamage" }
   /** "Players can't gain life this turn", "Your opponents can't gain life this turn" (CR 119.7). */
   | { type: "noLifeGain"; players: "all" | "opponents" }
+  /**
+   * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
+   * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
+   * is the kind of spell.
+   */
+  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec }
   /** "Damage can't be prevented this turn" (CR 615.12). */
   | { type: "noPrevention" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
@@ -1468,7 +1508,7 @@ export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
-  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true }
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }
   | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
@@ -1481,7 +1521,20 @@ export type AdditionalCost =
   /** "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. */
   | { kind: "reveal"; filter: TargetSpec; n: number }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
-  | { kind: "exileFromHand"; filter?: TargetSpec; n: number };
+  | {
+      kind: "exileFromHand";
+      filter?: TargetSpec;
+      n: number;
+      /** "Exile a red card with mana value X from your hand" (the Shoals): its mana value is the X announced (CR 107.3a). */
+      mvX?: true;
+    }
+  /** "Reveal your hand" (Land Grant): all of it, whatever is in it (rulings: even if it's revealed already). */
+  | { kind: "revealHand" }
+  /**
+   * "Have an opponent gain 3 life" (Invigorate: the caster picks which, CostChoices.lifeTo), "have each other player gain
+   * 6 life" (`each`; Reverent Silence).
+   */
+  | { kind: "giveLife"; n: number; each?: true };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,

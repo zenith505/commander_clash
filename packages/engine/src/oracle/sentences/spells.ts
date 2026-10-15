@@ -174,6 +174,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (what !== "you" && what?.kind !== "object") return null;
     return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", targetsWhat: what, text: `target spell that targets ${m[1]}` }) }];
   }
+  // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana
+  // value, as it resolves, is countered (rulings).
+  if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
   if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(`${m[1]}spell`);
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);

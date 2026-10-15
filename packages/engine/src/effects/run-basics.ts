@@ -68,6 +68,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const e of dealDamageBatch(s, events, { lifelink })) {
         dealt += e.dealt;
         if (e.dealt > 0 && "object" in e.to && s.resolving) (s.resolving.damagedThisWay ??= []).push(e.to.object);
+        if (e.dealt > 0 && "player" in e.to && s.resolving && !(s.resolving.playersDamagedThisWay ??= []).includes(e.to.player)) s.resolving.playersDamagedThisWay.push(e.to.player);
       }
       gainLife(s, from.controller, lifelink.n);
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
@@ -111,6 +112,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "preventCombatDamage":
       s.preventCombatDamage = true;
       log(s, `${src}: all combat damage will be prevented this turn.`);
+      return;
+    case "cantCast":
+      for (const pid of players(s, e.who, ctx)) {
+        (s.cantCastThisTurn ??= []).push({ player: pid, turn: s.turn, ...(e.filter ? { filter: e.filter } : {}), source: src });
+        log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn.`);
+      }
       return;
     case "noLifeGain":
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
@@ -185,6 +192,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (added) log(s, `${p.name} adds ${added}.`);
       return;
     }
+    case "cantAttackRule":
+      (s.cantAttackThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
+      log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
+      return;
     case "cantBlockRule":
       (s.cantBlockThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't block this turn.`);

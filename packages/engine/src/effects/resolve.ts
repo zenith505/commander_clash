@@ -325,6 +325,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exile":
     case "returnLinked":
     case "pick":
+    case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
     case "putInLibrary":

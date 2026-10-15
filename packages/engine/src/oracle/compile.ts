@@ -195,7 +195,7 @@ export function normalizeSelf(d: CardDef): string {
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Aura)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Aura|planeswalker)\b/g, "~");
   return t;
 }
 
@@ -251,9 +251,10 @@ export function compile(d: CardDef): CompiledCard {
       if (!maxSpeedAbility(d, maxSpeed[1]!, out)) out.unsupported.push(raw);
       continue;
     }
-    // Loyalty abilities (CR 606): "+1: ...", "−2: ...", "0: ...", "−X: ...".
-    const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line);
-    if (loyal && d.types.includes("Planeswalker")) {
+    // Loyalty abilities (CR 606): "+1: ...", "−2: ...", "0: ...", "−X: ...". Given in quotes, they're bracketed
+    // ('Planeswalkers you control have "[−4]: ..."'): the ability is still a loyalty ability (CR 606.3).
+    const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line) ?? /^\[([+−-]?)(\d+|X)\]: (.+)$/.exec(line);
+    if (loyal && (d.types.includes("Planeswalker") || line.startsWith("["))) {
       const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
       if (ab === "fail") out.unsupported.push(raw);
       else out.activated.push(bindThisAbility(ab, line));

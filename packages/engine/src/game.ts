@@ -2037,8 +2037,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
     if (!canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
-    const all = abilitiesOf(s, o).activated;
-    if (o.activatedThisTurn?.some((i) => all[i]?.loyalty !== undefined || all[i]?.loyaltyX)) return `a loyalty ability of ${d.name} was already activated this turn`;
+    // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
+    if (o.activatedThisTurn?.includes(LOYALTY_USED)) return `a loyalty ability of ${d.name} was already activated this turn`;
     const remove = ab.loyaltyX ? (x ?? 0) : -(ab.loyalty ?? 0);
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
@@ -2117,6 +2117,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     const change = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
     o.counters.loyalty = (o.counters.loyalty ?? 0) + change;
+    (o.activatedThisTurn ??= []).push(LOYALTY_USED);
     invalidateCharacteristics(s);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
@@ -2266,6 +2267,9 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   s.pending = null;
   continueResolution(s);
 }
+
+/** Marks, in `activatedThisTurn`, that a loyalty ability of the permanent was activated this turn (CR 606.3). */
+const LOYALTY_USED = -1;
 
 /** The cards a library search found (CR 701.23). */
 function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {

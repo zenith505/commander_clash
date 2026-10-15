@@ -37,6 +37,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
   // Scry and surveil (CR 701.22, 701.25)
   if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
+  // Empower Jace (CR 701.71a)
+  if ((m = new RegExp(`^Empower Jace ${NUMX}$`, "i").exec(s))) return [{ type: "empowerJace", n: amt(m[1]!) }];
   // Fighting (CR 701.14) and "deals damage equal to its power to"
   if ((m = /^(.+?) fights (.+)$/i.exec(s))) {
     const a = parseObject(m[1]!, ctx);

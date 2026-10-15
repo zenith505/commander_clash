@@ -718,7 +718,7 @@ function chooseRingBearer(s: GameState, pid: PlayerId, options: ObjectId[]): Obj
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
-  if (action === "populate" || action === "pair" || (action === "counters" && (counter === "+1/+1" || counter === "shield"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
+  if (action === "populate" || action === "pair" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   const cost = (id: ObjectId) => {
     const o = obj(s, id);
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);

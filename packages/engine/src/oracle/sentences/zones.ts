@@ -10,10 +10,43 @@ import { parseUnlessPays, type Ctx } from "../body";
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // Manifest dread: "Look at the top two cards of your library. Manifest one of them, then put the cards you looked at
+  // that were not manifested this way into your graveyard" (CR 701.62a). With one card left it's manifested; with none,
+  // nothing happens (rulings). "Its controller manifests dread": that player's library and choice.
+  if ((m = /^(?:(Its controller|That creature's controller|That permanent's controller) manifests|[Mm]anifest) dread( twice)?$/.exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : undefined;
+    if (who === null) return null;
+    const one: Effect = { type: "dig", n: 2, count: 1, upTo: false, required: true, into: "manifest", rest: "graveyard", reveal: false, ...(who ? { who } : {}) };
+    return m[2] ? [one, one] : [one];
+  }
+  // "Manifest the top card of your library", "Cloak the top two cards of your library" (CR 701.40a, 701.58a): one at a
+  // time (CR 701.40e).
+  if ((m = new RegExp(`^(?:(Its controller) (manifests|cloaks)|(Manifest|Cloak)) the top (card|${NUM} cards) of (?:your|their) library$`, "i").exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : undefined;
+    if (who === null) return null;
+    if (m[1] ? !/their library$/.test(s) : !/your library$/.test(s)) return null;
+    const n = m[4] === "card" ? 1 : num(m[5]!);
+    if (!Number.isInteger(n) || n < 1) return null;
+    const into = /^cloak/i.test(m[2] ?? m[3]!) ? "cloak" : "manifest";
+    return [{ type: "dig", n, count: n, upTo: false, required: true, into, rest: "graveyard", reveal: false, ...(who ? { who } : {}) }];
+  }
+
   // An instant or sorcery that exiles itself as it resolves, so it isn't put into the graveyard (CR 608.2n);
   // with suspend, it's suspended again (Arc Blade). If it doesn't resolve, it isn't exiled.
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
   if (/^Exile ~$/i.test(s) && ctx.spell) return [{ type: "exileSpell" }];
+  // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
+  if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
+  // "When ~ dies, shuffle it into its owner's library", "When ~ is put into a graveyard from anywhere, ...": the card where
+  // it went. "At the beginning of the end step, ~'s owner shuffles it into their library": the permanent.
+  if (ctx.selfCard && /^[Ss]huffle (?:it|~) into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
+  if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
+  // "The owner of target nonland permanent shuffles it into their library."
+  if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what }] : null;
+  }
+
 
   // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
   // (parseBody joins the two sentences).
@@ -108,6 +141,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "exile", what, until: "sourceLeaves" }] : null;
   }
+  // "When ~ enters, create a 1/1 white Soldier creature token, then attach ~ to it." (Ancestral Blade, like living
+  // weapon, CR 702.92a): the token just created, or the creature just manifested ("manifest dread, then attach ~ to
+  // that creature"). If ~ has left the battlefield, or can't legally be attached, it
+  // stays where it is (CR 701.3b).
+  if (/^Attach ~ to (?:it|that creature)$/i.test(s) && ctx.lastCreated && !ctx.spell) return [{ type: "attach", what: { ref: "created" } }];
   // "When ~ enters, attach it to target creature you control." (CR 701.3)
   if ((m = /^Attach (?:~|it) to (target .+)$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);

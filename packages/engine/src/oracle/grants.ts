@@ -86,6 +86,12 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: "Melee" });
       continue;
     }
+    // Ward is a triggered ability too (CR 702.21a); several instances each trigger (CR 702.21b).
+    const ward = /^ward ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(w) ?? /^ward—pay (\d+) life$/i.exec(w);
+    if (ward) {
+      out.push({ kind: "addAbility", text: /life$/i.test(w) ? `Ward—Pay ${ward[1]} life` : `Ward ${ward[1]}` });
+      continue;
+    }
     const k = parseKeywordList(w);
     if (!k) return null;
     kws.push(...k);

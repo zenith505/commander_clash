@@ -164,6 +164,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
     if (item.kind === "ability") return !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered);
     if (spec.noSpells || !item.objectId) return false;
+    if (spec.targetsWhat && !targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller)) return false;
     // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used.
     return printedMatches(spec, defOf(s, obj(s, item.objectId)));
   }
@@ -184,6 +185,19 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
   return spec.kind === "object" && objectMatches(s, spec, o, controller, true, src);
+}
+
+/**
+ * "A spell that targets a permanent you control": one of its targets is still that object on the battlefield and matches
+ * (it needn't still be a legal target for that spell), or "you" (rulings on Rebuff the Wicked).
+ */
+function targetsMatch(s: GameState, targets: TargetChoice[], what: TargetSpec | "you", controller: PlayerId): boolean {
+  return targets.some((t) => {
+    if (what === "you") return t.kind === "player" && t.id === controller;
+    if (t.kind !== "object") return false;
+    const o = s.objects[t.id];
+    return !!o && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc) && objectMatches(s, what, o, controller, false);
+  });
 }
 
 export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerId, excludeStackId?: string, src?: SourceQuality, sourceId?: ObjectId): ChosenTarget[] {

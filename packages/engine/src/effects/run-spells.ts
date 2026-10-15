@@ -1,11 +1,12 @@
 import type { AbilityBody, Effect, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
 import { manaValue, parseManaCost } from "../mana";
-import { cardIdOf, defOf, isType } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
+import { controllerOf } from "../layers";
 import { shuffle } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { isLegalTarget, legalTargets, sameTarget, sourceQuality, stampTargets } from "./targeting";
+import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, stampTargets } from "./targeting";
 import { ResolveCtx, objects, amountNow } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards } from "./run-library";
@@ -42,6 +43,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const body = { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
       if (e.each === "created") {
         for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
+        return;
+      }
+      if (e.each === "selfCard") {
+        const card = objects(s, { ref: "selfCard" }, ctx)[0];
+        if (card) addDelayed(s, e.when, ctx.controller, card, body);
         return;
       }
       if (e.each === "subject") {
@@ -160,7 +166,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   const item = s.stack[i];
   if (!item) return; // it already left the stack
   const what = item.kind === "spell" ? item.description : `${item.description.split(":")[0]}'s ability`;
-  if (item.objectId && compileCard(defOf(s, obj(s, item.objectId))).cantBeCountered) {
+  if (item.objectId && cantBeCountered(s, item)) {
     log(s, `${item.description} can't be countered.`); // CR 101.2
     return;
   }
@@ -172,6 +178,21 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   s.stack.splice(i, 1);
   if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead ? "library" : "graveyard", instead === "libraryTop" ? { top: true } : {});
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead ? " and puts it on top of its owner's library" : ""}.`);
+}
+
+/**
+ * A spell that can't be countered (CR 101.2): its own "~ can't be countered", or a permanent's "Creature spells you
+ * control can't be countered". The counter effect still does whatever else it does (rulings on Prowling Serpopard).
+ */
+export function cantBeCountered(s: GameState, item: StackItem): boolean {
+  const o = item.objectId ? s.objects[item.objectId] : undefined;
+  if (!o) return false;
+  const d = defOf(s, o);
+  if (compileCard(d).cantBeCountered) return true;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d));
+  });
 }
 
 /**

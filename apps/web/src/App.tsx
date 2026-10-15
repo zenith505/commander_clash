@@ -6,7 +6,7 @@ import {
   canCast,
   castProblem,
   planTurnFaceUp,
-  faceUpCost,
+  faceUpWays,
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
@@ -940,9 +940,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 dispatch(planPlot(s, HUMAN, menu) ?? [{ type: "plot", player: HUMAN, objectId: menu }]);
               }}
-              onTurnFaceUp={() => {
+              onTurnFaceUp={(way) => {
                 setMenu(null);
-                dispatch(planTurnFaceUp(s, HUMAN, menu) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu }]);
+                dispatch(planTurnFaceUp(s, HUMAN, menu, way) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}) }]);
               }}
               onClose={() => setMenu(null)}
             />
@@ -2333,7 +2333,7 @@ function AbilityMenu({
   /** For a card in hand with plot: exile it, to cast it free on a later turn (CR 702.170a). */
   onPlot: () => void;
   /** For your face-down permanent: turn it face up. */
-  onTurnFaceUp: () => void;
+  onTurnFaceUp: (way: number) => void;
   onClose: () => void;
 }) {
   const o = s.objects[objectId]!;
@@ -2344,7 +2344,8 @@ function AbilityMenu({
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
-  const upCost = o.zone === "battlefield" ? faceUpCost(s, o) : undefined;
+  // A manifested card with morph can be turned face up either way (CR 701.40c).
+  const upWays = o.zone === "battlefield" ? faceUpWays(s, o) : [];
   const inYard = o.zone === "graveyard";
   const land = isLand(s, objectId);
   const playable = inHand && (land ? canPlayLand(s, objectId) : canCastWithTaps(s, objectId));
@@ -2401,11 +2402,11 @@ function AbilityMenu({
           Cast face down <ManaCost cost="{3}" size="sm" /> ({faceDownCast.kind})
         </button>
       )}
-      {upCost && (
-        <button disabled={!planTurnFaceUp(s, HUMAN, objectId)} title={turnFaceUpProblem(s, HUMAN, objectId) ?? "A special action: it doesn't use the stack."} onClick={onTurnFaceUp}>
-          Turn face up: {upCost.kind} <ManaCost cost={upCost.cost} size="sm" />
+      {upWays.map((upCost, way) => (
+        <button key={`up${way}`} disabled={!planTurnFaceUp(s, HUMAN, objectId, way)} title={turnFaceUpProblem(s, HUMAN, objectId, way) ?? "A special action: it doesn't use the stack."} onClick={() => onTurnFaceUp(way)}>
+          Turn face up: {upCost.kind === "manifest" || upCost.kind === "cloak" ? "mana cost" : upCost.kind} <ManaCost cost={upCost.cost} size="sm" />
         </button>
-      )}
+      ))}
       {inYard &&
         graveyardWays(s, o).map((g) => {
           const ok = canCastFromGraveyard(s, objectId, g.kind);

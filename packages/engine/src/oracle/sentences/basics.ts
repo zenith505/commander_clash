@@ -17,10 +17,23 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:
+  // "Target player shuffles their graveyard into their library."
+  if ((m = /^(?:(Target player|Each player|Target opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
+    const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
+    if (!who) return null;
+    const out: Effect[] = [{ type: "shuffleZones", who, ...(m[2] !== "graveyard" ? { hand: true as const } : {}), ...(m[2] !== "hand" ? { graveyard: true as const } : {}) }];
+    if (m[3]) {
+      const n = num(m[3]);
+      if (!Number.isInteger(n)) return null;
+      out.push({ type: "draw", who, n });
+    }
+    return out;
+  }
   // "Sacrifice it at end of combat", "destroy that creature at end of combat" (CR 511.2, 603.7), "return ~ to its
   // owner's hand at the beginning of the next cleanup step" (514.3a): a delayed trigger
   // about the source or about the object the trigger was about, with no targets of its own.
-  if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
+  if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step|the beginning of the next end step)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
     const before = ctx.targets.length;
     const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
     if (!inner || ctx.targets.length !== before) return null;
@@ -33,13 +46,19 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     if (!players || refs.size !== 1) return null;
     const [ref] = refs;
-    const when = m[2] === "end of combat" ? "endOfCombat" : "nextCleanup";
+    const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : "nextEndStep";
     if (ref === "subject") return [{ type: "delayed", when, each: "subject", effects: inner, text: m[1]! }];
+    // The Locust God: "When ~ dies, return it to its owner's hand at the beginning of the next end step": about the card
+    // in the graveyard now; if it leaves there first, it stays where it went (rulings).
+    if (ref === "selfCard") return [{ type: "delayed", when, each: "selfCard", effects: JSON.parse(JSON.stringify(inner).replace(/\{"ref":"selfCard"\}/g, '{"ref":"subjectCard"}')) as Effect[], text: m[1]! }];
     if (ref !== "self") return null;
     // The delayed trigger is about the source as it is now: if it leaves, it's a new object (CR 400.7).
     const effects = JSON.parse(JSON.stringify(inner).replace(/\{"ref":"self"\}/g, '{"ref":"subject"}')) as Effect[];
     return [{ type: "delayed", when, effects, text: m[1]! }];
   }
+  // Uro: "When ~ enters, sacrifice it unless it escaped" (CR 702.138b): whether it escaped can't change.
+  if (/^[Ss]acrifice (?:~|it) unless (?:it|~) escaped$/.test(s) && ctx.selfIt && ctx.lastObjectTarget === undefined)
+    return [{ type: "if", cond: { kind: "state", cond: { kind: "self", is: "escaped" } }, effects: [], otherwise: [sacrificeSelf] }];
   // "Sacrifice ~ unless you pay {U}" (upkeep costs): pay to keep it, or it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you pay (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
     const pay = parsePayCost(m[2]!);

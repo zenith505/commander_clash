@@ -31,7 +31,7 @@ describe("mana", () => {
     expect(manaAbilities(signet)).toEqual(["C"]);
     expect(manaAbilities(birds)).toHaveLength(5);
     expect(isFullySupported(birds)).toBe(true);
-    expect(isFullySupported(card("Grow", "Instant", "{G}", { oracleText: "Manifest the top card of your library.\nDraw a card." }))).toBe(false);
+    expect(isFullySupported(card("Grow", "Instant", "{G}", { oracleText: "Open an Attraction.\nDraw a card." }))).toBe(false);
   });
 });
 

@@ -146,6 +146,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = mixedStackSpec(m[1]!);
     return spec && [{ type: "counterSpell", index: addTarget(ctx, spec) }];
   }
+  // "Counter target spell that targets a permanent you control" (Rebuff the Wicked), "... that targets you".
+  if ((m = /^Counter target spell that targets (you|an? .+)$/i.exec(s))) {
+    const what = m[1] === "you" ? "you" : parseTargetPhrase(m[1]!.replace(/^an? /, ""));
+    if (what !== "you" && what?.kind !== "object") return null;
+    return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", targetsWhat: what, text: `target spell that targets ${m[1]}` }) }];
+  }
   if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(`${m[1]}spell`);
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);

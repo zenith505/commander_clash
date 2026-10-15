@@ -1,6 +1,6 @@
 # Roadmap
 
-15,256 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,375 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,13 +14,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (a long tail of 2- and 3-card lines): "when ~ enters, manifest dread, then attach ~ to that
-   creature" (Conductive Machete), "you may cast ~ as though it had flash if you pay {N} more", "when ~ is put into a
-   graveyard from anywhere, shuffle it into its owner's library", "your opponents can't cast spells during your turn",
-   "creature spells you control can't be countered", "~ costs {N} less to cast if you've cast another spell this
-   turn", "counter target spell that targets a permanent you control", "when ~ enters, sacrifice it unless it
-   escaped", "when ~ dies, return it to its owner's hand at the beginning of the next end step", "when ~ enters,
-   create a N/N token, then attach ~ to it" (Ancestral Blade), "equipped creature gets +N/+N and has ward {N}".
+1. By `npm run blockers` (a long tail of 2- and 3-card lines): "earthbend N", "freerunning", "foretell", "ripple N",
+   "emerge", "as long as enchanted permanent is a creature, it gets +N/+N", "assigns combat damage equal to its
+   toughness rather than its power" (CR 510.1c), "equipped creature gets +N/+N and loses flying", "when ~ enters,
+   return another creature you control to its owner's hand", "{N}{G}: target creature blocks ~ this turn if able",
+   "when ~ enters, draw three cards, then put two cards from your hand on top of your library".
 
 ## Known gaps (from earlier rounds)
 
@@ -163,6 +161,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   ("Galadriel", "Samwise", CR 201.5c) aren't recognized as the card itself yet.
 - Phasing: "any number of target", "phases out until ~ leaves the battlefield" (Oubliette, The Moment), "can't phase
   in", "whenever ~ phases in or out", Teferi's Protection; flavor words before an ability ("Teleport —", CR 207.2d).
+- Manifest and cloak: from another player's library ("manifest the top card of that player's library"), from a hand
+  (Scroll of Fate), several cards from a face-down pile (Become Anonymous, Primordial Mist), "manifest dread X times",
+  "whenever you manifest dread", Cloudform's "it becomes an Aura with enchant creature"; Arbiter of the Ideal's
+  manifestation counters. Ward granted with a variable or non-mana cost (Minthara's ward {X}, Mishra's "Ward—Sacrifice a
+  permanent"), Thran Power Suit's "for each Aura and Equipment", Plate Armor's equip reduction, Leyline Immersion's
+  restricted mana ability; anthems for legendary or nonlegendary creatures and "each creature you control with a counter
+  on it" (Flowering of the White Tree, Cathedral Acolyte).
 - Dungeons: "venture into the dungeon" (Lost Mine of Phandelver, Dungeon of the Mad Mage, Tomb of Annihilation) stays
   unsupported until every room of those three is modeled (Tomb's "unless" rooms, the Mad Mage's last rooms); only
   Undercity and the initiative work. Dungeoneer's Pack's compound sentence. "Completed a dungeon" conditions.

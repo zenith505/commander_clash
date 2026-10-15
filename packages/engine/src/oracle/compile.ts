@@ -677,6 +677,26 @@ export function compile(d: CardDef): CompiledCard {
       out.cantBeCountered = true;
       continue;
     }
+    // "Creature spells you control can't be countered." "Creature spells can't be countered." (CR 101.2)
+    const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
+    if (uncounterable && !/\b(this turn|by)\b/.test(line)) {
+      const words = uncounterable[1]!.trim().toLowerCase();
+      const filter = words ? parseTargetPhrase(`${words} spell`) : { kind: "spell" as const, text: "spell" };
+      if (filter?.kind === "spell" && !filter.controller) (out.uncounterable ??= []).push({ filter: { ...filter, text: `${words ? `${words} ` : ""}spells` }, ...(uncounterable[2] ? {} : { anyone: true as const }) });
+      else out.unsupported.push(raw);
+      continue;
+    }
+    if (line === "Your opponents can't cast spells during your turn.") {
+      out.opponentsCantCastYourTurn = true;
+      continue;
+    }
+    // Rout: "You may cast ~ as though it had flash if you pay {2} more to cast it." Paying more is the price of casting it
+    // any time a sorcery couldn't have been cast (see spellCost).
+    const flashCost = /^You may cast ~ as though it had flash if you pay \{(\d+)\} more to cast it\.$/.exec(line);
+    if (flashCost) {
+      out.flashCost = Number(flashCost[1]);
+      continue;
+    }
     const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.

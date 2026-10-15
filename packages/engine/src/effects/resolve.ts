@@ -416,6 +416,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "surveil":
     case "orderTop":
     case "shuffle":
+    case "shuffleIntoLibrary":
+    case "shuffleSpell":
+    case "shuffleZones":
     case "search":
     case "dig":
       return runLibraryEffect(s, e, ctx, src);

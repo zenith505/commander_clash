@@ -107,6 +107,8 @@ export type TriggerSourceEvent =
   | { type: "targeted"; stackId: string }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean }
+  /** A card (or token) was put into a graveyard, from any zone. */
+  | { type: "toGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number }
   /**
@@ -644,6 +646,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         lki,
       );
     }
+  } else if (ev.type === "toGraveyard") {
+    // "When ~ is put into a graveyard from anywhere": the card's ability, in the graveyard (CR 603.6c).
+    const card = s.objects[ev.id];
+    if (card?.zone === "graveyard") add(card, card.owner, (e) => e === "selfToGraveyardAnywhere", compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "discarded") {
     // "Whenever you discard a card", "whenever a player cycles a card": once for each card (CR 603.2c). "That player" is
     // the one who discarded.

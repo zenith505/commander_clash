@@ -1277,6 +1277,13 @@ export interface ActivatedAbility {
    */
   loyalty?: number;
   loyaltyX?: boolean;
+  /**
+   * A mana ability (CR 605.1a): no target, could add mana, moves no card to or from a library. It doesn't use the
+   * stack: it resolves as soon as it's activated (605.3b), even while paying a cost (605.3a). The ones whose costs
+   * and mana fit `ManaAbility` are compiled as those instead; these have other costs ("Sacrifice a creature") or
+   * other instructions ("You gain 1 life").
+   */
+  mana?: true;
 }
 
 /**

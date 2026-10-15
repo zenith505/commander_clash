@@ -145,6 +145,6 @@ describe("returning all land cards, mana for each, greatest mana value", () => {
   });
 
   it("an activated ability with no target that adds mana is a mana ability (CR 605.1a), not one that uses the stack", () => {
-    expect(compileCard(crypt).activated).toHaveLength(0);
+    expect(compileCard(crypt).activated.every((a) => a.mana)).toBe(true);
   });
 });

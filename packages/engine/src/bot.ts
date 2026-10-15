@@ -1421,6 +1421,8 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
+      // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
+      if (ab.mana) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.

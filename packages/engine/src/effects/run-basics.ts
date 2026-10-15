@@ -4,7 +4,7 @@ import { addPhases, draw, gainLife, giveCitysBlessing, log, loseLife, obj, playe
 import { MONARCH } from "../oracle";
 import { invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
-import type { GameObject, GameState, PlayerId, RedirectShield } from "../types";
+import type { GameObject, GameState, ManaType, PlayerId, RedirectShield } from "../types";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
@@ -163,7 +163,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
       const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
-      for (const m of added.matchAll(/\{([WUBRGC])\}/g)) p.manaPool[m[1] as "W"]++;
+      for (const m of added.matchAll(/\{([WUBRGC])\}/g)) {
+        p.manaPool[m[1] as "W"]++;
+        if (s.resolving?.item.manaAbility) (s.resolving.made ??= []).push(m[1] as ManaType);
+      }
       if (added) log(s, `${p.name} adds ${added}.`);
       return;
     }

@@ -9,7 +9,7 @@
 //   heuristics.ts    estimates the bots use (is this harmful, how much damage)
 
 export { objectMatches, bindChosen, ENTERS_COUNTER, choiceOptions, withChoice, sourceQuality, printedMatches, isLegalTarget, legalTargets, sameTarget, canChooseTarget, targetProblem, divisionProblem, stampTargets, hasLegalTargets, legalModes, canChooseModes, modesProblem, pickOptions } from "./targeting";
-export { beginResolution, continueResolution, type Resolution } from "./resolve";
+export { beginResolution, continueResolution, resolveManaAbility, type Resolution } from "./resolve";
 export { becomeMonarch } from "./run-basics";
 export { takeInitiative, dungeonSBAs } from "./run-dungeons";
 export { ringBearer, isRingBearer, timesTempted, loseRingBearer, ringBearerOptions } from "./run-ring";

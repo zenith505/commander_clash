@@ -52,6 +52,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+  "name": "Ashnod's Altar",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a creature: Add {C}{C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ee05fc58-1356-4b2f-b9ce-bda8cc716aee",
   "name": "Augury Raven",
   "manaCost": "{3}{U}",
@@ -1316,6 +1341,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "de2440de-e948-4811-903c-0bbe376ff64d",
+  "name": "Mox Opal",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Metalcraft — {T}: Add one mana of any color. Activate only if you control three or more artifacts.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Metalcraft"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "mps",
+  "releasedAt": "2016-09-30",
+  "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "713332c1-5bd8-400f-bfff-c1ca0697a043",
   "name": "Opt",
   "manaCost": "{U}",
@@ -1373,6 +1431,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8d02b297-97c4-4379-9862-0a462400f66f",
+  "name": "Phyrexian Altar",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a creature: Add one mana of any color.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "uma",
+  "releasedAt": "2018-12-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
   "name": "Plains",
   "manaCost": "",
@@ -1400,6 +1487,31 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1b3d7fce-e9fe-4176-9d9a-472415826cdd",
+  "name": "Pristine Talisman",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}. You gain 1 life.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "brr",
+  "releasedAt": "2022-11-18",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -369,6 +369,11 @@ export interface StackItem {
   event?: TriggerEventInfo;
   /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
   sacrificed?: LastKnown[];
+  /**
+   * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
+   * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
+   */
+  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[] };
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
   ifCond?: StaticCondition;
   /** For a spell: how many spells were cast before it this turn (storm, CR 702.40a). */
@@ -777,6 +782,8 @@ export interface Resolving {
   discarded?: Record<PlayerId, number>;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
+  /** The mana it added, for a mana ability: what the triggered mana abilities of tapping its source see (CR 106.12a). */
+  made?: ManaType[];
   next: number;
   /** Whether the last "you may ..." was done, for a following "If you do, ..." (CR 608.2c). */
   did?: boolean;
@@ -830,7 +837,11 @@ export type Action =
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */
   /** `costs`: what's sacrificed or discarded to pay for it (see ActivatedAbility.costs). */
-  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices }
+  /**
+   * For a mana ability (CR 605.1a), which resolves right away: `mana`, the color for its "one mana of any color" (chosen
+   * as it resolves, CR 605.3b; without it, it's asked); `extra`, as for activateMana.
+   */
+  | { type: "activateAbility"; player: PlayerId; objectId: ObjectId; index: number; targets?: TargetChoice[]; modes?: number[]; tapCreatures?: ObjectId[]; x?: number; costs?: CostChoices; mana?: ManaType; extra?: ManaType[] }
   | { type: "chooseModes"; player: PlayerId; modes: number[] }
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */

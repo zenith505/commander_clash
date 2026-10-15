@@ -1,9 +1,9 @@
 import { kickerName } from "./abilities";
-import type { AbilityBody, ActivatedAbility, AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -21,6 +21,7 @@ import {
   RulesError,
   type Action,
   type CardDef,
+  type Color,
   type ContinuousEffect,
   type CostChoices,
   type ExtraTurn,
@@ -28,6 +29,7 @@ import {
   type GameObject,
   type GameState,
   type LastKnown,
+  type StackItem,
   type ManaType,
   type ObjectId,
   type Player,
@@ -277,6 +279,8 @@ export function applyInPlace(s: GameState, action: Action): void {
   }
   /** Everyone passed in succession: the top of the stack resolved, or the step ended. */
   let allPassed = false;
+  /** An activated mana ability was activated, and has resolved (CR 605.3b). */
+  let manaAbility = false;
   const expected = waitingOn(s);
   if (action.player !== expected) throw new RulesError(`waiting on player ${expected}, not ${action.player}`);
 
@@ -293,11 +297,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       s.passedInSuccession = [];
       break;
     case "activateMana":
-      // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
-      // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
-      // And while helping to pay for a spell with assist, or paying the rest of it (CR 702.132a).
-      // And while declaring attackers, to pay what attacking costs (CR 508.1i).
-      if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "declareAttackers" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
+      if (!paysManaNow(s)) requireNoPending(s);
       activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra);
       break;
     case "castSpell":
@@ -319,8 +319,9 @@ export function applyInPlace(s: GameState, action: Action): void {
       s.passedInSuccession = [];
       break;
     case "activateAbility":
-      requireNoPending(s);
-      activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs);
+      // A mana ability can be activated wherever mana abilities can (CR 605.3a); abilityProblem says which it is.
+      if (!paysManaNow(s)) requireNoPending(s);
+      manaAbility = activateAbility(s, p, action.objectId, action.index, action.targets, action.modes, action.tapCreatures, action.x, action.costs, action.mana, action.extra);
       s.passedInSuccession = [];
       break;
     case "chooseModes":
@@ -400,7 +401,7 @@ export function applyInPlace(s: GameState, action: Action): void {
   }
   // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
-  afterAction(s, action.type === "activateMana");
+  afterAction(s, action.type === "activateMana" || manaAbility);
   watchForMandatoryLoop(s, action, allPassed);
 }
 
@@ -444,6 +445,17 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
   const pend = s.pending;
   if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || pend.how !== "madness") return undefined;
   return compileCard(defOf(s, obj(s, id))).madness;
+}
+
+/**
+ * A decision that asks for a mana payment, during which mana abilities can be activated (CR 605.3a): paying a cost
+ * mid-resolution, like ward's; casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g);
+ * helping to pay for a spell with assist, or paying the rest of it (CR 702.132a); declaring attackers, to pay what
+ * attacking costs (CR 508.1i).
+ */
+export function paysManaNow(s: GameState): boolean {
+  const pd = s.pending;
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && pd.how === "madness");
 }
 
 function requireNoPending(s: GameState) {
@@ -2706,8 +2718,13 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
   } else if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
-  if (s.priority !== pid || s.pending) return "you don't have priority";
-  if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
+  if (ab.mana) {
+    // A mana ability: with priority, or while paying mana for something (CR 605.3a), even under split second (702.61b).
+    if (!(s.priority === pid && !s.pending) && !(paysManaNow(s) && waitingOn(s) === pid)) return "you can't activate mana abilities now";
+  } else {
+    if (s.priority !== pid || s.pending) return "you don't have priority";
+    if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
+  }
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid)) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
@@ -2820,7 +2837,11 @@ function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number
   return total >= n ? null : `those creatures have total power ${total}; ${what} ${n} needs ${n} or more`;
 }
 
-function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices) {
+/**
+ * Activate an ability (CR 602.2). Returns whether it was a mana ability, which resolved right away instead of going on
+ * the stack (CR 605.3b). `mana` and `extra`: for a mana ability, as for activateMana.
+ */
+function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices, mana?: ManaType, extra?: ManaType[]): boolean {
   const o = obj(s, id);
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
@@ -2831,6 +2852,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
+  const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
+  if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets);
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
@@ -2868,7 +2891,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
-  s.stack.push({
+  const item: StackItem = {
     id: stackId,
     kind: "ability",
     sourceId: id,
@@ -2884,7 +2907,15 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
-  });
+    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}) } } : {}),
+  };
+  if (manaPick) {
+    // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
+    log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
+    resolveManaAbility(s, item, body, manaPick.mana);
+    return true;
+  }
+  s.stack.push(item);
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
   else if (ab.crew !== undefined) log(s, `${p.name} ${ab.saddle ? "saddles" : "crews"} ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
@@ -2896,6 +2927,42 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     log(s, `${p.name} activates ${d.name} (${what.replace(/~/g, d.name).replace(/\.$/, "")})${abCost.hasX ? ` with X=${x ?? 0}` : ""}${describeTargets(s, targets)}.`);
   }
   fireEvent(s, { type: "targeted", stackId });
+  return false;
+}
+
+/**
+ * The choices for activating a mana ability that resolves right away: the color for "one mana of any color" and the
+ * picks for the triggered mana abilities tapping its source triggers (CR 605.4a). Without a color, it's asked as it
+ * resolves, which can't happen while another decision is open (paying for ward, say). Throws if a choice is missing.
+ */
+function manaAbilityPick(s: GameState, pid: PlayerId, o: GameObject, index: number, mana?: ManaType, extra?: ManaType[]): { mana?: Color; extra?: ManaType[] } {
+  const name = characteristics(s, o).name;
+  const ab = abilitiesOf(s, o).activated[index]!;
+  const options = activatedManaOptions(s, o, index);
+  const sameExtra = (x: { extra?: ManaType[] }) => (x.extra ?? []).length === (extra ?? []).length && (x.extra ?? []).every((m, i) => m === extra![i]);
+  if (options) {
+    const colors = [...new Set(options.map((x) => x.mana))];
+    if (mana === undefined) {
+      if (colors.length === 1) mana = colors[0]!; // fixed mana: nothing to choose
+      else {
+        // The color is chosen as it resolves (CR 608.2d): not inside another decision, and only if that's the only choice.
+        if (s.pending) throw new RulesError(`choose the mana ${name} adds`);
+        if (options.length !== colors.length) throw new RulesError(`choose the mana that tapping ${name} also adds`);
+        return {};
+      }
+    }
+    const ofColor = options.filter((x) => x.mana === mana);
+    if (!ofColor.length) throw new RulesError(`${name} can't add {${mana}}`);
+    const pick = ofColor.length === 1 ? ofColor[0]! : ofColor.find(sameExtra);
+    if (!pick) throw new RulesError(`choose the mana that tapping ${name} also adds`);
+    // A color only for "one mana of any color" (a fixed {C}{C} has none to choose).
+    return { ...(activatedAsMana(ab)!.produces.kind === "oneOf" ? { mana: mana as Color } : {}), ...(pick.extra ? { extra: pick.extra } : {}) };
+  }
+  if (mana !== undefined) throw new RulesError(`${name}'s ability has no color to choose before it resolves`);
+  // What it adds isn't known until it resolves ("add {G}{G} instead"): it can't be activated if what tapping it
+  // triggers would then need a choice (Fertile Ground's color), which isn't modeled yet.
+  if (ab.tap && manaTriggerResults(s, pid, o, { tap: true } as ManaAbility, ["W", "U"]).length > 1) throw new RulesError(`${name}'s mana ability can't be used yet with what tapping it for mana triggers`);
+  return {};
 }
 
 function chooseTriggerModes(s: GameState, p: Player, modes: number[]) {
@@ -4594,6 +4661,7 @@ export function availableMana(s: GameState, pid: PlayerId): number {
       const most = Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
       best = Math.max(best, most - manaValue(parseManaCost(ab.manaCost)));
     });
+    for (const { ab, options } of payableActivatedMana(s, pid, o)) best = Math.max(best, Math.max(0, ...options.map((x) => x.adds.length)) - manaValue(parseManaCost(ab.manaCost)));
     n += best;
   }
   return n;

@@ -53,6 +53,7 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   if (x === "defending player" && ctx.defending) return { ref: "eventPlayer" };
+  if (x === "enchanted player" || x === "enchanted opponent") return { ref: "enchantedPlayer" };
   // "Target player discards two cards. ... that player discards a card": the player targeted before.
   if (x === "that player" && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {

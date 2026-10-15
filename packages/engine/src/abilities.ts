@@ -150,7 +150,7 @@ export interface TargetSpec {
    * "Target creature that player controls" in a trigger about a player ("Whenever ~ deals combat damage to a
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
    */
-  controller?: "you" | "opponent" | "eventPlayer";
+  controller?: "you" | "opponent" | "eventPlayer" | "enchanted";
   controlledBy?: PlayerId;
   /** For players: only opponents. */
   opponent?: boolean;
@@ -270,7 +270,11 @@ export type PlayerRef =
   | { ref: "eachPlayer" }
   | { ref: "targetController"; index: number } // "its controller"
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
-  | { ref: "eventPlayer" };
+  | { ref: "eventPlayer" }
+  /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
+  | { ref: "enchantedPlayer" }
+  /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
+  | { ref: "opponentsAttackingEventPlayer" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -413,7 +417,8 @@ export type Affects =
       types: string[]; // all of these card types, e.g. ["Creature"]
       subtypes?: string[]; // any of these subtypes
       colors?: Color[]; // any of these colors
-      controller?: "you" | "opponent";
+      /** `enchanted`: the player the source Aura enchants controls them ("creatures enchanted player controls"). */
+      controller?: "you" | "opponent" | "enchanted";
       other?: boolean; // "other creatures ..." excludes the source
       /** Backgrounds' "Commander creatures you own" (CR 903.3): commanders owned by the source's controller. */
       ownedCommanders?: boolean;
@@ -1001,6 +1006,10 @@ export type TriggerEvent =
   | "playerDraws"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
+  /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
+  | "creatureAttacksEnchantedPlayer"
+  /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
+  | "enchantedPlayerAttacked"
   /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
   | "playerDiscards"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
@@ -1046,11 +1055,12 @@ export interface TriggeredAbility {
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
-  cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec; orCopy?: boolean; nth?: number };
+  /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
-  draws?: { by: "you" | "opponent" | "any"; nth?: number };
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -1132,6 +1142,8 @@ export interface TriggeredAbility {
   hostControllersUpkeep?: true;
   /** "At the beginning of each opponent's upkeep / draw step / end step": an "each" step trigger only on an opponent's turn. */
   opponentsTurn?: true;
+  /** "At the beginning of enchanted player's upkeep": an "each" step trigger only on the turn of the player this Aura enchants. */
+  enchantedPlayersTurn?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
 }
@@ -1465,7 +1477,7 @@ export interface CompiledCard {
    * "Each player can't cast more than one spell each turn" (Rule of Law), "... one noncreature spell": counting every
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
    */
-  castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
+  castLimits?: { who: "each" | "you" | "enchanted"; filter?: TargetSpec; text: string }[];
   /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
   beginOnBattlefield?: boolean;
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
@@ -1477,7 +1489,7 @@ export interface CompiledCard {
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
   drawTwoInstead?: true;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
-  cantGainLife?: "all" | "opponents";
+  cantGainLife?: "all" | "opponents" | "enchanted";
   /** "Damage can't be prevented." (CR 615.12) */
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */

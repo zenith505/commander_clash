@@ -212,6 +212,20 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "eventPlayer":
       return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
+    case "enchantedPlayer": {
+      // The player this Aura is attached to, or was as it last existed (CR 608.2h).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me) return [];
+      const lk = s.lastKnown?.[me.id];
+      const p = me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.attachedToPlayer : lk && lk.zc === ctx.sourceZc ? lk.attachedToPlayer : undefined;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
+    case "opponentsAttackingEventPlayer": {
+      // "A player is attacking another player if they control a creature that's attacking that player" (rulings).
+      const p = ctx.event?.player;
+      if (p === undefined) return [];
+      return opponents(s, ctx.controller).filter((q) => s.battlefield.some((id) => s.objects[id]!.attacking === p && !s.objects[id]!.attackingPermanent && controllerOf(s, s.objects[id]!) === q));
+    }
     case "subjectController": {
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
       if (!o) return [];

@@ -126,6 +126,7 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   if ((x === "that player's" || x === "their") && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
   // "At the beginning of each opponent's upkeep, ~ deals X damage to that player, where X is the number of cards in their hand".
   if ((x === "that player's" || x === "their") && ctx.eventPlayer) return { ref: "eventPlayer" };
+  if (x === "enchanted player's" || x === "enchanted opponent's") return { ref: "enchantedPlayer" };
   return null;
 }
 

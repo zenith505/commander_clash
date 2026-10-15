@@ -490,6 +490,8 @@ export function moveObject(
     top?: boolean;
     controller?: PlayerId;
     attachTo?: ObjectId;
+    /** An Aura with "enchant player" enters attached to this player (CR 303.4f). */
+    attachToPlayer?: PlayerId;
     tapped?: boolean;
     /** Counters it enters the battlefield with (persist, undying). */
     counters?: Record<string, number>;
@@ -577,7 +579,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}) };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}) };
   }
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
   const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
@@ -640,6 +642,7 @@ export function moveObject(
   o.band = undefined;
   o.timestamp = s.nextTimestamp++; // CR 613.7d
   o.attachedTo = to === "battlefield" ? opts.attachTo : undefined;
+  o.attachedToPlayer = to === "battlefield" ? opts.attachToPlayer : undefined;
   if (fromZone === "battlefield") {
     // It's a new object now (CR 400.7): effects locked onto it end, and things attached to it
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
@@ -773,16 +776,16 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
       moveObject(s, c.id, "hand");
       continue;
     }
-    let attachTo: ObjectId | undefined;
+    let host: AuraHost | undefined;
     if (d.subtypes.includes("Aura")) {
-      attachTo = auraHostFor(s, c, c.owner);
-      if (!attachTo) {
+      host = auraHostFor(s, c, c.owner);
+      if (!host) {
         log(s, `${d.name} stays in exile (nothing it can enchant).`);
         continue;
       }
     }
-    log(s, `${d.name} returns to the battlefield (${source} left)${attachTo ? ` attached to ${nameOf(s, attachTo)}` : ""}.`);
-    moveObject(s, c.id, "battlefield", { controller: c.owner, ...(attachTo ? { attachTo } : {}) });
+    log(s, `${d.name} returns to the battlefield (${source} left)${host ? ` attached to ${auraHostName(s, host)}` : ""}.`);
+    moveObject(s, c.id, "battlefield", { controller: c.owner, ...host });
   }
 }
 
@@ -791,9 +794,23 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
  * ability allows (it isn't targeted, so hexproof doesn't stop it). The player picks: one of their own
  * if the Aura only helps what it enchants, an opponent's otherwise.
  */
-export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): ObjectId | undefined {
+export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): AuraHost | undefined {
   const enchant = compileCard(defOf(s, aura)).enchant;
   if (!enchant) return undefined;
+  // "Enchant player" (CR 702.5d): a player, not targeted. Curses hurt the player they enchant: an opponent.
+  if (enchant.kind === "player") {
+    const p = opponents(s, pid)[0] ?? (enchant.opponent ? undefined : pid);
+    return p === undefined ? undefined : { attachToPlayer: p };
+  }
+  const id = auraObjectHost(s, aura, pid, enchant);
+  return id ? { attachTo: id } : undefined;
+}
+
+/** Where an Aura goes as it's put onto the battlefield: the permanent or the player it's attached to. */
+export type AuraHost = { attachTo: ObjectId } | { attachToPlayer: PlayerId };
+export const auraHostName = (s: GameState, h: AuraHost) => ("attachTo" in h ? nameOf(s, h.attachTo) : player(s, h.attachToPlayer).name);
+
+function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec): ObjectId | undefined {
   const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
@@ -915,9 +932,9 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
 
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
-  const stops = (who: "all" | "opponents" | undefined, controller: PlayerId) => who === "all" || (who === "opponents" && controller !== pid);
+  const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
   if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
-  return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id))));
+  return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
 }
 
 /** Can damage be prevented now, or does a "damage can't be prevented" effect stop prevention effects (CR 615.12)? */
@@ -1478,8 +1495,14 @@ function resolveTop(s: GameState) {
     if (enchant) {
       // An Aura spell's target is checked on resolution like any other (CR 608.2b); it enters attached to it (CR 303.4f).
       const t = item.targets?.[0];
-      const legal = !!t && t.kind === "object" && isLegalTarget(s, enchant, t, item.controller, d);
-      if (legal) {
+      const legal = !!t && (t.kind === "object" || t.kind === "player") && isLegalTarget(s, enchant, t, item.controller, d);
+      if (legal && t.kind === "player") {
+        // "Enchant player" (CR 702.5d): it enters attached to the player.
+        log(s, `${d.name} resolves and enters attached to ${player(s, t.id).name}.`);
+        moveObject(s, o.id, "battlefield", { controller: item.controller, attachToPlayer: t.id });
+        return;
+      }
+      if (legal && t.kind === "object") {
         log(s, `${d.name} resolves and enters attached to ${nameOf(s, t.id)}.`);
         moveObject(s, o.id, "battlefield", { controller: item.controller, attachTo: t.id });
         return;
@@ -2268,6 +2291,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | nul
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
+      if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;
       if (l.filter && !printedMatches(l.filter, d)) continue;
       if ((s.castThisTurn ?? []).some((c) => c.player === pid && (!l.filter || printedMatches(l.filter, s.cards[c.card]!))))
         return `${characteristics(s, o).name}: ${l.text.replace(/~/g, characteristics(s, o).name).replace(/\.$/, "")}`;
@@ -3879,7 +3903,18 @@ function attachmentSBAs(s: GameState): boolean {
     if (!o || o.zone !== "battlefield") continue;
     const c = characteristics(s, o);
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    if (c.subtypes.includes("Aura")) {
+    if (c.subtypes.includes("Aura") && compileCard(defOf(s, o)).enchant?.kind === "player") {
+      // An Aura with "enchant player" stays only while attached to a player still in the game that it can enchant
+      // (CR 303.4d, 704.5m): "enchant opponent" checks against its controller now, so a change of control can end it.
+      const p = o.attachedToPlayer;
+      const enchant = compileCard(defOf(s, o)).enchant!;
+      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p));
+      if (!legal) {
+        log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+      }
+    } else if (c.subtypes.includes("Aura")) {
       const enchant = compileCard(defOf(s, o)).enchant;
       // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
       // effect that "doesn't remove" this Aura.
@@ -3908,9 +3943,10 @@ function attachmentSBAs(s: GameState): boolean {
         log(s, `${c.name} becomes unattached.`);
         changed = true;
       }
-    } else if (o.attachedTo) {
+    } else if (o.attachedTo || o.attachedToPlayer !== undefined) {
       // A creature, or anything that's no longer an Aura or Equipment, can't stay attached (CR 704.5p).
       o.attachedTo = undefined;
+      o.attachedToPlayer = undefined;
       invalidateCharacteristics(s);
       log(s, `${c.name} becomes unattached.`);
       changed = true;

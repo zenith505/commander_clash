@@ -632,16 +632,16 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Each player can't cast more than one spell each turn", "... more than one noncreature spell", Ethersworn Canonist's
     // "Each player who has cast a nonartifact spell this turn can't cast additional nonartifact spells" (the same rule).
-    const limit = /^(Each player|You) can't cast more than one (?:(.+?) )?spell each turn\.$/.exec(line) ?? /^(Each player) who has cast an? (.+?) spell this turn can't cast additional \2 spells\.$/.exec(line);
+    const limit = /^(Each player|You|Enchanted player) can't cast more than one (?:(.+?) )?spell each turn\.$/.exec(line) ?? /^(Each player) who has cast an? (.+?) spell this turn can't cast additional \2 spells\.$/.exec(line);
     if (limit) {
       const filter = limit[2] ? parseTargetPhrase(`${limit[2]} spell`) : undefined;
       if (filter === null || (filter && filter.kind !== "spell")) out.unsupported.push(raw);
-      else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
+      else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : limit[1] === "Enchanted player" ? "enchanted" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
       continue;
     }
-    const noGain = /^(Players|Your opponents) can't gain life\.$/.exec(line);
+    const noGain = /^(Players|Your opponents|Enchanted player) can't gain life\.$/.exec(line);
     if (noGain) {
-      out.cantGainLife = noGain[1] === "Players" ? "all" : "opponents";
+      out.cantGainLife = noGain[1] === "Players" ? "all" : noGain[1] === "Enchanted player" ? "enchanted" : "opponents";
       continue;
     }
     if (line === "Damage can't be prevented.") {
@@ -784,6 +784,8 @@ export function compile(d: CardDef): CompiledCard {
     if (enchant) {
       const spec = parseTargetPhrase(enchant[1]!);
       if (spec?.kind === "object" && !out.enchant) out.enchant = { ...spec, text: `${spec.text.replace(/^target /, "")} to enchant` };
+      // "Enchant player", "Enchant opponent" (CR 702.5d): the Aura spell targets a player, and it's attached to one.
+      else if (/^(player|opponent)$/.test(enchant[1]!) && !out.enchant) out.enchant = { kind: "player", ...(enchant[1] === "opponent" ? { opponent: true } : {}), text: `${enchant[1]} to enchant` };
       else out.unsupported.push(raw);
       continue;
     }

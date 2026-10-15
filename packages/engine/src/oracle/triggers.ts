@@ -1,4 +1,4 @@
-import type { TriggeredAbility, SpellCondition, TargetSpec, TriggerEvent } from "../abilities";
+import type { Effect, TriggeredAbility, SpellCondition, TargetSpec, TriggerEvent } from "../abilities";
 import { NUM, X, num, singularWord } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
@@ -173,8 +173,8 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
  * "Whenever you cast a noncreature spell", "Whenever an opponent casts a creature spell",
  * "Whenever a player casts a spell", magecraft's "whenever you cast or copy an instant or sorcery spell".
  */
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|a player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
-const CAST_BY = { you: "you", "an opponent": "opponent", "a player": "any" } as const;
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|a player|enchanted player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
+const CAST_BY = { you: "you", "an opponent": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
 
 /**
  * "When ~ becomes the target of a spell, sacrifice it", "Whenever ~ becomes the target of a spell or ability for the first
@@ -233,9 +233,10 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!m) return null;
   let phrase = m[2]!;
   if (m[3]) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
-  const filter = parseTargetPhrase(phrase);
+  const ench = ENCHANTED_CONTROLS.test(phrase);
+  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase);
   if (!filter || filter.kind !== "object") return "fail";
-  const body = parseBody(m[4]!, { subjectIt: true });
+  const body = parseBody(ench ? m[4]!.replace(/\bthat player\b/g, "enchanted player") : m[4]!, { subjectIt: true });
   if (!body) return "fail";
   const kind = m[1]!.toLowerCase();
   return {
@@ -243,6 +244,14 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
     enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
     body,
   };
+}
+
+const ENCHANTED_CONTROLS = / enchanted (?:player|opponent) controls$/;
+
+/** "A creature enchanted player controls" (an Aura with "enchant player", CR 702.5d), only in enters and dies triggers. */
+function enchantedControls(phrase: string): TargetSpec | null {
+  const spec = parseTargetPhrase(phrase.replace(ENCHANTED_CONTROLS, " you control"));
+  return spec?.kind === "object" && spec.controller === "you" ? { ...spec, controller: "enchanted" } : null;
 }
 
 const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) dies, (.+)$/;
@@ -256,14 +265,16 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const attached = /^When(?:ever)? (equipped|enchanted) creature dies, (.+)$/.exec(line);
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
-  const bodyText = attached ? attached[2]! : m![3]!;
+  const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
+  // "That player" in a trigger about what enchanted player controls is that player.
+  const bodyText = (attached ? attached[2]! : m![3]!).replace(ench ? /\bthat player\b/g : /$^/, "enchanted player");
   const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true });
   if (!body) return "fail";
   if (attached) return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
   let phrase = m![2]!;
   const damaged = / dealt damage by ~ this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
-  const filter = parseTargetPhrase(phrase);
+  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase);
   if (!filter || filter.kind !== "object") return "fail";
   const kind = m![1]!.toLowerCase();
   return {
@@ -376,11 +387,11 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
+  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
   if (!m) return null;
-  const body = parseBody(m[4]!, { eventPlayer: true });
+  const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
   if (!body) return "fail";
-  const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
+  const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : /^enchanted /.test(m[1]!) ? "enchanted" : "any";
   const nth = m[3] ? { first: 1, second: 2, third: 3 }[m[3] as "first"] : undefined;
   return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}) }, body };
 }
@@ -415,6 +426,42 @@ function parseExploitsTrigger(line: string): TriggeredAbility | "fail" | null {
   const body = parseBody(m[2]!);
   if (!body) return "fail";
   return { event: "creatureYouControlExploits", body, ...(filter ? { subjectFilter: { ...filter, text: m[1]! } } : {}) };
+}
+
+/** "They lose 2 life", "~ deals 2 damage to them": the trigger's player, "that player". */
+const theyAreThatPlayer = (text: string) => text.replace(/^they (lose|draw|discard|mill|sacrifice|exile)s? /, (_, v: string) => `that player ${v === "lose" ? "loses" : `${v}s`} `).replace(/ to them\.$/, " to that player.");
+
+/**
+ * Triggers about the player an Aura with "enchant player" enchants (CR 702.5d): "At the beginning of enchanted player's
+ * upkeep" (only on that player's turn; "that player" is that player), "Whenever a creature attacks enchanted player"
+ * (that creature is the subject), "Whenever enchanted player is attacked" (once as attackers are declared; "each
+ * opponent attacking that player does the same": each opponent of its controller with a creature attacking them).
+ */
+function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | null {
+  const step = /^At the beginning of enchanted (?:player|opponent)'s (upkeep|draw step|end step), (.+)$/.exec(line);
+  if (step) {
+    const event = step[1] === "upkeep" ? "eachUpkeep" : step[1] === "draw step" ? "eachDrawStep" : "eachEndStep";
+    // "That player draws two additional cards" in their draw step: a trigger, so they just draw two more.
+    const body = parseBody(theyAreThatPlayer(step[2]!).replace(/^that player draws (\w+) additional cards?\.$/, "that player draws $1 cards."), { eventPlayer: true });
+    return body ? { event, body, enchantedPlayersTurn: true } : "fail";
+  }
+  const attacks = /^Whenever a creature attacks enchanted player, (.+)$/.exec(line);
+  if (attacks) {
+    const body = parseBody(attacks[1]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true });
+    return body ? { event: "creatureAttacksEnchantedPlayer", body } : "fail";
+  }
+  const attacked = /^Whenever enchanted player is attacked, (.+)$/.exec(line);
+  if (attacked) {
+    const same = / Each opponent attacking that player does the same\.$/;
+    const body = parseBody(attacked[1]!.replace(same, ""), { eventPlayer: true });
+    if (!body) return "fail";
+    if (!same.test(attacked[1]!)) return { event: "enchantedPlayerAttacked", body };
+    // "Does the same": what "you" did, for each of them.
+    const again = body.effects.map((e) => ((e.type === "draw" || e.type === "gainLife" || e.type === "createToken") && e.who.ref === "you" ? { ...e, who: { ref: "opponentsAttackingEventPlayer" as const } } : null));
+    if (body.targets.length || again.some((e) => !e)) return "fail";
+    return { event: "enchantedPlayerAttacked", body: { ...body, effects: [...body.effects, ...(again as Effect[])], text: attacked[1]! } };
+  }
+  return null;
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
@@ -502,6 +549,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(oppStep[2]!.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
     return body ? { event, body, opponentsTurn: true } : "fail";
   }
+  const enchanted = parseEnchantedPlayerTrigger(line);
+  if (enchanted) return enchanted;
   // Heroic before the other "whenever you cast" triggers.
   const heroic = /^Whenever you cast a spell that targets ~, (.+)$/.exec(line);
   if (heroic) {

@@ -1602,6 +1602,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Saddled
           </span>
         )}
+        {o.attachedToPlayer !== undefined && (
+          <span className="chip other" title={`${s.players[controllerOf(s, o)]!.name}'s Aura, enchanting ${s.players[o.attachedToPlayer]!.name}.`}>
+            On {s.players[o.attachedToPlayer]!.name}
+          </span>
+        )}
         {copying && (
           <span
             className={`chip ${copyEnds ? "temp" : "other"}`}
@@ -1739,11 +1744,12 @@ function Seat({
   // the Menagerie), or when you may play it.
   const topCanPlay = pid === HUMAN && !s.pending && topPlayable(s, HUMAN).some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)));
   const topShown = topVisible(s, pid, HUMAN) || (pid === HUMAN && topPlayable(s, HUMAN).length > 0);
-  // Auras and Equipment sit with whatever they're attached to, even in another player's area.
+  // Auras and Equipment sit with whatever they're attached to, even in another player's area; a Curse with the
+  // player it enchants.
   const onField = new Set(s.battlefield);
   const mine = s.battlefield
     .map((id) => s.objects[id]!)
-    .filter((o) => controllerOf(s, o) === pid && !(o.attachedTo && onField.has(o.attachedTo)));
+    .filter((o) => (o.attachedToPlayer !== undefined ? o.attachedToPlayer === pid : controllerOf(s, o) === pid && !(o.attachedTo && onField.has(o.attachedTo))));
   const phasedOut = (s.phasedOut ?? []).filter((id) => s.objects[id]!.phased?.by === pid);
   const lands = mine.filter((o) => isLand(s, o.id));
   const others = mine.filter((o) => !isLand(s, o.id));

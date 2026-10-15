@@ -377,7 +377,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // what it can enchant (CR 303.4d), neither to something with protection from it (CR 702.16c-d).
       const enchant = compileCard(defOf(s, me)).enchant;
       const meChars = characteristics(s, me);
-      if (meChars.subtypes.includes("Aura") ? !enchant || !objectMatches(s, enchant, host, ctx.controller, false, meChars) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, ctx.controller, false, meChars)) return;
+      if (meChars.subtypes.includes("Aura") ? enchant?.kind !== "object" || !objectMatches(s, enchant, host, ctx.controller, false, meChars) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, ctx.controller, false, meChars)) return;
       const was = me.attachedTo;
       me.attachedTo = host.id;
       me.timestamp = s.nextTimestamp++;

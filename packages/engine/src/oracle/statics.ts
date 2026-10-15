@@ -249,6 +249,17 @@ export function parsePreventAll(text: string): { subject: string; mod: Extract<M
 function parseAffected(subject: string): Affects | null {
   const x = subject.trim();
   if (x === "~") return { kind: "self" };
+  // "Creatures enchanted player controls" (an Aura with "enchant player", CR 702.5d): the group "you control" names,
+  // controlled by the player the Aura is attached to.
+  const enchanted = / enchanted (?:player|opponent) controls$/;
+  if (enchanted.test(x)) {
+    const a = parseAffected(x.replace(enchanted, " you control"));
+    if (a?.kind !== "filter" || a.other || a.ownedCommanders) return null;
+    if (a.controller === "you") return { ...a, controller: "enchanted" };
+    if (a.spec?.controller !== "you" || a.controller) return null;
+    const { controller: _, ...spec } = a.spec;
+    return { ...a, spec, controller: "enchanted" };
+  }
   if (/^(Enchanted|Equipped) (creature|permanent|artifact|land)$/.test(x)) return { kind: "attached" };
   let m = /^(Other )?((?:[A-Z]?[a-z]+ )*?)creatures (you control|your opponents control)$/i.exec(x);
   if (m) {

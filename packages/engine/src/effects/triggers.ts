@@ -147,7 +147,7 @@ function diesMatches(
     if (d.orSelf) return true;
     if (d.other) return false;
   }
-  return objectMatches(s, d.filter, dying.o, you, false, undefined, dying.c);
+  return objectMatches(s, bindEnchanted(d.filter, s.objects[srcId]), dying.o, you, false, undefined, dying.c);
 }
 
 /** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */
@@ -156,7 +156,14 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
     if (en.orSelf) return true;
     if (en.other) return false;
   }
-  return objectMatches(s, en.filter, entering, you, false);
+  return objectMatches(s, bindEnchanted(en.filter, o), entering, you, false);
+}
+
+/** "A creature enchanted player controls": the player the watching Aura is attached to now. */
+function bindEnchanted(spec: TargetSpec, aura: GameObject | undefined): TargetSpec {
+  if (spec.controller !== "enchanted" || aura?.attachedToPlayer === undefined) return spec;
+  const { controller: _, ...rest } = spec;
+  return { ...rest, controlledBy: aura.attachedToPlayer };
 }
 
 /** Record every triggered ability that `ev` triggers. They go on the stack the next time a player would get priority. */
@@ -485,6 +492,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
+    // "Whenever a creature attacks enchanted player": not one attacking a planeswalker of theirs (rulings).
+    if (o.attacking !== undefined && !o.attackingPermanent)
+      for (const id of s.battlefield) {
+        const aura = obj(s, id);
+        if (aura.attachedToPlayer === o.attacking) add(aura, controllerOf(s, aura), (e) => e === "creatureAttacksEnchantedPlayer", undefined, undefined, o);
+      }
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     const groupWatch = (o: GameObject) => {
@@ -501,6 +514,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
+    // "Whenever enchanted player is attacked": once, however many creatures attack them; not for a planeswalker (rulings).
+    if (ev.type === "groupAttack") {
+      const attacked = new Set(ev.ids.map((x) => s.objects[x]).filter((a) => a?.attacking !== undefined && !a.attackingPermanent).map((a) => a!.attacking!));
+      for (const id of s.battlefield) {
+        const aura = obj(s, id);
+        if (aura.attachedToPlayer !== undefined && attacked.has(aura.attachedToPlayer))
+          add(aura, controllerOf(s, aura), (e) => e === "enchantedPlayerAttacked", undefined, undefined, undefined, undefined, undefined, undefined, { player: aura.attachedToPlayer });
+      }
+    }
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
@@ -595,7 +617,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
-        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you)) return false;
+        if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length !== t.cast.nth) return false;
         return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
@@ -685,7 +707,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => {
         if (e !== "playerDraws" || !t.draws) return false;
         const by = t.draws.by;
-        if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you)) return false;
+        if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you) || (by === "enchanted" && o.attachedToPlayer !== ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
@@ -731,7 +753,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active))), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
   }

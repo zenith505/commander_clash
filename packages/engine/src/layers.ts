@@ -511,6 +511,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (a.colors?.length && !a.colors.some((col) => c.colors.includes(col))) continue;
     if (a.controller === "you" && c.controller !== you) continue;
     if (a.controller === "opponent" && c.controller === you) continue;
+    if (a.controller === "enchanted" && c.controller !== s.objects[e.sourceId!]?.attachedToPlayer) continue;
     if (a.ownedCommanders && !(s.objects[id]!.isCommander && s.objects[id]!.owner === you)) continue;
     if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c)) continue;
     out.push(id);

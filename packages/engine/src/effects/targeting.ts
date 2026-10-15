@@ -1,7 +1,7 @@
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Range, TargetChoice, TargetSpec } from "../abilities";
 import { manaValue, parseManaCost } from "../mana";
 import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { livingPlayers, obj, player } from "../game";
+import { creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
 import { modeCountProblem } from "../modes";
 import { CREATURE_TYPES, type SourceQuality } from "../keywords";
@@ -209,7 +209,16 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;
-  return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t));
+  return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) && relatedOk(s, spec, chosen, t);
+}
+
+/** "From a single graveyard", "that share a creature type": how this target relates to the others of its group already chosen. */
+function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[], t: TargetChoice): boolean {
+  if (t.kind !== "object") return true;
+  const others = (idx: number[] | undefined) => (idx ?? []).flatMap((j) => { const c = chosen[j]; const o = c?.kind === "object" ? s.objects[c.id] : undefined; return o ? [o] : []; });
+  const o = obj(s, t.id);
+  if (others(spec.sameGraveyardAs).some((x) => x.owner !== o.owner)) return false;
+  return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));
 }
 
 /**
@@ -263,7 +272,7 @@ export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined):
 export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   const options = specs.map((spec, i) => (spec.optional ? [] : legalTargets(s, spec, controller, undefined, src).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !specs[i]!.optional && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {
@@ -273,7 +282,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
       return fill(i + 1);
     }
     for (const t of options[i]!) {
-      if ((specs[i]!.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t))) continue;
+      if ((specs[i]!.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) || !relatedOk(s, specs[i]!, chosen, t)) continue;
       chosen[i] = t;
       if (fill(i + 1)) return true;
     }

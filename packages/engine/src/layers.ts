@@ -362,8 +362,22 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
       return n <= cond.max;
     }
+    case "life": {
+      const life = s.players[you]?.life ?? 0;
+      return (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
+    }
     case "opponentLostLife":
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "drawn": {
+      const d = s.players[you]?.draws;
+      return d?.turn === s.turn && d.n >= cond.n;
+    }
+    case "descended":
+      return (s.descendedThisTurn ?? []).includes(you);
+    case "revolt":
+      return (s.permanentLeftThisTurn ?? []).includes(you);
+    case "void":
+      return !!s.voidThisTurn;
     case "attachedIs": {
       const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
       const c = host && chars.get(host.id);
@@ -728,7 +742,7 @@ function countSignature(s: GameState): string {
     const o = s.objects[id]!;
     if (o.tapped || o.attacking !== undefined || o.blocking) parts.push(`${id}${o.tapped ? "t" : ""}${o.attacking !== undefined ? "a" : ""}${o.blocking ? "b" : ""}`);
   }
-  parts.push(`${s.activePlayer}`);
+  parts.push(`${s.activePlayer}`, `${s.turn}`); // and "this turn" conditions start over each turn
   return parts.join("|");
 }
 

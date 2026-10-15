@@ -15,16 +15,17 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Sacrificing (CR 701.21): "sacrifice ~", "sacrifice it" (the permanent itself)
   if ((m = /^Sacrifice (~|it)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what?.ref === "self" ? [{ type: "sacrifice", what }] : null;
+    // "It" in a trigger about another permanent (Grafted Wargear's "sacrifice that permanent"): only if you control it (CR 701.21a).
+    return what?.ref === "self" || what?.ref === "subject" ? [{ type: "sacrifice", what }] : null;
   }
   // Extra turns (CR 500.7): "Take an extra turn after this one", "Target player takes two extra turns after this one".
   if ((m = /^(?:(.+?) )?(?:take|takes) (an|two|three) extra turns? after this one$/i.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     return who ? [{ type: "extraTurn", who, n: m[2] === "an" ? 1 : m[2] === "two" ? 2 : 3 }] : null;
   }
-  if ((m = /^(.+?) loses? the game$/i.exec(s))) {
+  if ((m = /^(.+?) (loses?|wins?) the game$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    return who ? [{ type: "loseGame", who }] : null;
+    return who ? [{ type: /^lose/.test(m[2]!) ? "loseGame" : "winGame", who }] : null;
   }
   // Mill
   if ((m = new RegExp(`^Mill ${NUMX} cards?$`, "i").exec(s))) return [{ type: "mill", who: { ref: "you" }, n: amt(m[1]!) }];

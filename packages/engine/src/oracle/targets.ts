@@ -139,7 +139,11 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const [, upTo, count, other, another, range, phrase] = m;
   const [required, n] = range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
-  const [mine, theirs] = thatPlayerControls(phrase!, ctx);
+  const [mine0, theirs] = thatPlayerControls(phrase!, ctx);
+  // "Cards from a single graveyard" (all in one), "creature cards that share a creature type" (each with each other).
+  const single = n > 1 && / from a single graveyard$/.test(mine0);
+  const share = n > 1 && / that share a creature type(?= from |$)/.test(mine0);
+  const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "");
   const parsed = parseTargetPhrase(n > 1 ? singularPhrase(mine) : mine);
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   const spec: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
@@ -152,7 +156,16 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const first = ctx.targets.length;
   for (let k = 0; k < n; k++) {
     const distinct = [...(other || another ? before : []), ...Array.from({ length: k }, (_, j) => first + j)];
-    addTarget(ctx, { ...spec, ...(k >= required ? { optional: true } : {}), ...(notSource ? { notSource } : {}), ...(distinct.length ? { distinctFrom: distinct } : {}) });
+    const group = Array.from({ length: k }, (_, j) => first + j);
+    addTarget(ctx, {
+      ...spec,
+      ...(k >= required ? { optional: true } : {}),
+      ...(notSource ? { notSource } : {}),
+      ...(distinct.length ? { distinctFrom: distinct } : {}),
+      ...(single && k ? { sameGraveyardAs: group } : {}),
+      ...(share && k ? { sharesCreatureTypeWith: group } : {}),
+      ...(single || share ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}` } : {}),
+    });
   }
   // "It" can't mean one of several; "they" / "those creatures" means all of them.
   if (n > 1) ctx.lastObjectTarget = undefined;

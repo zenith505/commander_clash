@@ -1,6 +1,6 @@
 import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
-import type { Color } from "../types";
+import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, capital, singular } from "./words";
 import { replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
@@ -91,7 +91,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
 export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | "fail" | null {
-  const text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
+  const text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
@@ -105,6 +105,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
     const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return filter?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
+  }
+  // "The first creature spell you cast each turn costs {2} less to cast", "The second spell you cast each turn ...".
+  if ((m = /^The (first|second) (.*?)spell you cast each turn costs \{(\d+)\} less to cast$/.exec(text))) {
+    const filter = m[2] ? parseTargetPhrase(`${m[2]}spell`) : { kind: "spell" as const, text: "spell" };
+    if (!filter || filter.kind !== "spell") return "fail";
+    return { costMod: { who: "you", filter: { ...filter, text: `${m[2]}spells` }, n: -Number(m[3]), nth: m[1] === "first" ? 1 : 2, text: line } };
   }
   const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
   if ((m = /^~ costs \{(\d+)\} less to cast if (.+)$/.exec(text)) || (m = /^If (.+), ~ costs \{(\d+)\} less to cast$/.exec(text))) {
@@ -155,6 +161,17 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
+  if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
+  if (/^you descended this turn$/.test(text)) return { kind: "descended" };
+  if (/^a permanent left the battlefield under your control this turn$/.test(text)) return { kind: "revolt" };
+  if (/^a nonland permanent left the battlefield this turn or a spell was warped this turn$/.test(text)) return { kind: "void" };
+  // Your life total (CR 119), against a number or your starting life total (CR 903.7).
+  if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
+  if ((m = /^you have at least (\d+) life more than your starting life total$/.exec(text))) return { kind: "life", min: STARTING_LIFE + Number(m[1]) };
+  if ((m = /^your life total is (greater than or equal to|greater than|less than or equal to|less than) (half )?your starting life total$/.exec(text))) {
+    const base = m[2] ? Math.floor(STARTING_LIFE / 2) : STARTING_LIFE;
+    return { kind: "life", ...{ "greater than or equal to": { min: base }, "greater than": { min: base + 1 }, "less than or equal to": { max: base }, "less than": { max: base - 1 } }[m[1]!] };
+  }
   if ((m = new RegExp(`^an opponent has ${NUM} or more poison counters$`).exec(text))) return { kind: "opponentPoison", n: num(m[1]!) };
   // Pestilence: "if no creatures are on the battlefield".
   if ((m = /^no (.+) (?:are|is) on the battlefield$/.exec(text))) {

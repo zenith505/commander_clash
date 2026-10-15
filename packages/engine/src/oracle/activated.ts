@@ -74,10 +74,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (turn[2]) oncePerTurn = true;
     effectText = effectText.slice(0, turn.index);
   }
-  const onlyIf = / Activate only if ([^.]+?)( and only once each turn)?\.$/.exec(effectText);
+  const onlyIf = / Activate only if ([^.]+?)( and only once each turn| and only as a sorcery)?\.$/.exec(effectText);
   if (onlyIf) {
     if (activateIf) return "fail";
-    if (onlyIf[2]) oncePerTurn = true;
+    if (onlyIf[2] === " and only once each turn") oncePerTurn = true;
+    if (onlyIf[2] === " and only as a sorcery") sorcerySpeed = true;
     activateIf = parseStaticCondition(onlyIf[1]!, { affects: { kind: "self" }, mods: [], text: "" }) ?? undefined;
     if (!activateIf) return "fail";
     effectText = effectText.slice(0, onlyIf.index);

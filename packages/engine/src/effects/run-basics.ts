@@ -1,6 +1,6 @@
 import type { DamageRecipient, Effect } from "../abilities";
 import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
-import { draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses } from "../game";
+import { draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
@@ -30,6 +30,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "loseGame":
       for (const pid of players(s, e.who, ctx)) playerLoses(s, pid, `${src}`);
+      return;
+    case "winGame":
+      for (const pid of players(s, e.who, ctx)) winGame(s, pid, src);
       return;
     case "ascend":
       giveCitysBlessing(s, ctx.controller, true); // CR 702.131a

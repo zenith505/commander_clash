@@ -1,7 +1,7 @@
 import type { AbilityBody, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player } from "../game";
-import { controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
+import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { withModes } from "../modes";
 import { compileCard } from "../oracle";
 import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneName } from "../types";
@@ -59,6 +59,8 @@ export type TriggerSourceEvent =
   /** `counters`: the counters it had on the battlefield (last known information, for persist and undying). */
   /** It left the battlefield for `to` (only a graveyard makes it "die"). */
   /** `sacrificed`: its controller sacrificed it (CR 701.21a). */
+  /** An Aura or Equipment that stays on the battlefield became unattached from `host` (moved, or unattached). */
+  | { type: "unattached"; id: ObjectId; host: ObjectId }
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
@@ -179,6 +181,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   let hosting: GameObject | null = null;
   // While set, `add` is looking at the abilities of a card in a graveyard that work there (CR 113.6m).
   let fromYard = false;
+  // Torpor Orb: while set, the controllers whose abilities the event can't trigger.
+  let locked: ((controller: PlayerId) => boolean) | null = null;
   // Abilities that trigger on the battlefield use the permanent's abilities right now;
   // leaves-the-battlefield triggers look back in time (CR 603.10a), so "dies" passes them in.
   const add = (
@@ -194,6 +198,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     event?: TriggerEventInfo,
     colorsSpent?: number,
   ) => {
+    if (locked?.(controller)) return;
     const printed = compileCard(defOf(s, o)).triggers;
     triggers.forEach((t, index) => {
       // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
@@ -265,6 +270,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     checkAscend(s);
     const entering = obj(s, ev.id);
     const you = controllerOf(s, entering);
+    // "Creatures entering don't cause abilities to trigger": the permanent as it entered (rulings), with Torpor Orb on the
+    // battlefield, itself entering at the same time included. Replacement effects aren't triggers, so still apply.
+    const types = characteristics(s, entering).types;
+    const locks = s.battlefield.flatMap((id) => {
+      const lock = compileCard(defOf(s, obj(s, id))).enterLock;
+      const c = lock && characteristics(s, obj(s, id));
+      return lock && c!.hasPrintedAbilities && (!lock.types || lock.types.some((t) => types.includes(t))) ? [{ lock, by: c!.controller }] : [];
+    });
+    if (locks.length) locked = (ctrl) => locks.some((l) => !l.lock.opponents || l.by !== ctrl);
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
     // "if it was kicked" is an intervening if (CR 603.4), and that can't change by the time it resolves.
     // Evoke's sacrifice trigger only if the evoke cost was paid (CR 702.74a).
@@ -302,6 +316,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering);
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
+    locked = null;
+  } else if (ev.type === "unattached") {
+    const o = s.objects[ev.id];
+    const host = s.objects[ev.host];
+    if (o?.zone === "battlefield" && host) add(o, controllerOf(s, o), (e) => e === "selfBecomesUnattached", undefined, undefined, host);
   } else if (ev.type === "dies") {
     const o = obj(s, ev.id);
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
@@ -316,6 +335,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       undefined,
       { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) },
     );
+    // "Whenever ~ becomes unattached from a permanent": it left while attached (looking back in time, CR 603.10a), or what
+    // was attached to it stayed.
+    const host = ev.snapshot?.attachedTo ? s.objects[ev.snapshot.attachedTo] : undefined;
+    if (host) add(o, ev.controller, (e) => e === "selfBecomesUnattached", withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers, undefined, host);
+    for (const a of ev.attachments ?? []) {
+      const att = s.objects[a];
+      if (att?.zone === "battlefield") add(att, controllerOf(s, att), (e) => e === "selfBecomesUnattached", undefined, undefined, o);
+    }
     // "Whenever another creature dies", "a creature you control", "equipped creature": abilities of permanents
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     if (ev.to === "graveyard" && ev.snapshot && ev.chars) {
@@ -556,8 +583,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you)) return false;
+        // Its caster's spells this turn, this one included (it was counted as it was cast).
+        if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length !== t.cast.nth) return false;
         return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
-      }, undefined, ev.stackId, undefined, undefined, undefined, undefined, ev.manaSpent !== undefined ? { amount: ev.manaSpent } : undefined); // "counter it unless that player pays" acts on the spell cast
+      }, undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}) }); // "counter it unless that player pays" acts on the spell cast
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.
@@ -576,8 +605,27 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = s.objects[t.id];
       if (!o || o.zone !== "battlefield") continue;
       const you = controllerOf(s, o);
-      add(o, you, (e) => (e === "becomesTargetOfOpponent" && you !== item!.controller) || e === "selfBecomesTarget", undefined, ev.stackId);
+      const by = item!.controller;
+      // Who targeted it earlier this turn (each player once is enough to know what's a first time).
+      const before = o.targetedThisTurn?.turn === s.turn ? o.targetedThisTurn.by : [];
+      o.targetedThisTurn = { turn: s.turn, by: before.includes(by) ? before : [...before, by] };
+      // "Of a spell", "you control", "an opponent controls", "for the first time each turn" (counting those it names).
+      const fits = (tr: TriggeredAbility, watcher: PlayerId) => {
+        const w = tr.targeted;
+        if (!w) return true;
+        if (w.spell && item!.kind !== "spell") return false;
+        const mine = (p: PlayerId) => (w.by === "you" ? p === watcher : w.by === "opponent" ? p !== watcher : true);
+        if (!mine(by)) return false;
+        return !w.first || !before.some(mine);
+      };
+      const that = { player: by };
+      add(o, you, (e, tr) => (e === "becomesTargetOfOpponent" && you !== by) || (e === "selfBecomesTarget" && fits(tr, you)), undefined, ev.stackId, undefined, undefined, undefined, undefined, that);
       addHosted(o, (e) => e === "selfBecomesTarget", ev.stackId);
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        add(w, wc, (e, tr) => e === "permanentBecomesTarget" && fits(tr, wc) && !(tr.targeted?.other && w.id === o.id) && (!tr.subjectFilter || objectMatches(s, tr.subjectFilter, o, wc, false)), undefined, ev.stackId, o, undefined, undefined, undefined, that);
+      }
     }
   } else if (ev.type === "exploits") {
     const lki = { power: ev.chars.power, toughness: ev.chars.toughness };

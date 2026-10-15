@@ -8,7 +8,7 @@ import { objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
-import { addDelayed } from "./run-spells";
+import { addDelayed, paidUnless } from "./run-spells";
 import { fireEvent, inCombat } from "./triggers";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -37,7 +37,22 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   const r = s.resolving!;
   const sc = (r.scratch ??= {});
   const n = (sc.n ??= amountNow(s, e.n, ctx));
-  const who = players(s, e.who, ctx);
+  let who = players(s, e.who, ctx);
+  // "Each opponent sacrifices a permanent of their choice unless they pay {3}": each chooses in turn order whether to pay
+  // (CR 101.4), then those who didn't choose what to sacrifice (rulings).
+  if (e.unless) {
+    sc.payQueue ??= apnap(s, who);
+    while (sc.payQueue.length) {
+      const pid = sc.payQueue[0]!;
+      // The prompt reads "pay {2} or you sacrifice a permanent".
+      const paid = pickOptions(s, e, pid).length ? paidUnless(s, ctx, pid, e.unless, src, e.filter.text, `you ${e.action === "sacrifice" ? "sacrifice" : "choose"} ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text}`) : false;
+      if (paid === "paused") return "paused";
+      if (paid) (sc.paidBy ??= []).push(pid);
+      sc.paid = undefined;
+      sc.payQueue.shift();
+    }
+    who = who.filter((pid) => !sc.paidBy?.includes(pid));
+  }
   if (!sc.queue) {
     sc.queue = apnap(s, who);
     sc.chosen = {};
@@ -53,7 +68,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     sc.queue.shift();
   }
   for (const pid of apnap(s, who))
-    for (const id of sc.chosen![pid] ?? []) {
+    for (const id of sc.chosen?.[pid] ?? []) {
       const o = s.objects[id];
       if (o?.zone !== "battlefield") continue;
       if (e.action === "populate") {

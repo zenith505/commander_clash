@@ -4,7 +4,7 @@ import type { Effect, Modification, PlayerRef } from "../../abilities";
 import { NUM, amt, num } from "../words";
 import { mayBeAura, parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
-import type { Ctx } from "../body";
+import { parseUnlessPays, type Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -132,10 +132,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
   }
-  if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
+  if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const filter = pickFilter(m[3]!);
-    return who && filter && [{ type: "pick", who, filter, n: amt(m[2]!), action: "sacrifice" }];
+    // "Unless they pay {3}": mana only (a discard would need its own choice).
+    const unless = m[4] === undefined ? undefined : parseUnlessPays(m[4], ctx);
+    if (unless === null || (unless && (unless.discard || !m[1]))) return null;
+    return who && filter && [{ type: "pick", who, filter, n: amt(m[2]!), action: "sacrifice", ...(unless ? { unless } : {}) }];
   }
   return undefined;
 }

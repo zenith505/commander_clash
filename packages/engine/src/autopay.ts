@@ -1,7 +1,7 @@
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
 import type { TargetChoice } from "./abilities";
@@ -339,7 +339,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
   const ab = abilitiesOf(s, obj(s, objectId)).activated[index]!;
-  const cost = parseManaCost(ab.manaCost);
+  const cost = activationCost(s, pid, obj(s, objectId), ab, targets);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
   const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], { ability: obj(s, objectId) });

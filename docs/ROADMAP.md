@@ -1,6 +1,6 @@
 # Roadmap
 
-15,036 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,256 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,29 +14,37 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (a long tail of 3-card lines): "equip abilities you activate that target ~ cost {N} less",
-   "when ~ enters, manifest dread, then attach ~ to that creature", "~ gets +N/+N as long as you have N or more life",
-   "if you descended this turn", "exile up to three target cards from a single graveyard", "each opponent sacrifices
-   a permanent of their choice unless they pay {N}" (Rishadan: "unless" for each opponent), Glyph Keeper's "becomes
-   the target ... for the first time each turn", "whenever ~ becomes unattached from a permanent, sacrifice that
-   permanent", Torpor Orb's "creatures entering don't cause abilities to trigger", "return two target creature cards
-   that share a creature type".
+1. By `npm run blockers` (a long tail of 2- and 3-card lines): "when ~ enters, manifest dread, then attach ~ to that
+   creature" (Conductive Machete), "you may cast ~ as though it had flash if you pay {N} more", "when ~ is put into a
+   graveyard from anywhere, shuffle it into its owner's library", "your opponents can't cast spells during your turn",
+   "creature spells you control can't be countered", "~ costs {N} less to cast if you've cast another spell this
+   turn", "counter target spell that targets a permanent you control", "when ~ enters, sacrifice it unless it
+   escaped", "when ~ dies, return it to its owner's hand at the beginning of the next end step", "when ~ enters,
+   create a N/N token, then attach ~ to it" (Ancestral Blade), "equipped creature gets +N/+N and has ward {N}".
 
 ## Known gaps (from earlier rounds)
 
 - Layer 3 (text-changing effects).
 - "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing counters
   ("distribute three +1/+1 counters among one, two, or three target creatures"), divided prevention (Remedy), on a
-  planeswalker (Chandra, Flameshaper); "up to X target", targets that must share something ("from a single
-  graveyard").
-- "The first spell you cast each turn costs less", "costs {1} less for each target", reductions of colored mana.
+  planeswalker (Chandra, Flameshaper); "up to X target" (Rats' Feast, Martyr of Bones' "up to X target cards from a
+  single graveyard").
+- "Costs {1} less for each target", reductions of colored mana, "the first face-down / kicked spell you cast each
+  turn" (Kadena, Vine Gecko), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".
+  Equip reductions "that target enchanted creature" (Strong Back).
 - Granted static abilities ('has "This creature can't block"'), battles, "can't attack unless", "becomes tapped".
 - Protection from a player; protection that doesn't remove other Auras (Spectra Ward, Benevolent Blessing).
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).
 - Alternative costs that aren't mana ("exile a green card from your hand", Pyrokinesis, Flameshot, Lashknife, Vine
-  Dryad), for every spell (Fist of Suns, Jodah).
+  Dryad), Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost". Bots never use Fist of Suns'
+  {W}{U}{B}{R}{G}.
+- Elesh Norn, Mother of Machines' "triggers an additional time" (its other ability, Torpor Orb's for opponents, works).
+  With Torpor Orb, "whenever counters are put on" still triggers for counters a creature enters with.
+- "Becomes the target": "deals 2 damage to that spell's controller", "an ability that targets only it" (Agrus Kos),
+  "becomes the target of an Aura spell". A player who can't win (Abyssal Persecutor) still wins as the last player left
+  (CR 104.2a).
 - Mana: "until end of turn, whenever a player taps an Island for mana" (High Tide, Bubbling Muck), "tapped for mana"
   triggers that aren't mana abilities (Manabarbs) or have conditions (Regal Behemoth, Barbflare Gremlin), "may add"
   (Snowfall), "for each Elf" (Elvish Guidance); replacing mana ("produces twice as much", Mana Reflection,

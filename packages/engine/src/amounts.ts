@@ -91,6 +91,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
     case "cardsInLibrary":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
+    case "discardedThisWay": {
+      const counts = Object.values(s.resolving?.discarded ?? {});
+      return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
+    }
     case "cardsInGraveyard":
       return refPlayers(s, c.who, ctx).reduce(
         (n, pid) => n + s.players[pid]!.graveyard.filter((id) => !c.filter || printedMatches(bindChosen(c.filter, ctx.chosen), defOf(s, s.objects[id]!))).length,
@@ -232,6 +236,8 @@ function describeCount(c: Count): string {
       return "#cards in hand";
     case "cardsInLibrary":
       return "#cards in library";
+    case "discardedThisWay":
+      return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "cardsInGraveyard":
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":

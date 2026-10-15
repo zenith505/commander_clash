@@ -479,6 +479,7 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
   o.exileIfDiesTurn = undefined;
+  o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
   // battlefield or leaving it at the same time (rulings).
   if (fromZone === "battlefield" && to === "graveyard" && o.damagedBy?.length && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
@@ -501,6 +502,9 @@ export function moveObject(
     log(s, `${defOf(s, o).name} goes to the command zone instead.`);
   }
   const escaped = fromZone === "stack" && to === "battlefield" && o.castVia === "escape";
+  // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
+  // zone wasn't, rulings).
+  const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   if (fromZone === "stack") {
     o.castFrom = undefined;
     o.castVia = undefined;
@@ -590,7 +594,7 @@ export function moveObject(
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
-  const withCounters = printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller) ? undefined : printedCounters;
+  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) ? undefined : printedCounters;
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
@@ -2164,7 +2168,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
-  if (ab.discardSelf) discardCards(s, p.id, [id], "", true);
+  if (ab.discardSelf) discardCards(s, p.id, [id], "", true, true);
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
   s.stack.push({
@@ -2990,7 +2994,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
   for (const at of attackers(s)) {
-    if (!dealsDamageThisStep(s, at, firstStrikeStep)) continue;
+    if (!dealsDamageThisStep(s, at, firstStrikeStep) || at.noCombatDamageTurn === s.turn) continue;
     let dmg = power(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
@@ -3025,7 +3029,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   }
   for (const id of s.battlefield) {
     const bl = obj(s, id);
-    if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep)) continue;
+    if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep) || bl.noCombatDamageTurn === s.turn) continue;
     const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
     let dmg = power(s, bl);
     if (dmg <= 0) continue;

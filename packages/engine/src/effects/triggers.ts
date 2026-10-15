@@ -88,6 +88,8 @@ export type TriggerSourceEvent =
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   | { type: "targeted"; stackId: string }
+  /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
+  | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number }
   /**
@@ -328,6 +330,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
         }
       }
+      // "Whenever ~ attacks and isn't blocked": no creature was declared to block it (rulings).
+      if (o.attacking !== undefined && !o.blockedBy) {
+        add(o, you, (e) => e === "selfAttacksUnblocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        addHosted(o, (e) => e === "selfAttacksUnblocked", undefined, o, { player: o.attacking });
+      }
       if (o.attacking !== undefined && o.blockedBy?.length) {
         // "Defending player" (afflict) is the player it's attacking.
         add(o, you, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
@@ -517,6 +524,23 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         lki,
       );
     }
+  } else if (ev.type === "discarded") {
+    // "Whenever you discard a card", "whenever a player cycles a card": once for each card (CR 603.2c). "That player" is
+    // the one who discarded.
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, (e, t) => {
+        const d = t.discards;
+        if (e !== "playerDiscards" || !d) return false;
+        if ((d.by === "you" && ev.player !== you) || (d.by === "opponent" && ev.player === you)) return false;
+        if ((d.cycled && !ev.cycled) || (d.other && ev.id === o.id)) return false;
+        return !d.filter || printedMatches(d.filter, ev.card);
+      }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+    // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
+    const card = s.objects[ev.id];
+    if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "draw") {
     for (const id of s.battlefield) {
       const o = obj(s, id);

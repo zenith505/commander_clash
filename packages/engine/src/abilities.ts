@@ -62,6 +62,8 @@ export type Count =
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   | { kind: "cardsInLibrary"; who: PlayerRef }
+  /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
+  | { kind: "discardedThisWay"; greatest?: true }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
@@ -449,6 +451,8 @@ export type Effect =
   | { type: "connive"; what: ObjRef; n: Amount }
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   | { type: "exileIfDies"; what: ObjRef }
+  /** "~ assigns no combat damage this turn" (CR 510.1). */
+  | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
   /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
   | { type: "mustBlockSource"; what: ObjRef }
@@ -542,7 +546,8 @@ export type Effect =
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   | { type: "exileTop"; who: PlayerRef; n: Amount }
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
+  /** `hand`: "discards their hand", every card in it (n is ignored). */
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
@@ -716,6 +721,8 @@ export type TriggerEvent =
   // forms trigger once for each creature it blocks or is blocked by, which is their subject.
   | "selfBlocks"
   | "selfBecomesBlocked"
+  /** "Whenever ~ attacks and isn't blocked": after blockers are declared, if no creature blocks it (rulings). */
+  | "selfAttacksUnblocked"
   | "selfBlocksOrBecomesBlocked" // bushido (CR 702.45a)
   | "selfBlocksCreature"
   | "selfBlockedByCreature" // flanking (CR 702.25a)
@@ -727,6 +734,10 @@ export type TriggerEvent =
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
+  /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
+  | "playerDiscards"
+  /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
+  | "selfCycled"
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
@@ -758,6 +769,12 @@ export interface TriggeredAbility {
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   draws?: { by: "you" | "opponent" | "any"; nth?: number };
+  /**
+   * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
+   * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
+   * (rulings: cycling a card triggers it once).
+   */
+  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
   /**
@@ -1048,7 +1065,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**

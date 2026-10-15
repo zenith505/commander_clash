@@ -35,6 +35,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Blocking (CR 509.3). The "a creature" forms are matched first, by parseBlockTrigger.
   [/^Whenever ~ blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked"],
   [/^Whenever ~ becomes blocked, (.+)$/, "selfBecomesBlocked"],
+  [/^Whenever ~ attacks and isn't blocked, (.+)$/, "selfAttacksUnblocked"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
@@ -54,7 +55,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
-  "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
+  "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped",
 ];
 
@@ -64,6 +65,7 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^attacks, (.+)$/, "selfAttacks", { defending: true }],
   [/^blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked", {}],
   [/^becomes blocked, (.+)$/, "selfBecomesBlocked", { defending: true }],
+  [/^attacks and isn't blocked, (.+)$/, "selfAttacksUnblocked", { defending: true }],
   [/^blocks, (.+)$/, "selfBlocks", {}],
   // An attacking creature's combat damage to a player is dealt to the player it attacks (CR 510.1a); a blocking
   // creature deals none to players. So "defending player" is that player.
@@ -288,6 +290,26 @@ function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}) }, body };
 }
 
+/**
+ * "Whenever you discard a card", "whenever an opponent discards a card" ("that player" is who discarded), "whenever you
+ * cycle or discard another card" (the same as "discard", rulings), "whenever a player cycles a card", "whenever you
+ * discard a creature card". "One or more cards" (once per batch) isn't modeled.
+ */
+function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[a-z]+ )?card), (.+)$/.exec(line);
+  if (!m) return null;
+  let filter: TargetSpec | undefined;
+  if (m[4] !== "card") {
+    const f = parseTargetPhrase(m[4]!);
+    if (!f || f.kind !== "card") return "fail";
+    filter = f;
+  }
+  const body = parseBody(m[5]!, { eventPlayer: true });
+  if (!body) return "fail";
+  const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
+  return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };
+}
+
 /** "Whenever a creature you control exploits a nontoken creature" (CR 702.110b): the exploited creature is the subject. */
 function parseExploitsTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever a creature you control exploits an? (.+?), (.+)$/.exec(line);
@@ -377,6 +399,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (group) return group;
   const exploits = parseExploitsTrigger(line);
   if (exploits) return exploits;
+  const discards = parseDiscardTrigger(line);
+  if (discards) return discards;
+  // "When you cycle ~" (CR 702.29c): "it" is the card, wherever it went.
+  const cycled = /^When you cycle ~, (.+)$/.exec(line);
+  if (cycled) {
+    const body = parseBody(cycled[1]!, { selfCard: true });
+    return body ? { event: "selfCycled", body } : "fail";
+  }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
   const st = /^When (you control no .+?), (.+)$/.exec(line);
   if (st) {
@@ -409,7 +439,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}) } : ("fail" as const);

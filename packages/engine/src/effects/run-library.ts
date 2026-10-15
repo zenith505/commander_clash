@@ -8,6 +8,7 @@ import type { GameState, ObjectId, PlayerId } from "../types";
 import { printedMatches } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow } from "./resolve";
 import { describeDest } from "./describe";
+import { fireEvent } from "./triggers";
 
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -34,7 +35,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Worked out once, before anyone discards.
       const sc0 = (s.resolving!.scratch ??= {});
       const n = (sc0.n ??= amountNow(s, e.n, ctx));
-      if (e.random) {
+      if (e.random && !e.hand) {
         for (const pid of apnap(s, who)) {
           const hand = player(s, pid).hand;
           const picked: ObjectId[] = [];
@@ -54,7 +55,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
         const hand = player(s, pid).hand;
-        if (hand.length > n) {
+        if (!e.hand && hand.length > n) {
           s.pending = { kind: "discard", player: pid, count: n, source: src };
           return "paused";
         }
@@ -266,10 +267,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
  * Move cards from a player's hand to their graveyard (CR 701.9a). A card with madness is exiled instead, and its
  * madness ability triggers (CR 702.35a): it's still discarded. `quiet`: the caller says what happened (cycling).
  */
-export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false) {
+export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false) {
   if (!ids.length) return;
+  if (s.resolving) (s.resolving.discarded ??= {})[pid] = (s.resolving.discarded[pid] ?? 0) + ids.length;
   const names = ids.map((id) => defOf(s, obj(s, id)).name);
   if (!quiet) log(s, `${player(s, pid).name} discards ${names.join(", ")}${how}.`);
+  const cards = ids.map((id) => defOf(s, obj(s, id)));
   for (const id of ids) {
     const o = obj(s, id);
     const madness = compileCard(defOf(s, o)).madness;
@@ -290,6 +293,8 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
       body: { targets: [], effects: [{ type: "madness" }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
     });
   }
+  // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
+  ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}) }));
 }
 
 /** A card's mana value in a library: a split card's halves together (CR 709.4a). */

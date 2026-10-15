@@ -1,6 +1,6 @@
 import type { AbilityBody, Amount, AmountExpr, Count, Effect, SpellCondition, TargetSpec, UnlessPays, PayCost } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, isGroup } from "./words";
+import { num, NUMX, X, amt, isGroup, WHEEL } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
@@ -48,7 +48,12 @@ const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
-  (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) || (e.type === "draw" && e.who.ref === "you") || (e.type === "sacrifice" && e.what.ref === "self");
+  (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
+  (e.type === "draw" && e.who.ref === "you") ||
+  (e.type === "sacrifice" && e.what.ref === "self") ||
+  // "You may have it deal 3 damage to target creature. If you do, ...": done if that target is still legal.
+  (e.type === "damage" && (e.to.ref === "target" || e.to.ref === "anyTarget") && !("n" in e.to && e.to.n) && !e.also && !e.divided) ||
+  (e.type === "bite" && e.b.ref === "target" && !e.b.n && (e.a.ref === "self" || e.a.ref === "target"));
 
 /** Split text into sentences, keeping a quoted ability ('gains "Sacrifice ~. Draw a card."') whole. */
 function splitSentences(text: string): string[] {
@@ -91,7 +96,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
-    .flatMap((x) => (/^If you do, /.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
+    .flatMap((x) => (/^If you do, /.test(x) || WHEEL.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;
@@ -263,7 +268,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
     const may = /^[Yy]ou may (.+)$/.exec(s);
     if (may) {
-      const rest = may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1);
+      // "You may have ~ deal damage equal to its power to target creature": ~ deals it, if you choose.
+      const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) deal /, (_, w: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} deals `);
       const inner = parseOne(rest, ctx);
       if (!inner) return null;
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.

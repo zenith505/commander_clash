@@ -1,7 +1,7 @@
 import type { Modification, Effect } from "../abilities";
 import { CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS } from "./words";
+import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL } from "./words";
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseKeywordList } from "./targets";
@@ -45,6 +45,7 @@ const SENTENCE_PARSERS = [parseCopiesSentence, parseBasicsSentence, parseZonesSe
 
 /** One sentence of an ability's text to effects, or null if it can't be compiled. */
 export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
+  if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;

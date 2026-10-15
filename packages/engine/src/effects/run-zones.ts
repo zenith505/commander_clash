@@ -423,6 +423,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "exileIfDies":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfDiesTurn = s.turn;
       return;
+    case "noCombatDamage":
+      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.noCombatDamageTurn = s.turn;
+      return;
     case "sacrifice":
       for (const o of objects(s, e.what, ctx)) {
         const by = controllerOf(s, o);

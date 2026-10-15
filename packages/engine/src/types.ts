@@ -104,6 +104,8 @@ export interface GameObject {
   damagedBy?: ObjectId[];
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
+  /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
+  noCombatDamageTurn?: number;
   /**
    * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
    * while it's still the same object (`zc`), until the end of this turn or of their next turn. A warped card
@@ -617,6 +619,8 @@ export interface Resolving {
   created?: ObjectId[];
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
+  /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
+  discarded?: Record<PlayerId, number>;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   next: number;

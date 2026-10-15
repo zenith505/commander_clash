@@ -459,7 +459,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string } }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.

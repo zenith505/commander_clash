@@ -98,6 +98,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
+    // Free from the hand: the most expensive card is the best deal.
+    if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];

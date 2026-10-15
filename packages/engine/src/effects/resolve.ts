@@ -328,6 +328,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
+    case "putFromHand":
     case "putInLibrary":
     case "exileGraveyard":
     case "flicker":

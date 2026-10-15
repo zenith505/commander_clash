@@ -2091,7 +2091,11 @@ function LibrarySearch({
       <div className="modal search">
         <header>
           <strong>
-            {dig ? `${pending.source}: put ${pending.what} ${dig.to}` : `${pending.source}: search your library for ${pending.what}`}
+            {dig
+              ? `${pending.source}: put ${pending.what} ${dig.to}`
+              : pending.fromHand
+                ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
+                : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
             {" "}
@@ -2102,7 +2106,7 @@ function LibrarySearch({
                 : `Found ${found.length} of ${pending.max}.`}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {found.length || pending.min > 0 ? "Done" : dig ? "Take none" : "Find nothing"}
+            {found.length || pending.min > 0 ? "Done" : dig || pending.fromHand ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">

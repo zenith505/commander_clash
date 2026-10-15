@@ -2,6 +2,7 @@
 
 import type { Effect, Modification, PlayerRef } from "../../abilities";
 import { NUM, amt, num } from "../words";
+import { mayBeAura, parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import type { Ctx } from "../body";
 
@@ -23,6 +24,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // to the battlefield attached to that creature."
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
+  // "You may put a land card from your hand onto the battlefield (tapped)".
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?$/.exec(s))) {
+    const filter = parseSearchFilter(m[3]!);
+    if (filter === null || mayBeAura(filter)) return null;
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}) }];
+  }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all) graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =

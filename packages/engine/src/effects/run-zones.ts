@@ -4,7 +4,7 @@ import { attackedName, attackedPlaneswalker, auraHostFor, castProblem, destroyPe
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
-import { objectMatches, pickOptions } from "./targeting";
+import { objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
@@ -337,6 +337,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
         moveObject(s, o.id, "hand");
+      }
+      return;
+    }
+    case "putFromHand": {
+      // The player picks as it resolves, among the matching cards in their hand (CR 608.2d); it isn't playing a land.
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (!sc.found) {
+        const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        if (!cards.length) return;
+        const what = `${e.any ? "any number of " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? cards.length : 1, fromHand: true };
+        return "paused";
+      }
+      for (const id of sc.found) {
+        const o = s.objects[id];
+        if (o?.zone !== "hand" || o.owner !== p.id) continue;
+        log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}.`);
+        moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}) });
       }
       return;
     }

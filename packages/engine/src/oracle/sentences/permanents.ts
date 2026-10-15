@@ -187,6 +187,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what && parseChanges(m[2]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
   }
+  // "Target land you control becomes a 3/3 Elemental creature with haste that's still a land" (Brave the Wilds): with no
+  // duration, for as long as it stays on the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
+  if ((m = /^(target .+?) becomes? (an? \d+\/\d+ .+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
+    return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
   // Goad (CR 701.15a): "until your next turn, that creature attacks each combat if able and attacks a player other than you if able".
   if ((m = /^Goad (target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

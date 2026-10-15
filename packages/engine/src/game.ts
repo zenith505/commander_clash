@@ -4,7 +4,7 @@ import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf,
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem, enterAttacking } from "./effects";
-import { describeCount, entwined, withModes } from "./modes";
+import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -1320,6 +1320,7 @@ function startNextTurn(s: GameState) {
   for (const p of s.players) p.landsPlayedThisTurn = 0;
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
   s.damagedThisTurn = undefined;
+  s.damageThisTurn = undefined;
   s.diedThisTurn = undefined;
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
@@ -1940,10 +1941,12 @@ export function castProblem(
       if (mp) return mp;
     }
   }
-  const specs = spellTargetSpecs(d, modes);
+  const specs = spellTargetSpecs(d, modes, castHow(choices));
   if (specs.length) {
-    // A spell's colors are its card's (CR 702.16b: protection stops spells of that color).
-    const tp = targets ? targetProblem(s, specs, targets, pid, d) : hasLegalTargetsFor(s, specs, pid, d) ? null : `${d.name} has no legal targets`;
+    // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
+    // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
+    const any = () => hasLegalTargetsFor(s, specs, pid, d) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, spellTargetSpecs(d, modes, ALL_PAID), pid, d));
+    const tp = targets ? targetProblem(s, specs, targets, pid, d) : any() ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
   const tax = fromCommand ? commanderTax(p, o) : 0;
@@ -2168,7 +2171,18 @@ function tapCreaturesProblem(s: GameState, pid: PlayerId, ids: ObjectId[], what:
 const convokeProblem = (s: GameState, pid: PlayerId, ids: ObjectId[]) => tapCreaturesProblem(s, pid, ids, "convoke");
 
 /** Target specs a card needs when cast (empty for most permanents). For a modal spell, those of the chosen modes. */
-export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind) => spellTargetSpecs(castDef(s, id, alt), modes);
+export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => spellTargetSpecs(castDef(s, id, alt), modes, how);
+
+/** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
+export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift">): CastHow => ({
+  ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
+  ...(choices?.bargain ? { bargained: true } : {}),
+  ...(choices?.teamwork?.length ? { teamwork: true } : {}),
+  ...(choices?.gift !== undefined ? { gift: true } : {}),
+});
+const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
+/** Every optional cost paid (each kicker cost too): the most targets a spell can have. */
+const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true };
 
 /** What casting this card puts on the stack: the card, or for a bestowed cast, the Aura it is then (CR 702.103b, d). */
 export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
@@ -2215,10 +2229,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "Sacrifice a creature or pay {3}{B}": which one is announced as it's cast (CR 601.2b).
   const or = compileCard(d).costOr;
   if (or && choices.costOr === undefined) throw new RulesError(`choose how to pay ${d.name}'s additional cost: ${or.map((x) => x.text).join(" or ")}`);
-  const specs = spellTargets(s, id, modes);
+  const specs = spellTargets(s, id, modes, undefined, castHow(choices));
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
   if (problem) throw new RulesError(problem);
-  const body = spell ? withModes(spell, modes) : undefined;
+  // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
+  const body = spell ? gateBody(withModes(spell, modes), castHow(choices)) : undefined;
   const fromCommand = o.zone === "command";
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
@@ -3304,7 +3319,8 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     return;
   }
   (r.scratch ??= {}).may = yes;
-  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "")}.`);
+  // The prompt speaks to the player ("discard your hand"); the log is about them.
+  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/\byour\b/g, "their")}.`);
   s.pending = null;
   continueResolution(s);
 }
@@ -3504,6 +3520,9 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
+  const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
+  const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
+  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])] };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };

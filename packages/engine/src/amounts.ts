@@ -81,11 +81,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "permanents": {
       let n = 0;
       const filter = bindChosen(c.filter, ctx.chosen);
+      const whose = c.whose && refPlayers(s, c.whose, ctx);
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         const ch = view(o);
-        if (ch && objectMatches(s, filter, o, ctx.controller, false, undefined, ch)) n++;
+        if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch)) n++;
       }
       return n;
     }
@@ -207,6 +208,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return best;
     }
+    case "greatestManaValue": {
+      // From its mana cost (copy and face-down values included, CR 202.3, 708.2); X is 0 on the battlefield (CR 107.3).
+      let best = 0;
+      for (const id of s.battlefield) {
+        const o = s.objects[id]!;
+        const ch = view(o);
+        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)) best = Math.max(best, manaValue(parseManaCost(defOf(s, o).manaCost)));
+      }
+      return best;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       for (const id of s.battlefield) {
@@ -298,6 +309,8 @@ function describeCount(c: Count): string {
       return "#card types in graveyards";
     case "greatestPower":
       return `the greatest power among ${c.other ? "other " : ""}${c.filter.text}`;
+    case "greatestManaValue":
+      return `the greatest mana value among ${c.filter.text}`;
     case "kicked":
       return "times kicked";
     case "wasKicked":

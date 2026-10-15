@@ -1,4 +1,4 @@
-import type { AbilityBody, Amount, AmountExpr, Count, Effect, ObjRef, SpellCondition, TargetSpec, UnlessPays, PayCost } from "../abilities";
+import { refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, isGroup, WHEEL } from "./words";
 import { parseStaticCondition } from "./statics";
@@ -118,6 +118,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;
+  // Where the targets of the sentence before and of this one start.
+  let prevTargets = 0;
+  let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
   let payFirst: { pay: PayCost; text: string } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
@@ -125,6 +128,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   for (let si = 0; si < sentences.length; si++) {
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     [prevStart, curStart] = [curStart, effects.length];
+    [prevTargets, curTargets] = [curTargets, ctx.targets.length];
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(s);
     const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them) (this turn|until the end of your next turn))$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
@@ -222,9 +226,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)
     const kicked = /^If (?:~|it) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/.exec(s);
     if (kicked) {
-      const fx = parseKicked(kicked[2]!, effects.slice(prevStart), ctx);
-      if (!fx) return null;
       const cond: SpellCondition = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}) };
+      const fx = parseKicked(kicked[2]!, effects.slice(prevStart), ctx, true);
+      if (!fx || !gateNewTargets(ctx, cond, false, fx, effects.slice(prevStart), prevTargets, curTargets)) return null;
       if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
       else effects.push({ type: "if", cond, effects: fx.effects });
       continue;
@@ -232,14 +236,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "If ~ was bargained, that creature also gains flying", "... it deals twice X damage to that permanent instead"
     // (CR 702.166b); "If this spell was cast using teamwork, draw a card", "Also put a +1/+1 counter on that creature if
     // this spell was cast using teamwork", "Then discard a card unless this spell was cast using teamwork"; "If the gift
-    // was promised, ..." (CR 702.174b). Targets only the optional part would need aren't modeled (CR 702.166d,
-    // 702.174m), so none may be added.
+    // was promised, ..." (CR 702.174b). Targets only the optional part needs are chosen only if it was paid (CR 702.166d,
+    // 702.194c, 702.174m).
     const howCast = parseHowCast(s, ctx);
     if (howCast) {
-      const before = ctx.targets.length;
-      const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx);
-      if (!fx || ctx.targets.length !== before) return null;
-      if (howCast.not && fx.instead) return null;
+      const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx, true);
+      if (!fx || (howCast.not && fx.instead)) return null;
+      if (!gateNewTargets(ctx, howCast.cond, howCast.not, fx, effects.slice(prevStart), prevTargets, curTargets)) return null;
       if (howCast.not) effects.push({ type: "if", cond: howCast.cond, effects: [], otherwise: fx.effects });
       else if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: howCast.cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
       else effects.push({ type: "if", cond: howCast.cond, effects: fx.effects });
@@ -429,7 +432,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).
-    if (/^It's still an? (land|artifact|enchantment)$/i.test(s)) {
+    if (/^(?:It's still an? (land|artifact|enchantment)|They're still (?:lands|artifacts|enchantments))$/i.test(s)) {
       const last = [...effects].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes"));
       if (!last || last.type !== "continuous") return null;
       last.mods = last.mods.map((x) => (x.kind === "setTypes" ? { kind: "addTypes", types: x.types, subtypes: x.subtypes } : x));
@@ -466,10 +469,6 @@ export function parsePayCost(text: string): PayCost | null {
   return null;
 }
 
-/**
- * What "If ~ was kicked, ..." does. With "instead", it replaces the sentence before (`previous`).
- * Targets only the kicked part would need are chosen only if it's kicked (CR 702.33g): not modeled.
- */
 /** The ways a spell can have been cast that a sentence may depend on, as said in its text. */
 const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
@@ -497,7 +496,52 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   return null;
 }
 
-function parseKicked(text: string, previous: Effect[], ctx: Ctx): { effects: Effect[]; instead: boolean } | null {
+/**
+ * The targets a part of a spell that happens only if it was kicked (bargained, ...) just added are chosen only then (CR
+ * 702.33g, 702.166d, 702.194c, 702.174m): `fx` added the targets from `curTargets` on. If it's done "instead" of the
+ * sentence before, that sentence's own targets (from `prevTargets`) are chosen only if it wasn't: "If the gift was
+ * promised, instead return target nonland permanent" (rulings: "alternative or additional targets"). A later "it"
+ * can't mean a target that may not be there, so the parse forgets them. False if it can't be done that way.
+ */
+function gateNewTargets(ctx: Ctx, cond: SpellCondition, not: boolean, fx: { effects: Effect[]; instead: boolean }, previous: Effect[], prevTargets: number, curTargets: number): boolean {
+  if (ctx.targets.length === curTargets) return true;
+  // Only a spell's targets depend on how it was cast; a trigger's are chosen as it's put on the stack.
+  if (!ctx.spell) return false;
+  const gate = (i: number, negate: boolean) => {
+    if (ctx.targets[i]!.onlyIf) return false;
+    ctx.targets[i] = { ...ctx.targets[i]!, onlyIf: { cond: { ...cond }, ...(negate ? { not: true as const } : {}) } };
+    return true;
+  };
+  for (let i = curTargets; i < ctx.targets.length; i++) if (!gate(i, not)) return false;
+  if (fx.instead) {
+    for (let i = prevTargets; i < curTargets; i++) {
+      // "That creature" in the part done instead: the same target either way, so it isn't gated.
+      if (mentionsTarget(fx.effects, i)) return false;
+      if (!mentionsTarget(previous, i)) continue;
+      if (!gate(i, !not)) return false;
+    }
+  }
+  ctx.lastObjectTarget = undefined;
+  ctx.lastPlayerTarget = undefined;
+  ctx.lastTargets = undefined;
+  return true;
+}
+
+/** Whether these effects refer to target `i` ("target creature", "its controller", "counter that spell"). */
+function mentionsTarget(v: unknown, i: number): boolean {
+  if (Array.isArray(v)) return v.some((x) => mentionsTarget(x, i));
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  if (typeof o.index === "number" && refCovers(o, i)) return true;
+  if (o.target === i) return true;
+  return Object.values(o).some((x) => mentionsTarget(x, i));
+}
+
+/**
+ * What "If ~ was kicked, ..." does. With "instead", it replaces the sentence before (`previous`). `newTargets`: it may
+ * add targets of its own (see gateNewTargets).
+ */
+function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = false): { effects: Effect[]; instead: boolean } | null {
   let t = text;
   const instead = /^instead,? /i.test(t) || / instead$/i.test(t);
   t = t.replace(/^instead,? /i, "").replace(/ instead$/i, "");
@@ -515,7 +559,7 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx): { effects: Eff
   t = t.replace(/^It deals /, "~ deals ");
   const before = ctx.targets.length;
   const fx = parseOne(t, ctx);
-  if (!fx || ctx.targets.length !== before) return null;
+  if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
   if (fx.length > 1 && fx.some((e) => pauses(e))) return null;
   if (instead && previous.some((e) => pauses(e))) return null;
   return { effects: fx, instead };

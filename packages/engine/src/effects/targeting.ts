@@ -220,6 +220,8 @@ export const sameTarget = (a: TargetChoice | undefined, b: TargetChoice) => !!a 
  */
 export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], i: number, t: TargetChoice, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   const spec = specs[i]!;
+  // A target the spell is cast as if it didn't have (CR 702.33g): nothing is chosen for it.
+  if (spec.skip) return t.kind === "none";
   if (t.kind === "none") return !!spec.optional;
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
@@ -260,7 +262,7 @@ export function targetProblem(s: GameState, specs: TargetSpec[], targets: Target
 export function divisionProblem(specs: TargetSpec[], t: TargetChoice[]): string | null {
   const part = (c: TargetChoice | undefined) => (c && (c.kind === "object" || c.kind === "player") ? c.amount : undefined);
   for (let i = 0; i < specs.length; i++) {
-    const d = specs[i]!.divided;
+    const d = specs[i]!.skip ? undefined : specs[i]!.divided;
     const n = part(t[i]);
     if (!d) {
       if (n !== undefined) return `nothing is divided among ${specs[i]!.text}`;
@@ -285,14 +287,15 @@ export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined):
  * out, so only the others need something, each different where they must be.
  */
 export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
-  const options = specs.map((spec, i) => (spec.optional ? [] : legalTargets(s, spec, controller, undefined, src).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
-  if (options.some((o, i) => !specs[i]!.optional && !o.length)) return false;
+  const free = (spec: TargetSpec) => spec.optional || spec.skip;
+  const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
+  if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
   if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {
     if (i === specs.length) return true;
-    if (specs[i]!.optional) {
+    if (free(specs[i]!)) {
       chosen[i] = { kind: "none" };
       return fill(i + 1);
     }
@@ -336,8 +339,14 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
   const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false));
+  // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
+  // player chooses among those tied (rulings on Crackling Doom).
+  if (e.greatest === "power") {
+    const max = Math.max(...ids.map((id) => power(s, obj(s, id))));
+    return ids.filter((id) => power(s, obj(s, id)) === max);
+  }
   if (e.least !== "toughness") return ids;
   // Bolster: the least toughness, or tied for it (CR 701.39a).
   const min = Math.min(...ids.map((id) => toughness(s, obj(s, id))));

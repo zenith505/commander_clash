@@ -1,6 +1,6 @@
 # Roadmap
 
-15,961 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,089 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -16,22 +16,29 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Haunt, Read ahead.
+   Left from the conditional targets/Will cycle/hideaway conditions round:
+   - Mana abilities with costs `parseManaAbility` doesn't read ("Sacrifice a creature: Add {C}{C}", "{T}, Sacrifice a
+     Food: Add one mana of any color", Mox Opal's "Activate only if") compile as activated abilities, so they use the
+     stack; CR 605.1a and 605.3b say they don't (Ashnod's Altar, Phyrexian Altar, Gilded Goose, Mox Opal, Chromatic
+     Sphere, the Eggs, about 50 cards). Moving them to mana abilities needs those costs in `ManaAbility` and autopay.
+   - "Any number of target ..." (Kamahl's Will, Divine Resilience, Will of the Abzan's "any number of target
+     opponents"), "up to X target" (Klauth's Will): a target count chosen as it's cast isn't modeled.
+   - "Choose target X ... If the gift was promised, instead choose target Y ... the chosen" (Too Evil to Stay Dead,
+     Expel the Unworthy, The Eagles Are Coming!); "each creature target player controls" (Galadriel's Dismissal);
+     Role tokens (Diminisher Witch); "choose both instead" on modes that don't parse (Atlantis Attacks); "pays {4}
+     instead" (We Say Thee Nay!); "any number of ... instead" (Earth's Mightiest Heroes); "twice X ... instead"
+     (Stonesplitter Bolt, Torch the Tower).
+   - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Cruelclaw's Heist, Dawn's Truce, Longstalk Brawl,
+     Octomancer, Parting Gust, Perch Protection, Starfall Invocation; Dark Apostle's "Gift of Chaos" is a flavor word.
+   - Wills still out: Szat's ("the greatest power among creature cards exiled this way"), Nexus Mentality ("move all
+     counters", "for each counter removed this way"), Sakashima's, Kamahl's, Klauth's and Will of the Abzan (above).
+   - "Each player may discard their hand and draw ..." works; Snort's "each opponent who discarded their hand this
+     way" and Imposing Grandeur's "the greatest mana value of a commander they own" don't.
+   - "Return all ... cards from your graveyard to the battlefield" works for cards that can't be Auras; with
+     enchantments (Replenish, Brilliant Restoration, Open the Vaults, Calix, Estrid) each Aura needs a choice of what it
+     enchants (CR 303.4f), and Mount/Vehicle or "permanent cards" (Push the Limit, Return to the Light Realms) too.
+   - Hideaway: Evercoat Ursine, Smuggler's Buggy, Rabble Rousing ("create that many"), Wiretapping.
    Left from the teamwork/conspire/gift/tribute/hideaway/cipher round:
-   - Targets that exist only when an additional cost was paid (CR 702.174m for gift, 702.166d for bargain): "if the
-     gift was promised, instead return/destroy/counter target ..." and "tap target creature" (Into the Flood Maw,
-     Long River's Pull, Wear Down, Peerless Recycling, Mind Spiral, Sazacap's Brew, Valley Rally, Wildfire Howl) and
-     the same for teamwork (Cruel Alliance, Too Evil to Stay Dead); "choose both instead" on modes that don't parse
-     (Atlantis Attacks); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead" (Earth's Mightiest
-     Heroes). Gift on a modal spell is reported unsupported.
-   - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Consumed by Greed, Cruelclaw's Heist, Dawn's Truce,
-     Dewdrop Cure, Longstalk Brawl, Octomancer, Parting Gust, Perch Protection, Starfall Invocation; Dark Apostle's
-     "Gift of Chaos" is a flavor word, not gift.
-   - "Choose one. If you control a commander as you cast this spell, you may choose both instead" works (Akroma's
-     Will); the other Wills fail on a mode's text (Jeska's, Kamahl's, Klauth's, Sakashima's, Szat's, the Will of the
-     clans cycle, Drown in Dreams, Nexus Mentality).
-   - Hideaway conditions: "if an opponent was dealt 7 or more damage this turn" (Spinerock Knoll), "if you attacked
-     with three or more creatures this turn" (Windbrisk Heights); Evercoat Ursine, Smuggler's Buggy, Rabble Rousing,
-     Wiretapping.
    - Tribute: Flame-Wreathed Phoenix's granted dies trigger, Oracle of Bones' free cast from hand. Cipher: Arcane
      Heist, Hidden Strings, Trait Doctoring, Undercity Plague. Conspire: Traitor's Roar ("it deals damage equal to its
      power to its controller").
@@ -51,8 +58,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Job select (11 of 19): granted quoted abilities that don't compile (Ninja's Blades, Blue Mage's Cane, Summoner's
      Grimoire, Astrologian's Planisphere, Dancer's Chakrams' "other commanders you control"), "for each artifact you
      control" (Machinist's Arsenal), "Equip—Pay 3 life" (Dark Knight's Greatsword), Reaper's Scythe's soul counters.
-   - Bargain (10 of 20): targets only in the bargained part (Brave the Wilds, Diminisher Witch, CR 702.166d), "twice
-     X" and "instead it deals 3 ... and you scry" (Stonesplitter Bolt, Torch the Tower), "look at the top eight
+   - Bargain (11 of 20): Role tokens (Diminisher Witch), "twice X" and "instead it deals 3 ... and you scry"
+     (Stonesplitter Bolt, Torch the Tower), "look at the top eight
      instead" (Farsight Ritual), Beseech the Mirror's free cast, Back for Seconds, Rowan's Grim Search, Thunderous
      Debut, Realm-Scorcher Hellkite's mana.
    Left from the Spree/Saddle/Station/Curse round:

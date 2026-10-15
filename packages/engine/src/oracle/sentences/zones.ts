@@ -1,7 +1,7 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, PlayerRef } from "../../abilities";
-import { NUM, amt, num } from "../words";
+import { NUM, amt, num, singularWord } from "../words";
 import { mayBeAura, parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
@@ -71,6 +71,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // to the battlefield attached to that creature."
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
+  // "Return all land cards from your graveyard to the battlefield tapped" (Will of the Sultai), "Return all basic land cards
+  // from all graveyards to the battlefield tapped under their owners' control" (Planar Birth). Not Auras (CR 303.4f).
+  if ((m = /^Return all (.+?) cards from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
+    const kinds = m[1]!.replace(/,? and /g, " or ").replace(/, /g, " or ");
+    const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card" || mayBeAura(spec) || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
+  }
   // "You may put a land card from your hand onto the battlefield (tapped)".
   // Brainstorm: "put two cards from your hand on top of your library in any order", "put a card from your hand on top
   // of your library".
@@ -188,6 +196,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = new RegExp(`^Return ${NUM} (.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
+  }
+  // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
+  // control with the greatest power" (Szat's Will).
+  if ((m = /^(.+?) sacrifices? a creature (?:with the greatest power among creatures (?:they control|that player controls)|they control with the greatest power)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
   }
   if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

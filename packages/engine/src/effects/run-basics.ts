@@ -162,7 +162,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // The mana empties from the pool as the step or phase ends (CR 106.4).
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
-      const added = e.mana ?? (color && e.chosen ? `{${color}}`.repeat(e.chosen) : "");
+      const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
       for (const m of added.matchAll(/\{([WUBRGC])\}/g)) p.manaPool[m[1] as "W"]++;
       if (added) log(s, `${p.name} adds ${added}.`);
       return;

@@ -418,6 +418,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "opponentLostLife":
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "opponentDealtDamage":
+      // Also an opponent who has left the game since (Spinerock Knoll rulings).
+      return Object.entries(s.damageThisTurn ?? {}).some(([p, n]) => Number(p) !== you && n >= cond.n);
+    case "attackedWith": {
+      const w = s.players[you]?.attackedWith;
+      return w?.turn === s.turn && w.keys.length >= cond.n;
+    }
     case "handAtLeast":
       return (s.players[you]?.hand.length ?? 0) >= cond.n;
     case "handsEmpty":

@@ -3,7 +3,7 @@ import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, Compile
 import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
-import { withModes } from "../modes";
+import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
@@ -155,9 +155,10 @@ export function isFullySupported(d: CardDef): boolean {
  * What casting this card targets: a spell's targets (for a modal spell, those of the chosen
  * modes, CR 700.2c), or what an Aura enchants (CR 303.4a).
  */
-export function spellTargetSpecs(d: CardDef, modes?: number[]): TargetSpec[] {
+/** `how`: the optional costs announced for it, which decide whether it has the targets of parts that need them (gateTargets). */
+export function spellTargetSpecs(d: CardDef, modes?: number[], how?: CastHow): TargetSpec[] {
   const c = compileCard(d);
-  if (c.spell) return withModes(c.spell, modes).targets;
+  if (c.spell) return gateTargets(withModes(c.spell, modes).targets, how);
   return c.enchant ? [c.enchant] : [];
 }
 

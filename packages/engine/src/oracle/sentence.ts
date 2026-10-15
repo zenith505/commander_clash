@@ -113,8 +113,24 @@ export function parseBecomes(text: string): Modification[] | null {
   if (/^(white|blue|black|red|green|colorless)( and (white|blue|black|red|green))*$/i.test(rest)) {
     return [{ kind: "setColors", colors: rest.split(/ and /).map((w) => COLOR_WORDS[w.toLowerCase()]).filter((c): c is Color => !!c) }];
   }
+  // "... that's still a land" keeps its card types, like "It's still a land." after it (CR 205.1b).
+  let still = false;
+  if ((m = /^(.+?) that(?:'s| is) still an? land$|^(.+?) that are still lands$/i.exec(rest))) {
+    rest = (m[1] ?? m[2])!;
+    still = true;
+  }
+  // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
+  if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
+  // "A 3/3 Elemental creature with haste", "... with vigilance, indestructible, and haste": it also gains those.
+  const grants: Modification[] = [];
+  if ((m = /^(.+?) with (?!base power and toughness )(.+)$/i.exec(rest))) {
+    const g = parseGrants(m[2]!);
+    if (!g) return null;
+    grants.push(...g);
+    rest = m[1]!;
+  }
   let pt: [number, number] | null = null;
   if ((m = /^(\d+)\/(\d+) (.+)$/.exec(rest))) {
     pt = [Number(m[1]), Number(m[2])];
@@ -140,10 +156,12 @@ export function parseBecomes(text: string): Modification[] | null {
     // creature" keeps them too, except that its creature types are replaced (CR 205.1b).
     out.push({ kind: "addTypes", types, subtypes: [] });
     if (subtypes.length) out.push({ kind: "setSubtypes", subtypes });
-  } else if (types.length) out.push({ kind: "setTypes", types, subtypes });
-  else if (subtypes.length) out.push({ kind: "setSubtypes", subtypes });
+  } else if (types.length) out.push(still ? { kind: "addTypes", types, subtypes } : { kind: "setTypes", types, subtypes });
+  else if (subtypes.length && !still) out.push({ kind: "setSubtypes", subtypes });
+  else if (still) return null;
   if (colors.length || /colorless/i.test(rest)) out.push({ kind: "setColors", colors });
   if (pt) out.push({ kind: "setPT", power: pt[0], toughness: pt[1] });
+  out.push(...grants);
   return out.length ? out : null;
 }
 

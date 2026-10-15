@@ -6,6 +6,7 @@ import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, dam
 import { withModes } from "./modes";
 import {
   abilityProblem,
+  assistedRemaining,
   returnCandidates,
   attackProblem,
   blockProblem,
@@ -118,6 +119,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const ok = ids.filter((x) => !(characteristics(s, obj(s, x)).supertypes.includes("Legendary") && controllerOf(s, obj(s, x)) === pid));
       const best = ok.sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - worth(s, pid, obj(s, a)) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
+    // Assist (CR 702.132a): everyone else is an opponent, so we don't help pay for their spells.
+    if (pend.kind === "assist") return [{ type: "assist", player: pid, n: 0 }];
+    if (pend.kind === "assistCast") {
+      const rest = assistedRemaining(s);
+      const taps = rest && planMana(s, pid, rest.cost, rest.extra);
+      return taps ? [...taps, { type: "finishAssistedCast", player: pid }] : [{ type: "finishAssistedCast", player: pid, cancel: true }];
     }
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     if (pend.kind === "chooseOption") {

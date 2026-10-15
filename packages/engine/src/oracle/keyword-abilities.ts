@@ -70,6 +70,7 @@ export function parseCostKeyword(
   trigger?: TriggeredAbility;
   activated?: ActivatedAbility;
   delve?: true;
+  assist?: true;
   faceDown?: { kind: FaceDownKind; cost: string };
   madness?: string;
   suspend?: { n: number; cost: string };
@@ -147,6 +148,7 @@ export function parseCostKeyword(
     };
   }
   if (line === "Delve") return { delve: true };
+  if (line === "Assist") return { assist: true }; // CR 702.132a
   if (line === "Living weapon") {
     if (!d.subtypes.includes("Equipment")) return "fail";
     const germ: TokenSpec = { name: "Phyrexian Germ", power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: ["Phyrexian", "Germ"], keywords: [] };

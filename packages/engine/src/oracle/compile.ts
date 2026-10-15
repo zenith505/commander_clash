@@ -275,6 +275,7 @@ export function compile(d: CardDef): CompiledCard {
       if (costKw === "fail") out.unsupported.push(raw);
       else {
         if (costKw.delve) out.delve = true;
+        if (costKw.assist) out.assist = true;
         // Two of the same: each would work separately (CR 702.153b), which isn't modeled.
         const twice = (costKw.madness && out.madness) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
         if (twice) {

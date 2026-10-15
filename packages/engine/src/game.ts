@@ -268,10 +268,17 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "activateMana":
       // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
       // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
-      if (s.pending?.kind !== "payUnless" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
+      // And while helping to pay for a spell with assist, or paying the rest of it (CR 702.132a).
+      if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
       activateMana(s, p, action.objectId, action.mana, action.ability, action.tap);
       break;
     case "castSpell":
+      if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
+      if (action.assist !== undefined && freeCastOf(s, p.id) !== action.objectId) {
+        requireNoPending(s);
+        askAssist(s, p, action);
+        break;
+      }
       if (freeCastOf(s, p.id) === action.objectId) {
         // Cascade's "you may cast it without paying its mana cost", as the ability resolves.
         castSpell(s, p, action.objectId, action.targets, action.modes, undefined, undefined, action.x, action);
@@ -342,6 +349,12 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "plot":
       requireNoPending(s);
       plotCard(s, p, action.objectId);
+      break;
+    case "assist":
+      assistPays(s, p, action.n);
+      break;
+    case "finishAssistedCast":
+      finishAssistedCast(s, p, action.cancel);
       break;
     case "dredge":
       chooseDredge(s, p, action.objectId);
@@ -1450,6 +1463,8 @@ export function castProblem(
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
   if (typeof cost === "string") return cost;
+  if (choices?.assisted && (choices.assist === undefined || !payFromPool(parseManaCost(`{${choices.assisted}}`), player(s, choices.assist).manaPool)))
+    return "the assisting player can't pay that much";
   if (!payFromPool(cost.cost, p.manaPool, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
 }
@@ -1536,6 +1551,12 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     if (problem) return problem;
     const reduced = payGenericWith(cost, extra, improvise.length);
     if (!reduced) return `that's more artifacts than ${d.name}'s cost has generic mana for`;
+    ({ cost, extra } = reduced);
+  }
+  if (how.assisted) {
+    // The assisting player pays for generic mana only (CR 702.132a).
+    const reduced = payGenericWith(cost, extra, how.assisted);
+    if (!reduced) return `that's more than ${d.name}'s generic mana`;
     ({ cost, extra } = reduced);
   }
   if (how.delve?.length) {
@@ -1649,6 +1670,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const colorsSpent = COLORS.filter((c) => paid.pool[c] < p.manaPool[c]);
   p.manaPool = paid.pool;
   loseLife(s, p.id, paid.lifePaid);
+  if (choices.assisted && choices.assist !== undefined) {
+    const helper = player(s, choices.assist);
+    helper.manaPool = payFromPool(parseManaCost(`{${choices.assisted}}`), helper.manaPool)!.pool;
+    log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
+  }
   for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
@@ -3068,6 +3094,8 @@ function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
       s.pending = next !== undefined ? { ...s.pending, player: next, remaining: rest } : null;
     } else s.pending = null;
   }
+  // An assisted cast waiting on a player who left: it isn't cast.
+  if ((s.pending?.kind === "assist" && s.pending.caster === pid) || (s.pending?.kind === "assistCast" && s.pending.helper === pid)) s.pending = null;
   if (s.monarch === pid) {
     // The active player becomes the monarch, or if it's them leaving, the next player in turn order (CR 725.4).
     s.monarch = undefined;
@@ -3180,6 +3208,58 @@ function suspendCard(s: GameState, p: Player, id: ObjectId) {
   o.counters.time = sus.n;
   log(s, `${p.name} suspends ${d.name} with ${sus.n} time counter${sus.n === 1 ? "" : "s"} (${sus.cost}).`);
   s.passedInSuccession = [];
+}
+
+/**
+ * Assist (CR 702.132a): before paying, the caster chooses another player, who may activate mana abilities and pay for
+ * any amount of the generic mana in the spell's total cost; then the caster pays the rest. The cast waits on them.
+ */
+function askAssist(s: GameState, p: Player, action: Extract<Action, { type: "castSpell" }>) {
+  const o = obj(s, action.objectId);
+  const d = defOf(s, o);
+  if (!compileCard(d).assist) throw new RulesError(`${d.name} doesn't have assist`);
+  const helper = action.assist!;
+  if (helper === p.id || !s.players[helper] || player(s, helper).lost) throw new RulesError("choose another player in the game to assist");
+  const { assist: _, ...rest } = action;
+  const problem = castProblem(s, p.id, o.id, action.targets, action.modes, action.convoke, action.improvise, action.x, rest);
+  if (problem && !/not enough mana/.test(problem)) throw new RulesError(problem);
+  const cost = costToPay(s, p.id, o, action.convoke, action.improvise, action.x, action.kicks, { ...rest, targets: action.targets });
+  const generic = typeof cost === "string" ? 0 : splitGeneric(cost.cost, cost.extra).extra;
+  if (!generic) throw new RulesError(`${d.name}'s total cost has no generic mana for another player to pay`);
+  s.pending = { kind: "assist", player: helper, caster: p.id, source: d.name, max: generic, cast: action };
+  log(s, `${p.name} asks ${player(s, helper).name} to help pay for ${d.name} (assist, up to {${generic}}).`);
+}
+
+function assistPays(s: GameState, p: Player, n: number) {
+  const pend = s.pending;
+  if (pend?.kind !== "assist" || pend.player !== p.id) throw new RulesError("no spell to assist");
+  if (!Number.isInteger(n) || n < 0 || n > pend.max) throw new RulesError(`pay from 0 to ${pend.max}`);
+  if (n && !payFromPool(parseManaCost(`{${n}}`), p.manaPool)) throw new RulesError(`not enough mana in your pool to pay {${n}}`);
+  log(s, n ? `${p.name} will pay {${n}} of ${pend.source}'s cost.` : `${p.name} doesn't help pay for ${pend.source}.`);
+  s.pending = { kind: "assistCast", player: pend.caster, helper: p.id, source: pend.source, n, cast: { ...pend.cast, ...(n ? { assisted: n } : { assist: undefined }) } };
+}
+
+/** The caster pays what's left and casts it; or, if they can't or won't, the cast is undone (CR 733.1). */
+function finishAssistedCast(s: GameState, p: Player, cancel?: boolean) {
+  const pend = s.pending;
+  if (pend?.kind !== "assistCast" || pend.player !== p.id) throw new RulesError("no assisted spell to cast");
+  s.pending = null;
+  if (cancel) {
+    log(s, `${p.name} doesn't cast ${pend.source}.`);
+    return;
+  }
+  const a = pend.cast;
+  castSpell(s, p, a.objectId, a.targets, a.modes, a.convoke, a.improvise, a.x, a);
+  s.passedInSuccession = [];
+}
+
+/** What the caster still pays for an assisted spell, once the helper has chosen (for planning mana). */
+export function assistedRemaining(s: GameState): { cost: ParsedCost; extra: number } | null {
+  const pend = s.pending;
+  if (pend?.kind !== "assistCast") return null;
+  const a = pend.cast;
+  const cost = costToPay(s, pend.player, obj(s, a.objectId), a.convoke, a.improvise, a.x, a.kicks, { ...a, targets: a.targets });
+  return typeof cost === "string" ? null : cost;
 }
 
 /**

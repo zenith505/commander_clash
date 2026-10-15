@@ -348,6 +348,10 @@ export interface CostChoices {
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
   casualty?: ObjectId;
+  /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
+  assist?: PlayerId;
+  /** How much of that generic mana they pay, from their mana pool: set by the game once they've chosen. */
+  assisted?: number;
 }
 
 /**
@@ -393,6 +397,13 @@ export type PendingDecision =
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
    */
+  /**
+   * Assist (CR 702.132a): `caster` chose this player, who may activate mana abilities and then pay up to `max` of the
+   * generic mana in the spell's total cost. The spell isn't on the stack yet; `cast` is the caster's cast.
+   */
+  | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
+  /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
+  | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
   | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
@@ -625,6 +636,10 @@ export type Action =
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
   /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
   | { type: "plot"; player: PlayerId; objectId: ObjectId }
+  /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */
+  | { type: "assist"; player: PlayerId; n: number }
+  /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */
+  | { type: "finishAssistedCast"; player: PlayerId; cancel?: boolean }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */

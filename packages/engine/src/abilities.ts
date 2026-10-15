@@ -1021,6 +1021,8 @@ export interface CompiledCard {
   casualty?: number;
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
+  /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */
+  assist?: true;
   /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */
   faceDownCast?: { kind: FaceDownKind; cost: string };
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */

@@ -491,6 +491,8 @@ export type Effect =
    */
   | { type: "copySpell"; spell: "cause" | { target: number }; n: Amount | "storm" | "kicked"; newTargets: boolean }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  /** "Put its counters on target creature": as many of each kind (or of `only`) as the source had as it last existed. */
+  | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
   | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */

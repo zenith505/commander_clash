@@ -143,6 +143,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "lastKnownCounters": {
+      const had = Object.entries(ctx.lki?.counters ?? {}).filter(([k, n]) => n > 0 && (!e.only || k === e.only));
+      for (const o of objects(s, e.what, ctx))
+        for (const [k, n] of had) {
+          invalidateCharacteristics(s);
+          const put = putCounters(s, o, k, n);
+          log(s, `${defOf(s, o).name} gets ${put} ${k} counter${put > 1 ? "s" : ""}.`);
+        }
+      return;
+    }
     case "endure": {
       // CR 701.63a: "that permanent's controller creates an N/N white Spirit creature token unless they put N +1/+1
       // counters on that permanent", chosen as it resolves. Gone from the battlefield: just the token (rulings).

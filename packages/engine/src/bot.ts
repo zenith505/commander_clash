@@ -714,7 +714,17 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   const printed = castingBody(castDef(s, id, alt));
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
-  const modes = choice?.modes;
+  if (!printed?.modal?.costs) return castPlanWithModes(s, pid, id, free, x, via, alt, choice?.modes);
+  // Spree (CR 702.172a): each mode costs more, so the most useful modes we can pay for.
+  for (let n = choice!.ranked.length; n >= 1; n--) {
+    const plan = castPlanWithModes(s, pid, id, free, x, via, alt, choice!.ranked.slice(0, n).sort((a, b) => a - b));
+    if (plan) return plan;
+  }
+  return null;
+}
+
+function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via: CastFromGraveyardKind | undefined, alt: AltCostKind | undefined, modes: number[] | undefined): Action[] | null {
+  const printed = castingBody(castDef(s, id, alt));
   const body = printed && withModes(printed, modes);
   const specs = spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
@@ -980,9 +990,9 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
  * as many as allowed. Returns null when not enough modes are worth choosing, unless
  * `forced` (a trigger has to choose), in which case any legal modes fill the gap.
  */
-export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string): { modes: number[] } | null {
+export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string): { modes: number[]; ranked: number[] } | null {
   const m = body.modal;
-  if (!m) return { modes: [] };
+  if (!m) return { modes: [], ranked: [] };
   const legal = legalModes(s, body, pid, sourceId ? sourceQuality(s, sourceId) : undefined);
   const scored = m.modes
     .map((mode, i) => {
@@ -999,7 +1009,8 @@ export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forc
     modes = [...modes, ...rest].slice(0, m.min);
   }
   if (!modes.length && m.min > 0) return null;
-  return { modes: modes.sort((a, b) => a - b) };
+  // `ranked`: the same modes, most useful first.
+  return { ranked: [...modes], modes: modes.sort((a, b) => a - b) };
 }
 
 /** How much a permanent matters, for weighing effects on many at once. */

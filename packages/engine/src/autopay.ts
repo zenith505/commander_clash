@@ -181,7 +181,7 @@ export function planCast(
   const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" ? prototypedDef(d) : d };
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
-  let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets });
+  let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets, modes });
   if (choices.delve?.length) {
     // Cards exiled for delve pay generic mana (CR 702.66a).
     const reduced = payGenericWith(cost, extra, choices.delve.length);

@@ -899,9 +899,10 @@ export interface AbilityBody {
   text: string;
   /**
    * For modal text ("Choose one —" and a bulleted list, CR 700.2): the modes. A modal body
-   * has no targets or effects of its own; see `withModes` in modes.ts.
+   * has no targets or effects of its own; see `withModes` in modes.ts. `costs`: spree's additional cost for each
+   * mode (CR 702.172a), paid for the chosen ones.
    */
-  modal?: { min: number; max: number; modes: AbilityBody[] };
+  modal?: { min: number; max: number; modes: AbilityBody[]; costs?: string[] };
 }
 
 export type TriggerEvent =

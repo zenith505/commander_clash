@@ -1891,7 +1891,7 @@ export function castProblem(
   if (ap) return ap;
   const cp = casualtyProblem(s, pid, d, choices);
   if (cp) return cp;
-  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
+  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
@@ -1904,12 +1904,14 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice"> & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
   const kicker = compileCard(d).kicker;
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr);
+  // So are spree's costs for the chosen modes (CR 702.172a), also when it's cast without paying its mana cost (rulings).
+  const spree = compileCard(d).spell?.modal?.costs;
+  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "");
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
@@ -1980,7 +1982,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
  */
-function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } | string {
+function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } | string {
   const d = defOf(s, o);
   let { cost, extra } = spellCost(s, pid, o, x, kicks, how);
   if (convoke?.length) {
@@ -2143,7 +2145,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const fromCommand = o.zone === "command";
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
-  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets }) as { cost: ParsedCost; extra: number };
+  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).

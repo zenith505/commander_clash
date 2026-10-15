@@ -881,7 +881,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               key={modePick ? `${modePick.mode}:${modePick.objectId}` : `trigger:${pending?.kind === "chooseModes" ? pending.description : ""}`}
               {...(pending?.kind === "chooseModes"
                 ? { label: pending.description.split(":")[0]!, min: pending.min, max: pending.max, modes: pending.modes, legal: pending.legal }
-                : { label: modePick!.label, min: modePick!.body.modal!.min, max: modePick!.body.modal!.max, modes: modePick!.body.modal!.modes.map((m) => m.text), legal: legalModes(s, modePick!.body, HUMAN) })}
+                : { label: modePick!.label, min: modePick!.body.modal!.min, max: modePick!.body.modal!.max, modes: modePick!.body.modal!.modes.map((m, i) => (modePick!.body.modal!.costs ? `+ ${modePick!.body.modal!.costs[i]} — ${m.text}` : m.text)), legal: legalModes(s, modePick!.body, HUMAN) })}
               sourceName={(pending?.kind === "chooseModes" ? cardOf(s, pending.sourceId) : cardOf(s, modePick!.objectId)).name}
               onDone={pickModes}
               onCancel={pending?.kind === "chooseModes" ? undefined : () => setModePick(null)}

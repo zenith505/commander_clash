@@ -234,10 +234,24 @@ export function compile(d: CardDef): CompiledCard {
   const spellLines: string[] = [];
   let ascendSpell = false;
   const lines = joinModes(normalizeSelf(d).split("\n"));
+  // Spree (CR 702.172a): "Choose one or more modes. As an additional cost to cast this spell, pay the costs associated
+  // with those modes." Each mode is a "+ [cost] — [effect]" line.
+  let spree: { costs: string[]; texts: string[]; lines: string[] } | undefined;
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own.
     const line = raw.trim().replace(/^Converge — /, "");
     if (!line) continue;
+    if (line === "Spree" && isSpell && !spree) {
+      spree = { costs: [], texts: [], lines: [raw] };
+      continue;
+    }
+    const spreeMode = spree && /^\+ ((?:\{[0-9WUBRGC]+\})+) — (.+)$/.exec(line);
+    if (spree && spreeMode) {
+      spree.costs.push(spreeMode[1]!);
+      spree.texts.push(spreeMode[2]!);
+      spree.lines.push(raw);
+      continue;
+    }
     // Deck construction, not play: the deck checker reads it (deckLimit).
     if (/^A deck can have (?:any number of|up to \w+) cards named ~\.$/.test(line)) continue;
     // Also deck construction: who can be a commander (CR 903.3, deck.ts canBeCommander).
@@ -881,7 +895,12 @@ export function compile(d: CardDef): CompiledCard {
     if (isSpell) spellLines.push(stripAbilityWord(line));
     else out.unsupported.push(raw);
   }
-  if (isSpell) {
+  if (spree) {
+    const modes = spree.texts.map((t) => parseBody(t, { spell: true }));
+    // Every mode has to work, and nothing else may be in the spell's text (it would be outside the modes).
+    if (spellLines.length || spree.costs.length < 2 || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...spree.lines, ...spellLines);
+    else out.spell = { targets: [], effects: [], text: spree.lines.join(" "), modal: { min: 1, max: modes.length, modes: modes as AbilityBody[], costs: spree.costs } };
+  } else if (isSpell) {
     const body = spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;

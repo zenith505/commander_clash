@@ -860,7 +860,12 @@ export type ManaProduce =
   | { kind: "oneOf"; options: ManaType[]; amount: number }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
-  | { kind: "chosenColor"; also?: ManaType };
+  | { kind: "chosenColor"; also?: ManaType }
+  /**
+   * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
+   * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
+   */
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).

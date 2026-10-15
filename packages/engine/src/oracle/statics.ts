@@ -4,7 +4,7 @@ import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, capital, singular } from "./words";
 import { replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
-import { pickFilter, parseGroup, parseTargetPhrase } from "./targets";
+import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { parseGrants } from "./grants";
 
 /** What "~ enters tapped unless ..." waits for (CR 614.1d). */
@@ -66,6 +66,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], keywords: [capital(m[2]!)], text: `creature with ${m[2]}` } } };
+  }
+  // Akki War Paint: "As long as enchanted permanent is a creature, it gets +2/+1" (an Aura that can enchant an artifact
+  // or land that may become a creature): only while it's a creature (CR 611.3a).
+  if ((m = /^As long as (enchanted|equipped) permanent is a creature, it (gets .+|has .+)$/.exec(text))) {
+    const mods = parseStaticMods(m[2]!);
+    return mods ? { affects: { kind: "attached" }, mods, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], text: "creature" } } } : null;
   }
   // Aerial Modification: "As long as enchanted permanent is a Vehicle, it's a creature in addition to its other types."
   // A type-changing effect (layer 4) whose condition looks at the permanent as the earlier effects in that layer left it.
@@ -272,8 +278,10 @@ function parseAffected(subject: string): Affects | null {
     return { kind: "filter", types: ["Creature"], spec: { kind: "object", token: true, text: "creature token" }, ...(m[1] ? { controller: m[1] === " you control" ? ("you" as const) : ("opponent" as const) } : {}) };
   // A Background's "Commander creatures you own": whoever controls them (rulings).
   if (/^Commander creatures you own$/.test(x)) return { kind: "filter", types: ["Creature"], ownedCommanders: true };
-  // Anything else a group can say: "Each creature you control with a +1/+1 counter on it", "Creatures of the chosen type".
-  const g = parseGroup(x, true);
+  // Anything else a group can say: "Each creature you control with a +1/+1 counter on it", "Creatures of the chosen type";
+  // "Creatures you control with +1/+1 counters on them" is the same group.
+  const plural = /^Creatures you control with ([+-]1\/[+-]1) counters on them$/.exec(x);
+  const g = parseGroup(plural ? `Each creature you control with a ${plural[1]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;
 }
 
@@ -315,6 +323,11 @@ function parseStaticMods(rest: string): Modification[] | null {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
+  }
+  // "Equipped creature gets +3/+0 and loses flying" (Colossus Hammer): abilities lost in layer 6.
+  if ((m = new RegExp(`^gets? ${PT}/${PT} and loses (.+)$`).exec(rest))) {
+    const lost = parseKeywordList(m[3]!);
+    return lost ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, { kind: "removeKeywords", keywords: lost }] : null;
   }
   if ((m = new RegExp(`^gets? ${PT}/${PT}(?: and (?:has|have) (.+))?$`).exec(rest))) {
     const mods: Modification[] = [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }];

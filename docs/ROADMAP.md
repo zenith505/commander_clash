@@ -1,6 +1,6 @@
 # Roadmap
 
-15,375 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,502 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,11 +14,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (a long tail of 2- and 3-card lines): "earthbend N", "freerunning", "foretell", "ripple N",
-   "emerge", "as long as enchanted permanent is a creature, it gets +N/+N", "assigns combat damage equal to its
-   toughness rather than its power" (CR 510.1c), "equipped creature gets +N/+N and loses flying", "when ~ enters,
-   return another creature you control to its owner's hand", "{N}{G}: target creature blocks ~ this turn if able",
-   "when ~ enters, draw three cards, then put two cards from your hand on top of your library".
+1. By `npm run blockers` (a long tail of 2- and 3-card lines): "backup N", "ripple N" (needs a choice of bottom
+   order), "Partner—Friends forever", "Sneak {N}{B}", Rageform-style "it becomes an Aura ... manifest the top card",
+   "players play with their hands / the top card of their libraries revealed", "for each other attacking Aurochs",
+   "untap all creatures that attacked this turn ... additional combat phase", "draw three cards, then discard two
+   unless you discard a creature card", "when ~ enters, return another creature you control to its owner's hand".
+   Left from the earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed, Monastery Raid),
+   "if this spell was cast from exile" conditions on foretell cards (Haunting Voyage, Cosmos Charger), Earth
+   Rumble's reflexive earthbend trigger and Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
+   Death's lures with extra clauses, Kingpin of Crime.
 
 ## Known gaps (from earlier rounds)
 

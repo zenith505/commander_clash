@@ -1558,6 +1558,8 @@ export type AdditionalCost =
       n: number;
       /** "Exile a red card with mana value X from your hand" (the Shoals): its mana value is the X announced (CR 107.3a). */
       mvX?: true;
+      /** "Put a card from your hand on top of your library" (Penance, Leashling): moved there instead of exiled. */
+      toLibrary?: true;
     }
   /** "Reveal your hand" (Land Grant): all of it, whatever is in it (rulings: even if it's revealed already). */
   | { kind: "revealHand" }

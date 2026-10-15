@@ -44,6 +44,10 @@ const auriokReplica = card("Auriok Replica", "Artifact Creature — Cleric", "{3
 const repel = card("Repel the Abominable", "Instant", "{1}{W}", { oracleText: "Prevent all damage that would be dealt this turn by non-Human sources." });
 const forgeTender = card("Burrenton Forge-Tender", "Creature — Kithkin Wizard", "{W}", { power: "1", toughness: "1", keywords: ["Protection"], oracleText: "Protection from red\nSacrifice this creature: Prevent all damage a red source of your choice would deal this turn." });
 
+const penance = card("Penance", "Enchantment", "{2}{W}", { oracleText: "Put a card from your hand on top of your library: The next time a black or red source of your choice would deal damage this turn, prevent that damage." });
+const hiddenRetreat = card("Hidden Retreat", "Enchantment", "{2}{W}", { oracleText: "Put a card from your hand on top of your library: Prevent all damage that would be dealt by target instant or sorcery spell this turn." });
+const leashling = card("Leashling", "Artifact Creature — Dog", "{6}", { power: "3", toughness: "3", oracleText: "Put a card from your hand on top of your library: Return this creature to its owner's hand." });
+
 const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." });
 const pyroclasm = card("Pyroclasm", "Sorcery", "{1}{R}", { oracleText: "Pyroclasm deals 2 damage to each creature." });
 const pinger = () => card("Prodigal Pyromancer", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to any target." });
@@ -92,7 +96,7 @@ const nm = (s: GameState, pid: PlayerId) => s.players[pid]!.name;
 
 describe("prevention effects for the turn and sources of your choice (CR 615, 609.7)", () => {
   it("compile", () =>
-    supported(circleRed, payNoHeed, shiningShoal, harmsWay, sivvisRuse, safePassage, reverseDamage, deflectingPalm, invulnerability, healingGrace, korChant, etherealHaze, storyCircle, hallow, luminesce, generalsRegalia, samiteMinistration, shadowbane, pilgrim, kithkinArmor, honorablePassage, eerieInterference, fogOfWar, chantOfVituGhazi, beacon, oraclesAttendants, thwart, chameleonBlur, endure, divineLight, forfend, rithsCharm, martyrsCause, auriokReplica, repel, forgeTender));
+    supported(circleRed, payNoHeed, shiningShoal, harmsWay, sivvisRuse, safePassage, reverseDamage, deflectingPalm, invulnerability, healingGrace, korChant, etherealHaze, storyCircle, hallow, luminesce, generalsRegalia, samiteMinistration, shadowbane, pilgrim, kithkinArmor, honorablePassage, eerieInterference, fogOfWar, chantOfVituGhazi, beacon, oraclesAttendants, thwart, chameleonBlur, endure, divineLight, forfend, rithsCharm, martyrsCause, auriokReplica, repel, forgeTender, penance, hiddenRetreat, leashling));
 
   it("Circle of Protection: Red: only red sources are offered; the chosen Bolt's damage is prevented, the next Bolt's isn't", () => {
     const { s: s0, ap, opp } = setup([]);
@@ -315,6 +319,35 @@ describe("prevention effects for the turn and sources of your choice (CR 615, 60
     expect(s.log.some((e) => /chooses Lightning Bolt as the source for Circle of Protection: Red/.test(e.text))).toBe(true);
     expect(life(s, opp)).toBe(40);
     expect(s.objects[cop]!.zone).toBe("battlefield");
+  });
+
+  it("Penance and Hidden Retreat: the cost puts a card from your hand on top of your library", () => {
+    const { s: s0, ap, ids, opp } = setup([bear(), forest]);
+    const pen = putOnBattlefield(s0, ap, penance);
+    const hr = putOnBattlefield(s0, ap, hiddenRetreat);
+    let { s } = casts(s0, opp, bolt, [player(ap)]);
+    s = untilPriority(s, ap);
+    s = run(s, planActivate(s, ap, pen, 0, undefined, undefined, undefined, undefined, { exileFromHand: [ids[0]!] }));
+    expect(s.players[ap]!.library[0]).toBe(ids[0]);
+    expect(s.players[ap]!.hand).not.toContain(ids[0]);
+    s = chooseSource(passAll(s), "Lightning Bolt");
+    s = resolveTop(s);
+    expect(life(s, ap)).toBe(40);
+    ({ s } = casts(s, opp, bolt, [player(ap)]));
+    s = untilPriority(s, ap);
+    s = run(s, planActivate(s, ap, hr, 0, [{ kind: "stack", id: s.stack.at(-1)!.id }], undefined, undefined, undefined, { exileFromHand: [ids[1]!] }));
+    expect(s.players[ap]!.library.slice(0, 2)).toEqual([ids[1], ids[0]]);
+    s = resolveTop(passAll(s));
+    expect(life(s, ap)).toBe(40);
+  });
+
+  it("Leashling returns to its owner's hand for a card put on top of the library", () => {
+    const { s: s0, ap, ids } = setup([bear()]);
+    const dog = putOnBattlefield(s0, ap, leashling);
+    const s = passAll(run(s0, planActivate(s0, ap, dog, 0, undefined, undefined, undefined, undefined, { exileFromHand: [ids[0]!] })));
+    expect(s.players[ap]!.hand).toContain(dog);
+    expect(s.objects[dog]!.zone).toBe("hand");
+    expect(s.players[ap]!.library[0]).toBe(ids[0]);
   });
 
   it("bots don't cast prevention spells in their main phase", () => {

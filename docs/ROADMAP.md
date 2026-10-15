@@ -1,6 +1,6 @@
 # Roadmap
 
-16,331 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,414 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -141,11 +141,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).
-- Alternative costs still out: Shining Shoal (its redirect, "the next X damage ... to you or a creature you control
-  this turn is dealt to any target instead"), Security Rhox (mana from a Treasure only), Spinning Darkness's "top
-  three black cards of your graveyard" (the order of cards put into a graveyard at once isn't modeled), Conspiracy
-  Unraveler's "collect evidence 10 rather than pay the mana cost", Sivvi's Ruse (its "prevent all damage ... to
-  creatures you control" line). Bots never use Fist of Suns' {W}{U}{B}{R}{G} or the Shoals (an X spell for an
+- Alternative costs still out: Security Rhox ("spend only mana produced by Treasures": the mana pool doesn't record
+  where mana came from; the same tracking would unlock "if mana from a Treasure was spent to cast it", Hired Hexblade,
+  Jaded Sell-Sword, Devour Intellect, Price of Loyalty, Smaug and others), Spinning Darkness's "top three black cards
+  of your graveyard" (the order of cards put into a graveyard at once, CR 404.3, isn't modeled), Conspiracy
+  Unraveler's "collect evidence 10 rather than pay the mana cost" (collect evidence, CR 701.59, isn't supported at all:
+  also "you may collect evidence N" as an additional cost, ward—collect evidence, and as an ability's cost). Bots never use Fist of Suns' {W}{U}{B}{R}{G} or the Shoals (an X spell for an
   alternative cost), never cast Invigorate (no combat-trick logic for alternative costs), and use the other
   alternative costs only when they can't pay the mana cost. The game remembers only some of what happened in a turn
   (`GameState.turnLog`: searches, permanents entering, destructions by an opponent, creatures dealing damage to a
@@ -171,8 +172,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "Activate only during your turn, before attackers are declared" with additional combats: it's allowed in each
   combat's beginning of combat step but not in an added main phase; check the rulings before relying on it. Random
   discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with something else ("create a
-  2/2 black Zombie", Kalitas). "Prevent all damage that would be dealt by target instant or sorcery spell" (Hidden
-  Retreat).
+  2/2 black Zombie", Kalitas).
 - "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat; Pain Seer's "becomes
   untapped"; Ivory Gargoyle.
 - Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed"); reinforce X;
@@ -225,7 +225,17 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "As though it weren't blocked" from an effect rather than an ability (Predatory Focus, Outmaneuver), Ruxa,
   Gurzigost. "At the beginning of the next cleanup step" for counters (Bounty of the Hunt), Cunning, Necromancy.
 - Damage shields: outside combat damage the choices of which damage a prevention or redirection shield takes, and
-  which shield applies first (CR 615.7, 616.1), are made for the player (bots' heuristic); a shield that redirects to
+  which shield applies first (CR 615.7, 616.1), are made for the player (bots' heuristic); so is splitting a shared
+  "next N damage" among several recipients (Harm's Way). Turn-long rules (`GameState.damageRules`, "a source of your
+  choice", Safe Passage) apply after the shields on a permanent or player. A source of your choice is offered from the
+  battlefield and the stack only (not a commander in the command zone, which can't deal damage there anyway).
+  Prevention still out: "that damage is dealt to that source's controller instead" (Reflect Damage), Eye for an Eye's
+  "instead that source deals that much damage to you and ~ deals that much damage to that source's controller",
+  Dark Sphere's "prevent half that damage, rounded down", Nova Pentacle's "target creature of an opponent's choice",
+  "if damage is prevented this way, you may have ~ deal that much damage to target creature" (Channel Harm) and
+  "to that creature" (Comeuppance), "sources of the color of your choice" (Prismatic Strands), Rhystic Circle's "any
+  player may pay {1}", Heavy Fog's cast restriction; about 95 cards that mention prevention are still out (search
+  the card data for "source of your choice" or "prevented this way"). a shield that redirects to
   the creature it protects, and chains of redirection, are untested. Hazduhr (named by its short name), Captain's
   Maneuver ("creature, planeswalker, or player"), Personal Incarnation.
 - Planeswalkers: emblems (CR 114), "+X" loyalty abilities, compleated, "X" loyalty, "add mana" loyalty abilities,

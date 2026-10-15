@@ -322,7 +322,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -536,6 +536,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.tap !== undefined) continue;
         return setCostPick({ activate: d, kind: "tap", label: cardOf(s, d.objectId).name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
+      if (c.kind === "exileFromHand" && c.toLibrary) {
+        // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
+        if (d.exileFromHand !== undefined) continue;
+        return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `put ${c.n === 1 ? "a card" : `${c.n} cards`} from your hand on top of your library`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId), chosen: [] });
+      }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
       if (c.kind === "discard" && c.random) continue; // the game picks it (CR 701.9b)
       if (d[c.kind] !== undefined) continue;
@@ -547,7 +552,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -638,7 +643,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "discard" && c.oneOf)
         return setCostPick({ draft: d, kind: "discard", label: card.name, what: `discard ${/^[aeiou]/i.test(c.oneOf.text) ? "an" : "a"} ${c.oneOf.text} and another card`, n: c.n, candidates: me.hand.filter((id) => id !== d.objectId), chosen: [], oneOf: c.oneOf });
       const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
-      const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? "exile from your hand" : "exile from your graveyard";
+      const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : "exile from your graveyard";
       return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
     // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
@@ -1331,7 +1336,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `tap ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
-  if (c.kind === "exileFromHand") return `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
+  if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
 }
 

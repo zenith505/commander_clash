@@ -1894,6 +1894,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7818d6e0-74d8-46ae-94f6-d2a349c9507b",
+  "name": "Penance",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Put a card from your hand on top of your library: The next time a black or red source of your choice would deal damage this turn, prevent that damage.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "exo",
+  "releasedAt": "1998-06-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8d02b297-97c4-4379-9862-0a462400f66f",
   "name": "Phyrexian Altar",
   "manaCost": "{3}",

@@ -47,7 +47,7 @@ for play. When we add search-based AI we'll switch to structural sharing.
 | `layers.ts` | Characteristics after continuous effects, in layer order (CR 613), cached. |
 | `cards.ts` | Card definitions and characteristic helpers (`power`, `objIsType`, `objHasKeyword`, ...). |
 | `copies.ts` | Copiable values (CR 707). |
-| `damage.ts`, `counters.ts` | Dealing damage (CR 120) and counter/token replacement effects (CR 614, 616). |
+| `damage.ts`, `counters.ts` | Dealing damage (CR 120): damage dealt at the same time goes through one planner for protection, shield counters, prevention and redirection shields (CR 615, 616), which can pause combat damage to ask; counter/token replacement effects (CR 614, 616). |
 | `mana.ts`, `manaabilities.ts`, `autopay.ts` | Mana costs, mana abilities, automatic payment. |
 | `amounts.ts`, `modes.ts`, `keywords.ts` | Amounts (X, "for each"), modal spells, keyword tables. |
 | `bot.ts` | Bot decisions, using the same legal-action helpers as the UI. |

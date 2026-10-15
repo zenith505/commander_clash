@@ -110,6 +110,8 @@ function parseManaProduced(text: string): ManaProduce | null {
   const any = new RegExp(`^${NUM} mana of any (?:one )?color$`).exec(text);
   if (any) return { kind: "oneOf", options: ALL_COLORS, amount: num(any[1]!) };
   if (text === "one mana of any color in your commander's color identity") return { kind: "commanderIdentity" };
+  const could = /^one mana of any (color|type) that a land (you control|an opponent controls) could produce$/.exec(text);
+  if (could) return { kind: "landsCouldProduce", whose: could[2] === "you control" ? "you" : "opponent", ...(could[1] === "type" ? { anyType: true } : {}) };
   // "one mana of the chosen color", "{B} or one mana of the chosen color" (chosen as it entered).
   const chosen = /^(?:(\{[WUBRGC]\}) or )?one mana of the chosen color$/.exec(text);
   if (chosen) return { kind: "chosenColor", ...(chosen[1] ? { also: sym(chosen[1])! } : {}) };

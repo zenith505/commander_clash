@@ -13,7 +13,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
   [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
-  // Only players can be attacked here (planeswalkers and battles aren't supported as attack targets).
+  // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
   [/^Whenever ~ attacks a player, (.+)$/, "selfAttacks"],
   [/^Whenever ~ enlists a creature, (.+)$/, "selfEnlists"], // CR 702.154c
   [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
@@ -45,6 +45,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of each player's draw step, (.+)$/, "eachDrawStep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
+  [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^When(?:ever)? ~ exploits a creature, (.+)$/, "selfExploits"],
   // Heroic (an ability word): "Whenever you cast a spell that targets ~".
   [/^Whenever you cast a spell that targets ~, (.+)$/, "selfTargetedByYourSpell"],
@@ -54,7 +55,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped",
 ];
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
@@ -75,6 +76,7 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^deals combat damage, (.+)$/, "selfDealsCombatDamage", { thatMuch: true }],
   [/^deals damage, (.+)$/, "selfDealsDamage", { thatMuch: true }],
   [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
+  [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
 ];
 
 /**
@@ -85,11 +87,13 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
  * ("the other creature"). "Enchanted creature" in the effect is whatever it's attached to as it resolves.
  */
 function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) creature (.+)$/.exec(line);
+  // "Whenever enchanted land becomes tapped": an Aura on something other than a creature can only see that.
+  const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) (creature|land|artifact|permanent) (.+)$/.exec(line);
   if (!m) return null;
   for (const [re, event, o] of HOST_TRIGGERS) {
-    const h = re.exec(m[2]!);
+    const h = re.exec(m[3]!);
     if (!h) continue;
+    if (m[2] !== "creature" && event !== "selfBecomesTapped") return "fail";
     let text = h[1]!;
     // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm).
     if (m[1] && /\b(it|its|that creature)\b/i.test(text)) return "fail";
@@ -296,10 +300,27 @@ function parseExploitsTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "creatureYouControlExploits", body, ...(filter ? { subjectFilter: { ...filter, text: m[1]! } } : {}) };
 }
 
+/** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
+const YARD_EVENTS: TriggerEvent[] = ["castSpell", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
+  // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
+  // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to that creature)?))\.$/.exec(line);
+  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!)) {
+    const t = parseTrigger(`${yard[1]}, draw a card.`);
+    if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
+    if (!YARD_EVENTS.includes(t.event) || t.host) return "fail";
+    // "Attached to that creature": the entering creature, the trigger's subject.
+    const attach = / attached to that creature$/.test(yard[2]!);
+    if (attach && !(t.event === "permanentEnters" && t.enters?.filter.types?.includes("Creature")) && t.event !== "anotherCreatureYouControlEnters") return "fail";
+    const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true, ...(attach ? { subject: true } : {}) });
+    return body ? { ...t, body, zone: "graveyard" } : "fail";
+  }
   // "Whenever the Ring tempts you" (CR 701.54d). "If you chose a creature other than ~ as your Ring-bearer" is an
   // intervening if (CR 603.4) about the choice just made, so it can't change by the time it resolves.
   const ring = /^Whenever the Ring tempts you, (if you chose a creature other than ~ as your Ring-bearer, )?(.+)$/.exec(line);
@@ -335,6 +356,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const cast = parseCastTrigger(line);
   if (cast) return cast;
+  // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped".
+  const tapped = /^Whenever an? (.+?) becomes tapped, (.+)$/.exec(line);
+  if (tapped) {
+    const filter = parseTargetPhrase(tapped[1]!);
+    const body = filter && filter.kind === "object" && parseBody(tapped[2]!, { subjectIt: true });
+    return filter && body ? { event: "permanentBecomesTapped", tappedFilter: filter, body } : "fail";
+  }
   const block = parseBlockTrigger(line);
   if (block) return block;
   const damages = parseDamagesCreatureTrigger(line);
@@ -383,7 +411,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
-      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
+      const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
+      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}) } : ("fail" as const);
     }
   }
   return "fail" as const;

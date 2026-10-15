@@ -102,6 +102,20 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   };
 }
 
+/**
+ * A loyalty ability (CR 606): "+1: You gain 2 life.", "−3: ~ deals 4 damage to target creature.", "0: ...", "−X: ...",
+ * where X in the effect is the X announced for the cost (CR 107.3). Activated only as a sorcery (CR 606.3).
+ */
+export function parseLoyalty(sign: string, amount: string, effectText: string, raw: string): ActivatedAbility | "fail" {
+  const minus = sign === "−" || sign === "-";
+  if (amount === "X" && !minus) return "fail";
+  const body = parseBody(effectText, { activated: true });
+  if (!body) return "fail";
+  if (usesX(body) && amount !== "X") return "fail";
+  const n = Number(amount);
+  return { manaCost: "", tap: false, sacrificeSelf: false, sorcerySpeed: true, body, text: raw, ...(amount === "X" ? { loyaltyX: true } : { loyalty: minus ? -n : n }) };
+}
+
 /** How much energy "Pay {E}{E}" or "Pay eight {E}" asks for (CR 107.14), or 0. */
 export function energyIn(costs: string): number {
   const m = /Pay ((?:\{E\})+)|Pay (\w+) \{E\}/.exec(costs);

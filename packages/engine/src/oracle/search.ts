@@ -39,7 +39,7 @@ export function parseSearch(s: string): Effect[] | null {
   return null;
 }
 
-function mayBeAura(f: TargetSpec | undefined): boolean {
+export function mayBeAura(f: TargetSpec | undefined): boolean {
   if (!f || f.named) return true;
   if (f.notTypes?.includes("Enchantment")) return false;
   if (f.types?.length && !f.types.includes("Enchantment")) return false;

@@ -1,12 +1,12 @@
-import type { CounterKind, Effect } from "../abilities";
+import type { Amount, CounterKind, Effect, TokenSpec } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
-import { auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackedName, attackedPlaneswalker, auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
-import { pickOptions } from "./targeting";
+import { objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
-import { tokenCopies } from "./run-tokens";
+import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { addDelayed } from "./run-spells";
 import { fireEvent, inCombat } from "./triggers";
@@ -73,6 +73,48 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand");
     }
+}
+
+/** The token empower Jace creates (CR 701.71a). */
+const JACE: TokenSpec = { name: "Jace", colors: ["U"], types: ["Planeswalker"], subtypes: ["Jace"], keywords: [], abilities: "−1: Surveil 1.\n−3: Draw a card.", loyalty: 0 };
+
+/**
+ * Empower Jace N (CR 701.71a): with no Jace planeswalker token, create one with 0 loyalty; then put N loyalty counters
+ * on a Jace planeswalker token you control, chosen if there are several. Only tokens count, however they were made,
+ * and a nontoken Jace never does (rulings). The token isn't put into the graveyard for 0 loyalty before the counters
+ * go on: state-based actions wait until the effect is done (CR 704.3).
+ */
+function empowerJace(s: GameState, amount: Amount, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const pid = ctx.controller;
+  const jaces = () =>
+    s.battlefield.filter((id) => {
+      const o = obj(s, id);
+      if (!o.isToken || controllerOf(s, o) !== pid) return false;
+      const c = characteristics(s, o);
+      return c.types.includes("Planeswalker") && c.subtypes.includes("Jace");
+    });
+  if (!sc.queue) {
+    sc.n = amountNow(s, amount, ctx);
+    if (!jaces().length) {
+      log(s, `${player(s, pid).name} creates a Jace planeswalker token.`);
+      createToken(s, pid, JACE);
+      invalidateCharacteristics(s);
+    }
+    const options = jaces();
+    sc.queue = [pid];
+    sc.chosen = { [pid]: options };
+    if (options.length > 1) {
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: "counters", what: "Jace planeswalker token", options, count: 1, counter: "loyalty" };
+      return "paused";
+    }
+    sc.queue.shift();
+  }
+  const o = s.objects[sc.chosen![pid]?.[0] ?? ""];
+  if (o?.zone !== "battlefield" || sc.n! <= 0) return;
+  const put = putCounters(s, o, "loyalty", sc.n!);
+  invalidateCharacteristics(s);
+  log(s, `${player(s, pid).name} puts ${put} loyalty counter${put === 1 ? "" : "s"} on ${defOf(s, o).name}.`);
 }
 
 /**
@@ -281,6 +323,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "pick":
       return pickPermanents(s, e, ctx, src);
+    case "empowerJace":
+      return empowerJace(s, e.n, ctx, src);
     case "bounce": {
       // "If you win, return ~ to its owner's hand": a resolving spell goes from the stack to its owner's hand as part of
       // its resolution, never to the graveyard (Release the Ants rulings, CR 608.2n).
@@ -296,11 +340,44 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "putFromHand": {
+      // The player picks as it resolves, among the matching cards in their hand (CR 608.2d); it isn't playing a land.
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (!sc.found) {
+        const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        if (!cards.length) return;
+        const what = `${e.any ? "any number of " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? cards.length : 1, fromHand: true };
+        return "paused";
+      }
+      for (const id of sc.found) {
+        const o = s.objects[id];
+        if (o?.zone !== "hand" || o.owner !== p.id) continue;
+        log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}.`);
+        moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}) });
+      }
+      return;
+    }
     case "putOntoBattlefield":
       for (const o of objects(s, e.what, ctx)) {
         const d = defOf(s, o);
         // An Aura put onto the battlefield this way needs a choice of what it enchants (CR 303.4f);
         // the compiler doesn't produce this effect for cards that could be Auras, so this is a safeguard.
+        if (e.attachToSubject) {
+          // An Aura returned "attached to that creature" (CR 303.4f): only to one it could enchant, protection
+          // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.
+          const enchant = compileCard(d).enchant;
+          const host = ctx.subject && s.objects[ctx.subject.id];
+          const ok = !!enchant && !!host && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && objectMatches(s, enchant, host, ctx.controller, false, d);
+          if (!ok) {
+            log(s, `${d.name} can't be attached to that creature, so it stays in the graveyard.`);
+            continue;
+          }
+          log(s, `${src} returns ${d.name} to the battlefield attached to ${defOf(s, host).name}.`);
+          moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host.id });
+          continue;
+        }
         if (!isPermanentCard(d) || d.subtypes.includes("Aura")) continue;
         const under = e.owner ? o.owner : ctx.controller;
         log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under).name}'s control${e.tapped ? ", tapped" : ""}.`);
@@ -363,9 +440,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!o || o.zone !== "hand" || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
       moveObject(s, o.id, "battlefield", { tapped: true });
       if ((o.zone as string) !== "battlefield") return;
+      // Attacking the same player or planeswalker (CR 702.49c); a planeswalker that's gone leaves it not attacking (CR 506.3c).
       const defender = ctx.lki?.attacking;
-      if (defender !== undefined && inCombat(s) && livingPlayers(s).includes(defender)) o.attacking = defender;
-      log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${player(s, o.attacking).name}` : ""} (ninjutsu).`);
+      const pw = ctx.lki?.attackingPermanent;
+      if (defender !== undefined && inCombat(s) && livingPlayers(s).includes(defender)) {
+        o.attacking = defender;
+        if (pw) {
+          o.attackingPermanent = pw;
+          if (!attackedPlaneswalker(s, o)) {
+            o.attacking = undefined;
+            o.attackingPermanent = undefined;
+          }
+        }
+      }
+      log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
       return;
     }
     case "warpExile":

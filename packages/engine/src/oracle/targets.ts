@@ -4,6 +4,9 @@ import type { Color } from "../types";
 import { num, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
 import { Ctx, addTarget } from "./body";
 
+/** Spell and enchantment subtypes a filter can name: "Spirit or Arcane spell", "a Cartouche you control" (CR 205.3h, 205.3k). */
+const OTHER_SUBTYPES = ["Arcane", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse"];
+
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
@@ -333,8 +336,9 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
       // "Nonlegendary attacking creature": attacking after a supertype.
       else if ((w === "attacking" || w === "blocking") && alts.length === 1 && !extra.combat) extra.combat = w;
-      else if (CREATURE_TYPES.has(capital(w)) || BASIC_TYPES.includes(capital(w))) subtypes.push(capital(w));
+      else if (CREATURE_TYPES.has(capital(w)) || BASIC_TYPES.includes(capital(w)) || OTHER_SUBTYPES.includes(capital(w))) subtypes.push(capital(w));
       else if (COLOR_WORDS[w]) colors.push(COLOR_WORDS[w]!);
+      else if ((w === "multicolored" || w === "monocolored" || w === "colorless") && alts.length === 1 && !extra.colorCount) extra.colorCount = w;
       else if (SUPERTYPE_WORDS[w]) supertypes.push(SUPERTYPE_WORDS[w]!);
       else if (w === "permanent" && inGraveyard) types.push(...PERMANENT_TYPES); // "permanent card" (CR 110.4b)
       else if (w === "permanent" || w === "") continue;
@@ -344,6 +348,9 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   // "red or green creature" means a creature that's red or green. Mixing colors with several
   // different type alternatives ("red creature or green artifact") isn't modeled.
   if (colors.length && alts.filter((a) => a.split(/\s+/).some((w) => TYPE_WORDS[w])).length > 1) return null;
+  // "Swamp, Mountain, black permanent, or red permanent": a color in only some alternatives would need
+  // per-alternative filters too (the fields of a filter must all match).
+  if (colors.length && alts.length > 1 && alts.some((a) => !a.trim().split(/\s+/).some((w) => COLOR_WORDS[w]))) return null;
   // Supertypes are "and" requirements ("basic land"); with alternatives they'd need per-alternative filters.
   if ((supertypes.length || notSupertypes.length) && alts.length > 1) return null;
   // Subtypes mixed with card types in alternatives ("Wall or artifact") would need per-alternative filters too.

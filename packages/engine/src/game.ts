@@ -1,11 +1,11 @@
 import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
-import { dealDamage, objectSource, protectedFrom } from "./damage";
+import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -479,6 +479,21 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
   o.exileIfDiesTurn = undefined;
+  // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
+  // battlefield or leaving it at the same time (rulings).
+  if (fromZone === "battlefield" && to === "graveyard" && o.damagedBy?.length && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of dying.`);
+  }
+  // Darksteel Colossus: "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's
+  // library instead" (CR 614.1a). On the battlefield it's the permanent's ability now (it could have lost it);
+  // elsewhere the card's. If an "exile it instead" effect also applies, its owner would choose the order (CR 616.1):
+  // those were applied above, so the card goes to exile.
+  const shuffleIn = to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).shuffleInsteadOfGraveyard;
+  if (shuffleIn) {
+    to = "library";
+    log(s, `${player(s, o.owner).name} reveals ${defOf(s, o).name} and shuffles it into their library instead.`);
+  }
   // A commander that would be put into its owner's library goes to the command zone instead, if its owner
   // wants (CR 903.9b); owners always do. Into a hand it stays: it can be cast from there without tax.
   if (o.isCommander && to === "library" && fromZone !== "library") {
@@ -543,6 +558,7 @@ export function moveObject(
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
+  o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
   o.skipNextUntap = undefined;
   o.renowned = undefined;
@@ -552,6 +568,7 @@ export function moveObject(
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
   o.attacking = undefined;
+  o.attackingPermanent = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
   o.band = undefined;
@@ -590,6 +607,7 @@ export function moveObject(
   // triggers say "put into a graveyard" or "leaves the battlefield".
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
+  if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
 
@@ -603,6 +621,9 @@ type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: 
 function finishEntering(s: GameState, o: GameObject, printed: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number }) {
   const id = o.id;
   if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = true;
+  // A planeswalker enters with its printed loyalty in loyalty counters (CR 306.5b), its copiable values' if it's a copy.
+  const loyalty = isType(defOf(s, o), "Planeswalker") ? Number.parseInt(defOf(s, o).loyalty ?? "", 10) : NaN;
+  if (loyalty > 0) putCounters(s, o, "loyalty", loyalty, true);
   if (withCounters) putCounters(s, o, withCounters.counter, withCounters.n, true); // CR 614.1c
   // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
   if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
@@ -763,6 +784,27 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   fireEvent(s, { type: "lifeLost", player: pid, amount: n });
 }
 
+/** Is a permanent that dealt `o` damage this turn one that exiles it instead of letting it die (Kumano)? */
+function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
+  const by = o.damagedBy ?? [];
+  for (const id of s.battlefield) {
+    const w = obj(s, id);
+    const how = abilitiesOf(s, w).exileWhatItDamaged;
+    if ((how === "self" && by.includes(id)) || (how === "attached" && w.attachedTo && by.includes(w.attachedTo))) return true;
+  }
+  return (s.leftTogether ?? []).some((l) => l.hadAbilities && by.includes(l.id) && withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileWhatItDamaged === "self");
+}
+
+/**
+ * Tap a permanent (CR 701.26a). Only an untapped one can be: then it "becomes tapped", which triggers abilities
+ * (rulings: tapping a tapped permanent, or one entering tapped, doesn't).
+ */
+export function tapPermanent(s: GameState, o: GameObject) {
+  if (o.tapped) return;
+  o.tapped = true;
+  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id });
+}
+
 /**
  * Untap a permanent. A stun counter replaces that: one is removed instead (CR 122.1d). Untapping
  * an untapped permanent isn't an untap, so the counter stays.
@@ -801,7 +843,7 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
     o.regenShields! -= 1;
     o.damage = 0;
     o.deathtouchDamage = false;
-    o.tapped = true;
+    tapPermanent(s, o);
     if (o.attacking !== undefined || o.blocking !== undefined) {
       removeFromCombat(s, o);
       clearCombat(o);
@@ -1056,12 +1098,10 @@ function beginStep(s: GameState, step: Step): void {
     }
     case "firstStrikeDamage":
       if (!attackersAndBlockers(s).some((o) => hasFirstOrDouble(s, o))) return beginStep(s, "combatDamage");
-      if (askUnblocked(s)) return;
-      dealCombatDamage(s, true);
+      if (askUnblocked(s) || dealCombatDamage(s, true)) return;
       break;
     case "combatDamage":
-      if (askUnblocked(s)) return;
-      dealCombatDamage(s, false);
+      if (askUnblocked(s) || dealCombatDamage(s, false)) return;
       break;
     case "beginCombat":
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
@@ -1101,8 +1141,12 @@ function finishCleanup(s: GameState) {
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
     o.preventNext = undefined;
+    o.redirectNext = undefined;
   }
-  for (const p of s.players) p.preventNext = undefined;
+  for (const p of s.players) {
+    p.preventNext = undefined;
+    p.redirectNext = undefined;
+  }
   s.preventCombatDamage = undefined;
   // "You may play that card this turn" / "until the end of your next turn" ends now.
   for (const q of s.players)
@@ -1121,7 +1165,7 @@ function finishCleanup(s: GameState) {
   advanceStep(s);
 }
 
-function turnOrderFrom(s: GameState, pid: PlayerId): PlayerId[] {
+export function turnOrderFrom(s: GameState, pid: PlayerId): PlayerId[] {
   const i = s.turnOrder.indexOf(pid);
   return [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((id) => !player(s, id).lost);
 }
@@ -1370,8 +1414,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const src = objectSource(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
-  if (ab.tap) o.tapped = true;
-  for (const t of tap ?? []) obj(s, t).tapped = true;
+  if (ab.tap) tapPermanent(s, o);
+  for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
@@ -1717,7 +1761,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
     log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
   }
-  for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
+  for (const c of [...(convoke ?? []), ...(improvise ?? [])]) tapPermanent(s, obj(s, c));
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
@@ -1959,13 +2003,16 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
   for (const c of costs) {
     if (c.kind === "returnToHand") {
       for (const id of choices.returnToHand ?? []) {
-        if (returned) returned.attacking = obj(s, id).attacking;
+        if (returned) {
+          returned.attacking = obj(s, id).attacking;
+          returned.attackingPermanent = obj(s, id).attackingPermanent;
+        }
         log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
         moveObject(s, id, "hand");
       }
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];
-      for (const id of ids) obj(s, id).tapped = true;
+      for (const id of ids) tapPermanent(s, obj(s, id));
       log(s, `${p.name} taps ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
       loseLife(s, p.id, c.n);
@@ -2024,6 +2071,14 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
+  if (ab.loyalty !== undefined || ab.loyaltyX) {
+    // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
+    if (!canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
+    // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
+    if (o.activatedThisTurn?.includes(LOYALTY_USED)) return `a loyalty ability of ${d.name} was already activated this turn`;
+    const remove = ab.loyaltyX ? (x ?? 0) : -(ab.loyalty ?? 0);
+    if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
+  }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
   if (ab.lifeCost && p.life < ab.lifeCost) return `you can't pay ${ab.lifeCost} life`; // CR 119.4
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
@@ -2047,9 +2102,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (cp) return cp;
   }
   const cost = parseManaCost(ab.manaCost);
-  const xp = xProblem(cost, x);
+  const xp = ab.loyaltyX ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : null) : xProblem(cost, x);
   if (xp) return xp;
-  if (!canPayFromPool(s, pid, cost, { ability: o }, (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
+  if (!canPayFromPool(s, pid, cost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
 }
 
@@ -2089,15 +2144,22 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = parseManaCost(ab.manaCost);
-  const paid = spendFromPool(s, p.id, abCost, { ability: o }, (x ?? 0) * xCount(abCost), p.life)!;
+  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
+  // A loyalty cost puts on or removes loyalty counters (CR 606.4); counters put on as a cost aren't doubled (rulings).
+  if (ab.loyalty !== undefined || ab.loyaltyX) {
+    const change = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
+    o.counters.loyalty = (o.counters.loyalty ?? 0) + change;
+    (o.activatedThisTurn ??= []).push(LOYALTY_USED);
+    invalidateCharacteristics(s);
+  }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
-  if (ab.tap) o.tapped = true;
-  for (const c of tapCreatures ?? []) obj(s, c).tapped = true;
+  if (ab.tap) tapPermanent(s, o);
+  for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
@@ -2117,7 +2179,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     targets: body.targets.length ? stamped : undefined,
     modes: ab.body.modal ? modes : undefined,
     ...(lki ? { lki } : {}),
-    ...(abCost.hasX ? { x: x ?? 0 } : {}),
+    ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
   });
   if (ab.discardSelf) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
@@ -2243,6 +2305,9 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   continueResolution(s);
 }
 
+/** Marks, in `activatedThisTurn`, that a loyalty ability of the permanent was activated this turn (CR 606.3). */
+const LOYALTY_USED = -1;
+
 /** The cards a library search found (CR 701.23). */
 function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   const pend = s.pending;
@@ -2264,6 +2329,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "devour" || pend.what === "amplify") throw new RulesError(`${pend.what} is chosen by picking cards`);
   if (!pend.options.includes(choice)) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : "an option"} you can choose`);
   s.pending = null;
+  if (pend.what === "damageShield") {
+    // Which damage a shield takes, or which shield applies first (CR 615.7, 616.1); combat damage waits for it.
+    s.damageBatch!.answers.push(Number(choice));
+    finishCombatDamage(s);
+    return;
+  }
   if (pend.objectId) {
     const o = obj(s, pend.objectId);
     const entry = s.entersChoices?.shift();
@@ -2522,12 +2593,40 @@ const hasFirstOrDouble = (s: GameState, o: GameObject) =>
 
 export function clearCombat(o: GameObject) {
   o.attacking = undefined;
+  o.attackingPermanent = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
   o.band = undefined; // CR 702.22f
 }
 
-function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId }[]) {
+/**
+ * The planeswalker an attacking creature attacks, while that planeswalker is still in combat: on the battlefield as the
+ * same object, still a planeswalker, still controlled by the defending player (CR 506.4).
+ */
+export function attackedPlaneswalker(s: GameState, o: GameObject): GameObject | undefined {
+  const a = o.attackingPermanent;
+  const pw = a && s.objects[a.id];
+  return pw && pw.zone === "battlefield" && (pw.zoneChanges ?? 0) === a.zc && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === o.attacking ? pw : undefined;
+}
+
+/** Attacking a player, not a planeswalker: "whenever ~ attacks a player", dethrone, melee (rulings). */
+export const attacksAPlayer = (o: GameObject) => o.attacking !== undefined && !o.attackingPermanent;
+
+/** Where an attacking creature's combat damage goes when it isn't blocked (CR 510.1a): nowhere if what it attacked is gone (CR 506.4c). */
+function attackedRecipient(s: GameState, at: GameObject): { toPlayer: PlayerId } | { toObject: GameObject } | null {
+  if (at.attacking === undefined) return null;
+  if (!at.attackingPermanent) return { toPlayer: at.attacking };
+  const pw = attackedPlaneswalker(s, at);
+  return pw ? { toObject: pw } : null;
+}
+
+/** "Jace" or "Ana" for the log: what a creature attacks. */
+export function attackedName(s: GameState, o: GameObject): string {
+  const pw = o.attackingPermanent && s.objects[o.attackingPermanent.id];
+  return pw ? `${player(s, controllerOf(s, pw)).name}'s ${characteristics(s, pw).name}` : o.attacking !== undefined ? player(s, o.attacking).name : "nothing";
+}
+
+function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
   if (s.pending?.kind !== "declareAttackers" || s.pending.player !== p.id) throw new RulesError("not declaring attackers now");
   const legal = new Set(potentialAttackers(s, p.id).map((o) => o.id));
   const opps = opponents(s, p.id);
@@ -2535,6 +2634,11 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   for (const a of attacks) {
     if (!legal.has(a.attacker) || seen.has(a.attacker)) throw new RulesError(`${nameOf(s, a.attacker)} can't attack`);
     if (!opps.includes(a.defender)) throw new RulesError("must attack a living opponent");
+    // A planeswalker a defending player controls can be attacked instead (CR 506.2, 508.1b, 802.3).
+    if (a.planeswalker !== undefined) {
+      const pw = s.objects[a.planeswalker];
+      if (!pw || pw.zone !== "battlefield" || !objIsType(s, pw, "Planeswalker") || controllerOf(s, pw) !== a.defender) throw new RulesError("must attack a planeswalker that player controls");
+    }
     const why = attackProblem(s, obj(s, a.attacker), a.defender);
     if (why) throw new RulesError(why);
     seen.add(a.attacker);
@@ -2547,21 +2651,27 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0),
   );
   if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
-  // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d).
+  // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
+  // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
   for (const a of attacks) {
     const o = obj(s, a.attacker);
     const by = characteristics(s, o).goadedBy;
-    if (by.includes(a.defender) && opps.some((d) => !by.includes(d) && !attackProblem(s, o, d)))
+    if (!by.length) continue;
+    const obeyed = (d: PlayerId) => by.filter((g) => g !== d).length;
+    const best = Math.max(0, ...opps.filter((d) => !attackProblem(s, o, d)).map(obeyed));
+    if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
       throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
   }
   for (const a of attacks) {
     const o = obj(s, a.attacker);
     o.attacking = a.defender;
-    if (!objHasKeyword(s, o, "Vigilance")) o.tapped = true; // CR 508.1f
-    log(s, `${defOf(s, o).name} attacks ${player(s, a.defender).name}.`);
+    if (a.planeswalker !== undefined) o.attackingPermanent = { id: a.planeswalker, zc: obj(s, a.planeswalker).zoneChanges ?? 0 };
+    if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o); // CR 508.1f
+    log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
-  p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.map((a) => a.defender))] }; // melee
+  // Melee counts the opponents attacked, not their planeswalkers (rulings).
+  p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };
   s.pending = null;
   if (attacks.length === 0) {
     log(s, `${p.name} declares no attackers.`);
@@ -2578,9 +2688,11 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
 function bandOptions(s: GameState, ids: ObjectId[]): ObjectId[] {
   const free = ids.filter((id) => s.objects[id]?.attacking !== undefined && !obj(s, id).band);
   const bands = (id: ObjectId) => objHasKeyword(s, obj(s, id), "Banding");
-  return free.filter((id) => free.some((x) => x !== id && obj(s, x).attacking === obj(s, id).attacking && (bands(id) || bands(x))));
+  return free.filter((id) => free.some((x) => x !== id && sameAttack(obj(s, x), obj(s, id)) && (bands(id) || bands(x))));
 }
 const canBand = (s: GameState, ids: ObjectId[]) => bandOptions(s, ids).length > 0;
+/** Attacking the same player or the same planeswalker (CR 702.22c). */
+const sameAttack = (a: GameObject, b: GameObject) => a.attacking === b.attacking && a.attackingPermanent?.id === b.attackingPermanent?.id;
 
 /** Why these attackers can't be a band (CR 702.22c-d): one or more with banding, up to one without, attacking the same player. */
 export function bandProblem(s: GameState, ids: ObjectId[]): string | null {
@@ -2588,7 +2700,7 @@ export function bandProblem(s: GameState, ids: ObjectId[]): string | null {
   if (ids.length < 2) return "a band needs two or more attacking creatures";
   if (ids.some((id) => !options.includes(id))) return "choose attacking creatures that aren't in a band yet";
   if (ids.filter((id) => !objHasKeyword(s, obj(s, id), "Banding")).length > 1) return "a band can have only one creature without banding";
-  if (new Set(ids.map((id) => obj(s, id).attacking)).size > 1) return "all creatures in a band must attack the same player";
+  if (ids.some((id) => !sameAttack(obj(s, id), obj(s, ids[0]!)))) return "all creatures in a band must attack the same player or planeswalker";
   return null;
 }
 
@@ -2651,7 +2763,7 @@ function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
   d.enlist.shift();
   const c = ids[0];
   if (c) {
-    obj(s, c).tapped = true;
+    tapPermanent(s, obj(s, c));
     d.enlisted.push([at, c]);
     log(s, `${nameOf(s, at)} enlists ${nameOf(s, c)}.`);
   }
@@ -2873,8 +2985,8 @@ function bandSplit(s: GameState, source: GameObject, targets: GameObject[], dmg:
   return [...out];
 }
 
-/** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. */
-function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
+/** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. True if it waits on a choice. */
+function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
   for (const at of attackers(s)) {
@@ -2883,13 +2995,15 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
     const unblocked = s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id);
+    // To the player or planeswalker it attacks; nothing if that planeswalker has left combat (CR 506.4c).
+    const target = attackedRecipient(s, at);
     if (!at.blockedBy || unblocked) {
-      hits.push({ source: at, toPlayer: at.attacking!, amount: dmg });
+      if (target) hits.push({ source: at, ...target, amount: dmg });
       continue;
     }
     const blockers = at.blockedBy.map((id) => obj(s, id));
     if (blockers.length === 0) {
-      if (objHasKeyword(s, at, "Trample")) hits.push({ source: at, toPlayer: at.attacking!, amount: dmg }); // CR 702.19e
+      if (objHasKeyword(s, at, "Trample") && target) hits.push({ source: at, ...target, amount: dmg }); // CR 702.19e
       continue;
     }
     // Blocked by a creature with banding, the defending player divides its damage among the blockers as they
@@ -2902,11 +3016,12 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
     blockers.forEach((bl, i) => {
       const lethal = objHasKeyword(s, at, "Deathtouch") ? 1 : Math.max(0, toughness(s, bl) - bl.damage);
       const last = i === blockers.length - 1;
-      const amt = last && !objHasKeyword(s, at, "Trample") ? dmg : Math.min(dmg, lethal);
+      const amt = last && !(objHasKeyword(s, at, "Trample") && target) ? dmg : Math.min(dmg, lethal);
       if (amt > 0) hits.push({ source: at, toObject: bl, amount: amt });
       dmg -= amt;
     });
-    if (dmg > 0 && objHasKeyword(s, at, "Trample")) hits.push({ source: at, toPlayer: at.attacking!, amount: dmg });
+    // Trample: the rest to the player or planeswalker it attacks (CR 702.19c).
+    if (dmg > 0 && objHasKeyword(s, at, "Trample") && target) hits.push({ source: at, ...target, amount: dmg });
   }
   for (const id of s.battlefield) {
     const bl = obj(s, id);
@@ -2930,39 +3045,56 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
   }
   if (s.preventCombatDamage && hits.length) {
     log(s, "All combat damage is prevented.");
-    return;
+    return false;
   }
   // Sources as they are now, before any of the damage changes anything (it's all dealt at once).
   const sources = new Map(hits.map((h) => [h.source.id, objectSource(s, h.source)]));
+  const events: DamageEvent[] = hits.map((h) => ({ src: sources.get(h.source.id)!, to: h.toPlayer !== undefined ? { player: h.toPlayer } : { object: h.toObject!.id }, n: h.amount, combat: true }));
+  s.damageBatch = { events, answers: [] };
+  return finishCombatDamage(s);
+}
+
+/**
+ * Deal the combat damage waiting in s.damageBatch, once its players have chosen what their damage shields take
+ * (CR 615.7, 616.1). Returns true while it's waiting on a choice.
+ */
+function finishCombatDamage(s: GameState): boolean {
+  const batch = s.damageBatch!;
+  const plan = planShields(s, batch.events, batch.answers);
+  if (plan.ask) {
+    const q = plan.ask;
+    s.pending = { kind: "chooseOption", player: q.player, source: "Combat damage", what: "damageShield", prompt: q.prompt, options: q.labels.map((_, i) => String(i)), labels: q.labels };
+    return true;
+  }
+  s.damageBatch = undefined;
   // Each source's lifelink is one life-gain event however many things it damaged (CR 119.10).
-  const lifelink = new Map<ObjectId, { n: number }>(hits.map((h) => [h.source.id, { n: 0 }]));
+  const lifelink = new Map<string, { n: number }>();
+  const key = (e: DamageEvent) => e.src.id!;
+  const done = dealPlanned(s, plan, { lifelink: (e) => lifelink.get(key(e)) ?? lifelink.set(key(e), { n: 0 }).get(key(e))! });
   const dealt = new Map<ObjectId, number>();
-  const hitDealt: number[] = [];
-  for (const h of hits) {
-    const src = sources.get(h.source.id)!;
-    const opts = { combat: true, lifelink: lifelink.get(h.source.id)! };
-    let n = 0;
-    if (h.toPlayer !== undefined) {
-      n = dealDamage(s, src, { player: h.toPlayer }, h.amount, opts);
-      if (n) fireEvent(s, { type: "combatDamageToPlayer", id: h.source.id, player: h.toPlayer, amount: n });
-    } else if (h.toObject) n = dealDamage(s, src, { object: h.toObject }, h.amount, opts);
-    dealt.set(h.source.id, (dealt.get(h.source.id) ?? 0) + n);
-    hitDealt.push(n);
+  for (const e of done) {
+    dealt.set(key(e), (dealt.get(key(e)) ?? 0) + e.dealt);
+    if ("player" in e.to && e.dealt) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: e.to.player, amount: e.dealt });
   }
   // "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage.
   const groups = new Map<string, { controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }>();
-  for (const [i, h] of hits.entries()) {
-    if (h.toPlayer === undefined || !hitDealt[i]) continue;
-    const controller = sources.get(h.source.id)!.controller;
-    const g = groups.get(`${controller}|${h.toPlayer}`) ?? { controller, player: h.toPlayer, ids: [], amounts: [] };
-    g.ids.push(h.source.id);
-    g.amounts.push(hitDealt[i]!);
-    groups.set(`${controller}|${h.toPlayer}`, g);
+  for (const e of done) {
+    if (!("player" in e.to) || !e.dealt) continue;
+    const controller = e.src.controller;
+    const g = groups.get(`${controller}|${e.to.player}`) ?? { controller, player: e.to.player, ids: [], amounts: [] };
+    g.ids.push(key(e));
+    g.amounts.push(e.dealt);
+    groups.set(`${controller}|${e.to.player}`, g);
   }
-  for (const [id, gained] of lifelink) gainLife(s, sources.get(id)!.controller, gained.n);
+  for (const e of done) {
+    const gained = lifelink.get(key(e));
+    if (gained?.n) gainLife(s, e.src.controller, gained.n);
+    lifelink.delete(key(e));
+  }
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
   for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
   for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -3003,6 +3135,13 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       const o = s.objects[id];
       if (!o || o.zone !== "battlefield") continue;
       const d = defOf(s, o);
+      // A planeswalker with no loyalty goes to its owner's graveyard (704.5i, CR 306.9).
+      if (objIsType(s, o, "Planeswalker") && (o.counters.loyalty ?? 0) <= 0) {
+        log(s, `${characteristics(s, o).name} has no loyalty left and is put into the graveyard.`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+        continue;
+      }
       if (!objIsType(s, o, "Creature")) continue;
       const t = toughness(s, o);
       if (t <= 0) {

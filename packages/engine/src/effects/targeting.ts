@@ -9,6 +9,9 @@ import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { COLOR_NAMES } from "./describe";
 
+/** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
+const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : n === 0);
+
 /**
  * Does this permanent fit `spec` from `controller`'s point of view, using its current
  * characteristics? Hexproof only matters for targeting (CR 702.11b), not for what an Aura
@@ -22,6 +25,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.notTypes?.some((t) => c.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
   if (spec.notColors?.some((col) => c.colors.includes(col))) return false;
+  if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
   if (spec.supertypes?.some((t) => !c.supertypes.includes(t))) return false;
   if (spec.notSupertypes?.some((t) => c.supertypes.includes(t))) return false;
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
@@ -103,6 +107,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => d.colors.includes(col))) return false;
   if (spec.notColors?.some((col) => d.colors.includes(col))) return false;
+  if (spec.colorCount && !colorCountIs(spec.colorCount, d.colors.length)) return false;
   if (spec.supertypes?.some((x) => !d.supertypes.includes(x))) return false;
   if (spec.notSupertypes?.some((x) => d.supertypes.includes(x))) return false;
   // Changeling gives every creature type wherever the card is (CR 702.73a).

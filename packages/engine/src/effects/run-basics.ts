@@ -1,10 +1,10 @@
 import type { DamageRecipient, Effect } from "../abilities";
 import { defOf, objIsType, power, toughness } from "../cards";
-import { draw, gainLife, giveCitysBlessing, log, loseLife, player } from "../game";
+import { draw, gainLife, giveCitysBlessing, log, loseLife, obj, player } from "../game";
 import { MONARCH } from "../oracle";
 import { invalidateCharacteristics } from "../layers";
-import { dealDamage, objectSource } from "../damage";
-import type { GameObject, GameState, PlayerId } from "../types";
+import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
+import type { GameObject, GameState, PlayerId, RedirectShield } from "../types";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
@@ -30,14 +30,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const from = ctxSource(s, ctx);
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
+      const events: DamageEvent[] = [
+        ...all.flatMap((x) => x.objs.map((o): DamageEvent => ({ src: from, to: { object: o.id }, n: x.n }))),
+        ...all.flatMap((x) => x.pids.map((pid): DamageEvent => ({ src: from, to: { player: pid }, n: x.n }))),
+      ];
       let dealt = 0;
-      for (const x of all)
-        for (const o of x.objs) {
-          const n = dealDamage(s, from, { object: o }, x.n, { lifelink });
-          dealt += n;
-          if (n > 0 && s.resolving) (s.resolving.damagedThisWay ??= []).push(o.id);
-        }
-      for (const x of all) for (const pid of x.pids) dealt += dealDamage(s, from, { player: pid }, x.n, { lifelink });
+      for (const e of dealDamageBatch(s, events, { lifelink })) {
+        dealt += e.dealt;
+        if (e.dealt > 0 && "object" in e.to && s.resolving) (s.resolving.damagedThisWay ??= []).push(e.to.object);
+      }
       gainLife(s, from.controller, lifelink.n);
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
       return;
@@ -49,6 +50,21 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const x of [...objs, ...pids.map((pid) => player(s, pid))]) {
         x.preventNext = (x.preventNext ?? 0) + n;
         log(s, `${src} will prevent the next ${n} damage to ${"cardId" in x ? defOf(s, x).name : x.name} this turn.`);
+      }
+      return;
+    }
+    case "redirectNext": {
+      // A redirection shield (CR 614.9) on each permanent or player, for damage from any source. Where the damage goes
+      // is fixed now; a destination that isn't a legal target any more gets nothing (CR 608.2b).
+      const n = amountNow(s, e.n, ctx);
+      const dest = damageRecipients(s, e.to, ctx);
+      const to: RedirectShield["to"] | undefined = dest.objs[0] ? { object: dest.objs[0].id, zc: dest.objs[0].zoneChanges ?? 0 } : dest.pids[0] !== undefined ? { player: dest.pids[0] } : undefined;
+      if (!to || n <= 0) return;
+      const toName = "object" in to ? defOf(s, obj(s, to.object)).name : player(s, to.player).name;
+      const { objs, pids } = damageRecipients(s, e.from, ctx);
+      for (const x of [...objs, ...pids.map((pid) => player(s, pid))]) {
+        (x.redirectNext ??= []).push({ id: `r${s.nextId++}`, n, to, source: src });
+        log(s, `${src}: the next ${n} damage that would be dealt to ${"cardId" in x ? defOf(s, x).name : x.name} this turn will be dealt to ${toName} instead.`);
       }
       return;
     }

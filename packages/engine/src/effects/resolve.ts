@@ -302,6 +302,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
   switch (e.type) {
     case "damage":
     case "preventNext":
+    case "redirectNext":
     case "preventCombatDamage":
     case "pumpPerBlocker":
     case "draw":
@@ -324,8 +325,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exile":
     case "returnLinked":
     case "pick":
+    case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
+    case "putFromHand":
     case "putInLibrary":
     case "exileGraveyard":
     case "flicker":
@@ -344,6 +347,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":
+    case "removeFromCombat":
     case "mustBlockSource":
     case "phaseOut":
     case "proliferate":

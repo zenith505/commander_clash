@@ -112,6 +112,8 @@ export interface TargetSpec {
   notColors?: Color[];
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
+  /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
+  colorCount?: "multicolored" | "monocolored" | "colorless";
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
@@ -251,6 +253,8 @@ export interface TokenSpec {
   abilities?: string;
   /** A double-faced token's back face (CR 111.10i): an Incubator's Phyrexian. */
   back?: TokenSpec;
+  /** A planeswalker token's printed loyalty (CR 306.5b). */
+  loyalty?: number;
 }
 
 /**
@@ -412,10 +416,20 @@ export type Effect =
    * control to its owner's hand": each player picks n of their own permanents that match, in APNAP order,
    * then they're all sacrificed or returned at once (CR 101.4, 701.21). Not targeted.
    */
+  /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
+  | { type: "empowerJace"; n: Amount }
   | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness" }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
-  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean }
+  /**
+   * "You may put a land card from your hand onto the battlefield": the player picks one (or, with `any`, any number) of
+   * the cards in their hand that match; without `may`, one if they have one. Not an Aura: that would need a choice of
+   * what it enchants (CR 303.4f).
+   */
+  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; may: boolean; any?: boolean }
+  /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
+  | { type: "removeFromCombat"; what: ObjRef }
+  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean; /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */ attachToSubject?: boolean }
   /** "Put target card from your graveyard on top of / on the bottom of its owner's library". */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
@@ -586,6 +600,8 @@ export type Effect =
   | { type: "returnToBattlefield"; counter?: "+1/+1" | "-1/-1" }
   /** "Prevent the next 2 damage that would be dealt to any target this turn" (a prevention shield, CR 615.7). */
   | { type: "preventNext"; n: Amount; to: DamageRecipient }
+  /** "The next N damage that would be dealt to ~ this turn is dealt to target creature you control instead" (CR 614.9). */
+  | { type: "redirectNext"; n: Amount; from: DamageRecipient; to: DamageRecipient }
   /** "Prevent all combat damage that would be dealt this turn" (CR 615.1). */
   | { type: "preventCombatDamage" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
@@ -651,6 +667,8 @@ export type TriggerEvent =
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
+  | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
+  | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
   | "permanentEnters"
   /** "Whenever another creature dies", "a creature you control", "equipped creature": see TriggeredAbility.dies. */
@@ -724,6 +742,13 @@ export type TriggerEvent =
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** For "permanentBecomesTapped": which permanent ("a Dwarf you control"); it's the subject ("put a wind counter on it"). */
+  tappedFilter?: TargetSpec;
+  /**
+   * "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": an ability whose
+   * effect moves the card out of a zone works only in that zone (CR 113.6m), and its owner controls it there.
+   */
+  zone?: "graveyard";
   /** For "state": the game state that triggers it, checked whenever state-based actions are (CR 603.8). */
   state?: StaticCondition;
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
@@ -758,6 +783,8 @@ export interface TriggeredAbility {
   group?: TargetSpec;
   /** Dethrone (CR 702.105a): "attacks the player with the most life or tied for most life", as it attacks. */
   attacksMostLife?: boolean;
+  /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
+  attacksPlayer?: boolean;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
@@ -815,6 +842,12 @@ export interface ActivatedAbility {
   costs?: AdditionalCost[];
   /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */
   removeCounters?: { counter: CounterKind; n: number };
+  /**
+   * A loyalty ability (CR 606): its cost puts on (+N) or removes (−N) loyalty counters; `loyaltyX` for −X, where X is
+   * the number announced. Only as a sorcery, and only one loyalty ability of a permanent each turn (CR 606.3).
+   */
+  loyalty?: number;
+  loyaltyX?: boolean;
 }
 
 /**
@@ -829,7 +862,12 @@ export type ManaProduce =
   | { kind: "oneOf"; options: ManaType[]; amount: number }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
-  | { kind: "chosenColor"; also?: ManaType };
+  | { kind: "chosenColor"; also?: ManaType }
+  /**
+   * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
+   * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
+   */
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).
@@ -986,6 +1024,10 @@ export interface CompiledCard {
   /** For Auras: what it can enchant, which is also what the Aura spell targets. CR 303.4a, 702.5 */
   enchant?: TargetSpec;
   entersTapped: boolean;
+  /** "If a creature dealt damage by ~ (by enchanted creature) this turn would die, exile it instead." (Kumano) */
+  exileWhatItDamaged?: "self" | "attached";
+  /** "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead." */
+  shuffleInsteadOfGraveyard?: boolean;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

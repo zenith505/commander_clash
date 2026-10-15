@@ -33,11 +33,34 @@ function commanderIdentity(s: GameState, pid: PlayerId): ManaType[] {
   return COLORS.filter((c) => ids.has(c));
 }
 
+/**
+ * The types of mana the lands `whose` (relative to `pid`) could produce (CR 106.7): what their mana abilities would
+ * make if they resolved now, whatever their costs. A land whose ability asks the same question of other lands counts
+ * what those could produce, except the ones already being asked about (`asking`): Exotic Orchards that only see each
+ * other make no mana (rulings).
+ */
+function landsCouldProduce(s: GameState, pid: PlayerId, whose: "you" | "opponent", anyType: boolean, asking: ReadonlySet<ObjectId>): ManaType[] {
+  const out = new Set<ManaType>();
+  for (const id of s.battlefield) {
+    const land = obj(s, id);
+    const ctrl = controllerOf(s, land);
+    if (asking.has(id) || !objIsType(s, land, "Land") || (whose === "you" ? ctrl !== pid : ctrl === pid)) continue;
+    for (const ab of manaAbilitiesOn(s, land)) {
+      if (ab.activeIf && !staticConditionNow(s, ab.activeIf, land.id, ctrl)) continue;
+      const p = ab.produces;
+      const made = p.kind === "fixed" ? p.mana : p.kind === "landsCouldProduce" ? landsCouldProduce(s, ctrl, p.whose, !!p.anyType, new Set([...asking, id])) : manaChoices(s, land, ab);
+      made.forEach((m) => out.add(m));
+    }
+  }
+  return (["W", "U", "B", "R", "G", "C"] as ManaType[]).filter((m) => out.has(m) && (anyType || m !== "C"));
+}
+
 /** The mana a player picks from when activating it: one entry per possible result. */
 export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaType[] {
   const p = ab.produces;
   if (p.kind === "fixed") return [p.mana[0]!];
   if (p.kind === "oneOf") return p.options;
+  if (p.kind === "landsCouldProduce") return landsCouldProduce(s, controllerOf(s, o), p.whose, !!p.anyType, new Set([o.id]));
   if (p.kind === "chosenColor") {
     const c = o.chosen?.color;
     return [...(p.also ? [p.also] : []), ...(c && c !== p.also ? [c] : [])];
@@ -49,7 +72,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
 export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType): ManaType[] {
   const p = ab.produces;
   if (p.kind === "oneOf") return Array<ManaType>(p.amount).fill(choice);
-  if (p.kind === "commanderIdentity" || p.kind === "chosenColor") return [choice];
+  if (p.kind === "commanderIdentity" || p.kind === "chosenColor" || p.kind === "landsCouldProduce") return [choice];
   if (!p.count) return p.mana;
   const pid = controllerOf(s, o);
   const n = s.battlefield.filter((id) => objectMatches(s, p.count!, obj(s, id), pid, false)).length;

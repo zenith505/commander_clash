@@ -98,6 +98,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
+    // Free from the hand: the most expensive card is the best deal.
+    if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
@@ -134,6 +136,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
+    if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
@@ -187,7 +191,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -213,6 +217,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && /Turn$/.test(obj(s, a.objectId).mayPlay?.until ?? "")));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
+    // A loyalty ability of each planeswalker we control, once spells are cast (CR 606.3).
+    const loyalty = chooseLoyalty(s, pid);
+    if (loyalty) return loyalty;
     // Suspend what we can't cast now (CR 702.62a).
     const sus = chooseSuspend(s, pid);
     if (sus) return sus;
@@ -260,7 +267,8 @@ function chooseUnblocked(s: GameState, pid: PlayerId, ids: ObjectId[]): ObjectId
   return ids.filter((id) => {
     const at = obj(s, id);
     const dmg = power(s, at);
-    const life = player(s, at.attacking!).life;
+    const pw = at.attackingPermanent && s.objects[at.attackingPermanent.id];
+    const life = pw ? (pw.counters.loyalty ?? 0) : player(s, at.attacking!).life;
     const kills = (at.blockedBy ?? []).some((b) => s.objects[b]?.zone === "battlefield" && (objHasKeyword(s, at, "Deathtouch") || toughness(s, obj(s, b)) - obj(s, b).damage <= dmg));
     return controllerOf(s, at) === pid ? !kills || life <= dmg : kills && life > dmg + 5;
   });
@@ -712,7 +720,7 @@ function chooseRingBearer(s: GameState, pid: PlayerId, options: ObjectId[]): Obj
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
-  if (action === "populate" || action === "pair" || (action === "counters" && (counter === "+1/+1" || counter === "shield"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
+  if (action === "populate" || action === "pair" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   const cost = (id: ObjectId) => {
     const o = obj(s, id);
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);
@@ -1099,6 +1107,7 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
+      if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
@@ -1254,6 +1263,54 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 /**
+ * Redirection shields in a combat (the en-Kor, Daughter of Autumn), once blocks are declared and before damage: when
+ * one of our creatures would be dealt lethal combat damage, send 1 more of it at a time to a creature or player of an
+ * opponent's if the ability allows it, else to a creature of ours that survives it, until the one in danger survives.
+ */
+function chooseRedirect(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.step !== "declareBlockers" || s.stack.length) return null;
+  const foesOf = (c: GameObject) => (c.blocking ? c.blocking : c.attacking !== undefined ? (c.blockedBy ?? []) : []);
+  const incoming = (c: GameObject) => foesOf(c).reduce((n, f) => n + (s.objects[f]?.zone === "battlefield" ? power(s, obj(s, f)) : 0), 0);
+  const shielded = (c: GameObject) => (c.preventNext ?? 0) + (c.redirectNext ?? []).reduce((n, r) => n + r.n, 0);
+  const sentTo = (c: GameObject) =>
+    s.battlefield.reduce((n, id) => n + (obj(s, id).redirectNext ?? []).filter((r) => "object" in r.to && r.to.object === c.id).reduce((a, r) => a + r.n, 0), 0);
+  const inDanger = (c: GameObject) => objIsType(s, c, "Creature") && incoming(c) + sentTo(c) - shielded(c) >= Math.max(1, lethalDamage(s, c));
+  // A creature of ours that can take one more damage and live; theirs is better.
+  const spare = (c: GameObject) => objIsType(s, c, "Creature") && incoming(c) + sentTo(c) - shielded(c) + 1 < lethalDamage(s, c) && !objHasKeyword(s, c, "Indestructible");
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const e = ab.body.effects.length === 1 ? ab.body.effects[0]! : undefined;
+      if (e?.type !== "redirectNext" || ab.body.targets.length !== 1 || ab.tap || ab.sacrificeSelf) continue;
+      if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const options = legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id);
+      let target: TargetChoice | undefined;
+      if (e.from.ref === "self" && inDanger(o)) {
+        // Away from it: to an opponent, an opponent's creature, or one of ours that survives it.
+        target =
+          options.find((t) => t.kind === "player" && t.id !== pid) ??
+          options.find((t) => t.kind === "object" && t.id !== id && controllerOf(s, obj(s, t.id)) !== pid && objIsType(s, obj(s, t.id), "Creature")) ??
+          options.find((t) => t.kind === "object" && t.id !== id && controllerOf(s, obj(s, t.id)) === pid && spare(obj(s, t.id)));
+      } else if (e.to.ref === "self" && spare(o)) {
+        // Onto it (Daughter of Autumn): from one of ours in danger.
+        target = options.find((t) => t.kind === "object" && t.id !== id && controllerOf(s, obj(s, t.id)) === pid && inDanger(obj(s, t.id)));
+      }
+      if (!target) continue;
+      const costs = abilityCosts(s, pid, o, ab, [target]);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, [target], undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
  * Answer an opponent's colored spell or ability aimed at one of our creatures by giving it protection
  * from the color of our choice (CR 702.16b: the spell then has an illegal target): Gods Willing, Mother
  * of Runes. The color is chosen as that resolves (see chooseOption).
@@ -1359,6 +1416,80 @@ function chooseCycling(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
+/**
+ * A loyalty ability for one of our planeswalkers (CR 606): the ultimate when we can afford it, else a minus ability
+ * that leaves the planeswalker at 2 or more and has something good to aim at, else a plus or zero ability. −X uses all
+ * but 1 of its loyalty.
+ */
+function chooseLoyalty(s: GameState, pid: PlayerId): Action[] | null {
+  let best: { score: number; plan: Action[] } | null = null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || !objIsType(s, o, "Planeswalker")) continue;
+    const loyalty = o.counters.loyalty ?? 0;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.loyalty === undefined && !ab.loyaltyX) continue;
+      const x = ab.loyaltyX ? loyalty - 1 : undefined;
+      const cost = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
+      if (ab.loyaltyX && (x ?? 0) < 1) continue;
+      const after = loyalty + cost;
+      const ultimate = cost <= -6;
+      if (after < 0 || (after === 0 && !ultimate)) continue;
+      const problem = abilityProblem(s, pid, id, i, undefined, undefined, undefined, x);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
+      if (ab.body.modal && !modes) continue;
+      const body = withModes(ab.body, modes);
+      if ((groupValue(s, pid, body, defOf(s, o), id) ?? 1) <= 0) continue;
+      const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
+      if (!targets) continue;
+      const score = ultimate ? 100 : cost < 0 ? (after >= 2 ? 50 - cost : -1) : 30 + cost;
+      if (score < 0) continue;
+      if (best && best.score >= score) continue;
+      const plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x);
+      if (plan) best = { score, plan };
+    }
+  }
+  return best?.plan ?? null;
+}
+
+/**
+ * Opponents' planeswalkers worth attacking instead of the player: moves attackers that the planeswalker's controller
+ * can't block (or all of them when they have no untapped creatures) onto it, smallest first, until their power
+ * covers its loyalty. Not when the attack on the player would be lethal, and never a goaded creature (CR 701.15b).
+ */
+function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
+  const atPlayer = (d: PlayerId) => attacks.filter((a) => a.defender === d && a.planeswalker === undefined).reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0);
+  const walkers = s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => objIsType(s, o, "Planeswalker") && opponents(s, pid).includes(controllerOf(s, o)))
+    .sort((a, b) => (b.counters.loyalty ?? 0) - (a.counters.loyalty ?? 0));
+  for (const pw of walkers) {
+    const owner = controllerOf(s, pw);
+    if (atPlayer(owner) >= player(s, owner).life) continue;
+    const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && !b.tapped && objIsType(s, b, "Creature"));
+    const free = attacks
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !attackProblem(s, obj(s, a.attacker), owner))
+      .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
+      .sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)));
+    let need = pw.counters.loyalty ?? 0;
+    const moved: typeof attacks = [];
+    for (const a of free) {
+      if (need <= 0) break;
+      moved.push(a);
+      need -= Math.max(0, power(s, obj(s, a.attacker)));
+    }
+    if (need > 0) continue;
+    for (const a of moved) {
+      a.defender = owner;
+      a.planeswalker = pw.id;
+    }
+  }
+  return attacks;
+}
+
 function chooseAttacks(s: GameState, pid: PlayerId): Action {
   const opps = opponents(s, pid);
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
@@ -1391,7 +1522,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
   });
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
-  return { type: "declareAttackers", player: pid, attacks };
+  return { type: "declareAttackers", player: pid, attacks: attackPlaneswalkers(s, pid, attacks) };
 }
 
 function chooseBlocks(s: GameState, pid: PlayerId): Action {
@@ -1402,7 +1533,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     .filter((o) => controllerOf(s, o) === pid && !o.tapped && objIsType(s, o, "Creature") && !characteristics(s, o).cantBlock);
   const used = new Set<string>();
   const blocks: { blocker: string; attacker: string }[] = [];
-  const totalIncoming = incoming.reduce((n, a) => n + power(s, a), 0);
+  // Only damage to us counts toward our life; attackers of our planeswalkers are blocked when that's a good trade.
+  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + power(s, a), 0);
   const desperate = totalIncoming >= me.life;
   // Requirements first (CR 509.1c): every creature able to block a lure blocks one, and a creature that
   // must be blocked if able gets our sturdiest blocker (two against menace).

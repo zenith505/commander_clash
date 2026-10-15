@@ -2,6 +2,7 @@
 
 import type { Effect, Modification, PlayerRef } from "../../abilities";
 import { NUM, amt, num } from "../words";
+import { mayBeAura, parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import type { Ctx } from "../body";
 
@@ -14,10 +15,21 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
 
   // Graveyards. Cards in a graveyard (CR 109.2a): returning them, reanimating them, exiling them.
-  // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j): the card itself,
-  // while it's still the object whose ability was activated (CR 400.7).
-  if (ctx.selfCard && ctx.activated && (m = /^Return ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s)))
+  // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j) or "Whenever you
+  // cast a multicolored spell, you may return ~ from your graveyard to your hand" (CR 113.6m): the card itself,
+  // while it's still the object whose ability was activated or triggered (CR 400.7).
+  if (ctx.selfCard && (m = /^Return ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s)))
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
+  // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
+  // to the battlefield attached to that creature."
+  if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
+    return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
+  // "You may put a land card from your hand onto the battlefield (tapped)".
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?$/.exec(s))) {
+    const filter = parseSearchFilter(m[3]!);
+    if (filter === null || mayBeAura(filter)) return null;
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}) }];
+  }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all) graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =

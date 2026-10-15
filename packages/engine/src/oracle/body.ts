@@ -268,6 +268,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       if (!inner) return null;
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
       if (inner.length > 1 && inner.some((e) => PAUSING.has(e.type))) return null;
+      // "You may put a land card from your hand onto the battlefield": choosing none is the "may" (one question).
+      const only = inner.length === 1 ? inner[0]! : undefined;
+      if (only?.type === "putFromHand" && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
+        effects.push({ ...only, may: true });
+        if (!defineX()) return null;
+        continue;
+      }
       effects.push({ type: "may", effects: inner, text: may[1]! });
       if (!defineX()) return null;
       continue;

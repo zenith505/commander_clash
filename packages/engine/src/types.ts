@@ -1,7 +1,21 @@
 import type { AbilityBody, AltCostKind, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { DamageEvent } from "./damage";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
+
+/**
+ * A redirection shield (CR 614.9) for the next `n` damage that would be dealt to the permanent or player it's on this
+ * turn: that damage is dealt to `to` instead, by the same source. It does nothing while `to` is gone or isn't a
+ * creature or planeswalker any more.
+ */
+export interface RedirectShield {
+  id: string;
+  n: number;
+  to: { object: ObjectId; zc: number } | { player: PlayerId };
+  /** The card whose effect made it, for the log. */
+  source: string;
+}
 
 export type Color = "W" | "U" | "B" | "R" | "G";
 export const COLORS: readonly Color[] = ["W", "U", "B", "R", "G"];
@@ -78,6 +92,8 @@ export interface GameObject {
   regenShields?: number;
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
   preventNext?: number;
+  /** "The next N damage that would be dealt to it this turn is dealt to [X] instead" (CR 614.9, 615.7). */
+  redirectNext?: RedirectShield[];
   /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
   /** Renown's designation (CR 702.112b), until it leaves the battlefield. */
@@ -97,6 +113,12 @@ export interface GameObject {
   mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot"; turn: number };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
+  /**
+   * The planeswalker it's attacking, if it attacks one: `attacking` is then that planeswalker's controller, the
+   * defending player (CR 506.2, 802.2a). Once the planeswalker is removed from combat, the creature attacks nothing
+   * but is still attacking (CR 506.4c).
+   */
+  attackingPermanent?: { id: ObjectId; zc: number };
   /** Provoked: it must block this attacking creature this combat if able (CR 702.39a). Cleared at end of combat. */
   provokedBy?: { id: ObjectId; zc: number };
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
@@ -203,6 +225,8 @@ export interface Player {
   lastUpkeepTurn?: number;
   /** What's left of "prevent the next N damage that would be dealt to [this player] this turn" shields (CR 615.7). */
   preventNext?: number;
+  /** "The next N damage that would be dealt to [this player] this turn is dealt to [X] instead" (CR 614.9). */
+  redirectNext?: RedirectShield[];
   /** Combat damage received from each commander, keyed by commander object id. CR 903.10a */
   commanderDamage: Record<ObjectId, number>;
   lost: boolean;
@@ -329,8 +353,9 @@ export interface LastKnown {
   power?: number;
   toughness?: number;
   manaValue?: number;
-  /** The player a creature returned for ninjutsu was attacking (CR 702.49c). */
+  /** The player a creature returned for ninjutsu was attacking (CR 702.49c), and the planeswalker if it was one. */
   attacking?: PlayerId;
+  attackingPermanent?: { id: ObjectId; zc: number };
   /** Its copiable values as it last existed (CR 707.2, 608.2h), a key into GameState.cards: "becomes a copy of that creature". */
   copyKey?: string;
   /** Who controlled it as it last existed: "that creature's controller" after it died (CR 608.2h). */
@@ -434,13 +459,13 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string } }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure"; options: string[]; labels?: string[]; objectId?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -499,6 +524,11 @@ export interface GameState {
   effects: ContinuousEffect[];
   /** "Prevent all combat damage that would be dealt this turn" (Fog) is in effect until cleanup. */
   preventCombatDamage?: boolean;
+  /**
+   * Combat damage about to be dealt, waiting on choices about which of it damage shields apply to (CR 615.7, 616.1):
+   * the damage as assigned, and the options picked so far (see damage.ts planShields).
+   */
+  damageBatch?: { events: DamageEvent[]; answers: number[] };
   /** Players dealt damage this turn, for bloodthirst (CR 702.54a). */
   damagedThisTurn?: PlayerId[];
   /**
@@ -636,7 +666,8 @@ export type Action =
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */
   | { type: "copyTargets"; player: PlayerId; targets?: TargetChoice[] }
-  | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId }[] }
+  /** `planeswalker`: it attacks that planeswalker, controlled by `defender`, instead of the player (CR 508.1b). */
+  | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[] }
   | { type: "declareBlockers"; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[] }
   | { type: "discard"; player: PlayerId; objectIds: ObjectId[] }
   /** Answer to arrangeTop: `top` goes back on top in this order (first = top); `away` goes to the bottom (scry) or graveyard (surveil). */

@@ -14,7 +14,7 @@ import { parseTrigger } from "./triggers";
 import { parseActivated } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
-import { parseTargetPhrase } from "./targets";
+import { parseGroup, parseTargetPhrase } from "./targets";
 import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept } from "./tokens";
@@ -376,6 +376,19 @@ export function compile(d: CardDef): CompiledCard {
     if (/^~ enters tapped\.$/.test(line)) {
       out.entersTapped = true;
       continue;
+    }
+    // "Creatures your opponents control enter tapped." "Artifacts and lands enter tapped." "Creatures and nonbasic
+    // lands your opponents control enter tapped." An ability word may come first (CR 207.2c).
+    const othersTapped = /^(?:[A-Z][A-Za-z' -]+ — )?([A-Z][^.—]*?) enter tapped\.$/.exec(line);
+    if (othersTapped && !/\b(other|played|this turn|until)\b/i.test(othersTapped[1]!)) {
+      const words = othersTapped[1]!;
+      const split = /^(\w+) and (\w+ \w+)( your opponents control)?$/.exec(words);
+      const groups = [parseGroup(words, true)];
+      if (!groups[0] && split) groups.splice(0, 1, parseGroup(`${split[1]}${split[3] ?? ""}`, true), parseGroup(`${split[2]}${split[3] ?? ""}`, true));
+      if (groups.every((g) => g && !g.other)) {
+        for (const g of groups) (out.othersEnterTapped ??= []).push({ filter: g!.filter, text: line });
+        continue;
+      }
     }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
     const asEnters = /^(~ enters tapped\. )?As (?:~|it) enters, choose (an? (?:creature type|color)(?: other than \w+)?(?: and an? (?:creature type|color))?)\.$/.exec(line);

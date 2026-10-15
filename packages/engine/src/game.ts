@@ -602,7 +602,7 @@ type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: 
  */
 function finishEntering(s: GameState, o: GameObject, printed: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number }) {
   const id = o.id;
-  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped)) o.tapped = true;
+  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = true;
   if (withCounters) putCounters(s, o, withCounters.counter, withCounters.n, true); // CR 614.1c
   // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
   if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
@@ -693,6 +693,21 @@ export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): Obje
  * as it enters, so it doesn't count itself. "As it enters, you may pay 2 life (reveal a card). If you
  * don't, it enters tapped" depends on `choice` (CR 614.12).
  */
+/**
+ * "Creatures your opponents control enter tapped" (Authority of the Consuls): permanents already on the battlefield, not
+ * the entering one itself; such an effect wins over "enters tapped unless" (rulings), since it applies either way.
+ */
+function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
+  return s.battlefield.some((id) => {
+    if (id === o.id) return false;
+    const src = obj(s, id);
+    const rules = compileCard(defOf(s, src)).othersEnterTapped;
+    if (!rules || !characteristics(s, src).hasPrintedAbilities) return false;
+    const you = controllerOf(s, src);
+    return rules.some((r) => objectMatches(s, r.filter, o, you, false));
+  });
+}
+
 function entersTappedNow(s: GameState, o: GameObject, printed: CompiledCard, choice?: boolean): boolean {
   if (printed.entersTappedUnless) return !conditionHolds(s, printed.entersTappedUnless, o.controller, o.id);
   if (printed.entersTappedChoice) return !choice;

@@ -932,6 +932,11 @@ export interface CompiledCard {
   /** For Auras: what it can enchant, which is also what the Aura spell targets. CR 303.4a, 702.5 */
   enchant?: TargetSpec;
   entersTapped: boolean;
+  /**
+   * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
+   * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
+   */
+  othersEnterTapped?: { filter: TargetSpec; text: string }[];
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */

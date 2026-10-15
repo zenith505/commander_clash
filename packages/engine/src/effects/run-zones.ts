@@ -423,6 +423,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "exileIfDies":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfDiesTurn = s.turn;
       return;
+    case "lookAtHand":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        const cards = p.hand.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards";
+        if (e.reveal) log(s, `${p.name} reveals their hand: ${cards}.`);
+        else {
+          log(s, `${player(s, ctx.controller).name} looks at ${p.name}'s hand.`);
+          log(s, `${p.name}'s hand: ${cards}.`, ctx.controller);
+        }
+      }
+      return;
+    case "noCombatDamage":
+      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.noCombatDamageTurn = s.turn;
+      return;
     case "sacrifice":
       for (const o of objects(s, e.what, ctx)) {
         const by = controllerOf(s, o);

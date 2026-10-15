@@ -39,6 +39,8 @@ export interface UnlessPays {
   cost: string;
   generic?: Amount;
   life?: number;
+  /** "Ward—Discard a card": discard this many cards (of their choice) as the payment. */
+  discard?: number;
 }
 
 /**
@@ -62,6 +64,8 @@ export type Count =
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   | { kind: "cardsInLibrary"; who: PlayerRef }
+  /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
+  | { kind: "discardedThisWay"; greatest?: true }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
@@ -117,6 +121,8 @@ export interface TargetSpec {
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
+  /** Or one of these subtypes instead of one of `types`: "creature or Vehicle". */
+  orSubtypes?: string[];
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
   keywords?: string[]; // "creature with flying"
   notKeywords?: string[]; // "creature without flying"
@@ -383,6 +389,8 @@ export type StaticCondition =
   | { kind: "paired"; withKeyword?: string; not?: true }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
+  /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
+  | { kind: "increment" }
   /**
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
@@ -449,6 +457,10 @@ export type Effect =
   | { type: "connive"; what: ObjRef; n: Amount }
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   | { type: "exileIfDies"; what: ObjRef }
+  /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
+  | { type: "lookAtHand"; who: PlayerRef; reveal?: true }
+  /** "~ assigns no combat damage this turn" (CR 510.1). */
+  | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
   /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
   | { type: "mustBlockSource"; what: ObjRef }
@@ -472,7 +484,8 @@ export type Effect =
   /** Ascend on an instant or sorcery (CR 702.131a): "If you control ten or more permanents and you don't have the city's blessing, you get the city's blessing for the rest of the game." */
   | { type: "ascend" }
   /** The source explores (CR 701.44a): a land on top goes to hand; otherwise a +1/+1 counter, and the card may be milled. */
-  | { type: "explore" }
+  /** Explore (CR 701.44a): `what` explores ("target creature you control explores"), by default this permanent. */
+  | { type: "explore"; what?: ObjRef }
   /** Renown N (CR 702.112a): if it isn't renowned, N +1/+1 counters and it becomes renowned. */
   | { type: "renown"; n: number }
   /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */
@@ -542,7 +555,8 @@ export type Effect =
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   | { type: "exileTop"; who: PlayerRef; n: Amount }
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
+  /** `hand`: "discards their hand", every card in it (n is ignored). */
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
@@ -716,6 +730,8 @@ export type TriggerEvent =
   // forms trigger once for each creature it blocks or is blocked by, which is their subject.
   | "selfBlocks"
   | "selfBecomesBlocked"
+  /** "Whenever ~ attacks and isn't blocked": after blockers are declared, if no creature blocks it (rulings). */
+  | "selfAttacksUnblocked"
   | "selfBlocksOrBecomesBlocked" // bushido (CR 702.45a)
   | "selfBlocksCreature"
   | "selfBlockedByCreature" // flanking (CR 702.25a)
@@ -727,6 +743,10 @@ export type TriggerEvent =
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
+  /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
+  | "playerDiscards"
+  /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
+  | "selfCycled"
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
@@ -758,6 +778,12 @@ export interface TriggeredAbility {
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   draws?: { by: "you" | "opponent" | "any"; nth?: number };
+  /**
+   * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
+   * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
+   * (rulings: cycling a card triggers it once).
+   */
+  discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
   /**
@@ -824,8 +850,10 @@ export interface ActivatedAbility {
   text: string;
   /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a). Otherwise on the battlefield. */
   zone?: "hand" | "graveyard";
-  /** "Discard this card" is part of the cost (cycling). */
+  /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
+  /** It's a cycling ability (CR 702.29a, 702.29f): discarding this card to pay for it is cycling it. */
+  cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
   crew?: number;
   /** "Activate only once each turn" (CR 602.5b). */
@@ -1048,7 +1076,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**
@@ -1088,6 +1116,12 @@ export interface CompiledCard {
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
    */
   castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
+  /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
+  beginOnBattlefield?: boolean;
+  /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
+  doubleLifeGain?: boolean;
+  /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
+  youHave?: "hexproof" | "shroud";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
   /** "Whenever enchanted land is tapped for mana, its controller adds an additional {G}" and the like (CR 605.1b). */

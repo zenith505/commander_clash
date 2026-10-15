@@ -115,8 +115,32 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   if (opts.mulligans) {
     s.mulligans = { taken: {}, kept: [], toDeclare: turnOrderFrom(s, first), going: [] };
     nextMulliganDecision(s);
-  } else beginStep(s, "untap");
+  } else startOpeningActions(s);
   return s;
+}
+
+/**
+ * Once mulligans are done, the starting player and then each other player in turn order may take the actions their
+ * opening hands allow (CR 103.6): the Leylines' "begin the game with it on the battlefield" (103.6a). Then the
+ * first turn begins.
+ */
+function startOpeningActions(s: GameState) {
+  s.openingActions = turnOrderFrom(s, s.activePlayer).filter((pid) => !player(s, pid).lost);
+  nextOpeningAction(s);
+}
+
+function nextOpeningAction(s: GameState) {
+  while (s.openingActions?.length) {
+    const pid = s.openingActions[0]!;
+    const cards = player(s, pid).hand.filter((id) => compileCard(defOf(s, obj(s, id))).beginOnBattlefield);
+    if (cards.length) {
+      s.pending = { kind: "searchLibrary", player: pid, source: "Opening hand", what: "these cards", cards, min: 0, max: cards.length, fromHand: true, opening: true };
+      return;
+    }
+    s.openingActions.shift();
+  }
+  s.openingActions = undefined;
+  beginStep(s, "untap");
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +184,7 @@ function nextMulliganDecision(s: GameState) {
   // If the starting player left during mulligans, the next player in turn order starts instead.
   if (player(s, s.activePlayer).lost) s.activePlayer = s.priority = nextLivingAfter(s, s.activePlayer);
   log(s, "Everyone has kept. The game begins.");
-  beginStep(s, "untap");
+  startOpeningActions(s);
 }
 
 function declareMulligan(s: GameState, p: Player, keep: boolean) {
@@ -393,8 +417,8 @@ export const livingPlayers = (s: GameState) => s.turnOrder.filter((id) => !playe
 export const opponents = (s: GameState, pid: PlayerId) => livingPlayers(s).filter((id) => id !== pid);
 export const nameOf = (s: GameState, id: ObjectId) => defOf(s, obj(s, id)).name;
 
-export function log(s: GameState, text: string) {
-  s.log.push({ seq: s.log.length, turn: s.turn, text });
+export function log(s: GameState, text: string, to?: PlayerId) {
+  s.log.push({ seq: s.log.length, turn: s.turn, text, ...(to !== undefined ? { to } : {}) });
 }
 
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
@@ -479,6 +503,7 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
   o.exileIfDiesTurn = undefined;
+  o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
   // battlefield or leaving it at the same time (rulings).
   if (fromZone === "battlefield" && to === "graveyard" && o.damagedBy?.length && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
@@ -501,6 +526,9 @@ export function moveObject(
     log(s, `${defOf(s, o).name} goes to the command zone instead.`);
   }
   const escaped = fromZone === "stack" && to === "battlefield" && o.castVia === "escape";
+  // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
+  // zone wasn't, rulings).
+  const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   if (fromZone === "stack") {
     o.castFrom = undefined;
     o.castVia = undefined;
@@ -590,7 +618,7 @@ export function moveObject(
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
-  const withCounters = printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller) ? undefined : printedCounters;
+  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) ? undefined : printedCounters;
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
@@ -773,6 +801,12 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
 /** A player gains life (CR 119.3): one life-gain event, which "whenever you gain life" abilities see (CR 119.10). */
 export function gainLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
+  // "If you would gain life, you gain twice that much life instead" (CR 614.1a): each one doubles it again (rulings).
+  const doublers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).doubleLifeGain).length;
+  if (doublers) {
+    n *= 2 ** doublers;
+    log(s, `${player(s, pid).name} gains twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
+  }
   player(s, pid).life += n;
   fireEvent(s, { type: "lifeGained", player: pid, amount: n });
 }
@@ -1195,7 +1229,7 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player)) {
+    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount)) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -1756,6 +1790,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
+  // The amount of mana spent to cast it, by anyone (increment, CR 702.191a).
+  const manaSpent = Object.values(paid.spent).reduce((a, b) => a + b, 0) + (choices.assisted && choices.assist !== undefined ? choices.assisted : 0);
   if (choices.assisted && choices.assist !== undefined) {
     const helper = player(s, choices.assist);
     spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
@@ -1839,7 +1875,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
-  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d });
+  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent });
   fireEvent(s, { type: "targeted", stackId });
 }
 
@@ -2164,7 +2200,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
-  if (ab.discardSelf) discardCards(s, p.id, [id], "", true);
+  if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
   s.stack.push({
@@ -2182,7 +2218,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
   });
-  if (ab.discardSelf) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
+  if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
+  else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
   else if (ab.crew !== undefined) log(s, `${p.name} crews ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
   else {
     // Say which ability: its cost and, for a modal one, the chosen modes.
@@ -2311,6 +2348,17 @@ const LOYALTY_USED = -1;
 /** The cards a library search found (CR 701.23). */
 function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   const pend = s.pending;
+  if (pend?.kind === "searchLibrary" && pend.opening && pend.player === p.id) {
+    if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
+    s.pending = null;
+    for (const id of found) {
+      moveObject(s, id, "battlefield");
+      log(s, `${p.name} begins the game with ${nameOf(s, id)} on the battlefield.`);
+    }
+    s.openingActions!.shift();
+    nextOpeningAction(s);
+    return;
+  }
   const r = s.resolving;
   if (pend?.kind !== "searchLibrary" || pend.player !== p.id || !r) throw new RulesError("you aren't searching a library");
   if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
@@ -2540,6 +2588,19 @@ function payUnless(s: GameState, p: Player, pay: boolean) {
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
     loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
+    if (pend.discard) {
+      // Then which cards to discard; the cards are discarded as the counter effect carries on (see counterOnStack).
+      if (p.hand.length < pend.discard) throw new RulesError(`you don't have ${pend.discard} card${pend.discard === 1 ? "" : "s"} to discard`);
+      r.scratch = { ...r.scratch, queue: [p.id], chosen: {} };
+      if (p.hand.length > pend.discard) {
+        s.pending = { kind: "discard", player: p.id, count: pend.discard, source: pend.source };
+        return;
+      }
+      r.scratch.chosen![p.id] = [...p.hand];
+      s.pending = null;
+      continueResolution(s);
+      return;
+    }
   }
   (r.scratch ??= {}).paid = pay;
   s.pending = null;
@@ -2990,7 +3051,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
   for (const at of attackers(s)) {
-    if (!dealsDamageThisStep(s, at, firstStrikeStep)) continue;
+    if (!dealsDamageThisStep(s, at, firstStrikeStep) || at.noCombatDamageTurn === s.turn) continue;
     let dmg = power(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
@@ -3025,7 +3086,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   }
   for (const id of s.battlefield) {
     const bl = obj(s, id);
-    if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep)) continue;
+    if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep) || bl.noCombatDamageTurn === s.turn) continue;
     const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
     let dmg = power(s, bl);
     if (dmg <= 0) continue;

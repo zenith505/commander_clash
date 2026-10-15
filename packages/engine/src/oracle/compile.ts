@@ -558,6 +558,19 @@ export function compile(d: CardDef): CompiledCard {
       else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
       continue;
     }
+    if (line === "If you would gain life, you gain twice that much life instead.") {
+      out.doubleLifeGain = true;
+      continue;
+    }
+    const youHave = /^You have (hexproof|shroud)\.$/.exec(line);
+    if (youHave) {
+      out.youHave = youHave[1] as "hexproof" | "shroud";
+      continue;
+    }
+    if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
+      out.beginOnBattlefield = true;
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;
@@ -571,17 +584,17 @@ export function compile(d: CardDef): CompiledCard {
       out.cantBeCountered = true;
       continue;
     }
-    const ewc = new RegExp(`^(?:Raid — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (you attacked this turn))?\\.$`).exec(line);
+    const ewc = new RegExp(`^(?:Raid — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (you attacked this turn)| if (you cast it from your hand))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
       // "~ enters tapped with three stun counters on it."
-      const [, tapped, count, kind, each, where, raid] = ewc;
+      const [, tapped, count, kind, each, where, raid, fromHand] = ewc;
       const per = each ? parseCount(each, null, true) : null;
       const def = where ? parseCount(where, null) : null;
       const n = per ? scaleAmount(amt(count!), per) : def ? substituteX(amt(count!), def) : amt(count!);
       if ((each && !per) || (where && !def) || !n || out.entersWithCounters) out.unsupported.push(raw);
       else {
-        out.entersWithCounters = { counter: counterKind(kind!), n, ...(raid ? { if: { kind: "attackedThisTurn" as const } } : {}) };
+        out.entersWithCounters = { counter: counterKind(kind!), n, ...(raid ? { if: { kind: "attackedThisTurn" as const } } : {}), ...(fromHand ? { castFromHand: true as const } : {}) };
         if (tapped) out.entersTapped = true;
       }
       continue;
@@ -667,6 +680,23 @@ export function compile(d: CardDef): CompiledCard {
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     if (isSpell && /^When you next cast /.test(line)) {
       spellLines.push(line);
+      continue;
+    }
+    // "When you cast or cycle ~, ...", "When you cycle ~ and when ~ dies, ...", "Whenever ~ enters or attacks, ...",
+    // "When ~ enters or dies, ...": one ability that triggers on either event, which works like two with the same
+    // effect (CR 702.29c). The text is read for each event ("it" after it died is the card).
+    const twice =
+      /^When you cast or cycle ~, (.+)$/.exec(line) ?? /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ?? /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield), (.+)$/.exec(line);
+    if (twice && !/\bonly once\b/.test(line)) {
+      const effect = twice[twice.length - 1]!;
+      const events = /^When you cast/.test(line)
+        ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
+        : /^When you cycle/.test(line)
+          ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]
+          : [`When ~ enters, ${effect}`, `${twice[1] === "attacks" ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
+      const both = events.map((l) => parseTrigger(l));
+      if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);
+      else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));
       continue;
     }
     const trig = parseTrigger(line);

@@ -29,6 +29,35 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Discarding (CR 701.9): "Target player discards two cards", "Each opponent discards a card at random", "Discard a card"
   if ((m = new RegExp(`^Discard ${NUMX} cards?( at random)?$`, "i").exec(s))) return [{ type: "discard", who: { ref: "you" }, n: amt(m[1]!), random: !!m[2] }];
+  // "Look at target opponent's hand", "target player reveals their hand" (CR 402.3, 701.20).
+  if ((m = /^Look at (.+?)'s? hand$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "lookAtHand", who }] : null;
+  }
+  if ((m = /^(.+?) reveals? (?:their|his or her) hand$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "lookAtHand", who, reveal: true }] : null;
+  }
+  // "Discard your hand", "each opponent discards their hand", "discard all the cards in your hand" (CR 701.9b: no
+  // choice to make). Wheels: "each player discards their hand, then draws seven cards" (all of them discard, then all
+  // of them draw, CR 608.2c), "then draw that many cards", "then draws cards equal to the greatest number of cards a
+  // player discarded this way" (Windfall).
+  if ((m = /^(Discard|.+? discards?) (?:all the cards in )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s))) {
+    const who = /^Discard$/i.test(m[1]!) ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/ discards?$/i, ""), ctx);
+    if (!who || (/^Discard$/i.test(m[1]!) && /your/.test(s) === false)) return null;
+    const out: Effect[] = [{ type: "discard", who, n: 0, hand: true }];
+    if (m[2] !== undefined) {
+      const k = new RegExp(`^${NUMX} cards?$`, "i").exec(m[2]);
+      const n =
+        k && !/^that many$/i.test(k[1]!) ? amt(k[1]!)
+        : /^that many cards$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const } }
+        : /^cards equal to the greatest number of cards a player discarded this way$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, greatest: true as const } }
+        : null;
+      if (!n) return null;
+      out.push({ type: "draw", who, n });
+    }
+    return out;
+  }
   if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;

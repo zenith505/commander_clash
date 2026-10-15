@@ -104,6 +104,8 @@ export interface GameObject {
   damagedBy?: ObjectId[];
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
+  /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
+  noCombatDamageTurn?: number;
   /**
    * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
    * while it's still the same object (`zc`), until the end of this turn or of their next turn. A warped card
@@ -430,7 +432,7 @@ export type PendingDecision =
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
    */
-  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; source: string; what: string }
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; source: string; what: string }
   /**
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
@@ -459,7 +461,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -486,6 +488,8 @@ export interface GameEvent {
   seq: number;
   turn: number;
   text: string;
+  /** Hidden information only this player sees ("you look at target opponent's hand", CR 402.3). */
+  to?: PlayerId;
 }
 
 export interface GameState {
@@ -557,6 +561,8 @@ export interface GameState {
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
   mulligans?: MulliganState | null;
+  /** Players still to take actions with their opening hands, in turn order from the starting player (CR 103.6). */
+  openingActions?: PlayerId[];
   /** A spell or ability partway through resolving, waiting on `pending` (see continueResolution). */
   resolving: Resolving | null;
   /** Permanents that just entered and still have an "as ~ enters, choose ..." choice to make (CR 614.12). */
@@ -617,6 +623,8 @@ export interface Resolving {
   created?: ObjectId[];
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
+  /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
+  discarded?: Record<PlayerId, number>;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   next: number;

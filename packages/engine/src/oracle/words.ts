@@ -59,3 +59,6 @@ export const singularWord = (w: string) => (/^(Plains|plains|Aurochs|less|this|i
 export const isGroup = (r: ObjRef) => r.ref === "allCreatures" || r.ref === "each";
 /** Several targets: "up to two target creatures". */
 export const isSeveral = (r: ObjRef) => r.ref === "target" && (r.n ?? 1) > 1;
+
+/** "Each player discards their hand, then draws seven cards": one sentence, for the subject (see parseSpellsSentence). */
+export const WHEEL = /^(?:.+? )?discards? (?:all the cards in )?(?:your|their|his or her) hand, then draws? /i;

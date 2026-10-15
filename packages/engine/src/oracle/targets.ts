@@ -314,6 +314,11 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   const notSubtypes: string[] = [];
   const subtypes: string[] = [];
   const SUPERTYPE_WORDS: Record<string, string> = { basic: "Basic", legendary: "Legendary", snow: "Snow" };
+  // "Creature or Vehicle": a creature, or a Vehicle whether or not it's a creature right now.
+  if (p === "creature or vehicle") {
+    extra.orSubtypes = ["Vehicle"];
+    p = p.replace(/ or vehicle$/, "");
+  }
   const alts = p ? p.split(/,? or |, /) : [];
   // "artifact creature" is one object with both types; "artifact or creature" is either.
   const typeWords = alts.map((alt) => alt.trim().split(/\s+/).filter((w) => TYPE_WORDS[w]).length);

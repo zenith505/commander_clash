@@ -2747,11 +2747,19 @@ function Controls({
   if (pending?.kind === "payUnless") {
     // You can tap mana by hand first (CR 605.3a); Pay taps whatever else is needed.
     const life = pending.life ?? 0;
-    const taps = s.players[HUMAN]!.life >= life ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    const discard = pending.discard ?? 0;
+    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> pay <ManaCost cost={pending.cost} size="sm" />
+          <strong>{pending.source}:</strong>{" "}
+          {discard ? (
+            `discard ${discard === 1 ? "a card" : `${discard} cards`}`
+          ) : (
+            <>
+              pay <ManaCost cost={pending.cost} size="sm" />
+            </>
+          )}
           {life ? ` and ${life} life` : ""} or {pending.what} is countered.
         </span>
         <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>
@@ -2824,7 +2832,8 @@ function Controls({
 }
 
 function GameLog({ s }: { s: GameState }) {
-  const entries = s.log.slice(-80).reverse(); // newest first
+  // Hidden information is only shown to the player who may see it (CR 402.3).
+  const entries = s.log.filter((e) => e.to === undefined || e.to === HUMAN).slice(-80).reverse(); // newest first
   return (
     <div className="log">
       {entries.map((e) => (

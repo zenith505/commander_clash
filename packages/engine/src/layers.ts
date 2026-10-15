@@ -291,7 +291,7 @@ const PERMANENT_CARD_TYPES = ["Artifact", "Battle", "Creature", "Enchantment", "
  * Is an "as long as" condition true? Whatever it looks at on the battlefield is seen as the layers
  * applied so far have left it, so an effect that changes that waits for it (CR 613.8a).
  */
-function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId): boolean {
+function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
@@ -331,6 +331,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
+    case "increment": {
+      const c = chars.get(sourceId);
+      return !!c && c.types.includes("Creature") && eventAmount !== undefined && (eventAmount > c.power || eventAmount > c.toughness);
+    }
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {
@@ -363,9 +367,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
 }
 
 /** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
-export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId): boolean {
+export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number): boolean {
   const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
-  return conditionMet(s, cond, sourceId, you, chars, eventPlayer);
+  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount);
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {

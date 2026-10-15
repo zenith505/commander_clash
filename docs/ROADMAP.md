@@ -1,6 +1,6 @@
 # Roadmap
 
-16,089 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,146 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -16,13 +16,25 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Haunt, Read ahead.
+   Left from the mana abilities/any number of targets round:
+   - "Any number of target" players or opponents (Will of the Abzan, Court of Cunning, Call the Coppercoats, Stonespeaker
+     Crystal); "X damage divided as you choose among any number of targets" (Rolling Thunder, Fireball's "divided
+     evenly", Fire Covenant, about 25 cards); "up to X target" where X isn't the spell's own X ("where X is ...",
+     verse counters, monstrosity, kicker count); target counts with a group condition ("with total mana value 8 or
+     less", "with different controllers", "that each have a different mana value", "with equal toughness"); "for each
+     creature destroyed/exiled this way, its controller creates" (Descent of the Dragons, Hour of Need); "Shuffle any
+     number of target cards from your graveyard into your library"; "Return those cards ... at the beginning of the
+     next end step" after exiling several (Eerie Interlude, Brago); "Choose target creature you don't control. Each
+     creature you control deals damage equal to its power to that creature" (Kamahl's Will).
+   - Filter lands ("{W/U}, {T}: Add {W}{W}, {W}{U}, or {U}{U}", 10 cards): a choice between mana combinations and a
+     hybrid cost in a mana ability. Other "Activate only if" mana abilities still out: "~ is a creature" (Flywheel
+     Racer), "three or more lands with the same name", counters on ~ (Pyramid of the Pantheon, Tablet of Compleation).
+   - An activated mana ability whose body isn't a plain "Add ..." (Leafkin Druid's "add {G}{G} instead") can't be
+     activated while a "whenever ~ is tapped for mana, add one mana of any color" trigger would need a color choice
+     (Fertile Ground on it): it's refused rather than asked. No supported card hits this yet.
+   - Bots don't sacrifice nontoken permanents for mana abilities on their own (Ashnod's Altar, Phyrexian Tower): only
+     the human player does, from the ability menu.
    Left from the conditional targets/Will cycle/hideaway conditions round:
-   - Mana abilities with costs `parseManaAbility` doesn't read ("Sacrifice a creature: Add {C}{C}", "{T}, Sacrifice a
-     Food: Add one mana of any color", Mox Opal's "Activate only if") compile as activated abilities, so they use the
-     stack; CR 605.1a and 605.3b say they don't (Ashnod's Altar, Phyrexian Altar, Gilded Goose, Mox Opal, Chromatic
-     Sphere, the Eggs, about 50 cards). Moving them to mana abilities needs those costs in `ManaAbility` and autopay.
-   - "Any number of target ..." (Kamahl's Will, Divine Resilience, Will of the Abzan's "any number of target
-     opponents"), "up to X target" (Klauth's Will): a target count chosen as it's cast isn't modeled.
    - "Choose target X ... If the gift was promised, instead choose target Y ... the chosen" (Too Evil to Stay Dead,
      Expel the Unworthy, The Eagles Are Coming!); "each creature target player controls" (Galadriel's Dismissal);
      Role tokens (Diminisher Witch); "choose both instead" on modes that don't parse (Atlantis Attacks); "pays {4}
@@ -30,8 +42,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (Stonesplitter Bolt, Torch the Tower).
    - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Cruelclaw's Heist, Dawn's Truce, Longstalk Brawl,
      Octomancer, Parting Gust, Perch Protection, Starfall Invocation; Dark Apostle's "Gift of Chaos" is a flavor word.
-   - Wills still out: Szat's ("the greatest power among creature cards exiled this way"), Nexus Mentality ("move all
-     counters", "for each counter removed this way"), Sakashima's, Kamahl's, Klauth's and Will of the Abzan (above).
+   - Wills still out: Sakashima's, Kamahl's and Will of the Abzan (above).
    - "Each player may discard their hand and draw ..." works; Snort's "each opponent who discarded their hand this
      way" and Imposing Grandeur's "the greatest mana value of a commander they own" don't.
    - "Return all ... cards from your graveyard to the battlefield" works for cards that can't be Auras; with
@@ -114,8 +125,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Layer 3 (text-changing effects).
 - "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing X counters
   and "then" riders (Biogenic Upgrade), divided prevention (Remedy), on a
-  planeswalker (Chandra, Flameshaper); "up to X target" (Rats' Feast, Martyr of Bones' "up to X target cards from a
-  single graveyard").
+  planeswalker (Chandra, Flameshaper); "up to X target" with an X that isn't the spell's own (Rats' Feast, Martyr of
+  Bones' "up to X target cards from a single graveyard").
 - "Costs {1} less for each target", reductions of colored mana, "the first face-down / kicked spell you cast each
   turn" (Kadena, Vine Gecko), Radagast's "and can be cast as though it had flash", Eluge's "{U} (or {1}) less".
   Equip reductions "that target enchanted creature" (Strong Back).
@@ -248,7 +259,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - The Ring: Ringwraiths' "When the Ring tempts you, return this card from your graveyard", "your Ring-bearer's
   power", "protection from Ring-bearers", Aragorn's counter choice; legendary names shortened without a comma
   ("Galadriel", "Samwise", CR 201.5c) aren't recognized as the card itself yet.
-- Phasing: "any number of target", "phases out until ~ leaves the battlefield" (Oubliette, The Moment), "can't phase
+- Phasing: "phases out until ~ leaves the battlefield" (Oubliette, The Moment), "can't phase
   in", "whenever ~ phases in or out", Teferi's Protection; flavor words before an ability ("Teleport —", CR 207.2d).
 - Manifest and cloak: from another player's library ("manifest the top card of that player's library"), from a hand
   (Scroll of Fate), several cards from a face-down pile (Become Anonymous, Primordial Mist), "manifest dread X times",

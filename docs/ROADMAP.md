@@ -1,6 +1,6 @@
 # Roadmap
 
-13,540 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+13,854 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,12 +14,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: the Myojin's "enters with a divinity counter on it if you cast it from your hand", "whenever
-   you cycle or discard a card, ~ gets +N/+N", the Laccoliths' "you may have it deal damage equal to its power to
-   target creature. If you do, ~ assigns no combat damage this turn", "when ~ enters or dies, surveil N", "look at
-   target opponent's hand", the Leylines' "if ~ is in your opening hand, you may begin the game with it on the
-   battlefield", "you have hexproof", "Enchant creature or Vehicle", "Ward—Discard a card", increment, transmute,
-   "if you would gain life, you gain twice that much life instead", Lander tokens.
+1. By `npm run blockers`: "{T}: Add an amount of {G} equal to ~'s power", "target player draws two cards and loses N
+   life", "~ can't block creatures with power N or greater", "when enchanted creature is dealt damage, destroy it",
+   "change the target of target spell with a single target", "its owner puts it on their choice of the top or bottom
+   of their library", the Enduring cycle's "return it to the battlefield. It's an enchantment", "whenever a creature
+   you control deals combat damage to a player, draw a card", mayhem, "all creatures able to block target creature
+   this turn do so", encore, "untap ~ during each other player's untap step", "whenever you sacrifice another
+   permanent", extra turns, recruit, Ghostly Prison's attack tax.
 
 ## Known gaps (from earlier rounds)
 
@@ -121,7 +122,17 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "Multicolored creatures you control have ..." and other statics on multicolored or colorless permanents (Maze
   Glider, Glass of the Guildpact), "hexproof from monocolored", "for each of that spell's colors".
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each
-  turn", "draw that many cards"; "players can't gain life" and life-gain replacement effects.
+  turn", "draw that many cards"; "players can't gain life" and life-gain replacement effects other than doubling.
+- Discarding: "whenever you discard one or more cards" (once per batch, "that many"), "draw that many cards" after "you
+  may discard your hand. If you do" (Book Devourer), Hollow One's "for each card you've cycled or discarded this turn",
+  "when you discard ~" (Bartered Cow); Ward—Discard a card at random and other ward costs (sacrifice, blight).
+- Cycling: Astral Slide's "you may exile target creature. If you do, return that card at the beginning of the next end
+  step", Decree of Justice's "you may pay {X}" when cycled, Gavi's alternative cycling cost.
+- "Assigns no combat damage" after a destroy or gain control (Floral Spuzzem, Goblin Vandal, Kukemssa Pirates) and on
+  Auras ("the first creature", Laccolith Rig, Farrel's Mantle); Gaze of Pain.
+- Opening hand: revealing cards (the Chancellors, Gemstone Caverns' luck counter, CR 103.6b). Role tokens and Walker
+  tokens (CR 111.10d, 111.10j-r). Shalai's "you, planeswalkers you control, and other creatures you control have
+  hexproof"; protection or hexproof for players from a source other than "you have".
 
 - Support X (The Crowd Goes Wild); converge in a cast trigger's "that spell" (Magmablood Archaic); "You draw X cards
   and lose X life" (Painful Truths).

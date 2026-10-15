@@ -1000,6 +1000,8 @@ export interface CompiledCard {
   countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;
+  /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
+  landsFromGraveyard?: boolean;
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */

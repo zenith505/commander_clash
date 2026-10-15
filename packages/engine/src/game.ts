@@ -1301,6 +1301,15 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
   return o.mayPlay?.until === "plot" && mayPlayFromExile(s, o, pid);
 }
 
+/**
+ * A land card in `pid`'s own graveyard that "you may play lands from your graveyard" lets them play (Crucible of Worlds).
+ * Playing it is still their land play for the turn, with the usual timing (CR 305.1-2).
+ */
+export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard);
+}
+
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   let n = 1;
@@ -1311,7 +1320,7 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
 function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
   const o = obj(s, id);
   const d = defOf(s, o);
-  if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id))) throw new RulesError("land must be in your hand");
+  if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id) || mayPlayLandFromGraveyard(s, o, p.id))) throw new RulesError("land must be in your hand");
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
   if (!canActAtSorcerySpeed(s, p.id)) throw new RulesError("lands can only be played at sorcery speed");
   if (p.landsPlayedThisTurn >= landsAllowed(s, p.id)) throw new RulesError("already played a land this turn"); // CR 305.2
@@ -1326,9 +1335,9 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
-  const fromExile = o.zone === "exile";
+  const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
   moveObject(s, id, "battlefield", { untapped });
-  log(s, `${p.name} plays ${d.name}${fromExile ? " from exile" : ""}${obj(s, id).tapped ? " (tapped)" : ""}.`);
+  log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
 }
 
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
@@ -3198,6 +3207,9 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
   }
+  // "You may play lands from your graveyard" (Crucible of Worlds).
+  if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
+    for (const id of p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid)) out.push({ type: "playLand", player: pid, objectId: id });
   for (const id of p.command) if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
   for (const id of s.battlefield) {
     const o = obj(s, id);

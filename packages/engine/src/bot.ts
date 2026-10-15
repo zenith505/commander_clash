@@ -278,6 +278,8 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
     const tapped = c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false);
     return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };
   });
+  // A land from the graveyard (Crucible of Worlds) first: it keeps a card in hand.
+  options.sort((a, b) => Number(obj(s, b.action.objectId).zone === "graveyard") - Number(obj(s, a.action.objectId).zone === "graveyard"));
   return (options.find((x) => !x.tapped) ?? options[0])?.action ?? null;
 }
 

@@ -493,6 +493,10 @@ export function compile(d: CardDef): CompiledCard {
       out.entersTappedChoice = choice;
       continue;
     }
+    if (line === "You may play lands from your graveyard.") {
+      out.landsFromGraveyard = true;
+      continue;
+    }
     const extraLand = new RegExp(`^You may play ${NUM} additional lands? on each of your turns\\.$`).exec(line);
     if (extraLand) {
       out.extraLands = (out.extraLands ?? 0) + num(extraLand[1]!);

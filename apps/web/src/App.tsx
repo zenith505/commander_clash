@@ -10,6 +10,7 @@ import {
   delveRoom,
   graveyardCast,
   mayPlayFromExile,
+  mayPlayLandFromGraveyard,
   assistedRemaining,
   dungeonByName,
   commanderTax,
@@ -994,6 +995,7 @@ function exileOptions(s: GameState, id: string): boolean {
 /** Does this card in your graveyard have something you could do with it now (flashback, unearth, ...)? */
 function graveyardOptions(s: GameState, id: string): boolean {
   const d = cardOf(s, id);
+  if (mayPlayLandFromGraveyard(s, s.objects[id]!, HUMAN) && canPlayLand(s, id)) return true; // Crucible of Worlds
   if ((compileCard(d).fromGraveyard ?? []).some((g) => canCastFromGraveyard(s, id, g.kind))) return true;
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
@@ -2179,8 +2181,9 @@ function AbilityMenu({
 }) {
   const o = s.objects[objectId]!;
   const d = seenCardOf(s, objectId);
-  // A card you may play from exile for now works like one in your hand (impulse draw).
-  const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN);
+  // A card you may play from exile for now works like one in your hand (impulse draw), and so does a land you may
+  // play from your graveyard (Crucible of Worlds).
+  const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const plot = o.zone === "hand" ? compileCard(d).plot : undefined;

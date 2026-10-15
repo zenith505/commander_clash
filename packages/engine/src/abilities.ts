@@ -1007,6 +1007,11 @@ export interface CompiledCard {
   phantom?: boolean;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
+  /**
+   * "Each player can't cast more than one spell each turn" (Rule of Law), "... one noncreature spell": counting every
+   * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
+   */
+  castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
   countMods?: CountMod[];

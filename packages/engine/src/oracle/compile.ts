@@ -519,6 +519,15 @@ export function compile(d: CardDef): CompiledCard {
       (out.countMods ??= []).push(countMod);
       continue;
     }
+    // "Each player can't cast more than one spell each turn", "... more than one noncreature spell", Ethersworn Canonist's
+    // "Each player who has cast a nonartifact spell this turn can't cast additional nonartifact spells" (the same rule).
+    const limit = /^(Each player|You) can't cast more than one (?:(.+?) )?spell each turn\.$/.exec(line) ?? /^(Each player) who has cast an? (.+?) spell this turn can't cast additional \2 spells\.$/.exec(line);
+    if (limit) {
+      const filter = limit[2] ? parseTargetPhrase(`${limit[2]} spell`) : undefined;
+      if (filter === null || (filter && filter.kind !== "spell")) out.unsupported.push(raw);
+      else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;

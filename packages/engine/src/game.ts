@@ -1003,6 +1003,7 @@ function startNextTurn(s: GameState) {
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
   s.damagedThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
+  s.castThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
   s.lastKnown = undefined;
@@ -1451,6 +1452,8 @@ export function castProblem(
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
   if (isType(d, "Land")) return "lands are played, not cast";
+  const limit = castLimitProblem(s, pid, d);
+  if (limit) return limit;
   // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
   if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
@@ -1782,10 +1785,26 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
+  s.cards[d.oracleId] ??= d;
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d });
   fireEvent(s, { type: "targeted", stackId });
+}
+
+/** "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2). */
+function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    for (const l of abilitiesOf(s, o).castLimits ?? []) {
+      if (l.who === "you" && controllerOf(s, o) !== pid) continue;
+      if (l.filter && !printedMatches(l.filter, d)) continue;
+      if ((s.castThisTurn ?? []).some((c) => c.player === pid && (!l.filter || printedMatches(l.filter, s.cards[c.card]!))))
+        return `${characteristics(s, o).name}: ${l.text.replace(/~/g, characteristics(s, o).name).replace(/\.$/, "")}`;
+    }
+  }
+  return null;
 }
 
 /** The card's way of being cast from a graveyard of this kind, if it has one. */

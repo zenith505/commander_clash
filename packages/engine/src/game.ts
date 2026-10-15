@@ -1,5 +1,5 @@
 import { kickerName } from "./abilities";
-import type { ActivatedAbility, AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
@@ -603,6 +603,8 @@ export function moveObject(
     o.colorsSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
+    o.teamwork = undefined;
+    o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
     o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
     o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
@@ -631,6 +633,9 @@ export function moveObject(
   o.renowned = undefined;
   o.monstrous = undefined;
   o.saddled = undefined; // CR 702.171b
+  o.tribute = undefined; // CR 702.104
+  o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
+  o.encoded = undefined; // cards stay encoded only on the permanent as long as it's on the battlefield (CR 702.99c)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
@@ -1922,7 +1927,7 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = choices?.alt === "sneak" || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d);
+  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d);
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
@@ -1931,7 +1936,7 @@ export function castProblem(
     if (modes === undefined) {
       if (!canChooseModes(s, spell, pid, d)) return `${d.name} has no mode that can be chosen`;
     } else {
-      const mp = modesProblem(s, spell, modes, pid, d);
+      const mp = modesProblem(s, spell, modes, pid, d, bothModes(s, pid, spell, choices));
       if (mp) return mp;
     }
   }
@@ -1957,7 +1962,7 @@ export function castProblem(
   if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
@@ -2320,6 +2325,23 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     moveObject(s, choices.bargain, "graveyard", { sacrificed: true });
     o.bargained = true;
   }
+  // Teamwork: "you may tap any number of creatures you control with total power N or more".
+  if (choices.teamwork?.length) {
+    for (const c of choices.teamwork) tapPermanent(s, obj(s, c));
+    log(s, `${p.name} taps ${choices.teamwork.map((c) => nameOf(s, c)).join(", ")} (teamwork).`);
+    o.teamwork = true;
+  }
+  // Conspire: "you may tap two untapped creatures you control that each share a color with it" (CR 702.78a).
+  if (choices.conspire?.length) {
+    for (const c of choices.conspire) tapPermanent(s, obj(s, c));
+    log(s, `${p.name} taps ${choices.conspire.map((c) => nameOf(s, c)).join(" and ")} (conspire).`);
+    item.conspired = true;
+  }
+  // Gift: "you may choose an opponent" (CR 702.174a); the gift is promised to them (702.174k).
+  if (choices.gift !== undefined) {
+    log(s, `${p.name} promises ${player(s, choices.gift).name} a gift (${compileCard(d).gift!.what}).`);
+    o.gift = choices.gift;
+  }
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
@@ -2400,6 +2422,74 @@ export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): Obj
     const o = obj(s, id);
     return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n;
   });
+}
+
+/**
+ * "Choose both instead" of "Choose one" (see AbilityBody.modal.both): when the spell is cast using teamwork, or by a
+ * player who controls a commander as they cast it (any commander, rulings on Akroma's Will).
+ */
+export function bothModes(s: GameState, pid: PlayerId, body: AbilityBody, choices?: Pick<CostChoices, "teamwork">): boolean {
+  const both = body.modal?.both;
+  if (both === "teamwork") return !!choices?.teamwork?.length;
+  if (both === "commander") return s.battlefield.some((id) => obj(s, id).isCommander && controllerOf(s, obj(s, id)) === pid);
+  return false;
+}
+
+/** The power a creature adds toward teamwork's total: like crew's, a negative power counts as 0. */
+export const teamworkPower = (s: GameState, id: ObjectId) => Math.max(0, power(s, obj(s, id)));
+
+/**
+ * Creatures `pid` could tap for teamwork: untapped creatures they control, summoning sick or not (tapping them isn't a
+ * {T} cost, CR 302.6).
+ */
+export function teamworkCandidates(s: GameState, pid: PlayerId): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const o = obj(s, id);
+    return !o.tapped && controllerOf(s, o) === pid && objIsType(s, o, "Creature");
+  });
+}
+
+function teamworkProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices, convoke?: ObjectId[]): string | null {
+  const ids = choices?.teamwork;
+  if (ids === undefined || !ids.length) return null;
+  const n = compileCard(d).teamwork;
+  if (n === undefined) return `${d.name} doesn't have teamwork`;
+  const tp = tapCreaturesProblem(s, pid, ids, "pay for teamwork");
+  if (tp) return tp;
+  if (ids.some((id) => convoke?.includes(id))) return "a creature can't be tapped for both convoke and teamwork";
+  const total = ids.reduce((x, id) => x + teamworkPower(s, id), 0);
+  if (total < n) return `teamwork ${n} taps creatures with total power ${n} or more (these have ${total})`;
+  return null;
+}
+
+/** Creatures `pid` could tap for conspire: untapped creatures they control that share a color with the spell (CR 702.78a). */
+export function conspireCandidates(s: GameState, pid: PlayerId, spell: ObjectId): ObjectId[] {
+  const o = obj(s, spell);
+  if (!compileCard(defOf(s, o)).conspire) return [];
+  const colors = defOf(s, o).colors;
+  return s.battlefield.filter((id) => {
+    const c = obj(s, id);
+    return !c.tapped && controllerOf(s, c) === pid && objIsType(s, c, "Creature") && characteristics(s, c).colors.some((x) => colors.includes(x));
+  });
+}
+
+function conspireProblem(s: GameState, pid: PlayerId, spell: ObjectId, choices?: CostChoices, convoke?: ObjectId[]): string | null {
+  const ids = choices?.conspire;
+  if (ids === undefined || !ids.length) return null;
+  if (!compileCard(defOf(s, obj(s, spell))).conspire) return `${nameOf(s, spell)} doesn't have conspire`;
+  if (ids.length !== 2 || ids[0] === ids[1]) return "conspire taps two untapped creatures you control";
+  const ok = conspireCandidates(s, pid, spell);
+  if (ids.some((id) => !ok.includes(id))) return "conspire taps untapped creatures you control that share a color with it";
+  if (ids.some((id) => convoke?.includes(id) || choices?.teamwork?.includes(id))) return "a creature can't be tapped twice to cast it";
+  return null;
+}
+
+function giftProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {
+  const to = choices?.gift;
+  if (to === undefined) return null;
+  if (!compileCard(d).gift) return `${d.name} doesn't have gift`;
+  if (!opponents(s, pid).includes(to)) return "a gift is promised to an opponent";
+  return null;
 }
 
 /** What `pid` could sacrifice for this card's bargain: an artifact, enchantment, or token they control (CR 702.166a). */
@@ -2987,6 +3077,24 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "tribute") {
+      // Tribute (CR 702.104a): the chosen opponent decides next, still as it enters.
+      o.tribute = { to: Number(choice) };
+      log(s, `${p.name} chooses ${player(s, Number(choice)).name} for ${pend.source}'s tribute.`);
+      s.entersChoices!.unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "tributePay", ...(entry?.enters ? { enters: entry.enters } : {}) });
+      return;
+    }
+    if (pend.what === "tributePay") {
+      const n = compileCard(defOf(s, o)).tribute ?? 0;
+      if (choice === "pay") {
+        const put = putCounters(s, o, "+1/+1", n, true);
+        o.tribute = { to: p.id, paid: true };
+        log(s, `${p.name} pays tribute: ${pend.source} enters with ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+      } else log(s, `${p.name} doesn't pay tribute for ${pend.source}.`);
+      invalidateCharacteristics(s);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
       if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
@@ -3002,7 +3110,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay") throw new RulesError("nothing to choose");
   if (pend.what === "topOrBottom") {
     if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
     (r.scratch ??= {}).topOrBottom = choice;
@@ -3135,6 +3243,29 @@ function askEntersChoice(s: GameState): boolean {
       const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter);
       const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...ids, "none"], labels: [...labels, "Don't copy"], objectId: o.id };
+      return true;
+    }
+    if (c.what === "tribute") {
+      // "As this creature enters, choose an opponent" (CR 702.104a).
+      const opps = opponents(s, controllerOf(s, o));
+      if (!opps.length) {
+        q.shift();
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      const n = compileCard(defOf(s, o)).tribute;
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "tribute", options: opps.map(String), labels: opps.map((x) => player(s, x).name), objectId: o.id, prompt: `tribute ${n}: choose an opponent, who may put ${n} +1/+1 counter${n === 1 ? "" : "s"} on it` };
+      return true;
+    }
+    if (c.what === "tributePay") {
+      const n = compileCard(defOf(s, o)).tribute ?? 0;
+      const to = o.tribute?.to;
+      if (to === undefined || player(s, to).lost) {
+        q.shift();
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: to, source: defOf(s, o).name, what: "tributePay", options: ["pay", "no"], labels: [`Put ${n} +1/+1 counter${n === 1 ? "" : "s"} on it`, "Don't"], objectId: o.id, prompt: `pay tribute ${n}? If you don't, its "if tribute wasn't paid" ability triggers` };
       return true;
     }
     s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id };

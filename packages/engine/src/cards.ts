@@ -1,7 +1,7 @@
-import type { CompiledCard, ManaAbility } from "./abilities";
+import type { CompiledCard, ManaAbility, TriggeredAbility } from "./abilities";
 import { characteristics, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted } from "./oracle";
-import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType } from "./types";
+import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
@@ -148,8 +148,18 @@ export const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [
  */
 export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   const c = characteristics(s, o);
-  return withGranted(c.hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, c.grantedAbilities);
+  const own = withGranted(c.hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, c.grantedAbilities);
+  // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
+  // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
+  const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
+  if (!encoded.length) return own;
+  return { ...own, triggers: [...own.triggers, ...encoded.map((e) => cipherTrigger(defOf(s, s.objects[e.id]!).name, e))] };
 }
+
+const cipherTrigger = (name: string, e: { id: ObjectId; zc: number }): TriggeredAbility => ({
+  event: "selfDealsCombatDamageToPlayer",
+  body: { targets: [], effects: [{ type: "castCipher", card: e.id, zc: e.zc }], text: `Whenever ~ deals combat damage to a player, you may copy the encoded card (${name}) and you may cast the copy without paying its mana cost.` },
+});
 
 const merged = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
 /** A card's abilities plus granted ones (`grantedAbilities` texts), after them in that order. */

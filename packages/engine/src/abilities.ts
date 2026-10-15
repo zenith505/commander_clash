@@ -23,7 +23,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -274,7 +274,9 @@ export type PlayerRef =
   /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
   | { ref: "enchantedPlayer" }
   /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
-  | { ref: "opponentsAttackingEventPlayer" };
+  | { ref: "opponentsAttackingEventPlayer" }
+  /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
+  | { ref: "giftee" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -502,6 +504,14 @@ export type StaticCondition =
   | { kind: "life"; min?: number; max?: number }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
+  /** "If you have nine or more cards in hand" (Wiretapping). */
+  | { kind: "handAtLeast"; n: number }
+  /** "If each player has no cards in hand" (Howltooth Hollow). */
+  | { kind: "handsEmpty" }
+  /** "If creatures you control have total power 10 or greater" (Mosswort Bridge). */
+  | { kind: "totalPower"; n: number }
+  /** "If a library has twenty or fewer cards in it": any player's (Shelldock Isle). */
+  | { kind: "libraryAtMost"; n: number }
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
   | { kind: "opponentPoison"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
@@ -553,6 +563,23 @@ export type Effect =
   | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec }
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
   | { type: "returnLinked"; dest: "battlefield" | "hand" }
+  /**
+   * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
+   * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
+   */
+  | { type: "hideaway"; n: number }
+  /**
+   * "You may play the exiled card without paying its mana cost": the card this permanent's hideaway exiled, as this
+   * resolves. A land only on your turn with a land play left (CR 305.2-3, rulings on Evercoat Ursine).
+   */
+  | { type: "playLinked" }
+  /** Cipher's spell ability (CR 702.99a): if this spell is a card, you may exile it encoded on a creature you control. */
+  | { type: "cipher" }
+  /**
+   * The ability cipher grants the creature a card is encoded on (CR 702.99a): "you may copy the encoded card and you may
+   * cast the copy without paying its mana cost". `card`/`zc`: that card, as it is in exile.
+   */
+  | { type: "castCipher"; card: ObjectId; zc: number }
   /**
    * "Sacrifice a creature", "each opponent sacrifices a creature of their choice", "return a land you
    * control to its owner's hand": each player picks n of their own permanents that match, in APNAP order,
@@ -889,7 +916,7 @@ export type Effect =
 export type ChoiceKind = "creatureType" | "color" | "basicLandType";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
@@ -902,6 +929,10 @@ export type SpellCondition =
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
+  /** "If this spell was cast using teamwork": its teamwork cost was paid. */
+  | { kind: "teamwork" }
+  /** "If the gift was promised" (CR 702.174b, k). */
+  | { kind: "gift" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition };
 
@@ -920,7 +951,11 @@ export interface AbilityBody {
    * mode (CR 702.172a), paid for the chosen ones.
    */
   /** `entwine`: all modes may be chosen for this additional cost (CR 702.42a). */
-  modal?: { min: number; max: number; modes: AbilityBody[]; costs?: string[]; entwine?: string };
+  /**
+   * `both`: "Choose one. If this spell was cast using teamwork, choose both instead." (both modes, then) or "If you
+   * control a commander as you cast this spell, you may choose both instead" (one or both, then).
+   */
+  modal?: { min: number; max: number; modes: AbilityBody[]; costs?: string[]; entwine?: string; both?: "teamwork" | "commander" };
 }
 
 export type TriggerEvent =
@@ -1130,6 +1165,12 @@ export interface TriggeredAbility {
   ifCasualty?: boolean;
   /** "When ~ enters, if it was bargained, ..." (CR 702.166b). */
   ifBargained?: boolean;
+  /** "When ~ enters, if tribute wasn't paid" (CR 702.104b). */
+  ifTributeUnpaid?: boolean;
+  /** Conspire's "if its conspire cost was paid" (CR 702.78a). */
+  ifConspired?: boolean;
+  /** Gift on a permanent: "When this permanent enters, if its gift cost was paid" (CR 702.174b), and "if the gift was promised". */
+  ifGift?: boolean;
   /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
   ifEcho?: boolean;
   /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
@@ -1388,6 +1429,15 @@ export type CountMod =
   | { what: "tokens"; who: "you" | "any"; op: "double" | "plusOne"; subtype?: string }
   | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
 
+/**
+ * What a gift gives the chosen opponent (CR 702.174d-i): "Gift a card" means they draw a card, "Gift a Food" that they
+ * create a Food token, and so on. `effects` do it, with that player as the "giftee".
+ */
+export interface Gift {
+  what: string;
+  effects: Effect[];
+}
+
 export interface CompiledCard {
   spell?: AbilityBody; // instants and sorceries
   triggers: TriggeredAbility[];
@@ -1634,6 +1684,16 @@ export interface CompiledCard {
   bargain?: true;
   /** "~ costs {2} less to cast if it's bargained." */
   bargainReduction?: number;
+  /** Teamwork N: as an additional cost, you may tap any number of creatures you control with total power N or more. */
+  teamwork?: number;
+  /** "You may cast this spell as though it had flash if it's cast using teamwork." */
+  teamworkFlash?: true;
+  /** Tribute N (CR 702.104a): as it enters, an opponent of its controller's choice may put N +1/+1 counters on it. */
+  tribute?: number;
+  /** Conspire (CR 702.78a): you may tap two untapped creatures you control that each share a color with it, to copy it. */
+  conspire?: true;
+  /** Gift (CR 702.174a): you may choose an opponent as you cast it; what they get if you do. */
+  gift?: Gift;
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
   /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */

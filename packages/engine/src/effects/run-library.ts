@@ -118,6 +118,35 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       return;
     }
+    case "hideaway": {
+      // CR 702.75a. The card is exiled even if the permanent has left by now (rulings on Watcher for Tomorrow), linked to
+      // the permanent as it was when the ability triggered (CR 607.2a): a new object can't play it.
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.found) {
+        const cards = p.library.slice(0, e.n);
+        if (!cards.length) return;
+        sc.looked = cards;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards, min: 1, max: 1, dig: { looked: cards, to: "into exile face down (hideaway)", rest: "on the bottom of your library in a random order" } };
+        return "paused";
+      }
+      const looked = sc.looked ?? [];
+      const found = sc.found.filter((id) => obj(s, id).zone === "library");
+      for (const id of found) {
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        if (o.zone !== "exile") continue;
+        o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id] };
+        if (ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        log(s, `${p.name} exiles a card face down (hideaway).`);
+        log(s, `You exiled ${defOf(s, o).name} face down with ${src}.`, p.id);
+      }
+      const rest = looked.filter((id) => obj(s, id).zone === "library");
+      shuffle(s, rest);
+      for (const id of rest) moveObject(s, id, "library"); // to the bottom, in a random order
+      if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+      return;
+    }
     case "scry":
     case "surveil": {
       const p = player(s, ctx.controller);

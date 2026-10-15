@@ -5,11 +5,12 @@ import type { Color, ManaType } from "../types";
 
 export const NUMBER_WORDS: Record<string, number> = {
   a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
 };
-export const NUM = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\\d+)";
+export const NUM = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|\\d+)";
 export const num = (s: string) => NUMBER_WORDS[s.toLowerCase()] ?? Number(s);
 /** Like NUM, but X too (CR 107.3). */
-export const NUMX = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|\\d+|X)";
+export const NUMX = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|\\d+|X)";
 /** Counter kinds effects can put on permanents (see CounterKind). */
 export const COUNTER = "([+-]1/[+-]1|(?!(?:additional|each|kind|that|those|the|its|more|fewer|of)\\b)[a-z]+)";
 export const counterKind = (t: string): CounterKind => t;

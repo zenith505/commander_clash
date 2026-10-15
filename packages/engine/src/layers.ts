@@ -418,6 +418,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "opponentLostLife":
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "handAtLeast":
+      return (s.players[you]?.hand.length ?? 0) >= cond.n;
+    case "handsEmpty":
+      return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);
+    case "totalPower": {
+      let n = 0;
+      for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) n += c.power;
+      return n >= cond.n;
+    }
+    case "libraryAtMost":
+      return s.players.some((p) => !p.lost && p.library.length <= cond.n);
     case "drawn": {
       const d = s.players[you]?.draws;
       return d?.turn === s.turn && d.n >= cond.n;

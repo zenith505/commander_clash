@@ -1,6 +1,6 @@
 # Roadmap
 
-15,850 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,961 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,8 +15,30 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Teamwork, Cipher,
-   Hideaway, Gift, Conspire, Tribute, Haunt, Read ahead.
+1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Haunt, Read ahead.
+   Left from the teamwork/conspire/gift/tribute/hideaway/cipher round:
+   - Targets that exist only when an additional cost was paid (CR 702.174m for gift, 702.166d for bargain): "if the
+     gift was promised, instead return/destroy/counter target ..." and "tap target creature" (Into the Flood Maw,
+     Long River's Pull, Wear Down, Peerless Recycling, Mind Spiral, Sazacap's Brew, Valley Rally, Wildfire Howl) and
+     the same for teamwork (Cruel Alliance, Too Evil to Stay Dead); "choose both instead" on modes that don't parse
+     (Atlantis Attacks); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead" (Earth's Mightiest
+     Heroes). Gift on a modal spell is reported unsupported.
+   - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Consumed by Greed, Cruelclaw's Heist, Dawn's Truce,
+     Dewdrop Cure, Longstalk Brawl, Octomancer, Parting Gust, Perch Protection, Starfall Invocation; Dark Apostle's
+     "Gift of Chaos" is a flavor word, not gift.
+   - "Choose one. If you control a commander as you cast this spell, you may choose both instead" works (Akroma's
+     Will); the other Wills fail on a mode's text (Jeska's, Kamahl's, Klauth's, Sakashima's, Szat's, the Will of the
+     clans cycle, Drown in Dreams, Nexus Mentality).
+   - Hideaway conditions: "if an opponent was dealt 7 or more damage this turn" (Spinerock Knoll), "if you attacked
+     with three or more creatures this turn" (Windbrisk Heights); Evercoat Ursine, Smuggler's Buggy, Rabble Rousing,
+     Wiretapping.
+   - Tribute: Flame-Wreathed Phoenix's granted dies trigger, Oracle of Bones' free cast from hand. Cipher: Arcane
+     Heist, Hidden Strings, Trait Doctoring, Undercity Plague. Conspire: Traitor's Roar ("it deals damage equal to its
+     power to its controller").
+   - Known simplifications: two instances of conspire or tribute on one object act once; a cipher host that "loses all
+     abilities" still casts the encoded card; who has seen a hideaway card isn't updated when its permanent changes
+     control; teamwork counts a negative power as 0 (like crew). Bots use teamwork and conspire only with creatures
+     that couldn't attack anyway, and promise a gift only when it turns on something of the spell's own.
    Left from the untap/entwine/distribute/job select/bargain round:
    - "For as long as ~ remains tapped" (23 of 45 supported): storage lands' "remove any number of storage counters"
      (Bottomless Vault, Dwarven Hold, Sand Silos and others), dynamic target filters (Vedalken Shackles' "power less

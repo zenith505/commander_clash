@@ -194,6 +194,19 @@ export interface GameObject {
   sneak?: LastKnown;
   /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
   bargained?: true;
+  /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
+  tribute?: { to: PlayerId; paid?: true };
+  /**
+   * Exiled face down by hideaway (CR 702.75a): only players who controlled `by`, the permanent that exiled it, may look
+   * at it (`seen`). Gone when it changes zones.
+   */
+  hiddenExile?: { by: ObjectId; seen: PlayerId[] };
+  /** Cards exiled encoded on this permanent with cipher (CR 702.99b-c), as they are in exile. Gone when it leaves. */
+  encoded?: { id: ObjectId; zc: number }[];
+  /** As a spell: it was cast using teamwork (its optional "tap creatures with total power N" cost was paid). */
+  teamwork?: true;
+  /** As a spell, and as the permanent it became: the opponent its gift was promised to (CR 702.174a, k). */
+  gift?: PlayerId;
   /**
    * Face down (CR 708): a 2/2 creature with no name, text, subtypes or mana cost (with ward {2} for
    * disguise). Only its controller may look at it (CR 708.5).
@@ -357,6 +370,8 @@ export interface StackItem {
   castNth?: number;
   /** For a spell: its casualty cost was paid (CR 702.153a). */
   casualty?: boolean;
+  /** For a spell: its conspire cost was paid (CR 702.78a). */
+  conspired?: boolean;
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
   /** A triggered ability (CR 603), not an activated one (CR 602). */
@@ -456,6 +471,12 @@ export interface CostChoices {
   casualty?: ObjectId;
   /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
   bargain?: ObjectId;
+  /** Teamwork N: the untapped creatures you control, with total power N or more, tapped as you cast it. */
+  teamwork?: ObjectId[];
+  /** Conspire (CR 702.78a): the two untapped creatures you control that share a color with it, tapped to copy it. */
+  conspire?: ObjectId[];
+  /** Gift (CR 702.174a): the opponent chosen to promise the gift to. */
+  gift?: PlayerId;
   /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
   assist?: PlayerId;
   /** How much of that generic mana they pay, from their mana pool: set by the game once they've chosen. */
@@ -729,6 +750,8 @@ export interface Chosen {
 export interface TriggerEventInfo {
   amount?: number;
   player?: PlayerId;
+  /** A permanent's enters trigger: the opponent its spell's gift was promised to (CR 702.174b). */
+  gift?: PlayerId;
 }
 
 export interface Resolving {
@@ -769,6 +792,8 @@ export interface Resolving {
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     found?: ObjectId[]; // the cards a library search found
+    playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
+    cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
     copies?: { of: string; left: number; targets?: TargetChoice[] }; // spell copies still to make, and the next one's targets

@@ -320,10 +320,11 @@ export function canChooseModes(s: GameState, body: AbilityBody, controller: Play
 }
 
 /** Why these modes can't be chosen, or null. */
-export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | undefined, controller: PlayerId, src?: SourceQuality): string | null {
+/** `both`: a "choose both instead" applies (see AbilityBody.modal.both). */
+export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | undefined, controller: PlayerId, src?: SourceQuality, both = false): string | null {
   if (!body.modal) return modes?.length ? "this isn't modal" : null;
   if (!modes) return "choose a mode";
-  const count = modeCountProblem(body, modes);
+  const count = modeCountProblem(body, modes, both);
   if (count) return count;
   const legal = legalModes(s, body, controller, src);
   const bad = modes.find((i) => !legal[i]);

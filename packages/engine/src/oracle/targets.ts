@@ -96,12 +96,17 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (ctx.lastCreated && /^it$/i.test(x)) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
     if (ctx.subjectIt) return { ref: "subject" };
+    // "Tap enchanted creature. ... put three stun counters on it": the creature named last.
+    if (ctx.lastAttached && /^it$/i.test(x)) return { ref: "attached" };
     if (ctx.selfIt && /^it$/i.test(x)) return { ref: "self" };
     if (ctx.selfCard && /^it$/i.test(x)) return { ref: "selfCard" };
     return ctx.subject && /^that creature$/i.test(x) ? { ref: "subject" } : null;
   }
   // "Enchanted creature", "equipped creature": what the source is attached to (not targeted).
-  if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) return { ref: "attached" };
+  if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) {
+    ctx.lastAttached = true;
+    return { ref: "attached" };
+  }
   const group = parseGroup(x);
   if (group && group.other && ctx.spell) {
     // A spell's "other creatures you control": other than the creature it targeted ("Put two +1/+1

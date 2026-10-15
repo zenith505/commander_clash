@@ -1,6 +1,6 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
-import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
-import { attackedName, attackedPlaneswalker, auraHostFor, type AuraHost, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { abilitiesOf, defOf, isPermanentCard, isType, objIsType } from "../cards";
+import { attackedName, attackedPlaneswalker, auraHostFor, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
@@ -221,6 +221,33 @@ function soulbond(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
   pairCreatures(s, self, other, pid);
 }
 
+/**
+ * Cipher (CR 702.99a): "If this spell is represented by a card, you may exile this card encoded on a creature you
+ * control." It's the spell's last instruction; a copy isn't a card (CR 707.10a), so it can't be encoded.
+ */
+function cipher(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
+  const item = s.resolving?.item;
+  const card = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  if (!card || card.zone !== "stack" || card.spellCopy) return;
+  const sc = (s.resolving!.scratch ??= {});
+  const pid = ctx.controller;
+  if (!sc.queue) {
+    const options = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+    if (!options.length) return;
+    sc.queue = [pid];
+    sc.chosen = {};
+    s.pending = { kind: "pickPermanents", player: pid, source: src, action: "encode", what: "creature", options, count: 1, min: 0 };
+    return "paused";
+  }
+  const host = s.objects[sc.chosen?.[pid]?.[0] ?? ""];
+  if (!host || host.zone !== "battlefield") return;
+  moveObject(s, card.id, "exile");
+  const moved = s.objects[card.id];
+  if (moved?.zone !== "exile") return;
+  (host.encoded ??= []).push({ id: moved.id, zc: moved.zoneChanges ?? 0 });
+  log(s, `${src} is exiled encoded on ${defOf(s, host).name} (cipher).`);
+}
+
 /** Moving permanents and cards between zones: destroy, exile, bounce, reanimate, flicker, sacrifice, ninjutsu, impulse draw. */
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
@@ -373,6 +400,42 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           : [];
       for (const o of cards) (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
       if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} flashback until end of turn.`);
+      return;
+    }
+    case "cipher":
+      return cipher(s, ctx, src);
+    case "playLinked": {
+      // The card this permanent's hideaway exiled, still the same object in exile (CR 400.7, 607.2a), played as this
+      // resolves (rulings: it can't wait). Asked once; a land goes through "you may" since it isn't cast.
+      const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
+      const linked = s.linkedExile?.[key] ?? [];
+      const card = linked.map((l) => ({ o: s.objects[l.id], zc: l.zc })).find((x) => x.o && x.o.zone === "exile" && (x.o.zoneChanges ?? 0) === x.zc)?.o;
+      const sc = (s.resolving!.scratch ??= {});
+      if (!card) return;
+      const p = player(s, ctx.controller);
+      const d = defOf(s, card);
+      if (!sc.playLinked) {
+        sc.playLinked = true;
+        if (isType(d, "Land")) {
+          // A land is played only on your turn, with a land play left (CR 305.2b, 305.3).
+          if (s.activePlayer !== p.id || p.landsPlayedThisTurn >= landsAllowed(s, p.id)) {
+            log(s, `${p.name} can't play ${d.name} now.`);
+            return;
+          }
+          s.pending = { kind: "chooseMay", player: p.id, prompt: `play ${d.name} without paying its mana cost`, source: src, card: card.id };
+          return "paused";
+        }
+        s.pending = { kind: "castFree", player: p.id, objectId: card.id, source: src };
+        if (castProblem(s, p.id, card.id) === null) return "paused";
+        s.pending = null;
+        log(s, `${d.name} can't be cast.`);
+        return;
+      }
+      if (isType(d, "Land") && sc.may) {
+        p.landsPlayedThisTurn++;
+        moveObject(s, card.id, "battlefield");
+        log(s, `${p.name} plays ${d.name} from exile.`);
+      }
       return;
     }
     case "returnLinked": {

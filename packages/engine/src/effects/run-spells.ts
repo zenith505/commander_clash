@@ -24,6 +24,10 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   o.castAlt = card.castAlt;
   o.bestowed = card.bestowed; // a copy of a bestowed Aura spell is one too (CR 702.103c)
   o.prototyped = card.prototyped; // and of a prototyped spell (CR 718.3c)
+  // Decisions about additional costs are copied too (CR 707.10): bargain, teamwork, and the gift's opponent.
+  o.bargained = card.bargained;
+  o.teamwork = card.teamwork;
+  o.gift = card.gift;
   const name = orig.description.replace(/ \(copy\)$/, "");
   const id = `s${s.nextId++}`;
   const { castNth: _, ...rest } = structuredClone(orig);
@@ -31,6 +35,16 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
   fireEvent(s, { type: "cast", stackId: id, controller, card: defOf(s, o), copy: true }); // magecraft: "cast or copy"
   fireEvent(s, { type: "targeted", stackId: id });
+}
+
+/** A copy of a card that wasn't cast ceases to exist (CR 704.5e). */
+function removeCopy(s: GameState, id: ObjectId) {
+  const o = s.objects[id];
+  if (!o) return;
+  const list = player(s, o.owner).exile;
+  const i = list.indexOf(id);
+  if (i >= 0) list.splice(i, 1);
+  delete s.objects[id];
 }
 
 /** Spells on the stack: copying, countering, cascade, "when you next cast", delayed triggers. */
@@ -57,6 +71,29 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const o = id ? s.objects[id] : undefined;
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
+      return;
+    }
+    case "castCipher": {
+      // "You may copy the encoded card and you may cast the copy without paying its mana cost" (CR 702.99a): the copy
+      // is made in exile, where the card is, then cast (CR 707.12); if it isn't cast it ceases to exist (CR 704.5e).
+      const card = s.objects[e.card];
+      if (!card || card.zone !== "exile" || (card.zoneChanges ?? 0) !== e.zc) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (sc.playLinked) {
+        if (sc.cipherCopy && s.objects[sc.cipherCopy]?.zone === "exile") removeCopy(s, sc.cipherCopy);
+        return;
+      }
+      sc.playLinked = true;
+      const copy = newObject(s, defOf(s, card), p.id, "exile");
+      copy.spellCopy = true;
+      p.exile.push(copy.id);
+      sc.cipherCopy = copy.id;
+      s.pending = { kind: "castFree", player: p.id, objectId: copy.id, source: src };
+      if (castProblem(s, p.id, copy.id) === null) return "paused";
+      s.pending = null;
+      removeCopy(s, copy.id);
+      log(s, `The copy of ${defOf(s, card).name} can't be cast.`);
       return;
     }
     case "copySpell": {

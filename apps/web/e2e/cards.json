@@ -1,5 +1,31 @@
 [
  {
+  "oracleId": "fd949f82-fc10-4e37-8aa9-6c7569fe3c55",
+  "name": "Akroma's Will",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one. If you control a commander as you cast this spell, you may choose both instead.\n• Creatures you control gain flying, vigilance, and double strike until end of turn.\n• Creatures you control gain lifelink, indestructible, and protection from each color until end of turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5acc8b39-3c3e-4012-8cfd-ac3c2c4ca982",
   "name": "Arc Lightning",
   "manaCost": "{2}{R}",
@@ -59,6 +85,70 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a465f8a9-d5aa-4dfa-b674-7aa1798cb0bd",
+  "name": "Beast Mode",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Teamwork 1 (As an additional cost to cast this spell, you may tap any number of creatures you control with total power 1 or more.)\nTarget creature gets +2/+2 and gains trample until end of turn. Also put a +1/+1 counter on that creature if this spell was cast using teamwork.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Teamwork"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2e5b8973-4f6e-4abe-bbbe-81fdca784997",
+  "name": "Blooming Blast",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Gift a Treasure (You may promise an opponent a gift as you cast this spell. If you do, they create a Treasure token before its other effects. It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nBlooming Blast deals 2 damage to target creature. If the gift was promised, Blooming Blast also deals 3 damage to that creature's controller.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Gift",
+   "Treasure"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "36cd2364-d113-47d1-b2c4-b088d9eb88dd",
   "name": "Brainstorm",
   "manaCost": "{U}",
@@ -80,6 +170,60 @@
   "commanderLegal": "legal",
   "set": "tle",
   "releasedAt": "2025-11-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "566b4dcc-b7d7-4443-b2d0-954f1fc33a11",
+  "name": "Burn Trail",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Burn Trail deals 3 damage to any target.\nConspire (As you cast this spell, you may tap two untapped creatures you control that share a color with it. When you do, copy it and you may choose a new target for the copy.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Conspire"
+  ],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7d00fb28-ea6c-49a9-b4af-ffb38860a9a7",
+  "name": "Cancel",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Counter target spell.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -383,6 +527,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f1072af9-9e6f-45ce-8c4b-8e678e7da8ce",
+  "name": "Fanatic of Xenagos",
+  "manaCost": "{1}{R}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Centaur Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Centaur",
+   "Warrior"
+  ],
+  "oracleText": "Trample\nTribute 1 (As this creature enters, an opponent of your choice may put a +1/+1 counter on it.)\nWhen this creature enters, if tribute wasn't paid, it gets +1/+1 and gains haste until end of turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Trample",
+   "Tribute"
+  ],
+  "commanderLegal": "legal",
+  "set": "bng",
+  "releasedAt": "2014-02-07",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cf14d4e5-5965-45ad-97f7-26facf2884b5",
   "name": "Fertile Ground",
   "manaCost": "{1}{G}",
@@ -537,6 +717,66 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0efe1357-bfbb-42c0-9cc9-6a919d686c66",
+  "name": "Go Nuts!",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Teamwork 3 (As an additional cost to cast this spell, you may tap any number of creatures you control with total power 3 or more.)\nChoose one. If this spell was cast using teamwork, choose both instead.\n• Put a +1/+1 counter on target creature.\n• Target creature you control fights target creature an opponent controls.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Fight",
+   "Teamwork"
+  ],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "50608184-90d3-43d2-a221-deb186c78323",
+  "name": "Goblin Piker",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Goblin Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warrior"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "14c8f55d-d177-4c25-a931-ebeb9e6062a0",
   "name": "Grizzly Bears",
   "manaCost": "{1}{G}",
@@ -683,6 +923,34 @@
   "set": "lgn",
   "releasedAt": "2003-02-03",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "649d983a-e861-4893-8ae8-fb0a22cfad0a",
+  "name": "Last Thoughts",
+  "manaCost": "{3}{U}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw a card.\nCipher (Then you may exile this spell card encoded on a creature you control. Whenever that creature deals combat damage to a player, its controller may cast a copy of the encoded card without paying its mana cost.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cipher"
+  ],
+  "commanderLegal": "legal",
+  "set": "gtc",
+  "releasedAt": "2013-02-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -903,6 +1171,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7cb9e29f-835f-4155-a2a5-4b778866c773",
+  "name": "Mosswort Bridge",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "Hideaway 4 (When this land enters, look at the top four cards of your library, exile one face down, then put the rest on the bottom in a random order.)\nThis land enters tapped.\n{T}: Add {G}.\n{G}, {T}: You may play the exiled card without paying its mana cost if creatures you control have total power 10 or greater.",
+  "colors": [],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Hideaway"
+  ],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a3fb7228-e76b-4e96-a40e-20b5fed75685",
   "name": "Mountain",
   "manaCost": "",
@@ -1022,6 +1319,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "30997b43-fc13-41d3-8064-1ccc2cb6fd2b",
+  "name": "Raging Goblin",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goblin Berserker",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Berserker"
+  ],
+  "oracleText": "Haste (This creature can attack and {T} as soon as it comes under your control.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "074e467e-f574-4b44-b5a3-798b592a5a87",
   "name": "Rain of Rust",
   "manaCost": "{3}{R}{R}",
@@ -1077,6 +1407,35 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f748b2fb-6c2a-400a-8e96-fa4e4a1dfe80",
+  "name": "Shelldock Isle",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "Hideaway 4 (When this land enters, look at the top four cards of your library, exile one face down, then put the rest on the bottom in a random order.)\nThis land enters tapped.\n{T}: Add {U}.\n{U}, {T}: You may play the exiled card without paying its mana cost if a library has twenty or fewer cards in it.",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Hideaway"
+  ],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-11-29",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

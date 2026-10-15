@@ -17,7 +17,7 @@ import { parseCount } from "./counts";
 import { parseGroup, parseTargetPhrase } from "./targets";
 import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
-import { parseCountMod, parseCopyExcept } from "./tokens";
+import { parseCountMod, parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
 import { parseSearchFilter } from "./search";
 import { addStriation, simpleKeywords, striations } from "./striations";
 
@@ -234,7 +234,20 @@ export function compile(d: CardDef): CompiledCard {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
-  const all = joinModes(normalizeSelf(d).split("\n"));
+  // "Choose one. If this spell was cast using teamwork, choose both instead." and "Choose one. If you control a commander
+  // as you cast this spell, you may choose both instead.": a "Choose one —" list whose count can change as it's cast.
+  let both: "teamwork" | "commander" | undefined;
+  let cipher = false;
+  const all = joinModes(
+    normalizeSelf(d)
+      .split("\n")
+      .map((l) => {
+        const m = /^Choose one\. If (~ was cast using teamwork, choose|you control a commander as you cast ~, you may choose) both instead\.$/.exec(l.trim());
+        if (!m) return l;
+        both = m[1]!.startsWith("~") ? "teamwork" : "commander";
+        return "Choose one —";
+      }),
+  );
   // Leveler and station cards (CR 711, 721): the striations' abilities are compiled after the rest, each with its condition.
   const striated = striations(d, all);
   if (striated === "fail") out.unsupported.push("(a striated text box that doesn't read as levels or station symbols)");
@@ -738,6 +751,54 @@ export function compile(d: CardDef): CompiledCard {
       out.skipDrawStep = true;
       continue;
     }
+    // Teamwork N: "As an additional cost to cast this spell, you may tap any number of creatures you control with total
+    // power N or more." (The keyword's reminder text is all the rules there are for it.)
+    const teamwork = /^Teamwork (\d+)$/.exec(line);
+    if (teamwork && !d.types.includes("Land") && out.teamwork === undefined) {
+      out.teamwork = Number(teamwork[1]);
+      continue;
+    }
+    if (line === "You may cast ~ as though it had flash if it's cast using teamwork." && out.teamwork !== undefined) {
+      out.teamworkFlash = true;
+      continue;
+    }
+    // Conspire (CR 702.78a): an optional additional cost, and "When you cast this spell, if its conspire cost was paid,
+    // copy it. If the spell has any targets, you may choose new targets for the copy." Two instances (702.78b) aren't modeled.
+    if (line === "Conspire" && isSpell && !out.conspire) {
+      out.conspire = true;
+      out.triggers.push({ event: "selfCast", ifConspired: true, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Conspire: copy ~. You may choose new targets for the copy." } });
+      continue;
+    }
+    // Gift (CR 702.174): "As an additional cost to cast this spell, you may choose an opponent", and what they get if you
+    // do: first thing as an instant or sorcery resolves (702.174j), or "when this permanent enters, if its gift cost was
+    // paid" (702.174b).
+    const gift = /^Gift (a card|a Food|a tapped Fish|an extra turn|a Treasure|an Octopus)$/.exec(line);
+    if (gift && !out.gift) {
+      out.gift = giftOf(gift[1]!);
+      if (!isSpell) out.triggers.push({ event: "selfEnters", ifGift: true, body: { targets: [], effects: out.gift.effects, text: `Gift ${gift[1]}: the chosen player ${giftText(gift[1]!)}.` } });
+      continue;
+    }
+    // Hideaway N (CR 702.75a): "When this permanent enters, look at the top N cards of your library. Exile one of them
+    // face down and put the rest on the bottom of your library in a random order." "Hideaway 3, hideaway 3": each one.
+    const hideaway = /^Hideaway (\d+)((?:, hideaway \d+)*)$/.exec(line);
+    if (hideaway) {
+      for (const n of [hideaway[1]!, ...[...hideaway[2]!.matchAll(/\d+/g)].map((x) => x[0])].map(Number))
+        out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "hideaway", n }], text: `Hideaway ${n}: look at the top ${n} cards of your library, exile one of them face down, then put the rest on the bottom of your library in a random order.` } });
+      continue;
+    }
+    // Tribute N (CR 702.104a): "As this creature enters, choose an opponent. That player may put an additional N +1/+1
+    // counters on it as it enters." Each instance would work separately: one is modeled.
+    const tribute = /^Tribute (\d+)$/.exec(line);
+    if (tribute && d.types.includes("Creature") && out.tribute === undefined) {
+      out.tribute = Number(tribute[1]);
+      out.entersOptions = [...(out.entersOptions ?? []), "tribute"];
+      continue;
+    }
+    // Cipher (CR 702.99a): the spell's last instruction, "you may exile this card encoded on a creature you control".
+    if (line === "Cipher" && isSpell) {
+      cipher = true;
+      continue;
+    }
     if (line === "Bargain") {
       out.bargain = true; // CR 702.166a
       continue;
@@ -945,6 +1006,30 @@ export function compile(d: CardDef): CompiledCard {
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
   }
+  if (both) {
+    // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
+    const modal = out.spell?.modal;
+    if (modal && modal.min === 1 && modal.max === 1 && modal.modes.length === 2 && (both === "commander" || out.teamwork !== undefined)) modal.both = both;
+    else if (out.spell) {
+      delete out.spell;
+      out.unsupported.push("Choose one. If ... choose both instead.");
+    }
+  }
+  if (cipher) {
+    if (out.spell && !out.spell.modal) out.spell = { ...out.spell, effects: [...out.spell.effects, { type: "cipher" }] };
+    else if (out.spell) {
+      delete out.spell;
+      out.unsupported.push("Cipher (on a modal spell)");
+    }
+  }
+  // A spell's gift happens before any of its other instructions (CR 702.174j).
+  if (out.gift && isSpell) {
+    if (out.spell && !out.spell.modal) out.spell = { ...out.spell, effects: [{ type: "if", cond: { kind: "gift" }, effects: out.gift.effects }, ...out.spell.effects] };
+    else if (out.spell) {
+      delete out.spell;
+      out.unsupported.push("Gift (on a modal spell)");
+    }
+  }
   if (entwine) {
     const modal = out.spell?.modal;
     if (modal && !modal.costs && modal.max < modal.modes.length) modal.entwine = entwine.cost;
@@ -1002,12 +1087,13 @@ function linkExile(out: CompiledCard) {
   if (!returns.length) return;
   const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]
     .flatMap((b) => allEffects(b.effects))
-    .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile")) && !e.until);
+    .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway") && !("until" in e && e.until));
   if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     return;
   }
-  exiles[0]!.linked = true;
+  const ex = exiles[0]!;
+  if (ex.type !== "hideaway") ex.linked = true; // hideaway's exile is always linked
 }
 
 /**
@@ -1081,6 +1167,25 @@ function checkX(d: CardDef, out: CompiledCard) {
     delete out.costLess;
   }
 }
+
+/** What a gift gives (CR 702.174d-i), done for the opponent it was promised to. */
+function giftOf(what: string): NonNullable<CompiledCard["gift"]> {
+  const who = { ref: "giftee" } as const;
+  const effects: Effect[] =
+    what === "a card"
+      ? [{ type: "draw", who, n: 1 }]
+      : what === "an extra turn"
+        ? [{ type: "extraTurn", who, n: 1 }]
+        : what === "a tapped Fish"
+          ? [{ type: "createToken", who, n: 1, tapped: true, token: { name: "Fish", power: 1, toughness: 1, colors: ["U"], types: ["Creature"], subtypes: ["Fish"], keywords: [] } }]
+          : what === "an Octopus"
+            ? [{ type: "createToken", who, n: 1, token: { name: "Octopus", power: 8, toughness: 8, colors: ["U"], types: ["Creature"], subtypes: ["Octopus"], keywords: [] } }]
+            : [{ type: "createToken", who, n: 1, token: PREDEFINED_TOKENS[what === "a Food" ? "Food" : "Treasure"]! }];
+  return { what, effects };
+}
+
+const giftText = (what: string) =>
+  what === "a card" ? "draws a card" : what === "an extra turn" ? "takes an extra turn after this one" : what === "a tapped Fish" ? "creates a tapped 1/1 blue Fish creature token" : what === "an Octopus" ? "creates an 8/8 blue Octopus creature token" : `creates ${what} token`;
 
 /**
  * A modal ability is a "choose ... —" line followed by one line per mode, each starting

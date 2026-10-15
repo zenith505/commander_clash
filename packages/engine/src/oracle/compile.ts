@@ -695,6 +695,13 @@ export function compile(d: CardDef): CompiledCard {
       out.noMaxHandSize = true;
       continue;
     }
+    // Pilots: "~ saddles Mounts and crews Vehicles as though its power were 2 greater", "... using its toughness rather
+    // than its power" (CR 702.122a, 702.171a).
+    const crewsAs = /^~ (saddles Mounts and )?crews Vehicles (?:as though its power were (\d+) greater|using its toughness rather than its power)\.$/.exec(line);
+    if (crewsAs && !out.crewsAs) {
+      out.crewsAs = { ...(crewsAs[2] ? { n: Number(crewsAs[2]) } : { toughness: true as const }), saddles: !!crewsAs[1] };
+      continue;
+    }
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
       const spec = parseTargetPhrase(`${flashFor[1]}spell`);
@@ -866,14 +873,17 @@ export function compile(d: CardDef): CompiledCard {
     // "When ~ enters or dies, ...": one ability that triggers on either event, which works like two with the same
     // effect (CR 702.29c). The text is read for each event ("it" after it died is the card).
     const twice =
-      /^When you cast or cycle ~, (.+)$/.exec(line) ?? /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ?? /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield), (.+)$/.exec(line);
+      /^When you cast or cycle ~, (.+)$/.exec(line) ??
+      /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield), (.+)$/.exec(line) ??
+      /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast/.test(line)
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)
           ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]
-          : [`When ~ enters, ${effect}`, `${twice[1] === "attacks" ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
+          : [`When ~ enters, ${effect}`, `${/^attacks/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);
       else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));

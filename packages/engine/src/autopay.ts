@@ -305,20 +305,21 @@ export function autoConvoke(s: GameState, pid: PlayerId, cost: ParsedCost, tax: 
  * Creatures to crew a Vehicle with (CR 702.122a): the fewest, weakest ones that reach the crew
  * number, preferring creatures that couldn't attack anyway. Null if they can't.
  */
-export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: number): ObjectId[] | null {
+export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: number, saddle = false): ObjectId[] | null {
+  const counts = (c: GameObject) => crewPower(s, c, saddle);
   // What tapping a creature costs us: its power, unless it couldn't attack this turn anyway.
-  const lost = (c: GameObject) => (isSummoningSick(s, c) ? 0 : crewPower(s, c));
+  const lost = (c: GameObject) => (isSummoningSick(s, c) ? 0 : Math.max(0, power(s, c)));
   const pool = crewCandidates(s, pid, vehicleId)
-    .filter((c) => crewPower(s, c) > 0)
-    .sort((a, b) => lost(a) - lost(b) || crewPower(s, b) - crewPower(s, a));
+    .filter((c) => counts(c) > 0)
+    .sort((a, b) => lost(a) - lost(b) || counts(b) - counts(a));
   // Either the cheapest single creature that's enough, or the cheapest ones added up.
-  const single = [...pool].filter((c) => crewPower(s, c) >= n).sort((a, b) => lost(a) - lost(b))[0];
+  const single = [...pool].filter((c) => counts(c) >= n).sort((a, b) => lost(a) - lost(b))[0];
   const several: GameObject[] = [];
   let total = 0;
   for (const c of pool) {
     if (total >= n) break;
     several.push(c);
-    total += crewPower(s, c);
+    total += counts(c);
   }
   const options = [...(single ? [[single]] : []), ...(total >= n ? [several] : [])];
   const cost = (cs: GameObject[]) => cs.reduce((x, c) => x + lost(c), 0);

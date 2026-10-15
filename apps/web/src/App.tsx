@@ -213,7 +213,7 @@ function evenDivision(specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice
 type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
 
 /** Picking creatures to tap: to crew a Vehicle (CR 702.122a) or to convoke a spell (CR 702.51a). */
-type TapPick = { kind: "crew"; objectId: string; index: number; n: number; chosen: string[] } | { kind: "convoke"; objectId: string; chosen: string[] };
+type TapPick = { kind: "crew"; objectId: string; index: number; n: number; chosen: string[]; saddle?: boolean } | { kind: "convoke"; objectId: string; chosen: string[] };
 
 /**
  * A spell being cast, built up step by step in the order of CR 601.2b-h: modes, kicker, X,
@@ -432,7 +432,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const ab = abilitiesOf(s, s.objects[objectId]!).activated[index]!;
     const label = `${cardOf(s, objectId).name}: ${ab.text}`;
     // Crew: pick the creatures to tap, starting from a suggestion.
-    if (ab.crew !== undefined) return setTapPick({ kind: "crew", objectId, index, n: ab.crew, chosen: autoCrew(s, HUMAN, objectId, ab.crew) ?? [] });
+    if (ab.crew !== undefined) return setTapPick({ kind: "crew", objectId, index, n: ab.crew, chosen: autoCrew(s, HUMAN, objectId, ab.crew, ab.saddle) ?? [], ...(ab.saddle ? { saddle: true } : {}) });
     if (ab.body.modal && !modes) return setModePick({ mode: "activate", objectId, index, label, body: ab.body });
     // X is announced after modes and before targets (CR 602.2b, 601.2b-c).
     if (x === undefined && parseManaCost(ab.manaCost).hasX) {
@@ -1384,14 +1384,18 @@ function CardChoice({
 function TapPickBar({ s, pick, onDone, onCancel }: { s: GameState; pick: TapPick; onDone: () => void; onCancel: () => void }) {
   const name = cardOf(s, pick.objectId).name;
   if (pick.kind === "crew") {
-    const total = pick.chosen.reduce((n, id) => n + crewPower(s, s.objects[id]!), 0);
+    const total = pick.chosen.reduce((n, id) => n + crewPower(s, s.objects[id]!, pick.saddle), 0);
+    const verb = pick.saddle ? "Saddle" : "Crew";
     return (
       <div className="targeting">
         <span>
-          <strong>Crew {name}:</strong> tap creatures with total power {pick.n} (now {total})
+          <strong>
+            {verb} {name}:
+          </strong>{" "}
+          tap creatures with total power {pick.n} (now {total})
         </span>
         <button disabled={total < pick.n} onClick={onDone}>
-          Crew
+          {verb}
         </button>
         <button className="ghost" onClick={onCancel}>
           Cancel
@@ -1567,6 +1571,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {paired && (
           <span className="chip other" title={`Paired with ${cardOf(s, paired.id).name} (soulbond).`}>
             Paired
+          </span>
+        )}
+        {o.saddled && (
+          <span className="chip temp" title="Saddled until end of turn.">
+            Saddled
           </span>
         )}
         {copying && (
@@ -3041,7 +3050,7 @@ function GameLog({ s }: { s: GameState }) {
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
   if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand|next turn)\b/g, " your $1");
-  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses|copies)\b/g, (_, pre: string, v: string) =>
+  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|saddles|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses|copies)\b/g, (_, pre: string, v: string) =>
     `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v === "amasses" ? "amass" : v === "copies" ? "copy" : v.slice(0, -1)}`,
   );
 }

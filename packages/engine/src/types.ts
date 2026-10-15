@@ -106,6 +106,8 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
+  saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
   escaped?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */

@@ -799,6 +799,19 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         },
         text: `Crew ${m[1]}`,
       });
+    } else if ((m = /^saddle (\d+)$/i.exec(p))) {
+      // CR 702.171a: "Tap any number of other untapped creatures you control with total power N or greater: This
+      // permanent becomes saddled until end of turn. Activate only as a sorcery."
+      out.activated.push({
+        manaCost: "",
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        crew: Number(m[1]),
+        saddle: true,
+        body: { targets: [], effects: [{ type: "becomeSaddled", what: { ref: "self" } }], text: "~ becomes saddled until end of turn." },
+        text: `Saddle ${m[1]}`,
+      });
     } else return null;
   }
   return out;

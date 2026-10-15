@@ -623,6 +623,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
+  o.saddled = undefined; // CR 702.171b
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
@@ -1399,7 +1400,9 @@ function finishCleanup(s: GameState) {
     o.regenShields = undefined; // "this turn" effects end
     o.preventNext = undefined;
     o.redirectNext = undefined;
+    o.saddled = undefined; // "until end of turn" (CR 702.171b)
   }
+  invalidateCharacteristics(s);
   for (const p of s.players) {
     p.preventNext = undefined;
     p.redirectNext = undefined;
@@ -2524,7 +2527,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
-    const cp = crewProblem(s, pid, o, ab.crew, tapCreatures);
+    const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle);
     if (cp) return cp;
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
@@ -2581,23 +2584,31 @@ export function crewCandidates(s: GameState, pid: PlayerId, vehicleId: ObjectId)
   return creaturesOf(s, pid).filter((c) => c.id !== vehicleId && !c.tapped);
 }
 
-/** A creature's contribution to "total power N or greater": negative power adds nothing. */
-export const crewPower = (s: GameState, c: GameObject) => Math.max(0, power(s, c));
+/**
+ * A creature's contribution to "total power N or greater": negative power adds nothing. "Crews Vehicles as though its
+ * power were 2 greater", "using its toughness": its own static abilities say otherwise; for saddling only if they say so.
+ */
+export function crewPower(s: GameState, c: GameObject, saddle = false): number {
+  const as = abilitiesOf(s, c).crewsAs;
+  if (!as || (saddle && !as.saddles)) return Math.max(0, power(s, c));
+  return Math.max(0, (as.toughness ? toughness(s, c) : power(s, c)) + (as.n ?? 0));
+}
 
 /**
  * Crew N's cost (CR 702.122a): tap any number of other untapped creatures you control with total
  * power N or greater. Without a choice, whether some choice would do.
  */
-function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[]): string | null {
+function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[], saddle = false): string | null {
+  const what = saddle ? "saddle" : "crew";
   if (chosen === undefined) {
-    const total = crewCandidates(s, pid, vehicle.id).reduce((x, c) => x + crewPower(s, c), 0);
-    return total >= n ? null : `not enough untapped creatures to crew ${n}`;
+    const total = crewCandidates(s, pid, vehicle.id).reduce((x, c) => x + crewPower(s, c, saddle), 0);
+    return total >= n ? null : `not enough untapped creatures to ${what} ${n}`;
   }
-  if (chosen.includes(vehicle.id)) return "a Vehicle can't crew itself";
-  const problem = tapCreaturesProblem(s, pid, chosen, "crew");
+  if (chosen.includes(vehicle.id)) return saddle ? "a Mount can't saddle itself" : "a Vehicle can't crew itself";
+  const problem = tapCreaturesProblem(s, pid, chosen, what);
   if (problem) return problem;
-  const total = chosen.reduce((x, id) => x + crewPower(s, obj(s, id)), 0);
-  return total >= n ? null : `those creatures have total power ${total}; crew ${n} needs ${n} or more`;
+  const total = chosen.reduce((x, id) => x + crewPower(s, obj(s, id), saddle), 0);
+  return total >= n ? null : `those creatures have total power ${total}; ${what} ${n} needs ${n} or more`;
 }
 
 function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices) {
@@ -2605,7 +2616,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
-  if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose creatures to crew with");
+  if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   if (ab?.costs?.some((c) => c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
@@ -2664,7 +2675,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   });
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
-  else if (ab.crew !== undefined) log(s, `${p.name} crews ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
+  else if (ab.crew !== undefined) log(s, `${p.name} ${ab.saddle ? "saddles" : "crews"} ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
   else {
     // Say which ability: its cost and, for a modal one, the chosen modes.
     const cost = ab.text.split(":")[0]!;

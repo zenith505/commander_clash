@@ -367,6 +367,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":
+    case "becomeSaddled":
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":

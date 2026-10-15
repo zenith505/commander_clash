@@ -62,6 +62,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         else untapPermanent(s, o);
       }
       return;
+    case "becomeSaddled":
+      // Only permanents can become saddled (CR 702.171b).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield") continue;
+        o.saddled = true;
+        invalidateCharacteristics(s); // "as long as ~ is saddled"
+        log(s, `${defOf(s, o).name} becomes saddled.`);
+      }
+      return;
     case "phaseOut":
       // Only what's on the battlefield: "it" may have left (CR 702.26b).
       phaseOut(s, objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id));

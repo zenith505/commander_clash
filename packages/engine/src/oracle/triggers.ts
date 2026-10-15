@@ -16,6 +16,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
   [/^Whenever ~ attacks a player, (.+)$/, "selfAttacks"],
   [/^Whenever ~ attacks for the first time each turn, (.+)$/, "selfAttacks"],
+  // "Attacks while saddled": it has to be saddled as it attacks (CR 702.171b).
+  [/^Whenever ~ attacks while saddled, (.+)$/, "selfAttacks"],
   [/^Whenever ~ enlists a creature, (.+)$/, "selfEnlists"], // CR 702.154c
   [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
   // The beginning of combat step (CR 507) and end of combat step (CR 511).
@@ -628,7 +630,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
-      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}) } : ("fail" as const);
+      const saddled = /^Whenever ~ attacks while saddled, /.test(line);
+      return body
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        : ("fail" as const);
     }
   }
   return "fail" as const;

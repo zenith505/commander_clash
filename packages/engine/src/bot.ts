@@ -270,9 +270,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const dig = chooseUnearth(s, pid);
       if (dig) return dig;
     }
-    // Crew Vehicles before combat.
+    // Crew Vehicles and saddle Mounts before combat.
     if (s.step === "main1") {
-      const crew = chooseCrew(s, pid);
+      const crew = chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
@@ -1558,7 +1558,7 @@ function chooseCrew(s: GameState, pid: PlayerId): Action[] | null {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid || o.tapped || objIsType(s, o, "Creature") || isSummoningSick(s, o)) continue;
     const abilities = abilitiesOf(s, o).activated;
-    const i = abilities.findIndex((ab) => ab.crew !== undefined);
+    const i = abilities.findIndex((ab) => ab.crew !== undefined && !ab.saddle);
     if (i < 0) continue;
     const crew = autoCrew(s, pid, id, abilities[i]!.crew!);
     if (!crew) continue;
@@ -1566,6 +1566,27 @@ function chooseCrew(s: GameState, pid: PlayerId): Action[] | null {
     const givenUp = crew.reduce((n, c) => n + (isSummoningSick(s, obj(s, c)) ? 0 : power(s, obj(s, c))), 0);
     if (givenUp >= vehiclePower) continue;
     const plan = planActivate(s, pid, id, i, undefined, undefined, crew);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Saddle a Mount (CR 702.171a) that could attack this turn and has something that cares ("whenever ~ attacks while
+ * saddled"), with creatures that couldn't attack anyway or that give up less power than the Mount has.
+ */
+function chooseSaddle(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || o.tapped || o.saddled || !objIsType(s, o, "Creature") || isSummoningSick(s, o)) continue;
+    const abilities = abilitiesOf(s, o);
+    const i = abilities.activated.findIndex((ab) => ab.saddle);
+    if (i < 0 || !abilities.triggers.some((t) => t.activeIf?.kind === "self" && t.activeIf.is === "saddled")) continue;
+    const riders = autoCrew(s, pid, id, abilities.activated[i]!.crew!, true);
+    if (!riders) continue;
+    const givenUp = riders.reduce((n, c) => n + (isSummoningSick(s, obj(s, c)) ? 0 : Math.max(0, power(s, obj(s, c)))), 0);
+    if (givenUp > 0 && givenUp >= power(s, o)) continue;
+    const plan = planActivate(s, pid, id, i, undefined, undefined, riders);
     if (plan) return plan;
   }
   return null;

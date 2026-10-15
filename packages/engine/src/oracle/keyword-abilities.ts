@@ -799,6 +799,41 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         },
         text: `Crew ${m[1]}`,
       });
+    } else if ((m = /^level up ((?:\{[0-9WUBRGC]+\})+)$/i.exec(p))) {
+      // CR 702.87a: "[Cost]: Put a level counter on this permanent. Activate only as a sorcery."
+      out.activated.push({
+        manaCost: m[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "level", n: 1 }], text: "Put a level counter on ~." },
+        text: `Level up ${m[1]}`,
+      });
+    } else if (/^station$/i.test(p)) {
+      // CR 702.184a: "Tap another untapped creature you control: Put a number of charge counters on this permanent equal
+      // to the tapped creature's power. Activate only as a sorcery." X is that power as the ability resolves (rulings).
+      out.activated.push({
+        manaCost: "",
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        station: true,
+        body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "charge", n: { count: { kind: "stationPower" } } }], text: "Put charge counters equal to the tapped creature's power on ~." },
+        text: "Station",
+      });
+    } else if ((m = /^saddle (\d+)$/i.exec(p))) {
+      // CR 702.171a: "Tap any number of other untapped creatures you control with total power N or greater: This
+      // permanent becomes saddled until end of turn. Activate only as a sorcery."
+      out.activated.push({
+        manaCost: "",
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        crew: Number(m[1]),
+        saddle: true,
+        body: { targets: [], effects: [{ type: "becomeSaddled", what: { ref: "self" } }], text: "~ becomes saddled until end of turn." },
+        text: `Saddle ${m[1]}`,
+      });
     } else return null;
   }
   return out;

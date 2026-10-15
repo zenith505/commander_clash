@@ -19,6 +19,7 @@ import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept } from "./tokens";
 import { parseSearchFilter } from "./search";
+import { addStriation, simpleKeywords, striations } from "./striations";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -123,7 +124,7 @@ const RING_TRIGGERS: TriggeredAbility[] = [
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege", "Spacecraft"];
+const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
@@ -196,7 +197,7 @@ export function normalizeSelf(d: CardDef): string {
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Aura|planeswalker)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker)\b/g, "~");
   return t;
 }
 
@@ -233,11 +234,29 @@ export function compile(d: CardDef): CompiledCard {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
-  const lines = joinModes(normalizeSelf(d).split("\n"));
+  const all = joinModes(normalizeSelf(d).split("\n"));
+  // Leveler and station cards (CR 711, 721): the striations' abilities are compiled after the rest, each with its condition.
+  const striated = striations(d, all);
+  if (striated === "fail") out.unsupported.push("(a striated text box that doesn't read as levels or station symbols)");
+  const lines = striated && striated !== "fail" ? striated.base : all;
+  // Spree (CR 702.172a): "Choose one or more modes. As an additional cost to cast this spell, pay the costs associated
+  // with those modes." Each mode is a "+ [cost] — [effect]" line.
+  let spree: { costs: string[]; texts: string[]; lines: string[] } | undefined;
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own.
     const line = raw.trim().replace(/^Converge — /, "");
     if (!line) continue;
+    if (line === "Spree" && isSpell && !spree) {
+      spree = { costs: [], texts: [], lines: [raw] };
+      continue;
+    }
+    const spreeMode = spree && /^\+ ((?:\{[0-9WUBRGC]+\})+) — (.+)$/.exec(line);
+    if (spree && spreeMode) {
+      spree.costs.push(spreeMode[1]!);
+      spree.texts.push(spreeMode[2]!);
+      spree.lines.push(raw);
+      continue;
+    }
     // Deck construction, not play: the deck checker reads it (deckLimit).
     if (/^A deck can have (?:any number of|up to \w+) cards named ~\.$/.test(line)) continue;
     // Also deck construction: who can be a commander (CR 903.3, deck.ts canBeCommander).
@@ -613,16 +632,16 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Each player can't cast more than one spell each turn", "... more than one noncreature spell", Ethersworn Canonist's
     // "Each player who has cast a nonartifact spell this turn can't cast additional nonartifact spells" (the same rule).
-    const limit = /^(Each player|You) can't cast more than one (?:(.+?) )?spell each turn\.$/.exec(line) ?? /^(Each player) who has cast an? (.+?) spell this turn can't cast additional \2 spells\.$/.exec(line);
+    const limit = /^(Each player|You|Enchanted player) can't cast more than one (?:(.+?) )?spell each turn\.$/.exec(line) ?? /^(Each player) who has cast an? (.+?) spell this turn can't cast additional \2 spells\.$/.exec(line);
     if (limit) {
       const filter = limit[2] ? parseTargetPhrase(`${limit[2]} spell`) : undefined;
       if (filter === null || (filter && filter.kind !== "spell")) out.unsupported.push(raw);
-      else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
+      else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : limit[1] === "Enchanted player" ? "enchanted" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
       continue;
     }
-    const noGain = /^(Players|Your opponents) can't gain life\.$/.exec(line);
+    const noGain = /^(Players|Your opponents|Enchanted player) can't gain life\.$/.exec(line);
     if (noGain) {
-      out.cantGainLife = noGain[1] === "Players" ? "all" : "opponents";
+      out.cantGainLife = noGain[1] === "Players" ? "all" : noGain[1] === "Enchanted player" ? "enchanted" : "opponents";
       continue;
     }
     if (line === "Damage can't be prevented.") {
@@ -679,6 +698,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
+      continue;
+    }
+    // Pilots: "~ saddles Mounts and crews Vehicles as though its power were 2 greater", "... using its toughness rather
+    // than its power" (CR 702.122a, 702.171a).
+    const crewsAs = /^~ (saddles Mounts and )?crews Vehicles (?:as though its power were (\d+) greater|using its toughness rather than its power)\.$/.exec(line);
+    if (crewsAs && !out.crewsAs) {
+      out.crewsAs = { ...(crewsAs[2] ? { n: Number(crewsAs[2]) } : { toughness: true as const }), saddles: !!crewsAs[1] };
       continue;
     }
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
@@ -758,6 +784,8 @@ export function compile(d: CardDef): CompiledCard {
     if (enchant) {
       const spec = parseTargetPhrase(enchant[1]!);
       if (spec?.kind === "object" && !out.enchant) out.enchant = { ...spec, text: `${spec.text.replace(/^target /, "")} to enchant` };
+      // "Enchant player", "Enchant opponent" (CR 702.5d): the Aura spell targets a player, and it's attached to one.
+      else if (/^(player|opponent)$/.test(enchant[1]!) && !out.enchant) out.enchant = { kind: "player", ...(enchant[1] === "opponent" ? { opponent: true } : {}), text: `${enchant[1]} to enchant` };
       else out.unsupported.push(raw);
       continue;
     }
@@ -852,14 +880,17 @@ export function compile(d: CardDef): CompiledCard {
     // "When ~ enters or dies, ...": one ability that triggers on either event, which works like two with the same
     // effect (CR 702.29c). The text is read for each event ("it" after it died is the card).
     const twice =
-      /^When you cast or cycle ~, (.+)$/.exec(line) ?? /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ?? /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield), (.+)$/.exec(line);
+      /^When you cast or cycle ~, (.+)$/.exec(line) ??
+      /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield), (.+)$/.exec(line) ??
+      /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast/.test(line)
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)
           ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]
-          : [`When ~ enters, ${effect}`, `${twice[1] === "attacks" ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
+          : [`When ~ enters, ${effect}`, `${/^attacks/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);
       else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));
@@ -881,11 +912,24 @@ export function compile(d: CardDef): CompiledCard {
     if (isSpell) spellLines.push(stripAbilityWord(line));
     else out.unsupported.push(raw);
   }
-  if (isSpell) {
+  if (spree) {
+    const modes = spree.texts.map((t) => parseBody(t, { spell: true }));
+    // Every mode has to work, and nothing else may be in the spell's text (it would be outside the modes).
+    if (spellLines.length || spree.costs.length < 2 || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...spree.lines, ...spellLines);
+    else out.spell = { targets: [], effects: [], text: spree.lines.join(" "), modal: { min: 1, max: modes.length, modes: modes as AbilityBody[], costs: spree.costs } };
+  } else if (isSpell) {
     const body = spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
+  }
+  if (striated && striated !== "fail") {
+    const empty = compile({ ...d, oracleText: "", keywords: [] });
+    for (const part of striated.parts)
+      if (!addStriation(part, out, (line) => compile({ ...d, oracleText: line, keywords: [] }), empty)) out.unsupported.push(part.header, ...part.lines);
+    // A keyword printed outside the striations too is the card's own.
+    const own = new Set(lines.flatMap((l) => simpleKeywords(l.trim()) ?? []).map((k) => k.toLowerCase()));
+    if (out.striatedKeywords) out.striatedKeywords = out.striatedKeywords.filter((k) => !own.has(k.toLowerCase()));
   }
   checkX(d, out);
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.

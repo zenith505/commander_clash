@@ -1,6 +1,6 @@
 # Roadmap
 
-15,679 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,770 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,9 +15,32 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): "You may choose
-   not to untap ~ during your untap step" (44 cards), "Enchant player" (42), Station (31), Saddle (30), level up
-   (25), Spree (21), Bargain (20), Job select (19), Teamwork, Cipher, Hideaway, Entwine, Gift, Conspire, Tribute,
-   Haunt, Read ahead.
+   not to untap ~ during your untap step" (44 cards), Bargain (20), Job select (19), Teamwork, Cipher, Hideaway,
+   Entwine, Gift, Conspire, Tribute, Haunt, Read ahead.
+   Left from the Spree/Saddle/Station/Curse round:
+   - Curses (14 of 47 supported): "whenever a player attacks enchanted player with one or more creatures" (Chaos,
+     Inertia, Shallow Graves), "Curses attached to that player" counts (Thirst, Surveillance, Misfortunes), damage to
+     enchanted player (Bloodletting's doubling, Stalked Prey, Hospitality, Grievous Wound), "untap all nonland
+     permanents they control" for Curse of Bounty's "does the same", attaching a Curse to another player (Archnemesis,
+     Maddening Hex), "when enchanted player loses the game" (Vengeance), Cruel Reality's "if the player can't",
+     Torment of Scarabs' "unless", Curse of Oblivion's graveyard exile, decayed Zombie tokens (Restless Dead),
+     Overwhelming Splendor, Curse of Silence, Overencumbered, Paradox Haze, Shadow of the Second Sun, Tenuous Truce.
+   - Spree modes that don't parse yet: outlaw groups (Caught in the Crossfire), "search for a basic land or Desert"
+     and X/X tokens (Dance of the Tumbleweeds), "choose a creature you control. It gains" (Final Showdown),
+     "if no other creature has greater power" (Getaway Glamer), "choose target opponent. Whenever ..." (Great Train
+     Heist), total mana value (Lively Dirge), "Mount or Vehicle" / "Aura or Equipment" (One Last Job), "each creature
+     target player controls" (Requisition Raid, Rustler Rampage), copying an ability (Return the Favor), "half ...
+     rounded up" (Rush of Dread), "exchange control of two target" (Shifting Grift), Smuggler's Surprise.
+   - Saddle: "the creature that saddled it this turn" (Giant Beaver, Rambling Possum, Calamity, Fortune, The Gitrog),
+     effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory), "is saddled" and "becomes
+     saddled for the first time each turn" (Archmage's Newt, Caustic Bronco, Stubborn Burrowfiend), "saddles a Mount
+     or crews a Vehicle" triggers (Canyon Vaulter, Reckless Velocitaur), "Mount or Vehicle" groups (Cloudspire Captain
+     and the "unless you control a Mount or Vehicle" lands), Bounding Felidar, Guardian Sunmare, Lagorin, Ornery
+     Tumblewagg. Bots only saddle Mounts that have an "attacks while saddled" trigger.
+   - Station and levelers: a striation is all or nothing, so cards with one unparsed line there stay out (Entropic
+     Battlecruiser, Exploration Broodship, Hearthhull, Inspirit, The Seriema, Echo Mage, Hedron-Field Purists,
+     Lighthouse Chronologist, Lord of Shatterskull Pass); "stations permanents using its toughness" (Tapestry Warden).
+     Bots station after combat with summoning-sick creatures, or any creature while above 20 life.
 2. By `npm run blockers` (a long tail of 2- and 3-card lines): Rageform-style "it becomes an Aura ... manifest the
    top card", "for each other attacking ~" naming the card itself (Aurochs Herd) and Shared Animosity's "that share a
    creature type with it". Left from the additional-combat round: "at the beginning of that combat" and "each combat

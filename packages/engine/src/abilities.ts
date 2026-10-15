@@ -105,7 +105,9 @@ export type Count =
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
-  | { kind: "counters"; counter: CounterKind; of: ObjRef };
+  | { kind: "counters"; counter: CounterKind; of: ObjRef }
+  /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
+  | { kind: "stationPower" };
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
@@ -148,7 +150,7 @@ export interface TargetSpec {
    * "Target creature that player controls" in a trigger about a player ("Whenever ~ deals combat damage to a
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
    */
-  controller?: "you" | "opponent" | "eventPlayer";
+  controller?: "you" | "opponent" | "eventPlayer" | "enchanted";
   controlledBy?: PlayerId;
   /** For players: only opponents. */
   opponent?: boolean;
@@ -268,7 +270,11 @@ export type PlayerRef =
   | { ref: "eachPlayer" }
   | { ref: "targetController"; index: number } // "its controller"
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
-  | { ref: "eventPlayer" };
+  | { ref: "eventPlayer" }
+  /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
+  | { ref: "enchantedPlayer" }
+  /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
+  | { ref: "opponentsAttackingEventPlayer" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -411,7 +417,8 @@ export type Affects =
       types: string[]; // all of these card types, e.g. ["Creature"]
       subtypes?: string[]; // any of these subtypes
       colors?: Color[]; // any of these colors
-      controller?: "you" | "opponent";
+      /** `enchanted`: the player the source Aura enchants controls them ("creatures enchanted player controls"). */
+      controller?: "you" | "opponent" | "enchanted";
       other?: boolean; // "other creatures ..." excludes the source
       /** Backgrounds' "Commander creatures you own" (CR 903.3): commanders owned by the source's controller. */
       ownedCommanders?: boolean;
@@ -440,8 +447,10 @@ export type StaticCondition =
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
+  /** A level symbol's "at least N1 and no more than N2 level counters" (CR 711.2), a station symbol's "N or more charge counters" (CR 721.2). */
+  | { kind: "selfCounters"; counter: CounterKind; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
   | { kind: "coven" }
   /**
@@ -806,6 +815,8 @@ export type Effect =
   | { type: "castFromExileFree" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
+  /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
+  | { type: "becomeSaddled"; what: ObjRef }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
@@ -899,9 +910,10 @@ export interface AbilityBody {
   text: string;
   /**
    * For modal text ("Choose one —" and a bulleted list, CR 700.2): the modes. A modal body
-   * has no targets or effects of its own; see `withModes` in modes.ts.
+   * has no targets or effects of its own; see `withModes` in modes.ts. `costs`: spree's additional cost for each
+   * mode (CR 702.172a), paid for the chosen ones.
    */
-  modal?: { min: number; max: number; modes: AbilityBody[] };
+  modal?: { min: number; max: number; modes: AbilityBody[]; costs?: string[] };
 }
 
 export type TriggerEvent =
@@ -994,6 +1006,10 @@ export type TriggerEvent =
   | "playerDraws"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
+  /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
+  | "creatureAttacksEnchantedPlayer"
+  /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
+  | "enchantedPlayerAttacked"
   /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
   | "playerDiscards"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
@@ -1039,11 +1055,12 @@ export interface TriggeredAbility {
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
-  cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec; orCopy?: boolean; nth?: number };
+  /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
-  draws?: { by: "you" | "opponent" | "any"; nth?: number };
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -1125,6 +1142,8 @@ export interface TriggeredAbility {
   hostControllersUpkeep?: true;
   /** "At the beginning of each opponent's upkeep / draw step / end step": an "each" step trigger only on an opponent's turn. */
   opponentsTurn?: true;
+  /** "At the beginning of enchanted player's upkeep": an "each" step trigger only on the turn of the player this Aura enchants. */
+  enchantedPlayersTurn?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
 }
@@ -1146,6 +1165,10 @@ export interface ActivatedAbility {
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
   crew?: number;
+  /** Saddle N (CR 702.171a): `crew` is N, and the creatures tapped saddle this permanent (CR 702.171c). */
+  saddle?: true;
+  /** Station (CR 702.184a): the cost is tapping one other untapped creature you control (`tapCreatures`). */
+  station?: true;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
   /** "Activate no more than twice each turn" (CR 602.5b). */
@@ -1454,7 +1477,7 @@ export interface CompiledCard {
    * "Each player can't cast more than one spell each turn" (Rule of Law), "... one noncreature spell": counting every
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
    */
-  castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
+  castLimits?: { who: "each" | "you" | "enchanted"; filter?: TargetSpec; text: string }[];
   /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
   beginOnBattlefield?: boolean;
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
@@ -1466,7 +1489,7 @@ export interface CompiledCard {
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
   drawTwoInstead?: true;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
-  cantGainLife?: "all" | "opponents";
+  cantGainLife?: "all" | "opponents" | "enchanted";
   /** "Damage can't be prevented." (CR 615.12) */
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
@@ -1479,6 +1502,17 @@ export interface CompiledCard {
   cantWin?: "you" | "opponents";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /**
+   * "~ (saddles Mounts and) crews Vehicles as though its power were 2 greater" (`n`), "... using its toughness rather
+   * than its power" (`toughness`): what it counts for when it's tapped to pay a crew or saddle cost (CR 702.122a,
+   * 702.171a). `saddles`: for saddle costs too, not only crew.
+   */
+  crewsAs?: { n?: number; toughness?: true; saddles: boolean };
+  /**
+   * Keywords the card data lists that it has only in a striation of a leveler or station card (CR 711.2, 721.2): they
+   * come from those static abilities, not printed on it unconditionally.
+   */
+  striatedKeywords?: string[];
   /**
    * "Equip abilities you activate cost {1} less to activate" (CR 602.2b, 601.2f); `targetSelf`: "that target ~";
    * `otherEquipment`: "of other Equipment".

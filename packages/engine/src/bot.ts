@@ -270,14 +270,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const dig = chooseUnearth(s, pid);
       if (dig) return dig;
     }
-    // Crew Vehicles before combat.
+    // Crew Vehicles and saddle Mounts before combat.
     if (s.step === "main1") {
-      const crew = chooseCrew(s, pid);
+      const crew = chooseCrew(s, pid) ?? chooseSaddle(s, pid);
       if (crew) return crew;
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
     if (s.step === "main2") {
-      const act = chooseActivation(s, pid) ?? chooseCycling(s, pid);
+      const act = chooseStation(s, pid) ?? chooseActivation(s, pid) ?? chooseCycling(s, pid);
       if (act) return act;
     }
   }
@@ -714,7 +714,17 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   const printed = castingBody(castDef(s, id, alt));
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
-  const modes = choice?.modes;
+  if (!printed?.modal?.costs) return castPlanWithModes(s, pid, id, free, x, via, alt, choice?.modes);
+  // Spree (CR 702.172a): each mode costs more, so the most useful modes we can pay for.
+  for (let n = choice!.ranked.length; n >= 1; n--) {
+    const plan = castPlanWithModes(s, pid, id, free, x, via, alt, choice!.ranked.slice(0, n).sort((a, b) => a - b));
+    if (plan) return plan;
+  }
+  return null;
+}
+
+function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via: CastFromGraveyardKind | undefined, alt: AltCostKind | undefined, modes: number[] | undefined): Action[] | null {
+  const printed = castingBody(castDef(s, id, alt));
   const body = printed && withModes(printed, modes);
   const specs = spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
@@ -980,9 +990,9 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
  * as many as allowed. Returns null when not enough modes are worth choosing, unless
  * `forced` (a trigger has to choose), in which case any legal modes fill the gap.
  */
-export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string): { modes: number[] } | null {
+export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string): { modes: number[]; ranked: number[] } | null {
   const m = body.modal;
-  if (!m) return { modes: [] };
+  if (!m) return { modes: [], ranked: [] };
   const legal = legalModes(s, body, pid, sourceId ? sourceQuality(s, sourceId) : undefined);
   const scored = m.modes
     .map((mode, i) => {
@@ -999,7 +1009,8 @@ export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forc
     modes = [...modes, ...rest].slice(0, m.min);
   }
   if (!modes.length && m.min > 0) return null;
-  return { modes: modes.sort((a, b) => a - b) };
+  // `ranked`: the same modes, most useful first.
+  return { ranked: [...modes], modes: modes.sort((a, b) => a - b) };
 }
 
 /** How much a permanent matters, for weighing effects on many at once. */
@@ -1264,7 +1275,9 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // A cost of nothing, "{0}" included, could be paid over and over.
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
-      if ((ab.sacrificeSelf && !cashIn) || freeCost) continue;
+      if ((ab.sacrificeSelf && !cashIn) || freeCost || ab.station) continue;
+      // Level up (CR 702.87a) past the last level symbol does nothing more.
+      if (ab.body.effects.some((e) => e.type === "counters" && e.counter === "level") && (o.counters.level ?? 0) >= lastStriation(s, o, "level")) continue;
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
@@ -1547,7 +1560,7 @@ function chooseCrew(s: GameState, pid: PlayerId): Action[] | null {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid || o.tapped || objIsType(s, o, "Creature") || isSummoningSick(s, o)) continue;
     const abilities = abilitiesOf(s, o).activated;
-    const i = abilities.findIndex((ab) => ab.crew !== undefined);
+    const i = abilities.findIndex((ab) => ab.crew !== undefined && !ab.saddle);
     if (i < 0) continue;
     const crew = autoCrew(s, pid, id, abilities[i]!.crew!);
     if (!crew) continue;
@@ -1555,6 +1568,55 @@ function chooseCrew(s: GameState, pid: PlayerId): Action[] | null {
     const givenUp = crew.reduce((n, c) => n + (isSummoningSick(s, obj(s, c)) ? 0 : power(s, obj(s, c))), 0);
     if (givenUp >= vehiclePower) continue;
     const plan = planActivate(s, pid, id, i, undefined, undefined, crew);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Saddle a Mount (CR 702.171a) that could attack this turn and has something that cares ("whenever ~ attacks while
+ * saddled"), with creatures that couldn't attack anyway or that give up less power than the Mount has.
+ */
+function chooseSaddle(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || o.tapped || o.saddled || !objIsType(s, o, "Creature") || isSummoningSick(s, o)) continue;
+    const abilities = abilitiesOf(s, o);
+    const i = abilities.activated.findIndex((ab) => ab.saddle);
+    if (i < 0 || !abilities.triggers.some((t) => t.activeIf?.kind === "self" && t.activeIf.is === "saddled")) continue;
+    const riders = autoCrew(s, pid, id, abilities.activated[i]!.crew!, true);
+    if (!riders) continue;
+    const givenUp = riders.reduce((n, c) => n + (isSummoningSick(s, obj(s, c)) ? 0 : Math.max(0, power(s, obj(s, c)))), 0);
+    if (givenUp > 0 && givenUp >= power(s, o)) continue;
+    const plan = planActivate(s, pid, id, i, undefined, undefined, riders);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/** The counters a permanent needs for its last level or station symbol (CR 711.2, 721.2). */
+function lastStriation(s: GameState, o: GameObject, counter: string): number {
+  const conds = abilitiesOf(s, o).statics.map((st) => st.condition);
+  return Math.max(0, ...conds.map((c) => (c?.kind === "selfCounters" && c.counter === counter ? c.min : 0)));
+}
+
+/**
+ * Station (CR 702.184a) after combat, until the last station symbol: tap the creature with the greatest power that
+ * couldn't have attacked, or any untapped creature while our life is comfortable.
+ */
+function chooseStation(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const i = abilitiesOf(s, o).activated.findIndex((ab) => ab.station);
+    if (i < 0 || (o.counters.charge ?? 0) >= lastStriation(s, o, "charge")) continue;
+    const comfortable = s.players[pid]!.life > 20;
+    const crew = s.battlefield
+      .map((x) => obj(s, x))
+      .filter((c) => c.id !== id && controllerOf(s, c) === pid && !c.tapped && objIsType(s, c, "Creature") && power(s, c) > 0 && (comfortable || isSummoningSick(s, c)))
+      .sort((a, b) => power(s, b) - power(s, a))[0];
+    if (!crew || abilityProblem(s, pid, id, i, undefined, undefined, [crew.id])) continue;
+    const plan = planActivate(s, pid, id, i, undefined, undefined, [crew.id]);
     if (plan) return plan;
   }
   return null;

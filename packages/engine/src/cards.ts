@@ -120,11 +120,13 @@ export const isPermanentCard = (d: CardDef) =>
   ["Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"].some((t) => d.types.includes(t));
 export const hasKeyword = (d: CardDef, k: SupportedKeyword) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 
+// A station card's power and toughness are in a striation, its own only while that applies (CR 721.2b-c).
+const ptInStriation = (d: CardDef) => d.keywords.includes("Station");
 export function basePower(d: CardDef): number {
-  return Number.parseInt(d.power ?? "0", 10) || 0;
+  return ptInStriation(d) ? 0 : Number.parseInt(d.power ?? "0", 10) || 0;
 }
 export function baseToughness(d: CardDef): number {
-  return Number.parseInt(d.toughness ?? "0", 10) || 0;
+  return ptInStriation(d) ? 0 : Number.parseInt(d.toughness ?? "0", 10) || 0;
 }
 /** Current power and toughness, after all continuous effects and counters (CR 613.4). */
 export const power = (s: GameState, o: GameObject) => characteristics(s, o).power;

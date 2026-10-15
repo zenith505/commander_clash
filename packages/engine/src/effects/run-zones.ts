@@ -1,6 +1,6 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
-import { attackedName, attackedPlaneswalker, auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackedName, attackedPlaneswalker, auraHostFor, type AuraHost, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
@@ -20,13 +20,13 @@ export function isSuspended(s: GameState, o: GameObject): boolean {
 function returnFromExile(s: GameState, c: GameObject, controller: PlayerId, src: string, counter?: CounterKind) {
   const d = defOf(s, c);
   if (!isPermanentCard(d)) return;
-  let attachTo: ObjectId | undefined;
+  let host: AuraHost | undefined;
   if (d.subtypes.includes("Aura")) {
-    attachTo = auraHostFor(s, c, controller);
-    if (!attachTo) return;
+    host = auraHostFor(s, c, controller);
+    if (!host) return;
   }
   log(s, `${src} returns ${d.name} to the battlefield.`);
-  moveObject(s, c.id, "battlefield", { controller, ...(attachTo ? { attachTo } : {}), ...(counter ? { counters: { [counter]: 1 } } : {}) });
+  moveObject(s, c.id, "battlefield", { controller, ...host, ...(counter ? { counters: { [counter]: 1 } } : {}) });
 }
 
 /**
@@ -387,13 +387,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           moveObject(s, c.id, "hand");
           continue;
         }
-        let attachTo: ObjectId | undefined;
+        let host: AuraHost | undefined;
         if (d.subtypes.includes("Aura")) {
-          attachTo = auraHostFor(s, c, c.owner);
-          if (!attachTo) continue; // nothing it can enchant: it stays in exile (CR 303.4g)
+          host = auraHostFor(s, c, c.owner);
+          if (!host) continue; // nothing it can enchant: it stays in exile (CR 303.4g)
         }
         log(s, `${src} returns ${d.name} to the battlefield.`);
-        moveObject(s, c.id, "battlefield", { controller: c.owner, ...(attachTo ? { attachTo } : {}) });
+        moveObject(s, c.id, "battlefield", { controller: c.owner, ...host });
       }
       return;
     }
@@ -445,7 +445,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.
           const enchant = compileCard(d).enchant;
           const host = ctx.subject && s.objects[ctx.subject.id];
-          const ok = !!enchant && !!host && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && objectMatches(s, enchant, host, ctx.controller, false, d);
+          const ok = enchant?.kind === "object" && !!host && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && objectMatches(s, enchant, host, ctx.controller, false, d);
           if (!ok) {
             log(s, `${d.name} can't be attached to that creature, so it stays in the graveyard.`);
             continue;

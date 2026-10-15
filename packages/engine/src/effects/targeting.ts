@@ -47,7 +47,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
-  if (spec.controller === "eventPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
+  if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;

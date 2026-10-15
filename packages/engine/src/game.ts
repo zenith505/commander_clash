@@ -490,6 +490,8 @@ export function moveObject(
     top?: boolean;
     controller?: PlayerId;
     attachTo?: ObjectId;
+    /** An Aura with "enchant player" enters attached to this player (CR 303.4f). */
+    attachToPlayer?: PlayerId;
     tapped?: boolean;
     /** Counters it enters the battlefield with (persist, undying). */
     counters?: Record<string, number>;
@@ -507,6 +509,9 @@ export function moveObject(
 ) {
   const o = obj(s, id);
   const fromZone = o.zone;
+  // A creature tapped for a station ability that's still on the stack: its power as it last existed (rulings on station).
+  if (fromZone === "battlefield")
+    for (const item of s.stack) if (item.stationed?.id === id && item.stationed.zc === (o.zoneChanges ?? 0)) item.stationed.power = power(s, o);
   // A copy of a spell anywhere but the stack ceases to exist (CR 707.10a); it isn't a card, so nothing sees it arrive.
   if (o.spellCopy && to !== "stack" && to !== "battlefield") {
     delete s.objects[id];
@@ -574,7 +579,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}) };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}) };
   }
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
   const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
@@ -623,6 +628,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
+  o.saddled = undefined; // CR 702.171b
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
@@ -636,6 +642,7 @@ export function moveObject(
   o.band = undefined;
   o.timestamp = s.nextTimestamp++; // CR 613.7d
   o.attachedTo = to === "battlefield" ? opts.attachTo : undefined;
+  o.attachedToPlayer = to === "battlefield" ? opts.attachToPlayer : undefined;
   if (fromZone === "battlefield") {
     // It's a new object now (CR 400.7): effects locked onto it end, and things attached to it
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
@@ -769,16 +776,16 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
       moveObject(s, c.id, "hand");
       continue;
     }
-    let attachTo: ObjectId | undefined;
+    let host: AuraHost | undefined;
     if (d.subtypes.includes("Aura")) {
-      attachTo = auraHostFor(s, c, c.owner);
-      if (!attachTo) {
+      host = auraHostFor(s, c, c.owner);
+      if (!host) {
         log(s, `${d.name} stays in exile (nothing it can enchant).`);
         continue;
       }
     }
-    log(s, `${d.name} returns to the battlefield (${source} left)${attachTo ? ` attached to ${nameOf(s, attachTo)}` : ""}.`);
-    moveObject(s, c.id, "battlefield", { controller: c.owner, ...(attachTo ? { attachTo } : {}) });
+    log(s, `${d.name} returns to the battlefield (${source} left)${host ? ` attached to ${auraHostName(s, host)}` : ""}.`);
+    moveObject(s, c.id, "battlefield", { controller: c.owner, ...host });
   }
 }
 
@@ -787,9 +794,23 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
  * ability allows (it isn't targeted, so hexproof doesn't stop it). The player picks: one of their own
  * if the Aura only helps what it enchants, an opponent's otherwise.
  */
-export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): ObjectId | undefined {
+export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): AuraHost | undefined {
   const enchant = compileCard(defOf(s, aura)).enchant;
   if (!enchant) return undefined;
+  // "Enchant player" (CR 702.5d): a player, not targeted. Curses hurt the player they enchant: an opponent.
+  if (enchant.kind === "player") {
+    const p = opponents(s, pid)[0] ?? (enchant.opponent ? undefined : pid);
+    return p === undefined ? undefined : { attachToPlayer: p };
+  }
+  const id = auraObjectHost(s, aura, pid, enchant);
+  return id ? { attachTo: id } : undefined;
+}
+
+/** Where an Aura goes as it's put onto the battlefield: the permanent or the player it's attached to. */
+export type AuraHost = { attachTo: ObjectId } | { attachToPlayer: PlayerId };
+export const auraHostName = (s: GameState, h: AuraHost) => ("attachTo" in h ? nameOf(s, h.attachTo) : player(s, h.attachToPlayer).name);
+
+function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec): ObjectId | undefined {
   const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
@@ -911,9 +932,9 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
 
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
-  const stops = (who: "all" | "opponents" | undefined, controller: PlayerId) => who === "all" || (who === "opponents" && controller !== pid);
+  const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
   if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
-  return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id))));
+  return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
 }
 
 /** Can damage be prevented now, or does a "damage can't be prevented" effect stop prevention effects (CR 615.12)? */
@@ -1399,7 +1420,9 @@ function finishCleanup(s: GameState) {
     o.regenShields = undefined; // "this turn" effects end
     o.preventNext = undefined;
     o.redirectNext = undefined;
+    o.saddled = undefined; // "until end of turn" (CR 702.171b)
   }
+  invalidateCharacteristics(s);
   for (const p of s.players) {
     p.preventNext = undefined;
     p.redirectNext = undefined;
@@ -1472,8 +1495,14 @@ function resolveTop(s: GameState) {
     if (enchant) {
       // An Aura spell's target is checked on resolution like any other (CR 608.2b); it enters attached to it (CR 303.4f).
       const t = item.targets?.[0];
-      const legal = !!t && t.kind === "object" && isLegalTarget(s, enchant, t, item.controller, d);
-      if (legal) {
+      const legal = !!t && (t.kind === "object" || t.kind === "player") && isLegalTarget(s, enchant, t, item.controller, d);
+      if (legal && t.kind === "player") {
+        // "Enchant player" (CR 702.5d): it enters attached to the player.
+        log(s, `${d.name} resolves and enters attached to ${player(s, t.id).name}.`);
+        moveObject(s, o.id, "battlefield", { controller: item.controller, attachToPlayer: t.id });
+        return;
+      }
+      if (legal && t.kind === "object") {
         log(s, `${d.name} resolves and enters attached to ${nameOf(s, t.id)}.`);
         moveObject(s, o.id, "battlefield", { controller: item.controller, attachTo: t.id });
         return;
@@ -1891,7 +1920,7 @@ export function castProblem(
   if (ap) return ap;
   const cp = casualtyProblem(s, pid, d, choices);
   if (cp) return cp;
-  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
+  const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
@@ -1904,12 +1933,14 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice"> & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
   const kicker = compileCard(d).kicker;
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr);
+  // So are spree's costs for the chosen modes (CR 702.172a), also when it's cast without paying its mana cost (rulings).
+  const spree = compileCard(d).spell?.modal?.costs;
+  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "");
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
@@ -1980,7 +2011,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
  */
-function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } | string {
+function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectId[], improvise?: ObjectId[], x?: number, kicks?: number[], how: CostChoices & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } | string {
   const d = defOf(s, o);
   let { cost, extra } = spellCost(s, pid, o, x, kicks, how);
   if (convoke?.length) {
@@ -2143,7 +2174,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const fromCommand = o.zone === "command";
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
-  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets }) as { cost: ParsedCost; extra: number };
+  const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets, modes }) as { cost: ParsedCost; extra: number };
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
@@ -2260,6 +2291,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | nul
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
+      if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;
       if (l.filter && !printedMatches(l.filter, d)) continue;
       if ((s.castThisTurn ?? []).some((c) => c.player === pid && (!l.filter || printedMatches(l.filter, s.cards[c.card]!))))
         return `${characteristics(s, o).name}: ${l.text.replace(/~/g, characteristics(s, o).name).replace(/\.$/, "")}`;
@@ -2522,8 +2554,18 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
-    const cp = crewProblem(s, pid, o, ab.crew, tapCreatures);
+    const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle);
     if (cp) return cp;
+  } else if (ab.station) {
+    // Station (CR 702.184a): tap another untapped creature you control, whatever its power.
+    if (tapCreatures === undefined) {
+      if (!crewCandidates(s, pid, o.id).length) return "no other untapped creature to tap for station";
+    } else {
+      if (tapCreatures.length !== 1) return "station taps exactly one other creature";
+      if (tapCreatures[0] === o.id) return "the creature tapped for station must be another one";
+      const tp = tapCreaturesProblem(s, pid, tapCreatures, "station");
+      if (tp) return tp;
+    }
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
@@ -2579,23 +2621,31 @@ export function crewCandidates(s: GameState, pid: PlayerId, vehicleId: ObjectId)
   return creaturesOf(s, pid).filter((c) => c.id !== vehicleId && !c.tapped);
 }
 
-/** A creature's contribution to "total power N or greater": negative power adds nothing. */
-export const crewPower = (s: GameState, c: GameObject) => Math.max(0, power(s, c));
+/**
+ * A creature's contribution to "total power N or greater": negative power adds nothing. "Crews Vehicles as though its
+ * power were 2 greater", "using its toughness": its own static abilities say otherwise; for saddling only if they say so.
+ */
+export function crewPower(s: GameState, c: GameObject, saddle = false): number {
+  const as = abilitiesOf(s, c).crewsAs;
+  if (!as || (saddle && !as.saddles)) return Math.max(0, power(s, c));
+  return Math.max(0, (as.toughness ? toughness(s, c) : power(s, c)) + (as.n ?? 0));
+}
 
 /**
  * Crew N's cost (CR 702.122a): tap any number of other untapped creatures you control with total
  * power N or greater. Without a choice, whether some choice would do.
  */
-function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[]): string | null {
+function crewProblem(s: GameState, pid: PlayerId, vehicle: GameObject, n: number, chosen?: ObjectId[], saddle = false): string | null {
+  const what = saddle ? "saddle" : "crew";
   if (chosen === undefined) {
-    const total = crewCandidates(s, pid, vehicle.id).reduce((x, c) => x + crewPower(s, c), 0);
-    return total >= n ? null : `not enough untapped creatures to crew ${n}`;
+    const total = crewCandidates(s, pid, vehicle.id).reduce((x, c) => x + crewPower(s, c, saddle), 0);
+    return total >= n ? null : `not enough untapped creatures to ${what} ${n}`;
   }
-  if (chosen.includes(vehicle.id)) return "a Vehicle can't crew itself";
-  const problem = tapCreaturesProblem(s, pid, chosen, "crew");
+  if (chosen.includes(vehicle.id)) return saddle ? "a Mount can't saddle itself" : "a Vehicle can't crew itself";
+  const problem = tapCreaturesProblem(s, pid, chosen, what);
   if (problem) return problem;
-  const total = chosen.reduce((x, id) => x + crewPower(s, obj(s, id)), 0);
-  return total >= n ? null : `those creatures have total power ${total}; crew ${n} needs ${n} or more`;
+  const total = chosen.reduce((x, id) => x + crewPower(s, obj(s, id), saddle), 0);
+  return total >= n ? null : `those creatures have total power ${total}; ${what} ${n} needs ${n} or more`;
 }
 
 function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices) {
@@ -2603,7 +2653,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
-  if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose creatures to crew with");
+  if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
+  if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   if (ab?.costs?.some((c) => c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
@@ -2659,10 +2710,12 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(lki ? { lki } : {}),
     ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
+    ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
   });
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
-  else if (ab.crew !== undefined) log(s, `${p.name} crews ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
+  else if (ab.crew !== undefined) log(s, `${p.name} ${ab.saddle ? "saddles" : "crews"} ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
+  else if (ab.station) log(s, `${p.name} stations ${d.name} with ${nameOf(s, tapCreatures![0]!)}.`);
   else {
     // Say which ability: its cost and, for a modal one, the chosen modes.
     const cost = ab.text.split(":")[0]!;
@@ -3850,7 +3903,18 @@ function attachmentSBAs(s: GameState): boolean {
     if (!o || o.zone !== "battlefield") continue;
     const c = characteristics(s, o);
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    if (c.subtypes.includes("Aura")) {
+    if (c.subtypes.includes("Aura") && compileCard(defOf(s, o)).enchant?.kind === "player") {
+      // An Aura with "enchant player" stays only while attached to a player still in the game that it can enchant
+      // (CR 303.4d, 704.5m): "enchant opponent" checks against its controller now, so a change of control can end it.
+      const p = o.attachedToPlayer;
+      const enchant = compileCard(defOf(s, o)).enchant!;
+      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p));
+      if (!legal) {
+        log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+      }
+    } else if (c.subtypes.includes("Aura")) {
       const enchant = compileCard(defOf(s, o)).enchant;
       // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
       // effect that "doesn't remove" this Aura.
@@ -3879,9 +3943,10 @@ function attachmentSBAs(s: GameState): boolean {
         log(s, `${c.name} becomes unattached.`);
         changed = true;
       }
-    } else if (o.attachedTo) {
+    } else if (o.attachedTo || o.attachedToPlayer !== undefined) {
       // A creature, or anything that's no longer an Aura or Equipment, can't stay attached (CR 704.5p).
       o.attachedTo = undefined;
+      o.attachedToPlayer = undefined;
       invalidateCharacteristics(s);
       log(s, `${c.name} becomes unattached.`);
       changed = true;

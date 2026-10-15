@@ -212,8 +212,11 @@ function evenDivision(specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice
 /** The human is choosing modes for a modal spell or activated ability they're casting (CR 700.2a). */
 type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
 
-/** Picking creatures to tap: to crew a Vehicle (CR 702.122a) or to convoke a spell (CR 702.51a). */
-type TapPick = { kind: "crew"; objectId: string; index: number; n: number; chosen: string[] } | { kind: "convoke"; objectId: string; chosen: string[] };
+/** Picking creatures to tap: to crew a Vehicle (CR 702.122a), to station (CR 702.184a, one creature) or to convoke a spell (CR 702.51a). */
+type TapPick =
+  | { kind: "crew"; objectId: string; index: number; n: number; chosen: string[]; saddle?: boolean }
+  | { kind: "station"; objectId: string; index: number; chosen: string[] }
+  | { kind: "convoke"; objectId: string; chosen: string[] };
 
 /**
  * A spell being cast, built up step by step in the order of CR 601.2b-h: modes, kicker, X,
@@ -432,7 +435,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const ab = abilitiesOf(s, s.objects[objectId]!).activated[index]!;
     const label = `${cardOf(s, objectId).name}: ${ab.text}`;
     // Crew: pick the creatures to tap, starting from a suggestion.
-    if (ab.crew !== undefined) return setTapPick({ kind: "crew", objectId, index, n: ab.crew, chosen: autoCrew(s, HUMAN, objectId, ab.crew) ?? [] });
+    if (ab.crew !== undefined) return setTapPick({ kind: "crew", objectId, index, n: ab.crew, chosen: autoCrew(s, HUMAN, objectId, ab.crew, ab.saddle) ?? [], ...(ab.saddle ? { saddle: true } : {}) });
+    // Station: pick the one creature to tap, starting from the one with the greatest power.
+    if (ab.station) {
+      const best = convokers(s).filter((o) => o.id !== objectId).sort((a, b) => power(s, b) - power(s, a))[0];
+      return setTapPick({ kind: "station", objectId, index, chosen: best ? [best.id] : [] });
+    }
     if (ab.body.modal && !modes) return setModePick({ mode: "activate", objectId, index, label, body: ab.body });
     // X is announced after modes and before targets (CR 602.2b, 601.2b-c).
     if (x === undefined && parseManaCost(ab.manaCost).hasX) {
@@ -637,7 +645,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Crewing or convoking: click your untapped creatures to tap them for it.
     if (tapPick) {
       if (!tapCandidates(s, tapPick).some((c) => c.id === o.id)) return;
-      const chosen = tapPick.chosen.includes(o.id) ? tapPick.chosen.filter((x) => x !== o.id) : [...tapPick.chosen, o.id];
+      const chosen = tapPick.chosen.includes(o.id) ? tapPick.chosen.filter((x) => x !== o.id) : tapPick.kind === "station" ? [o.id] : [...tapPick.chosen, o.id];
       return setTapPick({ ...tapPick, chosen });
     }
     // Attacking: click a creature, then the player it attacks (an arrow follows the mouse).
@@ -747,7 +755,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   };
   const waiting = waitingOn(s);
   const corners = seatCorners(s);
-  const combat: Combat = { attacks, aim, blocks, blocker, crew: tapPick?.kind === "crew" ? { vehicle: tapPick.objectId, chosen: tapPick.chosen } : undefined };
+  const combat: Combat = { attacks, aim, blocks, blocker, crew: tapPick?.kind === "crew" || tapPick?.kind === "station" ? { vehicle: tapPick.objectId, chosen: tapPick.chosen } : undefined };
   const arrows = targetingArrows(s, targeting, intent, combat);
   // While aiming, the arrow snaps onto whatever the click would choose.
   const snap = targeting
@@ -881,7 +889,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               key={modePick ? `${modePick.mode}:${modePick.objectId}` : `trigger:${pending?.kind === "chooseModes" ? pending.description : ""}`}
               {...(pending?.kind === "chooseModes"
                 ? { label: pending.description.split(":")[0]!, min: pending.min, max: pending.max, modes: pending.modes, legal: pending.legal }
-                : { label: modePick!.label, min: modePick!.body.modal!.min, max: modePick!.body.modal!.max, modes: modePick!.body.modal!.modes.map((m) => m.text), legal: legalModes(s, modePick!.body, HUMAN) })}
+                : { label: modePick!.label, min: modePick!.body.modal!.min, max: modePick!.body.modal!.max, modes: modePick!.body.modal!.modes.map((m, i) => (modePick!.body.modal!.costs ? `+ ${modePick!.body.modal!.costs[i]} — ${m.text}` : m.text)), legal: legalModes(s, modePick!.body, HUMAN) })}
               sourceName={(pending?.kind === "chooseModes" ? cardOf(s, pending.sourceId) : cardOf(s, modePick!.objectId)).name}
               onDone={pickModes}
               onCancel={pending?.kind === "chooseModes" ? undefined : () => setModePick(null)}
@@ -1201,7 +1209,7 @@ const convokers = (s: GameState) => s.battlefield.map((id) => s.objects[id]!).fi
 
 /** Creatures that can be clicked for a crew or convoke pick: your untapped creatures, other than the Vehicle being crewed. */
 function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
-  return convokers(s).filter((o) => !(pick.kind === "crew" && o.id === pick.objectId));
+  return convokers(s).filter((o) => !(pick.kind !== "convoke" && o.id === pick.objectId));
 }
 
 /** The bar shown while announcing X. */
@@ -1384,14 +1392,34 @@ function CardChoice({
 function TapPickBar({ s, pick, onDone, onCancel }: { s: GameState; pick: TapPick; onDone: () => void; onCancel: () => void }) {
   const name = cardOf(s, pick.objectId).name;
   if (pick.kind === "crew") {
-    const total = pick.chosen.reduce((n, id) => n + crewPower(s, s.objects[id]!), 0);
+    const total = pick.chosen.reduce((n, id) => n + crewPower(s, s.objects[id]!, pick.saddle), 0);
+    const verb = pick.saddle ? "Saddle" : "Crew";
     return (
       <div className="targeting">
         <span>
-          <strong>Crew {name}:</strong> tap creatures with total power {pick.n} (now {total})
+          <strong>
+            {verb} {name}:
+          </strong>{" "}
+          tap creatures with total power {pick.n} (now {total})
         </span>
         <button disabled={total < pick.n} onClick={onDone}>
-          Crew
+          {verb}
+        </button>
+        <button className="ghost" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  if (pick.kind === "station") {
+    const tapped = pick.chosen[0] ? s.objects[pick.chosen[0]] : undefined;
+    return (
+      <div className="targeting">
+        <span title="Put charge counters equal to the tapped creature's power on it. Station only as a sorcery.">
+          <strong>Station {name}:</strong> tap another creature you control{tapped ? ` (${cardOf(s, tapped.id).name}, ${Math.max(0, power(s, tapped))} charge counters)` : ""}
+        </span>
+        <button disabled={!tapped} onClick={onDone}>
+          Station
         </button>
         <button className="ghost" onClick={onCancel}>
           Cancel
@@ -1569,6 +1597,16 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Paired
           </span>
         )}
+        {o.saddled && (
+          <span className="chip temp" title="Saddled until end of turn.">
+            Saddled
+          </span>
+        )}
+        {o.attachedToPlayer !== undefined && (
+          <span className="chip other" title={`${s.players[controllerOf(s, o)]!.name}'s Aura, enchanting ${s.players[o.attachedToPlayer]!.name}.`}>
+            On {s.players[o.attachedToPlayer]!.name}
+          </span>
+        )}
         {copying && (
           <span
             className={`chip ${copyEnds ? "temp" : "other"}`}
@@ -1706,11 +1744,12 @@ function Seat({
   // the Menagerie), or when you may play it.
   const topCanPlay = pid === HUMAN && !s.pending && topPlayable(s, HUMAN).some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)));
   const topShown = topVisible(s, pid, HUMAN) || (pid === HUMAN && topPlayable(s, HUMAN).length > 0);
-  // Auras and Equipment sit with whatever they're attached to, even in another player's area.
+  // Auras and Equipment sit with whatever they're attached to, even in another player's area; a Curse with the
+  // player it enchants.
   const onField = new Set(s.battlefield);
   const mine = s.battlefield
     .map((id) => s.objects[id]!)
-    .filter((o) => controllerOf(s, o) === pid && !(o.attachedTo && onField.has(o.attachedTo)));
+    .filter((o) => (o.attachedToPlayer !== undefined ? o.attachedToPlayer === pid : controllerOf(s, o) === pid && !(o.attachedTo && onField.has(o.attachedTo))));
   const phasedOut = (s.phasedOut ?? []).filter((id) => s.objects[id]!.phased?.by === pid);
   const lands = mine.filter((o) => isLand(s, o.id));
   const others = mine.filter((o) => !isLand(s, o.id));
@@ -3041,7 +3080,7 @@ function GameLog({ s }: { s: GameState }) {
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
   if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand|next turn)\b/g, " your $1");
-  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses|copies)\b/g, (_, pre: string, v: string) =>
+  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|saddles|stations|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses|copies)\b/g, (_, pre: string, v: string) =>
     `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v === "amasses" ? "amass" : v === "copies" ? "copy" : v.slice(0, -1)}`,
   );
 }

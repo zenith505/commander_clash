@@ -26,6 +26,8 @@ export interface AmountCtx {
   colorsSpent?: number;
   /** What was sacrificed to cast the spell, as it last existed. */
   sacrificed?: LastKnown[];
+  /** A station ability's tapped creature (CR 702.184a). */
+  stationed?: { id: ObjectId; zc: number; power: number };
   /** The creature type or color chosen ("for each creature of the chosen type"). */
   chosen?: Chosen;
   /** For a triggered ability, what its event was about ("that much"). */
@@ -129,6 +131,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const zc = o.zoneChanges ?? 0;
       const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
       return same ? (o.devoured ?? 0) : 0;
+    }
+    case "stationPower": {
+      // Its power as the ability resolves, or as it last existed; negative power puts on no counters (rulings).
+      const st = ctx.stationed;
+      const o = st && s.objects[st.id];
+      if (!st) return 0;
+      return Math.max(0, o?.zone === "battlefield" && (o.zoneChanges ?? 0) === st.zc ? characteristics(s, o).power : st.power);
     }
     case "power":
     case "toughness":

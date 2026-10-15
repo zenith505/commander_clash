@@ -80,6 +80,8 @@ export interface GameObject {
   timestamp: number;
   /** The permanent this Aura or Equipment is attached to. CR 301.5, 303.4 */
   attachedTo?: ObjectId;
+  /** The player this Aura with "enchant player" is attached to. CR 303.4, 702.5d */
+  attachedToPlayer?: PlayerId;
   /** Controller as of the last control check, to notice control changes (summoning sickness, combat). */
   seenController?: PlayerId;
   tapped: boolean;
@@ -106,6 +108,8 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
+  saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
   escaped?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
@@ -329,6 +333,8 @@ export interface StackItem {
   /** For a state trigger: which of its source's triggered abilities it is (CR 603.8). */
   stateIndex?: number;
   lki?: LastKnown;
+  /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
+  stationed?: { id: ObjectId; zc: number; power: number };
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
@@ -646,7 +652,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string }>;
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;

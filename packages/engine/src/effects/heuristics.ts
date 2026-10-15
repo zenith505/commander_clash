@@ -37,6 +37,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if ((e.type === "discard" || e.type === "takeFromHand" || (e.type === "lookAtHand" && e.reveal)) && e.who.ref === "target") mark(e.who.index);
     if ((e.type === "fight" || e.type === "bite") && e.b.ref === "target") mark(e.b.index);
   }
+  // An Aura spell with "enchant player" is a Curse, aimed at an opponent.
+  body.targets.forEach((t, i) => t.kind === "player" && / to enchant$/.test(t.text) && mark(i));
   return harm;
 }
 

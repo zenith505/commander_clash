@@ -6,7 +6,7 @@ import { gainLife, log, loseLife, moveObject, obj, opponents, player } from "../
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { printedMatches } from "./targeting";
-import { ResolveCtx, apnap, players, amountNow } from "./resolve";
+import { ResolveCtx, apnap, players, amountNow, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 
@@ -88,6 +88,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (pid === undefined) return;
       const p = player(s, pid);
       const sc = (s.resolving!.scratch ??= {});
+      // "Until ~ leaves the battlefield": if it already left, the hand is revealed but nothing is exiled (CR 610.3b,
+      // Kitesail Freebooter rulings).
+      const me = e.until ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+      if (e.until && !me) {
+        log(s, `${src} has left the battlefield, so nothing is exiled.`);
+        return;
+      }
       if (!sc.found) {
         const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
         if (!cards.length) return;
@@ -101,8 +108,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.action === "discard") discardCards(s, pid, ids, "", false, false, ctx.controller);
       else
         for (const id of ids) {
-          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s hand.`);
+          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s hand${me ? ` until ${src} leaves the battlefield` : ""}.`);
           moveObject(s, id, "exile");
+          const o = obj(s, id);
+          if (o.zone !== "exile") continue;
+          if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
+          // Linked to the source as it was when the ability triggered (CR 607.2a), like an exile ability's.
+          if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         }
       return;
     }

@@ -1,6 +1,6 @@
 import { allEffects } from "../abilities";
 import type { AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec } from "../abilities";
-import { CHOSEN_PROTECTION, stripReminder } from "../keywords";
+import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes } from "../modes";
@@ -814,7 +814,7 @@ function linkExile(out: CompiledCard) {
   if (!returns.length) return;
   const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]
     .flatMap((b) => allEffects(b.effects))
-    .filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile")) && !e.until);
   if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     return;
@@ -844,7 +844,8 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.ref === "sacrificed" && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : needs.add("creatureType"));
-    if (o.kind === "chosenColor") needs.add("color");
+    if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
+    if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PROTECTION)) needs.add("color");
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     Object.values(o).forEach(visit);

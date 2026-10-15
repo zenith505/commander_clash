@@ -34,6 +34,7 @@ export function layerOf(m: Modification): Layer {
     case "addTypes":
     case "setTypes":
     case "setSubtypes":
+    case "setLandTypes":
     case "loseTypes":
       return "4";
     case "setColors":
@@ -375,6 +376,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {
       if (cond.is === "attacking") return src.attacking !== undefined;
+      // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
+      if (cond.is === "tapped" || cond.is === "untapped") return src.tapped === (cond.is === "tapped");
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
@@ -481,6 +484,16 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     }
     case "setSubtypes":
       setSubtypes(c, m.subtypes);
+      return;
+    case "setLandTypes":
+      // CR 305.7: its old land types go, and so do the abilities from its rules text (its keywords are all printed ones
+      // this early, layer 6 grants come later). Its basic land types give it their mana abilities (manaAbilitiesOn).
+      // Card types and supertypes stay: a nonbasic land stays nonbasic, a land creature stays a creature.
+      if (!c.types.includes("Land")) return;
+      c.subtypes = [...c.subtypes.filter((st) => subtypeSet(st) !== "Land"), ...m.subtypes];
+      c.hasPrintedAbilities = false;
+      c.keywords = [];
+      c.sparedBy = undefined;
       return;
     case "loseTypes":
       c.types = c.types.filter((t) => !m.types.includes(t));
@@ -631,7 +644,7 @@ function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock:
  * controller, types, colors, and whether a source still has its abilities, so only these
  * can create a dependency (CR 613.8a).
  */
-const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "loseTypes", "setColors", "loseAllAbilities"]);
+const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "setColors", "loseAllAbilities"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";

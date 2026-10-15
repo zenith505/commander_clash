@@ -1,6 +1,6 @@
 # Roadmap
 
-14,792 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+14,873 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -17,13 +17,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 1. By `npm run blockers` (a long tail of 3-card lines): "equip abilities you activate that target ~ cost {N} less",
    "when ~ enters, manifest dread, then attach ~ to that creature", "if you would draw a card except the first one you
    draw in each of your draw steps", "damage that would reduce your life total to less than N reduces it to N
-   instead", "Put a -N/-N counter on ~: Untap ~" (Devoted Druid), "~ becomes the color of your choice until end of
-   turn", "if you descended this turn", "exile up to three target cards from a single graveyard", "destroy target
+   instead", "if you descended this turn", "exile up to three target cards from a single graveyard", "destroy target
    creature an opponent controls that was dealt damage this turn", "each opponent sacrifices a permanent of their
-   choice unless they pay {N}", "whenever ~ becomes tapped, you gain N life and scry N", "enchanted land is a Swamp"
-   (CR 305.7), "when you cast a creature spell, sacrifice ~", Glyph Keeper's "becomes the target ... for the first
-   time each turn", Hellfire Mongrel, "~ has hexproof as long as it's untapped", "if you would gain life, you gain
-   that much life plus N instead".
+   choice unless they pay {N}", "whenever ~ becomes tapped, you gain N life and scry N", "when you cast a creature
+   spell, sacrifice ~", Glyph Keeper's "becomes the target ... for the first time each turn", Hellfire Mongrel, "if
+   you would gain life, you gain that much life plus N instead".
 
 ## Known gaps (from earlier rounds)
 
@@ -190,13 +188,14 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "Whenever a creature is dealt damage" (Death Pits of Rath, Shriveling Rot), "becomes tapped or is dealt damage"
   (Cryoshatter). Old-Growth Troll and Harold and Bob (they return as Auras). Mayhem without a cost (a land, CR
   702.187c). "You recruit" after a cast trigger (The Queen of Dale), "if that spell's mana value was 2 or less, recruit".
-- Hand disruption: "nonlegendary, nonland card" (Lay Bare the Heart); taking a card "until ~ leaves the battlefield"
-  (Kitesail Freebooter, Brain Maggot); Mesmeric Fiend and Tidehollow Sculler.
-- Mana: "Activate only if" on a mana ability (corrupted: The Seedcore, Glistening Sphere); "add N mana in any
-  combination of colors" from a spell or trigger; mana that stays ("until end of turn, you don't lose this mana");
+- Mana: "add N mana in any combination of colors" from a spell or trigger; mana that stays ("until end of turn, you don't lose this mana");
   Rite of Flame's count. Bots cast rituals only when the mana lets them cast a card they couldn't otherwise.
 - Other "cast this spell only ..." restrictions (only "if you've cast another spell this turn" is supported).
-- Aerial Modification ("as long as enchanted permanent is a Vehicle, it's an artifact creature"): layer dependency.
+- Land types (CR 305.7): a shock land's "you may pay 2 life" is still asked under Blood Moon (it has no abilities
+  then, so it should just enter tapped); copy effects of lands under a land-type effect; "doesn't untap" for one
+  enchanted permanent with "loses all abilities" (Stop Cold); Winter Orb ("players can't untap more than one land").
+- Granted flashback is only "until end of turn" with the card's mana cost (Snapcaster Mage, Past in Flames); a
+  static grant (Lier, Disciple of the Drowned) and Mission Briefing's "you may cast it this turn" are not modeled.
 
 ## Later
 

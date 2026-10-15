@@ -58,7 +58,8 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
     else if (m.kind === "removeKeywords") parts.push(`loses ${m.keywords.join(", ").toLowerCase()}`);
     else if (m.kind === "loseAllAbilities") parts.push("loses all abilities");
     else if (m.kind === "control") parts.push(`comes under ${player(s, controller).name}'s control`);
-    else if (m.kind === "setColors") parts.push(`becomes ${m.colors.join("/") || "colorless"}`);
+    else if (m.kind === "setColors") parts.push(`becomes ${m.colors.map((c) => COLOR_NAMES[c].toLowerCase()).join(" and ") || "colorless"}`);
+    else if (m.kind === "setLandTypes") parts.push(`becomes ${m.subtypes.map((t) => (t === "Plains" ? t : `${/^[AEIOU]/.test(t) ? "an" : "a"} ${t}`)).join(" ")}`);
     else if (m.kind === "setSubtypes" || m.kind === "setTypes" || m.kind === "addTypes")
       parts.push(`becomes ${[...("types" in m ? m.types : []), ...m.subtypes].join(" ")}`.trim());
     else parts.push(m.kind.replace(/([A-Z])/g, " $1").toLowerCase());

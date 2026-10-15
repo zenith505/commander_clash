@@ -3,7 +3,7 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
+import { bindChosenKeywords, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import type { CardDef, Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, StackItem, TriggerEventInfo } from "../types";
@@ -293,7 +293,12 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
         : // "Becomes the creature type of your choice": the type chosen as it resolved.
           (m.kind === "setSubtypes" || m.kind === "addTypes") && m.subtypes.includes(CHOSEN_TYPE)
           ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_TYPE ? [st] : s.resolving?.chosen?.type ? [s.resolving.chosen.type] : [])) }
-          : m,
+          : // "Becomes the basic land type of your choice", "becomes the color of your choice".
+            m.kind === "setLandTypes" && m.subtypes.includes(CHOSEN_LAND_TYPE)
+            ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_LAND_TYPE ? [st] : s.resolving?.chosen?.landType ? [s.resolving.chosen.landType] : [])) }
+            : m.kind === "setColors" && m.chosen
+              ? { kind: "setColors", colors: s.resolving?.chosen?.color ? [s.resolving.chosen.color] : [] }
+              : m,
   );
 }
 
@@ -331,6 +336,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "regenerate":
     case "exile":
     case "returnLinked":
+    case "grantFlashback":
     case "pick":
     case "empowerJace":
     case "bounce":

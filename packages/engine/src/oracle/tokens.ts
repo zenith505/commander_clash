@@ -66,6 +66,9 @@ export function parseCountMod(line: string): CountMod | undefined {
   if (m) return { what: "tokens", who: "you", op: "plusOne", subtype: m[1]! };
   m = /^If one or more \+1\/\+1 counters would be put on (another|a) creature( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature) instead\.$/.exec(line);
   if (m) return { what: "counters", counter: "+1/+1", on: "creature", who: m[2] ? "you" : "any", op: m[3] === "twice that many" ? "double" : "plusOne", ...(m[1] === "another" ? { other: true } : {}) };
+  // Vizier of Remedies.
+  if (line === "If one or more -1/-1 counters would be put on a creature you control, that many -1/-1 counters minus one are put on it instead.")
+    return { what: "counters", counter: "-1/-1", on: "creature", who: "you", op: "minusOne" };
   m = /^If an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead\.$/.exec(line);
   if (m) return { what: "counters", on: "permanent", who: "you", op: "double" };
   return undefined;

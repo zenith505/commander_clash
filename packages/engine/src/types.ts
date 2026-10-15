@@ -163,8 +163,8 @@ export interface GameObject {
    * disguise). Only its controller may look at it (CR 708.5).
    */
   faceDown?: FaceDownKind;
-  /** Cards this permanent exiled "until ~ leaves the battlefield" (CR 610.3), as they are in exile. */
-  exiledUntilLeaves?: { id: ObjectId; zc: number }[];
+  /** Cards this permanent exiled "until ~ leaves the battlefield" (CR 610.3), as they are in exile; `hand`: it came from a hand and goes back there. */
+  exiledUntilLeaves?: { id: ObjectId; zc: number; hand?: true }[];
   /** Cast as a prototyped spell (CR 718.3): its alternative mana cost, color, power and toughness, on the stack and the battlefield. */
   prototyped?: boolean;
   /**
@@ -526,6 +526,8 @@ export interface GameState {
   leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
+  /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
+  flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
   nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
@@ -648,6 +650,8 @@ export interface MulliganState {
 export interface Chosen {
   type?: string;
   color?: Color;
+  /** "The basic land type of your choice" (Reef Shaman). */
+  landType?: string;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

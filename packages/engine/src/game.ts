@@ -1,6 +1,6 @@
 import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
+import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
@@ -667,8 +667,12 @@ type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: 
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
  * then its enters event. `withCounters`: its "enters with N counters", counted before it was on the battlefield.
  */
-function finishEntering(s: GameState, o: GameObject, printed: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number }) {
+function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opts: EnterOpts, withCounters?: { counter: string; n: number }) {
   const id = o.id;
+  // Its own replacement effects apply only if it has them as it would exist on the battlefield (CR 614.12): a nonbasic
+  // land entering under Blood Moon has lost them (CR 305.7, rulings), so it doesn't enter tapped.
+  const printed = characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
+  if (!characteristics(s, o).hasPrintedAbilities) withCounters = undefined;
   if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = true;
   // A planeswalker enters with its printed loyalty in loyalty counters (CR 306.5b), its copiable values' if it's a copy.
   const loyalty = isType(defOf(s, o), "Planeswalker") ? Number.parseInt(defOf(s, o).loyalty ?? "", 10) : NaN;
@@ -724,10 +728,20 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
  * exiled; a token has ceased to exist (CR 111.7). An Aura's owner chooses what it enchants, and with
  * nothing it can enchant it stays in exile (CR 303.4f-g).
  */
-function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number }[], source: string) {
-  const back = links.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === links[i]!.zc && !c.isToken);
-  for (const c of back) {
+function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true }[], source: string) {
+  const back = links.filter((l) => {
+    const c = s.objects[l.id];
+    return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
+  });
+  for (const l of back) {
+    const c = obj(s, l.id);
     const d = defOf(s, c);
+    // It returns to the zone it was exiled from (CR 610.3): Kitesail Freebooter's card goes back to its owner's hand.
+    if (l.hand) {
+      log(s, `${d.name} returns to its owner's hand (${source} left).`);
+      moveObject(s, c.id, "hand");
+      continue;
+    }
     let attachTo: ObjectId | undefined;
     if (d.subtypes.includes("Aura")) {
       attachTo = auraHostFor(s, c, c.owner);
@@ -1248,6 +1262,7 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
 
 function finishCleanup(s: GameState) {
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
+  s.flashbackGrants = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
   for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
@@ -1612,14 +1627,14 @@ export function castProblem(
   const plotted = !free && plottedCast(s, pid, o);
   // Casting it face down is an alternative cost: no other one can go with it (CR 118.9a).
   if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
-  const via = graveyardCast(d, choices?.via);
+  const via = graveyardWay(s, o, choices?.via);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
-  if (via && (via.kind === "flashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
+  if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
-    return o.zone === "graveyard" && compileCard(d).fromGraveyard?.length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
+    return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
@@ -1710,7 +1725,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
   // So do evoke, dash, bestow and madness (CR 702.74a, 702.109a, 702.103a, 702.35a).
-  const base = how.faceDown ? "{3}" : (madness ?? graveyardCast(d, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost);
+  const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost);
   const mana = parseManaCost(base + kickCost);
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
@@ -1925,7 +1940,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
-  const via = graveyardCast(d, choices.via);
+  const via = graveyardWay(s, o, choices.via);
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -2021,8 +2036,22 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
   return via ? compileCard(d).fromGraveyard?.find((g) => g.kind === via) : undefined;
 }
 
+/** Flashback an effect gave this card until end of turn, its cost equal to the card's mana cost (Snapcaster Mage). */
+export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0));
+
+/** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
+export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] {
+  const d = defOf(s, o);
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : [])];
+}
+
+/** One way to cast it from a graveyard, if it has it. */
+export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyardKind): CastFromGraveyard | undefined {
+  return via ? graveyardWays(s, o).find((g) => g.kind === via) : undefined;
+}
+
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
-  return via === "jumpStart" ? "jump-start" : via;
+  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via;
 }
 
 /** ", kicked", ", kicked twice", ", kicked with {1}{U}", for the log. */
@@ -2322,6 +2351,12 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
+  // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).
+  if (ab.putCounters) {
+    const put = putCounters(s, o, ab.putCounters.counter, ab.putCounters.n);
+    invalidateCharacteristics(s);
+    log(s, `${p.name} puts ${put === 1 ? "a" : put} ${ab.putCounters.counter} counter${put === 1 ? "" : "s"} on ${d.name}.`);
+  }
   // A loyalty cost puts on or removes loyalty counters (CR 606.4); counters put on as a cost aren't doubled (rulings).
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     const change = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
@@ -3519,7 +3554,7 @@ function attachmentSBAs(s: GameState): boolean {
 
 /**
  * Notice permanents whose controller changed. The new controller hasn't controlled it
- * continuously since their turn began (CR 302.6), and it leaves combat (CR 506.4).
+ * continuously since their turn began (CR 302.6), and it leaves combat (CR 506.4), as does one that stopped being a creature.
  */
 function syncControl(s: GameState) {
   for (const id of s.battlefield) {
@@ -3539,6 +3574,13 @@ function syncControl(s: GameState) {
         removeFromCombat(s, o);
         clearCombat(o);
       }
+    }
+    // An attacking or blocking creature that stops being a creature (a Vehicle whose Aerial Modification fell off) is
+    // removed from combat too (CR 506.4).
+    if ((o.attacking !== undefined || o.blocking !== undefined) && !objIsType(s, o, "Creature")) {
+      log(s, `${nameOf(s, o.id)} is no longer a creature and is removed from combat.`);
+      removeFromCombat(s, o);
+      clearCombat(o);
     }
   }
 }

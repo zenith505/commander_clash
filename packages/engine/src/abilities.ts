@@ -289,8 +289,14 @@ export type Modification =
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
   | { kind: "setTypes"; types: string[]; subtypes: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
+  /**
+   * Layer 4, "Nonbasic lands are Mountains", "enchanted land is an Island": the land's land types become these basic
+   * ones, and it loses the abilities from its rules text, gaining each basic type's mana ability instead (CR 305.7).
+   */
+  | { kind: "setLandTypes"; subtypes: string[] }
   | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
-  | { kind: "setColors"; colors: Color[] } // layer 5
+  /** `chosen`: "becomes the color of your choice", the color chosen as it resolved. */
+  | { kind: "setColors"; colors: Color[]; chosen?: true } // layer 5
   /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
   | { kind: "addKeywords"; keywords: string[]; spares?: true }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
@@ -407,7 +413,7 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
@@ -471,6 +477,12 @@ export type Effect =
    * returnLinked. `until`: it comes back right after the source leaves, without a trigger (CR 610.3).
    */
   | { type: "exile"; what: ObjRef; until?: "sourceLeaves"; linked?: boolean }
+  /**
+   * "Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to
+   * its mana cost." (Snapcaster Mage), "each instant and sorcery card in your graveyard ..." (Past in Flames): only the
+   * cards there as it resolves (rulings). A card with no mana cost can't be cast this way (rulings).
+   */
+  | { type: "grantFlashback"; what?: ObjRef; each?: TargetSpec }
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
   | { type: "returnLinked"; dest: "battlefield" | "hand" }
   /**
@@ -644,9 +656,11 @@ export type Effect =
   /**
    * "Target opponent reveals their hand. You choose a nonland card from it. That player discards that card." (CR 701.9b:
    * another player chooses the card), "... and exile that card": the ability's controller picks one matching card from
-   * that player's hand, if there is one.
+   * that player's hand, if there is one. `until`: "Exile that card until ~ leaves the battlefield" (Kitesail Freebooter;
+   * CR 610.3: it returns to its owner's hand). `linked`: Tidehollow Sculler's "When ~ leaves the battlefield, return the
+   * exiled card to its owner's hand" returns it (CR 607.2a).
    */
-  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile" }
+  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile"; until?: "sourceLeaves"; linked?: boolean }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
@@ -762,7 +776,7 @@ export type Effect =
   | { type: "choose"; choice: ChoiceKind; except?: string };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
-export type ChoiceKind = "creatureType" | "color";
+export type ChoiceKind = "creatureType" | "color" | "basicLandType";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify";
@@ -1012,6 +1026,8 @@ export interface ActivatedAbility {
   costs?: AdditionalCost[];
   /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */
   removeCounters?: { counter: CounterKind; n: number };
+  /** "Put a -1/-1 counter on ~" as part of the cost (Devoted Druid): replacement effects on counters apply (Vizier of Remedies rulings). */
+  putCounters?: { counter: CounterKind; n: number };
   /**
    * A loyalty ability (CR 606): its cost puts on (+N) or removes (−N) loyalty counters; `loyaltyX` for −X, where X is
    * the number announced. Only as a sorcery, and only one loyalty ability of a permanent each turn (CR 606.3).
@@ -1182,7 +1198,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype";
 
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem";
+/** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   mana?: string;
@@ -1196,7 +1213,7 @@ export interface CastFromGraveyard {
  */
 export type CountMod =
   | { what: "tokens"; who: "you" | "any"; op: "double" | "plusOne"; subtype?: string }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent"; who: "you" | "any"; op: "double" | "plusOne"; other?: boolean };
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
 
 export interface CompiledCard {
   spell?: AbilityBody; // instants and sorceries

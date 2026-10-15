@@ -17,10 +17,12 @@ function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source
 
 /**
  * Applies "plus one" before "twice that many": the affected permanent's controller chooses the order
- * (CR 616.1, Hardened Scales rulings), and this order gives them the most.
+ * (CR 616.1, Hardened Scales rulings), and this order gives them the most. "Minus one" (Vizier of Remedies, on -1/-1
+ * counters) goes first, which gives them the fewest.
  */
-function apply(n: number, ops: ("double" | "plusOne")[]): number {
+function apply(n: number, ops: CountMod["op"][]): number {
   if (n <= 0) return n;
+  for (const op of ops) if (op === "minusOne") n = Math.max(0, n - 1);
   for (const op of ops) if (op === "plusOne") n += 1;
   for (const op of ops) if (op === "double") n *= 2;
   return n;

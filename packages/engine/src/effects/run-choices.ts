@@ -56,7 +56,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "choose": {
       // "Choose a creature type": the controller names one as it resolves (CR 608.2c-d); it's kept for the rest.
       const r = s.resolving!;
-      if (r.chosen?.[e.choice === "color" ? "color" : "type"] === undefined) {
+      if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "basicLandType" ? "landType" : "type"] === undefined) {
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: e.choice, options: choiceOptions(e.choice, e.except) };
         return "paused";
       }

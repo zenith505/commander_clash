@@ -348,6 +348,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "grantFlashback": {
+      // Locked to the cards there now (Past in Flames rulings); it ends with the turn (cleanup, CR 514.2).
+      const each = e.each;
+      const cards = each
+        ? player(s, ctx.controller).graveyard.map((id) => obj(s, id)).filter((o) => printedMatches(each, defOf(s, o)))
+        : e.what
+          ? objects(s, e.what, ctx).filter((o) => o.zone === "graveyard")
+          : [];
+      for (const o of cards) (s.flashbackGrants ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
+      if (cards.length) log(s, `${cards.length > 2 ? `${cards.length} cards` : cards.map((o) => defOf(s, o).name).join(" and ")} ${cards.length === 1 ? "gains" : "gain"} flashback until end of turn.`);
+      return;
+    }
     case "returnLinked": {
       // The leaves ability triggered after the source moved, so the object it links to is the one before (CR 400.7).
       const key = `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;

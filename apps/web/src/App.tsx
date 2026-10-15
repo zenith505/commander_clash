@@ -9,6 +9,7 @@ import {
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
+  graveyardWays,
   castExtraCosts,
   mayPlayFromExile,
   mayPlayLandFromGraveyard,
@@ -1103,7 +1104,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   prototype: "the smaller version: the prototype's mana cost, color, power and toughness",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
@@ -1131,7 +1132,7 @@ function exileOptions(s: GameState, id: string): boolean {
 function graveyardOptions(s: GameState, id: string): boolean {
   const d = cardOf(s, id);
   if (mayPlayLandFromGraveyard(s, s.objects[id]!, HUMAN) && canPlayLand(s, id)) return true; // Crucible of Worlds
-  if ((compileCard(d).fromGraveyard ?? []).some((g) => canCastFromGraveyard(s, id, g.kind))) return true;
+  if (graveyardWays(s, s.objects[id]!).some((g) => canCastFromGraveyard(s, id, g.kind))) return true;
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
@@ -2403,7 +2404,7 @@ function AbilityMenu({
         </button>
       )}
       {inYard &&
-        (compileCard(d).fromGraveyard ?? []).map((g) => {
+        graveyardWays(s, o).map((g) => {
           const ok = canCastFromGraveyard(s, objectId, g.kind);
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind }) ?? "");
           return (
@@ -2679,6 +2680,19 @@ function Controls({
             onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}
           >
             {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
+  if (pending?.kind === "chooseOption" && pending.what === "basicLandType" && pending.player === HUMAN)
+    return (
+      <div className="controls color-pick">
+        <span>
+          <strong>{pending.source}:</strong> choose a basic land type
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            <ManaCost cost={`{${({ Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" } as Record<string, string>)[o] ?? "C"}}`} size="sm" /> {o}
           </button>
         ))}
       </div>

@@ -3,7 +3,7 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CHOSEN_PROTECTION } from "../keywords";
+import { bindChosenKeywords, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import type { CardDef, Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, StackItem, TriggerEventInfo } from "../types";
@@ -213,9 +213,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
       if (!o) return [];
       if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc) return [controllerOf(s, o)];
-      // It left the battlefield: its controller as it last existed (CR 608.2h).
+      // It left the battlefield: its controller as it last existed (CR 608.2h). A dies trigger saw it leave, so its
+      // subject is the card where it went, and the trigger carries who controlled it.
       const lk = s.lastKnown?.[o.id];
-      return lk && lk.zc === ctx.subject!.zc ? [lk.controller] : [];
+      if (lk && lk.zc === ctx.subject!.zc) return [lk.controller];
+      return ctx.lki?.controller !== undefined && !player(s, ctx.lki.controller).lost ? [ctx.lki.controller] : [];
     }
     case "targetController": {
       const t = ctx.targets[ref.index];
@@ -288,7 +290,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
       : // "Gains protection from the color of your choice": the color chosen as it resolved.
         m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PROTECTION)
         ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
-        : m,
+        : // "Becomes the creature type of your choice": the type chosen as it resolved.
+          (m.kind === "setSubtypes" || m.kind === "addTypes") && m.subtypes.includes(CHOSEN_TYPE)
+          ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_TYPE ? [st] : s.resolving?.chosen?.type ? [s.resolving.chosen.type] : [])) }
+          : m,
   );
 }
 
@@ -346,6 +351,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "connive":
     case "skipUntap":
     case "counters":
+    case "endure":
     case "moveCounter":
     case "removeCounters":
     case "removeSelfCounter":
@@ -374,6 +380,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTop":
     case "discard":
     case "scry":
+    case "clash":
     case "surveil":
     case "orderTop":
     case "shuffle":

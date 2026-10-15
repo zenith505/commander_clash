@@ -11,6 +11,11 @@ import type { Ctx } from "../body";
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Tap that creature and it doesn't untap during its controller's next untap step" (Kashi-Tribe Warriors).
+  if ((m = /^Tap (target .+?|that creature|it) and it doesn't untap during its controller's next untap step$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "tap", what }, { type: "skipUntap", what }] : null;
+  }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
@@ -39,6 +44,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
     return what ? [{ type: "phaseOut", what }] : null;
   }
+  // Endure N (CR 701.63a): "~ endures 2", "it endures X, where X is ...".
+  if ((m = /^(~|it|that creature) endures (\d+|X)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "endure", what, n: amt(m[2]!) }] : null;
+  }
   // Regeneration (CR 701.19a)
   if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -57,6 +67,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {
     const filter = pickFilter(m[3]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: counterKind(m[2]!), n: amt(m[1]!) } }];
+  }
+  // Bolster N (CR 701.39a): "Choose a creature you control with the least toughness or tied for least toughness among
+  // creatures you control. Put N +1/+1 counters on that creature." Chosen as it resolves, not targeted (rulings).
+  if ((m = /^Bolster (\d+|X)$/i.exec(s))) {
+    const filter = pickFilter("creature")!;
+    return [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1]!) }, least: "toughness" }];
   }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);

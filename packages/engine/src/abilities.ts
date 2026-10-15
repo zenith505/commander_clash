@@ -87,6 +87,8 @@ export type Count =
   | { kind: "colorsSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
+  /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
+  | { kind: "opponentsAttacked" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef };
 
@@ -402,10 +404,10 @@ export type Effect =
    * control to its owner's hand": each player picks n of their own permanents that match, in APNAP order,
    * then they're all sacrificed or returned at once (CR 101.4, 701.21). Not targeted.
    */
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount } }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness" }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
-  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean }
+  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean }
   /** "Put target card from your graveyard on top of / on the bottom of its owner's library". */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
@@ -518,6 +520,10 @@ export type Effect =
   | { type: "exileTop"; who: PlayerRef; n: Amount }
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
+  /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
+  | { type: "endure"; what: ObjRef; n: Amount }
+  /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
+  | { type: "clash" }
   | { type: "surveil"; n: Amount } // CR 701.25
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount }
@@ -607,6 +613,8 @@ export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
+  /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
+  | { kind: "wonClash" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition };
 
@@ -682,6 +690,9 @@ export type TriggerEvent =
   | "selfBlocksCreature"
   | "selfBlockedByCreature" // flanking (CR 702.25a)
   | "selfBlocksOrBlockedByCreature"
+  /** "Whenever ~ deals (combat) damage to a creature": once for each creature dealt damage, its subject. */
+  | "selfDealsDamageToCreature"
+  | "selfDealsCombatDamageToCreature"
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
@@ -824,6 +835,22 @@ export interface ManaAbility {
   oncePerTurn?: boolean;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
+  /** "Spend this mana only to cast a creature spell." (CR 106.6) */
+  spendOnly?: ManaSpend;
+}
+
+/**
+ * What restricted mana can be spent on (CR 106.6): the total cost of casting matching spells, additional and
+ * alternative costs included, and/or the costs of activating abilities ("any", or of permanents matching).
+ */
+export interface ManaSpend {
+  spells?: TargetSpec;
+  abilities?: TargetSpec | "any";
+  /** "Abilities of artifact sources": in any zone, not only permanents. */
+  anyZone?: boolean;
+  /** Any other cost too: a Powerstone's mana "can't be spent to cast a nonartifact spell" (CR 111.10h). */
+  other?: boolean;
+  text: string;
 }
 
 /**
@@ -913,6 +940,11 @@ export interface CompiledCard {
   /** For Auras: what it can enchant, which is also what the Aura spell targets. CR 303.4a, 702.5 */
   enchant?: TargetSpec;
   entersTapped: boolean;
+  /**
+   * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
+   * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
+   */
+  othersEnterTapped?: { filter: TargetSpec; text: string }[];
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
@@ -968,6 +1000,8 @@ export interface CompiledCard {
   countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;
+  /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
+  landsFromGraveyard?: boolean;
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */

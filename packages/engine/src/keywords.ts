@@ -100,6 +100,8 @@ export function canonicalKeyword(text: string): string | undefined {
   const st = creatureTypeOfPlural(q);
   return st ? `Protection from ${text.trim().slice(-q.length).replace(/^./, (c) => c.toUpperCase())}` : undefined;
 }
+/** "Becomes the creature type of your choice": a subtype filled in with the type chosen as it resolved. */
+export const CHOSEN_TYPE = "(the chosen creature type)";
 /** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };

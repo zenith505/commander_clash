@@ -88,6 +88,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const ok = !!taps && player(s, pid).life > life + 5 && wantsMay(s, pid);
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
+    // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
+    if (pend.kind === "chooseMay" && pend.clash) return [{ type: "chooseMay", player: pid, yes: !wantOnTop(s, pid, pend.card!) }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? millExplored(s, pid, pend.card) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting.
@@ -127,6 +129,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const taps = rest && planMana(s, pid, rest.cost, rest.extra);
       return taps ? [...taps, { type: "finishAssistedCast", player: pid }] : [{ type: "finishAssistedCast", player: pid, cancel: true }];
     }
+    // Endure (CR 701.63a): every card that endures is a creature, so grow it rather than make a separate Spirit.
+    if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
+    // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
+    if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
@@ -272,6 +278,8 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
     const tapped = c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false);
     return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };
   });
+  // A land from the graveyard (Crucible of Worlds) first: it keeps a card in hand.
+  options.sort((a, b) => Number(obj(s, b.action.objectId).zone === "graveyard") - Number(obj(s, a.action.objectId).zone === "graveyard"));
   return (options.find((x) => !x.tapped) ?? options[0])?.action ?? null;
 }
 

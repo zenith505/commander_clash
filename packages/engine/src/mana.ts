@@ -53,9 +53,15 @@ export interface Payment {
  * symbols first so a greedy pass doesn't spend mana a later symbol needed.
  * Phyrexian symbols fall back to 2 life when `life` allows.
  */
-export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean } = {}): Payment | null {
+export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool } = {}): Payment | null {
   if (!cost.supported) return null;
   const p = { ...pool };
+  // `prefer`: mana to spend before the rest where there's a choice (mana that can only be spent on this, CR 106.6).
+  const pref = { ...(opts.prefer ?? emptyPool()) };
+  const spend = (c: ManaType) => {
+    p[c]--;
+    if (pref[c] > 0) pref[c]--;
+  };
   let generic = extraGeneric;
   let lifePaid = 0;
   const hybrids: Color[][] = [];
@@ -65,35 +71,37 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     if (s.kind === "generic") generic += s.amount;
     else if (s.kind === "colored") {
       if (p[s.color] <= 0) return null;
-      p[s.color]--;
+      spend(s.color);
     } else if (s.kind === "hybrid") hybrids.push(s.options);
     else if (s.kind === "twoHybrid") twoHybrids.push(s.color);
     else if (s.kind === "phyrexian") phyrexian.push(s.color);
     // X is chosen as 0 for now.
   }
   for (const opts of hybrids) {
-    const best = opts.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0];
+    const best = opts.filter((c) => p[c] > 0).sort((a, b) => pref[b] - pref[a] || p[b] - p[a])[0];
     if (!best) return null;
-    p[best]--;
+    spend(best);
   }
   for (const c of phyrexian) {
-    if (p[c] > 0) p[c]--;
+    if (p[c] > 0) spend(c);
     else if (life - lifePaid >= 2) lifePaid += 2;
     else return null;
   }
   for (const c of twoHybrids) {
-    if (p[c] > 0) p[c]--;
+    if (p[c] > 0) spend(c);
     else generic += 2;
   }
   // Generic: spend colorless first, then whichever color we have most of. With `spreadColors` (sunburst, which counts
   // the colors spent, CR 702.44a), a color not spent yet comes first: the caster chooses what pays for it (CR 601.2h).
   const spent = (c: ManaType) => p[c] < pool[c];
+  const kinds: ManaType[] = ["C", ...COLORS];
   while (generic > 0) {
     const fresh = opts.spreadColors ? COLORS.filter((c) => p[c] > 0 && !spent(c))[0] : undefined;
+    const preferred = kinds.filter((c) => pref[c] > 0 && p[c] > 0).sort((a, b) => pref[b] - pref[a])[0];
     const from: ManaType | undefined =
-      fresh ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0] as ManaType | undefined));
+      fresh ?? preferred ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0] as ManaType | undefined));
     if (!from) return null;
-    p[from]--;
+    spend(from);
     generic--;
   }
   return { pool: p, lifePaid };

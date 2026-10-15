@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
@@ -167,6 +167,13 @@ export interface CopyEffect {
   until?: "endOfTurn" | { turnOf: PlayerId };
 }
 
+/** `n` of the `mana` in a player's pool that can only be spent as `only` says (CR 106.6). */
+export interface RestrictedMana {
+  mana: ManaType;
+  n: number;
+  only: ManaSpend;
+}
+
 export interface Player {
   id: PlayerId;
   name: string;
@@ -177,6 +184,8 @@ export interface Player {
   exile: ObjectId[];
   command: ObjectId[];
   manaPool: Record<ManaType, number>;
+  /** Mana in the pool (counted in manaPool too) that can only be spent some ways (CR 106.6). */
+  restrictedMana?: RestrictedMana[];
   /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
   combatMana?: number;
   landsPlayedThisTurn: number;
@@ -203,6 +212,8 @@ export interface Player {
   draws?: { turn: number; n: number };
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
+  /** The players this player attacked with creatures in the latest combat, and its turn (melee, CR 702.121a). */
+  attackedPlayers?: { turn: number; players: PlayerId[] };
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
   citysBlessing?: boolean;
   /**
@@ -322,6 +333,8 @@ export interface LastKnown {
   attacking?: PlayerId;
   /** Its copiable values as it last existed (CR 707.2, 608.2h), a key into GameState.cards: "becomes a copy of that creature". */
   copyKey?: string;
+  /** Who controlled it as it last existed: "that creature's controller" after it died (CR 608.2h). */
+  controller?: PlayerId;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
@@ -387,7 +400,7 @@ export type PendingDecision =
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -427,7 +440,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture"; options: string[]; labels?: string[]; objectId?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure"; options: string[]; labels?: string[]; objectId?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -577,6 +590,8 @@ export interface Resolving {
   next: number;
   /** Whether the last "you may ..." was done, for a following "If you do, ..." (CR 608.2c). */
   did?: boolean;
+  /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
+  wonClash?: boolean;
   scratch?: {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
@@ -592,6 +607,9 @@ export interface Resolving {
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
     copies?: { of: string; left: number; targets?: TargetChoice[] }; // spell copies still to make, and the next one's targets
+    /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
+    endure?: string; // "counters" or "token" (CR 701.63a)
+    clash?: { opp?: PlayerId; revealed?: Record<string, ObjectId | null>; queue?: PlayerId[]; bottom?: PlayerId[]; answer?: boolean };
   };
 }
 

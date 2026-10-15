@@ -337,7 +337,12 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         body: { targets: [], effects: [{ type: "continuous", what: { ref: "subject" }, mods: [{ kind: "modifyPT", power: 1, toughness: 1 }], duration: "endOfTurn" }], text: "Exalted: that creature gets +1/+1 until end of turn." },
       });
     }
-    else if ((m = /^bushido (\d+)$/i.exec(p))) {
+    else if (/^melee$/i.test(p)) {
+      // CR 702.121a: "Whenever this creature attacks, it gets +1/+1 until end of turn for each opponent you attacked
+      // with a creature this combat." Each instance triggers separately (702.121b).
+      const n = { count: { kind: "opponentsAttacked" as const } };
+      out.triggers.push({ event: "selfAttacks", body: { targets: [], effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: n, toughness: n }], duration: "endOfTurn" }], text: "Melee: ~ gets +1/+1 until end of turn for each opponent you attacked with a creature this combat." } });
+    } else if ((m = /^bushido (\d+)$/i.exec(p))) {
       // CR 702.45a: "Whenever this creature blocks or becomes blocked, it gets +N/+N until end of turn."
       const n = Number(m[1]);
       out.triggers.push({ event: "selfBlocksOrBecomesBlocked", body: { targets: [], effects: [pumpSelf(n, n)], text: `Bushido ${n}: ~ gets +${n}/+${n} until end of turn.` } });

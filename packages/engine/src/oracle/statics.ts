@@ -236,6 +236,12 @@ function parseStaticMods(rest: string): Modification[] | null {
     const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
     return first && grants && more ? [...first, ...grants, more] : null;
   }
+  // "Gets +2/+2 and can't block" (Childhood Horror), "gets +1/+1 and attacks each combat if able".
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|must be blocked if able)$`).exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[4]!);
+    return first && second ? [...first, ...second] : null;
+  }
   if ((m = new RegExp(`^gets? ${PT}/${PT}(?: and (?:has|have) (.+))?$`).exec(rest))) {
     const mods: Modification[] = [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }];
     if (m[3]) {

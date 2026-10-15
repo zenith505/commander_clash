@@ -6,6 +6,7 @@
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
 import { abilitiesOf } from "./cards";
+import { fireEvent } from "./effects";
 import { gainLife, log, loseLife, player, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
@@ -107,6 +108,8 @@ export function dealDamage(
     }
     if (has(src, "Deathtouch")) o.deathtouchDamage = true;
     if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);
+    // "Whenever ~ deals damage to a creature" (combat damage is all dealt before any of it triggers anything).
+    if (src.id && c.types.includes("Creature")) fireEvent(s, { type: "damagedCreature", source: src.id, id: o.id, amount: n, combat: !!opts.combat });
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {

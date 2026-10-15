@@ -44,7 +44,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick", "clash", "endure"]);
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
@@ -205,6 +205,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       copy.newTargets = true;
       continue;
     }
+    // "Clash with an opponent. If you win, ... Otherwise, ...": decided by that clash (CR 701.30d).
+    const ifWin = /^If you win, (.+)$/.exec(s);
+    if (ifWin) {
+      const clashed = (es: Effect[]): boolean => es.some((e) => e.type === "clash" || (e.type === "may" && clashed(e.effects)));
+      const inner = clashed(effects) && parseOne(ifWin[1]!.charAt(0).toUpperCase() + ifWin[1]!.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      effects.push({ type: "if", cond: { kind: "wonClash" }, effects: inner });
+      continue;
+    }
+    const otherwise = /^Otherwise, (.+)$/.exec(s);
+    if (otherwise) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "if" || prev.cond.kind !== "wonClash" || prev.otherwise) return null;
+      const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      prev.otherwise = inner;
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -214,6 +232,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       continue;
     }
+    // "Create four Bear tokens instead if there are seven or more cards in your graveyard" (threshold) is
+    // "If there are seven or more cards in your graveyard, create four Bear tokens instead."
+    const insteadIf = /^(.+) instead if ([^,]+)$/.exec(s);
+    if (insteadIf) s = `If ${insteadIf[2]}, ${insteadIf[1]!.charAt(0).toLowerCase()}${insteadIf[1]!.slice(1)} instead`;
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
@@ -258,6 +280,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push({ type: "choose", choice: "color" });
       s = s.replace("the color of your choice", "the chosen color");
     }
+    // "~ becomes the creature type of your choice until end of turn", "Creatures of the creature type of your choice
+    // get +X/+X until end of turn": the type is chosen as it resolves (CR 608.2d). Not "target creatures of the
+    // creature type of your choice", which would need the choice as the targets are chosen.
+    if (/\bbecomes? the creature type of your choice\b/.test(s) || (/\bof the creature type of your choice\b/.test(s) && !/\btarget\b/i.test(s))) {
+      effects.push({ type: "choose", choice: "creatureType" });
+      s = s.replace(/\b(becomes?) the creature type of your choice\b/, "$1 the chosen creature type").replace(/\bof the creature type of your choice\b/, "of the chosen type");
+    }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."
     if (/^You gain life equal to the (?:total )?life lost this way$/.test(s)) {
       const last = effects[effects.length - 1];
@@ -266,7 +295,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c).
-    if (/^(It|They) can't be regenerated$/i.test(s)) {
+    if (/^(It|They|The creature) can't be regenerated$/i.test(s)) {
       const last = effects[effects.length - 1];
       if (!last || last.type !== "destroy") return null;
       last.noRegen = true;

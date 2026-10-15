@@ -73,6 +73,8 @@ export type TriggerSourceEvent =
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** A permanent dealt damage to a creature (`id`). */
+  | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
@@ -247,7 +249,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever another creature dies", "a creature you control", "equipped creature": abilities of permanents
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     if (ev.to === "graveyard" && ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
         add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);
@@ -364,6 +366,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield")
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
+  } else if (ev.type === "damagedCreature") {
+    const o = s.objects[ev.source];
+    const hit = s.objects[ev.id];
+    if (o?.zone === "battlefield" && hit)
+      add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };

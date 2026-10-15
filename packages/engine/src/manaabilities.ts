@@ -6,7 +6,8 @@ import { basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
 import { isSummoningSick, obj, player, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
-import { parseManaCost, payFromPool } from "./mana";
+import { parseManaCost } from "./mana";
+import { canPayFromPool } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
 import { COLORS, type Action, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
@@ -84,7 +85,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.lifeCost && p.life < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
-  if (!ignorePool && ab.manaCost && !payFromPool(parseManaCost(ab.manaCost), p.manaPool)) return "not enough mana";
+  if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, parseManaCost(ab.manaCost), { ability: o })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);

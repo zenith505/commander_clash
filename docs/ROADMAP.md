@@ -1,6 +1,6 @@
 # Roadmap
 
-12,772 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+13,022 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,11 +14,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: "spend this mana only to cast a creature spell", Kashi-Tribe's "tap that creature and it
-   doesn't untap during its controller's next untap step", "{N}: ~ becomes the creature type of your choice",
-   "when enchanted creature dies, return that card to the battlefield under your control", clash, bolster, endure,
-   "you may play lands from your graveyard", Powerstone tokens, "creatures your opponents control enter tapped",
-   melee, threshold.
+1. By `npm run blockers`: "whenever enchanted land is tapped for mana, its controller adds an additional one mana"
+   (Fertile Ground) and Mana Flare's "adds one mana of any type that land produced", the en-Kor "next N damage that
+   would be dealt to ~ this turn is dealt to target creature you control instead", "each player can't cast more than
+   one spell each turn", Auras with "protection from the chosen color. This effect doesn't remove ~", Lairs' "sacrifice
+   it unless you return a non-Lair land", Borderposts' alternative cost, "spells your opponents cast that target ~ cost
+   {N} more", "when ~ dies, put its counters on target creature you control", "whenever enchanted creature deals
+   damage, you gain that much life", "divided as you choose among any number of targets".
 
 ## Known gaps (from earlier rounds)
 
@@ -29,7 +31,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Protection from a player; Auras whose protection doesn't remove themselves.
 - "One or more creatures enter/die" (once per batch), "whenever ~ connives", "while ~ is in your graveyard".
 - Choosing what to proliferate. "Exile any number of them and put the rest back in any order".
-- Effects on the attackers as a group; impulse draw from an opponent's library; lands from graveyard or library.
+- Effects on the attackers as a group; impulse draw from an opponent's library; "play lands from the top of your
+  library"; Glacierwood Siege's modal choice.
 - Vorinclex (counters on players, halving), Academy Manufactor.
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".
@@ -98,6 +101,19 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   Undercity and the initiative work. Dungeoneer's Pack's compound sentence. "Completed a dungeon" conditions.
 - Blitz and warp with non-mana costs; cards that care about warped or plotted cards ("void", "if it was warped").
   Reconfigure with non-mana costs. Transforming anything but an Incubator token (double-faced cards).
+- Restricted mana: "of the chosen type" (Cavern of Souls, Secluded Courtyard), "and that spell can't be countered",
+  "spells with {X} in their mana costs", "multicolored", "with flashback from a graveyard", cumulative upkeep, "an
+  ability of a [type] source or a [type] spell" lists with three or more types, mana added by an enters trigger
+  (Eager Flameguide, Boommobile), unlocking doors and turning face up.
+- "Creatures your opponents control enter tapped": a permanent that enters at the same time as the one with the
+  ability is treated as entering after it (CR 614.12 says it isn't affected).
+- Clash: "whenever you clash" / "whenever you win a clash" triggers, "clash with defending player" (Marvo), Hoarder's
+  Greed's "repeat this process", Whirlpool Whelm's "instead". Bots always clash with the next opponent in turn order.
+- Endure on a compound sentence ("you lose 1 life and ~ endures 1"), "enters or attacks" triggers, Pay X life costs.
+  Bolster with "differently named" counts. Melee on Lieutenant ("as long as you control your commander, ... have
+  melee").
+- Threshold activated abilities with "Activate only if there are seven or more cards in your graveyard", threshold
+  granting quoted triggers, "choose a color" inside a threshold "If" sentence.
 - Assist: bots never ask for or give help (everyone else is an opponent). Gang Up's "power X or less" target.
   Assist kicker (All-Star Kicker) and team-play cards.
 

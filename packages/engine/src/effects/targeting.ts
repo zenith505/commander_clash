@@ -1,6 +1,6 @@
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Range, TargetChoice, TargetSpec } from "../abilities";
 import { manaValue, parseManaCost } from "../mana";
-import { defOf, objHasKeyword, objIsType, power } from "../cards";
+import { defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { livingPlayers, obj, player } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
 import { modeCountProblem } from "../modes";
@@ -263,6 +263,10 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 // Resolving
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
-export function pickOptions(s: GameState, e: { filter: TargetSpec }, pid: PlayerId): ObjectId[] {
-  return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false));
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness" }, pid: PlayerId): ObjectId[] {
+  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false));
+  if (e.least !== "toughness") return ids;
+  // Bolster: the least toughness, or tied for it (CR 701.39a).
+  const min = Math.min(...ids.map((id) => toughness(s, obj(s, id))));
+  return ids.filter((id) => toughness(s, obj(s, id)) === min);
 }

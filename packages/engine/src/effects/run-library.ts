@@ -2,7 +2,8 @@ import type { Effect } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
-import { log, moveObject, obj, player } from "../game";
+import { log, moveObject, obj, opponents, player } from "../game";
+import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { printedMatches } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow } from "./resolve";
@@ -85,6 +86,58 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const names = arranged.away.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }
+      return;
+    }
+    case "clash": {
+      // CR 701.30b: "Choose an opponent. You and that opponent each clash." Both reveal at once, decide in APNAP order
+      // whether to put their card on the bottom, then the cards move at the same time (701.30c).
+      const r = s.resolving!;
+      const c = ((r.scratch ??= {}).clash ??= {});
+      if (c.opp === undefined) {
+        const opps = opponents(s, ctx.controller);
+        if (!opps.length) {
+          r.wonClash = false;
+          return;
+        }
+        if (opps.length > 1) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "clash", options: opps.map(String), labels: opps.map((pid) => player(s, pid).name) };
+          return "paused";
+        }
+        c.opp = opps[0]!;
+      }
+      const who = apnap(s, [ctx.controller, c.opp]);
+      if (!c.revealed) {
+        // An empty library reveals nothing (CR 701.30a).
+        c.revealed = Object.fromEntries(who.map((pid) => [pid, player(s, pid).library[0] ?? null]));
+        for (const pid of who) {
+          const id = c.revealed[pid];
+          log(s, `${player(s, pid).name} reveals ${id ? `${defOf(s, obj(s, id)).name} (mana value ${clashValue(s, id)})` : "nothing"} for the clash.`);
+        }
+        c.queue = who.filter((pid) => c.revealed![pid]);
+        c.bottom = [];
+      }
+      while (c.queue!.length) {
+        const pid = c.queue![0]!;
+        if (c.answer === undefined) {
+          const id = c.revealed[pid]!;
+          s.pending = { kind: "chooseMay", player: pid, prompt: `put ${defOf(s, obj(s, id)).name} on the bottom of your library`, source: src, card: id, clash: true };
+          return "paused";
+        }
+        if (c.answer) c.bottom!.push(pid);
+        c.answer = undefined;
+        c.queue!.shift();
+      }
+      for (const pid of c.bottom!) {
+        const p = player(s, pid);
+        const id = c.revealed[pid]!;
+        p.library = [...p.library.filter((x) => x !== id), id];
+        log(s, `${p.name} puts the revealed card on the bottom of their library.`);
+      }
+      // CR 701.30d: you win with a card of higher mana value than every other card revealed.
+      const mine = c.revealed[ctx.controller];
+      const theirs = c.revealed[c.opp];
+      r.wonClash = !!mine && (!theirs || clashValue(s, mine) > clashValue(s, theirs));
+      log(s, `${player(s, ctx.controller).name} ${r.wonClash ? "wins" : "doesn't win"} the clash.`);
       return;
     }
     case "orderTop": {
@@ -237,4 +290,11 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
       body: { targets: [], effects: [{ type: "madness" }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
     });
   }
+}
+
+/** A card's mana value in a library: a split card's halves together (CR 709.4a). */
+function clashValue(s: GameState, id: ObjectId): number {
+  return defOf(s, obj(s, id))
+    .manaCost.split(" // ")
+    .reduce((n, half) => n + manaValue(parseManaCost(half)), 0);
 }

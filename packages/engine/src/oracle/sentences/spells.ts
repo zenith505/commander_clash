@@ -33,6 +33,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;
   }
+  // Clash (CR 701.30b): see "If you win, ..." in body.ts.
+  if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
   // Scry and surveil (CR 701.22, 701.25)
   if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
   // Fighting (CR 701.14) and "deals damage equal to its power to"

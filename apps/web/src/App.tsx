@@ -10,6 +10,7 @@ import {
   delveRoom,
   graveyardCast,
   mayPlayFromExile,
+  mayPlayLandFromGraveyard,
   assistedRemaining,
   dungeonByName,
   commanderTax,
@@ -994,6 +995,7 @@ function exileOptions(s: GameState, id: string): boolean {
 /** Does this card in your graveyard have something you could do with it now (flashback, unearth, ...)? */
 function graveyardOptions(s: GameState, id: string): boolean {
   const d = cardOf(s, id);
+  if (mayPlayLandFromGraveyard(s, s.objects[id]!, HUMAN) && canPlayLand(s, id)) return true; // Crucible of Worlds
   if ((compileCard(d).fromGraveyard ?? []).some((g) => canCastFromGraveyard(s, id, g.kind))) return true;
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
@@ -1612,7 +1614,7 @@ function Seat({
           </span>
         )}
         {p.lost && <span className="error">Out: {p.lossReason}</span>}
-        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} />}</span>
+        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} restricted={p.restrictedMana} />}</span>
       </header>
       <div className="seat-body">
         <div className="zones" onClick={(e) => e.stopPropagation()}>
@@ -2179,8 +2181,9 @@ function AbilityMenu({
 }) {
   const o = s.objects[objectId]!;
   const d = seenCardOf(s, objectId);
-  // A card you may play from exile for now works like one in your hand (impulse draw).
-  const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN);
+  // A card you may play from exile for now works like one in your hand (impulse draw), and so does a land you may
+  // play from your graveyard (Crucible of Worlds).
+  const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
@@ -2560,6 +2563,32 @@ function Controls({
       </div>
     );
   }
+  if (pending?.kind === "chooseOption" && pending.what === "endure" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> endure with
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} className={i === 0 ? "" : "ghost"} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
+  if (pending?.kind === "chooseOption" && pending.what === "clash" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> clash with which opponent?
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "venture" && pending.player === HUMAN)
     return (
       <div className="controls">

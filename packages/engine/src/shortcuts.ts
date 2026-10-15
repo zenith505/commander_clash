@@ -1,6 +1,6 @@
 import { planActivate, planCast } from "./autopay";
 import { applyInPlace, cloneState, log, player, waitingOn } from "./game";
-import { RulesError, type Action, type GameEvent, type GameState, type ObjectId, type PlayerId } from "./types";
+import { RulesError, type Action, type GameEvent, type GameState, type ObjectId, type PlayerId, type TurnLog } from "./types";
 
 // Loops (CR 732). A player with priority may propose a shortcut: the game choices of one pass through a loop, for every
 // player, repeated a number of times (732.2a). Each other player accepts or shortens it to the point where they'd
@@ -364,7 +364,27 @@ export function stateHash(s: GameState): string {
     }
     return byId ? Object.fromEntries(Object.entries(out).sort(([p], [q]) => (p < q ? -1 : 1))) : out;
   };
-  return hash(JSON.stringify(walk(s)));
+  return hash(JSON.stringify(walk({ ...s, turnLog: turnLogSummary(s.turnLog) })));
+}
+
+/**
+ * What of the turn's log can still matter: the Traps count no higher than three (Ravenous Trap's "three or more cards"),
+ * so a loop that keeps adding to it repeats once each count reaches that.
+ */
+const TURN_LOG_CAP = 3;
+function turnLogSummary(t: TurnLog | undefined) {
+  if (!t) return undefined;
+  const capped = (r: Record<number, number>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.min(v, TURN_LOG_CAP)]));
+  const entered: Record<string, number> = {};
+  for (const e of t.entered ?? []) entered[JSON.stringify(e)] = Math.min((entered[JSON.stringify(e)] ?? 0) + 1, TURN_LOG_CAP);
+  return {
+    searched: t.searched,
+    gainedLife: t.gainedLife,
+    destroyed: [...new Set((t.destroyed ?? []).map((e) => JSON.stringify(e)))].sort(),
+    entered,
+    damagedBy: capped(Object.fromEntries(Object.entries(t.damagedBy ?? {}).map(([k, v]) => [k, v.length]))),
+    toGraveyard: capped(t.toGraveyard ?? {}),
+  };
 }
 
 /** cyrb53: a fast 53-bit string hash. */

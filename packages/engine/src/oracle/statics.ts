@@ -217,6 +217,16 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
+  // The Traps' "this turn" conditions (see StaticCondition opponentSearched).
+  if (/^an opponent searched their library this turn$/.test(text)) return { kind: "opponentSearched" };
+  if ((m = new RegExp(`^an opponent had (?:an?|${NUM} or more) (?:(white|blue|black|red|green) )?(artifact|creature|land|enchantment|planeswalker)s? enter the battlefield under their control this turn$`).exec(text)))
+    return { kind: "opponentEntered", types: [capital(m[3]!)], ...(m[2] ? { color: COLOR_WORDS[m[2]]! } : {}), n: m[1] ? num(m[1]) : 1 };
+  if (/^a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled$/.test(text)) return { kind: "destroyedByOpponent" };
+  if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
+  if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
+  if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
+  if ((m = /^an opponent cast an? (white|blue|black|red|green) spell this turn$/.exec(text))) return { kind: "opponentCast", color: COLOR_WORDS[m[1]!]! };
+  if ((m = /^you have no (land|creature|artifact|enchantment|instant|sorcery|planeswalker) cards in hand$/.exec(text))) return { kind: "noneInHand", filter: { kind: "card", types: [capital(m[1]!)], text: `${m[1]} card` } };
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };

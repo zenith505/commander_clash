@@ -605,6 +605,22 @@ export interface GameEvent {
   to?: PlayerId;
 }
 
+/** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
+export interface TurnLog {
+  /** Players who searched their library (Archive Trap). */
+  searched?: PlayerId[];
+  /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
+  entered?: { controller: PlayerId; types: string[]; colors: Color[] }[];
+  /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
+  destroyed?: { controller: PlayerId; by: PlayerId }[];
+  /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
+  damagedBy?: Record<number, string[]>;
+  /** Players who gained life (Needlebite Trap). */
+  gainedLife?: PlayerId[];
+  /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */
+  toGraveyard?: Record<number, number>;
+}
+
 export interface GameState {
   /** Phased-out permanents (CR 702.26b), which are treated as though they don't exist. */
   phasedOut?: ObjectId[];
@@ -622,7 +638,7 @@ export interface GameState {
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
-  castThisTurn?: { player: PlayerId; card: string }[];
+  castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[] }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** Each spell cast this turn as it was cast, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
@@ -681,6 +697,8 @@ export interface GameState {
   damagedThisTurn?: PlayerId[];
   /** How much damage each player was dealt this turn (Spinerock Knoll). */
   damageThisTurn?: Record<number, number>;
+  /** What the Traps' "this turn" conditions look back at (StaticCondition opponentSearched and the rest); cleared each turn. */
+  turnLog?: TurnLog;
   /**
    * Power and toughness of permanents as they last existed on the battlefield (CR 608.2h), for
    * "destroy target creature; you gain life equal to its power". `zc` is its zoneChanges while it

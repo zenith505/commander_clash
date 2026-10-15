@@ -100,17 +100,22 @@ export function parseCostKeyword(
     if (cond === null) return "fail";
     let mana = "";
     const costs: AdditionalCost[] = [];
-    for (const part of m[2]!.split(" and ")) {
+    // An X in it is the spell's (the Shoals' "a red card with mana value X", CR 107.3a).
+    const allowX = /\{X\}/.test(d.manaCost);
+    // One cost with "and" in it ("discard an Island card and another card"), or several joined by "and".
+    const whole = parseAdditionalCost(m[2]!, allowX);
+    for (const part of whole ? [] : m[2]!.split(" and ")) {
       const pay = /^pay ((?:\{[^}]+\})+)$/.exec(part);
       if (pay && !mana && !costs.length) {
         if (!plainMana(pay[1]!)) return "fail";
         mana = pay[1]!;
         continue;
       }
-      const c = parseAdditionalCost(part);
+      const c = parseAdditionalCost(part, allowX);
       if (!c) return "fail";
       costs.push(c);
     }
+    if (whole) costs.push(whole);
     const text = m[2]!.replace(/^pay (?:\{[^}]+\})+(?: and )?/, "");
     return { alt: { kind: "alternative", mana, ...(costs.length ? { costs } : {}), ...(cond ? { if: cond } : {}), ...(text ? { text } : {}) } };
   }
@@ -361,6 +366,11 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     if (spec?.kind !== "object" || spec.controller || spec.combat) return null;
     return { kind: "sacrifice", filter: { ...spec, text: m[2]! }, ...n };
   }
+  // "Discard an Island card and another card" (Foil): two cards, one of them an Island card.
+  if ((m = /^discard an? (.+? card) and another card$/i.exec(text))) {
+    const oneOf = parseSearchFilter(m[1]!);
+    return oneOf ? { kind: "discard", n: 2, oneOf } : null;
+  }
   if ((m = new RegExp(`^discard ${NUM} cards?( at random)?$`, "i").exec(text))) return { kind: "discard", n: num(m[1]!), ...(m[2] ? { random: true as const } : {}) };
   // "Discard X cards", "discard X land cards", "discard X cards at random".
   if (allowX && (m = /^discard X (?:(.+?) )?cards( at random)?$/i.exec(text))) {
@@ -372,6 +382,12 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   if ((m = new RegExp(`^discard ${NUM} (.+?) cards?$`, "i").exec(text))) {
     const filter = parseSearchFilter(`${m[2]} card`);
     return filter ? { kind: "discard", n: num(m[1]!), filter } : null;
+  }
+  if (/^reveal your hand$/i.test(text)) return { kind: "revealHand" };
+  // "Exile a red card with mana value X from your hand" (the Shoals): X is the spell's (CR 107.3a).
+  if (allowX && (m = /^exile an? (.+? card) with mana value X from your hand$/i.exec(text))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? { kind: "exileFromHand", n: 1, filter: { ...filter, text: `${m[1]} with mana value X` }, mvX: true } : null;
   }
   // "Exile a blue card from your hand", "exile two red cards from your hand" (Force of Will, Fury of the Horde).
   if ((m = new RegExp(`^exile ${NUM} (?:(.+?) )?cards? from your hand$`, "i").exec(text))) {

@@ -18,7 +18,7 @@
 
 import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
-import { bindChosen, objectMatches } from "./effects";
+import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { bindChosenKeywords, subtypeSet } from "./keywords";
 import { compileCard } from "./oracle";
@@ -420,6 +420,27 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "opponentLostLife":
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "opponentSearched":
+      return (s.turnLog?.searched ?? []).some((p) => p !== you);
+    case "opponentEntered": {
+      // Under one opponent's control: "if an opponent had two or more lands enter" counts each opponent on their own.
+      const n: Record<number, number> = {};
+      for (const e of s.turnLog?.entered ?? [])
+        if (e.controller !== you && cond.types.every((ty) => e.types.includes(ty)) && (!cond.color || e.colors.includes(cond.color))) n[e.controller] = (n[e.controller] ?? 0) + 1;
+      return Object.values(n).some((k) => k >= cond.n);
+    }
+    case "destroyedByOpponent":
+      return (s.turnLog?.destroyed ?? []).some((e) => e.controller === you && e.by !== you);
+    case "damagedByCreatures":
+      return (s.turnLog?.damagedBy?.[you]?.length ?? 0) >= cond.n;
+    case "opponentGainedLife":
+      return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
+    case "opponentCardsToGraveyard":
+      return Object.entries(s.turnLog?.toGraveyard ?? {}).some(([p, k]) => Number(p) !== you && k >= cond.n);
+    case "opponentCast":
+      return (s.castThisTurn ?? []).some((c) => c.player !== you && !!c.colors?.includes(cond.color));
+    case "noneInHand":
+      return !(s.players[you]?.hand ?? []).some((id) => printedMatches(cond.filter, defOf(s, s.objects[id]!)));
     case "opponentDealtDamage":
       // Also an opponent who has left the game since (Spinerock Knoll rulings).
       return Object.entries(s.damageThisTurn ?? {}).some(([p, n]) => Number(p) !== you && n >= cond.n);

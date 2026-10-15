@@ -551,6 +551,33 @@ export type StaticCondition =
   /** Void: "if a nonland permanent left the battlefield this turn or a spell was warped this turn". */
   | { kind: "void" }
   /**
+   * The Traps' "this turn" conditions (Zendikar), checked as the spell is cast (CR 601.2b) against what happened this
+   * turn (GameState.turnLog): "if an opponent searched their library this turn" (Archive Trap; only an effect that says
+   * "search", rulings).
+   */
+  | { kind: "opponentSearched" }
+  /**
+   * "If an opponent had an artifact enter the battlefield under their control this turn" (Baloth Cage Trap), "two or more
+   * lands" (Lavaball Trap), "a green creature" (Permafrost Trap), "two or more creatures" (Whiplash Trap): permanents
+   * that entered under one opponent's control, as they entered, with all of `types` and `color`.
+   */
+  | { kind: "opponentEntered"; types: string[]; color?: Color; n: number }
+  /**
+   * "If a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled"
+   * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
+   */
+  | { kind: "destroyedByOpponent" }
+  /** "If you've been dealt damage by two or more creatures this turn" (Inferno Trap): different creatures, anyone's (rulings). */
+  | { kind: "damagedByCreatures"; n: number }
+  /** "If an opponent gained life this turn" (Needlebite Trap): whether or not they also lost life (rulings). */
+  | { kind: "opponentGainedLife" }
+  /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
+  | { kind: "opponentCardsToGraveyard"; n: number }
+  /** "If an opponent cast a blue spell this turn" (Ricochet Trap): the spell's colors as it was cast. */
+  | { kind: "opponentCast"; color: Color }
+  /** "If you have no land cards in hand" (Land Grant). */
+  | { kind: "noneInHand"; filter: TargetSpec }
+  /**
    * "As long as you have 25 or more life", fateful hour's "5 or less life", "at least 7 life more than your starting life
    * total", "your life total is greater than or equal to your starting life total" (CR 903.7: 40): your life total now.
    */
@@ -879,7 +906,7 @@ export type Effect =
    * Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead", "put it on
    * top of its owner's library instead".
    */
-  | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean }
+  | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean; /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */ ifMvX?: true }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
    * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
@@ -1468,7 +1495,7 @@ export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
-  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true }
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }
   | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
@@ -1481,7 +1508,15 @@ export type AdditionalCost =
   /** "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. */
   | { kind: "reveal"; filter: TargetSpec; n: number }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
-  | { kind: "exileFromHand"; filter?: TargetSpec; n: number };
+  | {
+      kind: "exileFromHand";
+      filter?: TargetSpec;
+      n: number;
+      /** "Exile a red card with mana value X from your hand" (the Shoals): its mana value is the X announced (CR 107.3a). */
+      mvX?: true;
+    }
+  /** "Reveal your hand" (Land Grant): all of it, whatever is in it (rulings: even if it's revealed already). */
+  | { kind: "revealHand" };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,

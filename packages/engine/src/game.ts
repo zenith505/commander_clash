@@ -2,7 +2,8 @@ import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { untapStepPhasing, releasePhased } from "./phasing";
+import { loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
@@ -268,7 +269,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
       // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
       if (s.pending?.kind !== "payUnless" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap);
       break;
     case "castSpell":
       if (freeCastOf(s, p.id) === action.objectId) {
@@ -419,6 +420,8 @@ function zoneList(s: GameState, o: GameObject): ObjectId[] | null {
       return p.command;
     case "battlefield":
       return s.battlefield;
+    case "phasedOut":
+      return (s.phasedOut ??= []);
     case "stack":
       return null; // tracked through s.stack
   }
@@ -553,7 +556,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   const withCounters = printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller) ? undefined : printedCounters;
-  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked })) : 0;
+  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
@@ -823,7 +826,7 @@ function checkPairs(s: GameState) {
   }
 }
 
-function removeFromCombat(s: GameState, o: GameObject) {
+export function removeFromCombat(s: GameState, o: GameObject) {
   for (const a of o.blocking ?? []) {
     const att = s.objects[a];
     if (att?.blockedBy) att.blockedBy = att.blockedBy.filter((b) => b !== o.id);
@@ -916,15 +919,29 @@ const STEP_ORDER: Step[] = [
   "cleanup",
 ];
 
+/** Steps that firebending's mana survives the end of: every combat step but the last (CR 702.189a). */
+const KEEPS_COMBAT_MANA = new Set<Step>(["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage"]);
+
 function advanceStep(s: GameState): void {
-  for (const p of s.players) p.manaPool = emptyPool(); // CR 500.4
+  for (const p of s.players) {
+    // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a). Red mana
+    // spent is spent from the rest first, so what's kept is the red left, up to firebending's.
+    const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R) : 0;
+    p.manaPool = emptyPool();
+    p.manaPool.R = keep;
+    p.combatMana = keep || undefined;
+  }
   if (s.step === "cleanup" && s.cleanupAgain) {
     s.cleanupAgain = undefined;
     return beginStep(s, "cleanup"); // CR 514.3a
   }
   if (s.step === "cleanup") return startNextTurn(s);
-  // CR 511.3: as the end of combat step ends, everything is removed from combat.
-  if (s.step === "endCombat") for (const o of attackersAndBlockers(s)) clearCombat(o);
+  // CR 511.3: as the end of combat step ends, everything is removed from combat. Provoke's requirement was for
+  // this combat only (CR 702.39a).
+  if (s.step === "endCombat") {
+    for (const o of attackersAndBlockers(s)) clearCombat(o);
+    for (const id of s.battlefield) obj(s, id).provokedBy = undefined;
+  }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
   beginStep(s, next);
 }
@@ -940,6 +957,7 @@ function startNextTurn(s: GameState) {
     if (order[i] === s.activePlayer || began.size >= order.length) break;
   }
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
+  releasePhased(s, began);
   s.turn++;
   for (const p of s.players) p.landsPlayedThisTurn = 0;
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
@@ -960,6 +978,7 @@ function beginStep(s: GameState, step: Step): void {
   const ap = s.activePlayer;
   switch (step) {
     case "untap":
+      untapStepPhasing(s, ap); // CR 502.1, 702.26a
       for (const id of s.battlefield) {
         const o = obj(s, id);
         if (controllerOf(s, o) !== ap) continue;
@@ -1034,9 +1053,9 @@ function finishCleanup(s: GameState) {
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
-  for (const id of s.battlefield) {
+  for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
     const o = obj(s, id);
-    o.damage = 0; // CR 514.2
+    o.damage = 0; // CR 514.2, phased-out permanents too
     o.damagedBy = undefined;
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
@@ -1240,14 +1259,14 @@ export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[]) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
   if (i === undefined) throw new RulesError(`${name} can't produce {${mana}} right now`);
-  const problem = manaAbilityProblem(s, p.id, o, i);
-  if (problem) throw new RulesError(problem);
   const ab = manaAbilitiesOn(s, o)[i]!;
+  const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
+  if (problem) throw new RulesError(problem);
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
   const adds = manaProduced(s, o, ab, mana);
@@ -1255,6 +1274,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) p.manaPool = payFromPool(parseManaCost(ab.manaCost), p.manaPool)!.pool;
   if (ab.tap) o.tapped = true;
+  for (const t of tap ?? []) obj(s, t).tapped = true;
+  if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -1562,7 +1583,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets }) as { cost: ParsedCost; extra: number };
-  const sunburst = !!compileCard(d).sunburst;
+  const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
   const flashSacrifice = !!compileCard(d).flashSacrifice && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
@@ -1713,9 +1734,11 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string): string | null {
   const d = defOf(s, o);
   const p = player(s, pid);
-  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand") => choices?.[k];
-  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k}`;
+  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap") => choices?.[k];
+  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap"] as const)
+    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k}`;
+  const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
+  if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
   for (const c of costs) {
     if (c.kind === "payLife") {
       if (p.life < c.n) return `you can't pay ${c.n} life`; // CR 119.4
@@ -1724,6 +1747,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const pool =
       c.kind === "sacrifice"
         ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id) && objectMatches(s, c.filter, obj(s, id), pid, false))
+        : c.kind === "tap"
+          ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"
           ? returnCandidates(s, pid, c)
           : c.kind === "discard"
@@ -1732,12 +1757,14 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const what =
       c.kind === "sacrifice"
         ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
+        : c.kind === "tap"
+        ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
         : c.kind === "discard"
           ? c.filter
             ? `${c.n === 1 ? "a" : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : "exile";
+    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     if (!chosen) {
       if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
@@ -1746,6 +1773,17 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id))) return `choose ${what} to ${verb}`;
   }
   return null;
+}
+
+/**
+ * What can be tapped for "Tap an untapped creature you control": untapped ones you control, summoning sick or not
+ * (CR 302.6 restricts only {T} and {Q}). Not the source when the ability's {T} taps it already.
+ */
+export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "tap" }>): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const x = obj(s, id);
+    return !x.tapped && controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, c.filter, x, pid, false);
+  });
 }
 
 /**
@@ -1779,6 +1817,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
         moveObject(s, id, "hand");
       }
+    } else if (c.kind === "tap") {
+      const ids = choices.tap ?? [];
+      for (const id of ids) obj(s, id).tapped = true;
+      log(s, `${p.name} taps ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
       loseLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
@@ -1850,7 +1892,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const tp = targets ? targetProblem(s, body.targets, targets, pid, src, id) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
     if (tp) return tp;
   }
-  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length) {
+  if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
     const cp = extraCostProblem(s, pid, o, ab.costs ?? [], costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
@@ -1891,7 +1933,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose creatures to crew with");
-  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard" || c.kind === "returnToHand") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard" || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
@@ -2041,6 +2083,7 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   const r = s.resolving;
   if (pend?.kind !== "arrangeTop" || pend.player !== p.id || !r) throw new RulesError("nothing to arrange");
   const all = [...top, ...away];
+  if (pend.how === "order" && away.length) throw new RulesError("put them all back on top");
   if (all.length !== pend.cards.length || new Set(all).size !== all.length || all.some((id) => !pend.cards.includes(id)))
     throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : "into your graveyard"));
   r.scratch = { ...r.scratch, arranged: { top, away } };
@@ -2305,7 +2348,7 @@ const attackersAndBlockers = (s: GameState) =>
 const hasFirstOrDouble = (s: GameState, o: GameObject) =>
   objHasKeyword(s, o, "First strike") || objHasKeyword(s, o, "Double strike");
 
-function clearCombat(o: GameObject) {
+export function clearCombat(o: GameObject) {
   o.attacking = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
@@ -2513,7 +2556,8 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
 export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked);
-  if (!demanding.length) return null;
+  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o));
+  if (!demanding.length && !provoked.length) return null;
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
@@ -2521,8 +2565,16 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
-    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x));
+    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokerOf(s, b)?.id === x);
   };
+  // Provoke (CR 702.39a): the provoked creature blocks the creature that provoked it if able. With menace, that
+  // takes another creature able to block it too (CR 702.111b).
+  for (const b of mine) {
+    const at = provokerOf(s, b);
+    if (!at || (blocking.get(b.id) ?? []).includes(at.id) || blockProblem(s, b, at) || full(b)) continue;
+    if (objHasKeyword(s, at, "Menace") && !mine.some((o) => o.id !== b.id && !blockProblem(s, o, at))) continue;
+    return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
+  }
   for (const at of demanding) {
     const ac = characteristics(s, at);
     const could = mine.filter((b) => !blockProblem(s, b, at));
@@ -2535,6 +2587,12 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     if (!blocked && could.some((b) => !full(b))) return `${ac.name} must be blocked if able`;
   }
   return null;
+}
+
+/** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
+export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
+  const at = b.provokedBy && s.objects[b.provokedBy.id];
+  return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === b.provokedBy!.zc && at.attacking === controllerOf(s, b) ? at : undefined;
 }
 
 const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Island", Forestwalk: "Forest", Mountainwalk: "Mountain", Plainswalk: "Plains" };
@@ -2559,6 +2617,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
+  if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it (Ring-bearer)`; // CR 701.54c
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
@@ -2808,7 +2867,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     }
     // Tokens that left the battlefield cease to exist (704.5d).
     for (const o of Object.values(s.objects)) {
-      if (!o.isToken || o.zone === "battlefield" || o.zone === "stack") continue;
+      // A phased-out token still exists on the battlefield (CR 702.26d).
+      if (!o.isToken || o.zone === "battlefield" || o.zone === "stack" || o.zone === "phasedOut") continue;
       const list = zoneList(s, o);
       if (list) list.splice(list.indexOf(o.id), 1);
       delete s.objects[o.id];
@@ -2886,6 +2946,7 @@ function syncControl(s: GameState) {
     if (o.seenController === undefined) o.seenController = now;
     else if (o.seenController !== now) {
       o.seenController = now;
+      loseRingBearer(s, o.id); // CR 701.54a
       o.controlledSinceTurn = s.turn;
       if (o.attacking !== undefined || o.blocking !== undefined) {
         removeFromCombat(s, o);
@@ -2913,6 +2974,13 @@ function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
       delete s.objects[id];
     }
   }
+  // Phased-out permanents they own leave too (CR 702.26k).
+  if (s.phasedOut)
+    s.phasedOut = s.phasedOut.filter((id) => {
+      if (s.objects[id]!.owner !== pid) return true;
+      delete s.objects[id];
+      return false;
+    });
   for (const other of s.battlefield) if (s.objects[other]!.attachedTo && !s.objects[s.objects[other]!.attachedTo!]) s.objects[other]!.attachedTo = undefined;
   invalidateCharacteristics(s);
   for (const o of attackers(s)) if (o.attacking === pid) clearCombat(o);
@@ -2988,7 +3056,8 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     if (controllerOf(s, o) !== pid) continue;
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
-      for (const m of manaChoices(s, o, ab)) out.push({ type: "activateMana", player: pid, objectId: id, mana: m, ability: i });
+      const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
+      for (const m of manaChoices(s, o, ab)) out.push({ type: "activateMana", player: pid, objectId: id, mana: m, ability: i, ...(tap ? { tap } : {}) });
     });
   }
   return out;

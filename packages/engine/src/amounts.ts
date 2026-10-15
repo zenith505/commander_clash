@@ -22,6 +22,8 @@ export interface AmountCtx {
   lki?: LastKnown;
   /** Kicker costs paid for the spell (or the spell its permanent was), CR 702.33d. */
   kicked?: number[];
+  /** How many colors of mana were spent to cast the spell (or the spell its permanent was), CR 207.2c. */
+  colorsSpent?: number;
   /** What was sacrificed to cast the spell, as it last existed. */
   sacrificed?: LastKnown[];
   /** The creature type or color chosen ("for each creature of the chosen type"). */
@@ -102,6 +104,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).filter((i) => c.which === undefined || i === c.which).length;
     case "wasKicked":
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
+    case "colorsSpent":
+      return ctx.colorsSpent ?? 0;
     case "devoured": {
       // "For each creature it devoured" (CR 702.82b): the source, also after it left the battlefield (CR 608.2h).
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -205,6 +209,8 @@ function describeCount(c: Count): string {
       return "times kicked";
     case "wasKicked":
       return "kicked";
+    case "colorsSpent":
+      return "colors of mana spent";
     default:
       return c.kind;
   }

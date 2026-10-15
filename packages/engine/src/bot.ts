@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
-import { manaActionAbility } from "./manaabilities";
+import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
@@ -9,6 +9,8 @@ import {
   returnCandidates,
   attackProblem,
   blockProblem,
+  provokerOf,
+  tapCostCandidates,
   maxBlocks,
   canEnterUntapped,
   conditionHolds,
@@ -95,6 +97,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
+    if (pend.kind === "pickPermanents" && pend.action === "ringBearer") return [{ type: "pickPermanents", player: pid, ids: [chooseRingBearer(s, pid, pend.options)] }];
     if (pend.kind === "pickPermanents" && pend.action === "band") return [{ type: "pickPermanents", player: pid, ids: [] }];
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
@@ -118,6 +121,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
+    }
+    if (pend.kind === "arrangeTop" && pend.how === "order") {
+      // Its own library: wanted cards first. Someone else's: the cards its owner wants least on top.
+      const owner = pend.owner ?? pid;
+      const rank = (id: ObjectId) => (wantOnTop(s, owner, id) ? 1 : 0) * (owner === pid ? -1 : 1);
+      return [{ type: "arrangeTop", player: pid, top: [...pend.cards].sort((a, b) => rank(a) - rank(b)), away: [] }];
     }
     if (pend.kind === "arrangeTop") {
       const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
@@ -346,6 +355,13 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
       : reanimate
         ? all
         : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)));
+    // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
+    const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);
+    if (provoke && sourceId && s.objects[sourceId]) {
+      const good = all.filter((t) => t.kind === "object" && provokeGood(s, obj(s, sourceId), obj(s, t.id)));
+      out.push(good.length ? best(s, pid, good, true, 0) : all[0] ?? { kind: "none" });
+      continue;
+    }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
     const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
     if (!pool.length) {
@@ -573,6 +589,24 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
 }
 
 /**
+ * The Ring tempts us (CR 701.54a): our best creature, but not one the legend rule would then make us lose (another
+ * legendary permanent of ours has its name, CR 704.5j), and not one whose "if you chose a creature other than ~" ability would then miss.
+ */
+function chooseRingBearer(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId {
+  const score = (id: ObjectId) => {
+    const o = obj(s, id);
+    const c = characteristics(s, o);
+    const clash = !c.supertypes.includes("Legendary") && s.battlefield.some((x) => {
+      const other = characteristics(s, obj(s, x));
+      return x !== id && other.controller === pid && other.name === c.name && other.supertypes.includes("Legendary");
+    });
+    const wantsOther = abilitiesOf(s, o).triggers.some((t) => t.event === "ringTemptsYou" && t.ifOtherBearer);
+    return worth(s, pid, o) - (clash ? 1000 : 0) - (wantsOther ? 100 : 0);
+  };
+  return [...options].sort((a, b) => score(b) - score(a))[0]!;
+}
+
+/**
  * Which of our permanents to sacrifice or return to hand: the least valuable. Returning a land, a
  * tapped one that's already been used this turn, and not the one that asked for it if we can help it.
  */
@@ -610,10 +644,22 @@ function millExplored(s: GameState, pid: PlayerId, card: string): boolean {
   return manaValue(parseManaCost(defOf(s, obj(s, card)).manaCost)) > lands + 1;
 }
 
+/** Provoking `target` into blocking `attacker` is good for us: it dies in the block, and ours doesn't. */
+function provokeGood(s: GameState, attacker: GameObject, target: GameObject): boolean {
+  const deadly = (a: GameObject) => objHasKeyword(s, a, "Deathtouch");
+  return (power(s, attacker) >= toughness(s, target) || deadly(attacker)) && power(s, target) < toughness(s, attacker) && !deadly(target);
+}
+
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
   if (!r || e?.type !== "may") return true;
+  const provoke = e.effects.find((x) => x.type === "mustBlockSource");
+  if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
+    const t = r.item.targets?.[provoke.what.index];
+    const src = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
+    return !!src && t?.kind === "object" && !!s.objects[t.id] && provokeGood(s, src, obj(s, t.id));
+  }
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
   let v = 0;
@@ -729,7 +775,7 @@ function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, card?: CardD
     }
     if (!("what" in e) || typeof e.what !== "object" || e.what.ref !== "each") continue;
     const objs = group(e.what);
-    if (e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "tap" || e.type === "putInLibrary") add(objs, true);
+    if (e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "tap" || e.type === "putInLibrary" || e.type === "phaseOut") add(objs, true);
     else if (e.type === "untap") add(objs.filter((o) => o.tapped), false, () => 0.5);
     else if (e.type === "counters") add(objs, harmfulCounter(e.counter), () => estimate(e.n) / 2);
     else if (e.type === "continuous") add(objs, modsAreHarmful(e.mods), () => 0.5);
@@ -821,6 +867,9 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         break;
       case "bounce":
         v += e.what.ref === "target" ? 5 : 0;
+        break;
+      case "phaseOut":
+        v += e.what.ref === "target" ? 3 : 0;
         break;
       case "putOntoBattlefield":
         v += 8;
@@ -948,6 +997,8 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
+      // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
+      if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
@@ -1041,6 +1092,18 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
       if (pool.length < c.n) return null;
       out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+    } else if (c.kind === "tap") {
+      // Tap creatures only once they're done for the turn (after our combat), anything else any time; the least
+      // valuable first, and never one already paying a cost or a target.
+      const late = s.activePlayer === pid && ["main2", "end"].includes(s.step);
+      const pool = tapCostCandidates(s, pid, o, c)
+        .map((x) => obj(s, x))
+        .filter((x) => x.id !== keep && !targeted.has(x.id) && !out.sacrifice?.includes(x.id) && !out.tap?.includes(x.id))
+        .filter((x) => late || !objIsType(s, x, "Creature"))
+        .filter((x) => !manaAbilitiesOn(s, x).some((m) => m.tap) || late)
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+      if (pool.length < c.n) return null;
+      out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
     } else if (c.kind === "discard") {
       const hand = player(s, pid).hand.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
       if (hand.length < c.n || player(s, pid).hand.length < c.n + 4) return null;
@@ -1239,6 +1302,17 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     for (const b of able) {
       used.add(b.id);
       blocks.push({ blocker: b.id, attacker: at.id });
+    }
+  }
+  // A provoked creature blocks the creature that provoked it (CR 702.39a), with a second blocker against menace.
+  for (const b of mine) {
+    const at = provokerOf(s, b);
+    if (!at || used.has(b.id) || blockProblem(s, b, at)) continue;
+    const helper = objHasKeyword(s, at, "Menace") ? mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x))[0] : undefined;
+    if (objHasKeyword(s, at, "Menace") && !helper) continue;
+    for (const o of [b, ...(helper ? [helper] : [])]) {
+      used.add(o.id);
+      blocks.push({ blocker: o.id, attacker: at.id });
     }
   }
   for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {

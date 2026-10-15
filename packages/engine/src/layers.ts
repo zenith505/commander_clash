@@ -101,6 +101,8 @@ export interface Characteristics {
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
+  /** The Ring-bearer's (CR 701.54c). */
+  cantBeBlockedByGreaterPower: boolean;
   cantAttackAlone: boolean;
   cantBlockAlone: boolean;
   mustBeBlocked: boolean;
@@ -150,6 +152,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     maxOneBlocker: false,
     attackUnless: [],
     cantBeBlockedByLesserPower: false,
+    cantBeBlockedByGreaterPower: false,
     cantAttackAlone: false,
     cantBlockAlone: false,
     mustBeBlocked: false,
@@ -209,6 +212,23 @@ function gather(s: GameState): Inst[] {
       controller: e.controller,
       fixed: e.affected,
     });
+  // Each player's Ring: "Your Ring-bearer is legendary and can't be blocked by creatures with greater power"
+  // (CR 701.54c), with the emblem's timestamp (CR 613.7a). Another player gaining control of it ends the designation.
+  for (const pid of s.turnOrder) {
+    const r = s.players[pid]!.ring;
+    const o = r?.bearer && s.objects[r.bearer.id];
+    if (!r || !o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== r.bearer!.zc) continue;
+    out.push({
+      key: `ring:${pid}`,
+      timestamp: r.timestamp,
+      order: order++,
+      sourceName: "The Ring",
+      untilEndOfTurn: false,
+      mods: [{ kind: "addTypes", types: [], subtypes: [], supertypes: ["Legendary"] }, { kind: "cantBeBlockedByGreaterPower" }],
+      controller: pid,
+      fixed: [o.id],
+    });
+  }
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
@@ -266,6 +286,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.activePlayer === you;
     case "monarch":
       return s.monarch === you;
+    case "ringBearer": {
+      // On the battlefield under your control, with the designation (CR 701.54e).
+      const b = s.players[you]?.ring?.bearer;
+      const o = b && s.objects[b.id];
+      const is = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === b.zc && chars.get(o.id)?.controller === you && (!cond.self || o.id === sourceId);
+      return is !== !!cond.not;
+    }
     case "maxSpeed":
       return s.players[you]?.speed === 4;
     case "defenderMostLife": {
@@ -375,6 +402,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "addTypes":
       for (const t of m.types) if (!c.types.includes(t)) c.types.push(t);
       for (const t of m.subtypes) if (!c.subtypes.includes(t)) c.subtypes.push(t);
+      for (const t of m.supertypes ?? []) if (!c.supertypes.includes(t)) c.supertypes.push(t);
       return;
     case "setTypes": {
       // The new card types replace the old, but an instant or sorcery stays one (CR 205.1a). Subtypes of
@@ -464,6 +492,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.attackUnless.push(m.defenderControls);
       return;
     case "cantBeBlockedByLesserPower":
+    case "cantBeBlockedByGreaterPower":
     case "cantAttackAlone":
     case "cantBlockAlone":
     case "mustBeBlocked":

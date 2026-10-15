@@ -64,8 +64,7 @@ export function validateCommanderDeck(commander: CardDef, deck: CardDef[], banne
   for (const c of [...commanders, ...deck]) counts.set(c.name, (counts.get(c.name) ?? 0) + 1);
   for (const [name, k] of counts) {
     const c = [...deck, ...commanders].find((x) => x.name === name)!;
-    const unlimited = c.supertypes.includes("Basic") || /A deck can have any number of cards named/i.test(c.oracleText);
-    if (k > 1 && !unlimited) out.push({ card: name, problem: `appears ${k} times (singleton)` });
+    if (k > 1 && k > deckLimit(c)) out.push({ card: name, problem: deckLimit(c) === 1 ? `appears ${k} times (singleton)` : `appears ${k} times (at most ${deckLimit(c)})` });
   }
   const ci = new Set(commanders.flatMap((c) => c.colorIdentity));
   for (const c of deck) {
@@ -74,4 +73,17 @@ export function validateCommanderDeck(commander: CardDef, deck: CardDef[], banne
   }
   for (const c of commanders) if (banned.has(c.name)) out.push({ card: c.name, problem: "banned in Commander" });
   return out;
+}
+
+const LIMIT_WORDS: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+/**
+ * How many copies of a card a Commander deck can have: one (CR 903.5b), except basic lands and cards whose text
+ * overrides that rule (CR 101.1): "A deck can have any number of cards named ~", "up to seven" (Seven Dwarves),
+ * "up to nine" (Nazgûl).
+ */
+export function deckLimit(c: CardDef): number {
+  if (c.supertypes.includes("Basic") || /A deck can have any number of cards named/i.test(c.oracleText)) return Infinity;
+  const m = /A deck can have up to (\w+) cards named/i.exec(c.oracleText);
+  return (m && LIMIT_WORDS[m[1]!.toLowerCase()]) || 1;
 }

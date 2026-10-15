@@ -7,6 +7,7 @@ import { dealDamage, objectSource } from "../damage";
 import type { GameObject, GameState, PlayerId } from "../types";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
+import { ringTempts } from "./run-ring";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -77,6 +78,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} gets ${"{E}".repeat(Math.min(n, 10))}${n > 10 ? ` (${n})` : ""}.`);
       }
       return;
+    case "ringTempts":
+      return ringTempts(s, ctx, src);
     case "becomeMonarch":
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
       return;
@@ -87,6 +90,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       p.speed = (p.speed ?? 0) + 1;
       invalidateCharacteristics(s); // max speed abilities
       log(s, `${p.name}'s speed increases to ${p.speed}${p.speed === 4 ? " (max speed)" : ""}.`);
+      return;
+    }
+    case "addCombatMana": {
+      // Firebending (CR 702.189a): red mana that stays in the pool until end of combat (see advanceStep).
+      const n = amountNow(s, e.n, ctx);
+      const p = player(s, ctx.controller);
+      p.manaPool.R += n;
+      p.combatMana = (p.combatMana ?? 0) + n;
+      if (n) log(s, `${p.name} adds ${"{R}".repeat(n)} (until end of combat).`);
       return;
     }
     case "gainLife":

@@ -35,7 +35,7 @@ export interface CardDef {
 /** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */
 export type FaceDownKind = "morph" | "megamorph" | "disguise";
 
-export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command";
+export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command" | "phasedOut";
 
 /** A game object (card or token) in some zone. CR 109 */
 export interface GameObject {
@@ -93,6 +93,8 @@ export interface GameObject {
   mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn"; turn: number };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
+  /** Provoked: it must block this attacking creature this combat if able (CR 702.39a). Cleared at end of combat. */
+  provokedBy?: { id: ObjectId; zc: number };
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
   blocking?: ObjectId[];
   blockedBy?: ObjectId[];
@@ -110,6 +112,16 @@ export interface GameObject {
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
+  /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
+  phantomEvent?: string;
+  /**
+   * Phased out (CR 702.26b): `zone` is "phasedOut", but it hasn't changed zones (CR 702.26d), so it keeps its
+   * zoneChanges. `by`: the player it phased out under the control of, whose untap step phases it in (702.26a).
+   * `indirect`: it phased out with the permanent it's attached to, and phases in with it (702.26g).
+   * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
+   * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
+   */
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   castVia?: CastFromGraveyardKind;
@@ -161,6 +173,8 @@ export interface Player {
   exile: ObjectId[];
   command: ObjectId[];
   manaPool: Record<ManaType, number>;
+  /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
+  combatMana?: number;
   landsPlayedThisTurn: number;
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;
@@ -187,6 +201,11 @@ export interface Player {
   attackedTurn?: number;
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
   citysBlessing?: boolean;
+  /**
+   * The Ring (CR 701.54c): the emblem this player got the first time the Ring tempted them (`timestamp`), how many
+   * times it has tempted them, and their Ring-bearer (CR 701.54a-b), the creature it was as it was chosen.
+   */
+  ring?: { tempted: number; timestamp: number; bearer?: { id: ObjectId; zc: number } };
   isBot: boolean;
 }
 
@@ -230,6 +249,8 @@ export interface StackItem {
   x?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
+  /** For its permanent's enters trigger: how many colors of mana were spent to cast it (converge, CR 207.2c). */
+  colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
   event?: TriggerEventInfo;
   /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
@@ -275,6 +296,7 @@ export interface PendingTrigger {
   /** For an enters trigger of a permanent that was a spell with X: that X (CR 107.3m). */
   x?: number;
   kicked?: number[];
+  colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
   event?: TriggerEventInfo;
   /** A delayed trigger's own ability (its source card has no such printed ability). */
@@ -312,6 +334,8 @@ export interface CostChoices {
   sacrifice?: ObjectId[];
   discard?: ObjectId[];
   exileCards?: ObjectId[];
+  /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
+  tap?: ObjectId[];
   /** Permanents to return to their owner's hand: ninjutsu's unblocked attacker (CR 702.49a). */
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
@@ -344,7 +368,8 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
-  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil"; cards: ObjectId[]; source: string }
+  /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
+  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
   | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean }
   /**
@@ -403,6 +428,8 @@ export interface GameEvent {
 }
 
 export interface GameState {
+  /** Phased-out permanents (CR 702.26b), which are treated as though they don't exist. */
+  phasedOut?: ObjectId[];
   /**
    * Permanents that left the battlefield in the current event (one effect, or one pass of state-based
    * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).
@@ -551,7 +578,8 @@ export type Action =
    * Activate a mana ability (CR 605.3): `ability` indexes manaAbilitiesOn (unset: the cheapest
    * one that makes `mana`), `mana` is the choice for one that offers several.
    */
-  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number }
+  /** `tap`: what pays a "Tap an untapped creature you control" cost, if the ability has one. */
+  | { type: "activateMana"; player: PlayerId; objectId: ObjectId; mana: ManaType; ability?: number; tap?: ObjectId[] }
   /** `convoke`: creatures tapped to help pay (CR 702.51a); `improvise`: artifacts (CR 702.126a). */
   | ({ type: "castSpell"; player: PlayerId; objectId: ObjectId; targets?: TargetChoice[]; modes?: number[]; convoke?: ObjectId[]; improvise?: ObjectId[]; x?: number } & CostChoices)
   /** `tapCreatures`: the creatures tapped to pay a crew cost (CR 702.122a). */

@@ -78,6 +78,31 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
+    case "orderTop": {
+      // Each targeted player's library, one at a time (only one player can be named here).
+      const r = s.resolving!;
+      const owner = players(s, e.who, ctx)[0];
+      if (owner === undefined) return;
+      const lib = player(s, owner);
+      const arranged = r.scratch?.arranged;
+      if (!arranged) {
+        const cards = lib.library.slice(0, amountNow(s, e.n, ctx));
+        if (cards.length < 2) return; // nothing to order
+        s.pending = { kind: "arrangeTop", player: ctx.controller, how: "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
+        return "paused";
+      }
+      const looked = new Set(arranged.top);
+      lib.library = [...arranged.top, ...lib.library.filter((id) => !looked.has(id))];
+      log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
+      return;
+    }
+    case "shuffle":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        shuffle(s, p.library);
+        log(s, `${p.name} shuffles their library.`);
+      }
+      return;
     case "search": {
       // CR 701.23: look through the library for matching cards. With a stated quality ("a basic land
       // card") a player may find fewer than asked for, even none (701.23b); asked simply for "a card"

@@ -5,6 +5,7 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
+import { abilitiesOf } from "./cards";
 import { gainLife, log, loseLife, player, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
@@ -74,6 +75,23 @@ export function dealDamage(
     n -= stopped;
     log(s, `${stopped} damage from ${src.name} to ${targetName} is prevented.`);
     if (n <= 0) return 0;
+  }
+  // The Phantom creatures: prevent it all and remove a +1/+1 counter (CR 615). Damage dealt at the same time by
+  // several sources (combat) removes only one counter; with none on it, the damage is still prevented (rulings).
+  if ("object" in to && abilitiesOf(s, to.object).phantom) {
+    const o = to.object;
+    const event = opts.combat ? `${s.turn}:${s.step}` : undefined;
+    log(s, `Damage from ${src.name} to ${targetName} is prevented.`);
+    if (!event || o.phantomEvent !== event) {
+      if (o.counters["+1/+1"]) {
+        o.counters["+1/+1"] -= 1;
+        if (!o.counters["+1/+1"]) delete o.counters["+1/+1"];
+        invalidateCharacteristics(s);
+        log(s, `A +1/+1 counter is removed from ${targetName}.`);
+      }
+      o.phantomEvent = event;
+    }
+    return 0;
   }
   if ("object" in to) {
     const o = to.object;

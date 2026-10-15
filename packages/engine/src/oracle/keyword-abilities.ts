@@ -1,5 +1,5 @@
 import type { CopyExcept } from "../copies";
-import type { CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, AltCostKind, EntersOption } from "../abilities";
+import type { Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, AltCostKind, EntersOption } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { CardDef, FaceDownKind } from "../types";
@@ -266,6 +266,12 @@ interface KeywordParts {
   enlist?: boolean;
 }
 
+/** CR 702.189a: "Whenever this creature attacks, add N {R}. Until end of combat, you don't lose this mana as steps and phases end." */
+export function firebending(n: Amount, text: string): TriggeredAbility {
+  const add = typeof n === "number" ? "{R}".repeat(n) : "X {R}";
+  return { event: "selfAttacks", body: { targets: [], effects: [{ type: "addCombatMana", n }], text: `${text.charAt(0).toUpperCase()}${text.slice(1)}: add ${add}. Until end of combat, you don't lose this mana as steps and phases end.` } };
+}
+
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
   const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0, entersOptions: [], statics: [] };
   const plus = (n: number, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
@@ -449,6 +455,20 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       out.triggers.push({
         event: "selfAttacks",
         body: { targets: [], effects: [{ type: "continuous", what: { ref: "allCreatures", other: true, attacking: true }, mods: [{ kind: "modifyPT", power: 1, toughness: 0 }], duration: "endOfTurn" }], text: "Battle cry: each other attacking creature gets +1/+0 until end of turn." },
+      });
+    } else if ((m = /^firebending (\d+)$/i.exec(p))) {
+      out.triggers.push(firebending(Number(m[1]), p));
+    } else if (/^provoke$/i.test(p)) {
+      // CR 702.39a: "Whenever this creature attacks, you may choose to have target creature defending player controls
+      // block this creature this combat if able. If you do, untap that creature." Each instance triggers (702.39b).
+      const it: ObjRef = { ref: "target", index: 0 };
+      out.triggers.push({
+        event: "selfAttacks",
+        body: {
+          targets: [{ kind: "object", types: ["Creature"], controller: "eventPlayer", text: "target creature defending player controls" }],
+          effects: [{ type: "may", effects: [{ type: "mustBlockSource", what: it }, { type: "untap", what: it }], text: "have target creature defending player controls block ~ this combat if able and untap it" }],
+          text: "Provoke: you may have target creature defending player controls untap and block ~ if able.",
+        },
       });
     } else if (/^mentor$/i.test(p)) {
       // CR 702.134a: "Whenever this creature attacks, put a +1/+1 counter on target attacking creature with lesser power."

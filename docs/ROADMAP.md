@@ -1,6 +1,6 @@
 # Roadmap
 
-12,380 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+12,572 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,9 +14,10 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: firebending, assist, provoke, phasing, support, "the Ring tempts you", the initiative,
-   converge (the colors spent are now recorded, see sunburst), Phantom creatures' "prevent that damage, remove a
-   counter", "Tap an untapped creature you control: Add one mana", "put them back in any order".
+1. By `npm run blockers`: assist, the initiative (and dungeons), "{N}{B}: Return ~ from your graveyard to your hand",
+   party, ingest, incubate, warp, plot, blitz, reconfigure, Arrest-style "can't attack or block, and its activated
+   abilities can't be activated", "spend this mana only to cast a creature spell", "can't be blocked except by three
+   or more creatures", "whenever ~ attacks, tap target creature defending player controls".
 
 ## Known gaps (from earlier rounds)
 
@@ -26,7 +27,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Granted static abilities ('has "This creature can't block"'), battles, "can't attack unless", "becomes tapped".
 - Protection from a player; Auras whose protection doesn't remove themselves.
 - "One or more creatures enter/die" (once per batch), "whenever ~ connives", "while ~ is in your graveyard".
-- Choosing what to proliferate; putting cards back "in any order" yourself.
+- Choosing what to proliferate. "Exile any number of them and put the rest back in any order".
 - Effects on the attackers as a group; impulse draw from an opponent's library; lands from graveyard or library.
 - Vorinclex (counters on players, halving), Academy Manufactor.
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
@@ -81,6 +82,16 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   Gurzigost. "At the beginning of the next cleanup step" for counters (Bounty of the Hunt), Cunning, Necromancy.
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each
   turn", "draw that many cards"; "players can't gain life" and life-gain replacement effects.
+
+- Support X (The Crowd Goes Wild); converge in a cast trigger's "that spell" (Magmablood Archaic); "You draw X cards
+  and lose X life" (Painful Truths).
+- Firebending granted or on tokens ("gains firebending 2", "a token with firebending 1"), "whenever you firebend".
+- Tap costs: "Tap X untapped creatures", land subtypes (Gates, Deserts), "artifacts and/or creatures".
+- The Ring: Ringwraiths' "When the Ring tempts you, return this card from your graveyard", "your Ring-bearer's
+  power", "protection from Ring-bearers", Aragorn's counter choice; legendary names shortened without a comma
+  ("Galadriel", "Samwise", CR 201.5c) aren't recognized as the card itself yet.
+- Phasing: "any number of target", "phases out until ~ leaves the battlefield" (Oubliette, The Moment), "can't phase
+  in", "whenever ~ phases in or out", Teferi's Protection; flavor words before an ability ("Teleport —", CR 207.2d).
 
 ## Later
 

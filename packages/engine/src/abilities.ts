@@ -22,7 +22,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "band": attacking creatures declared to be in a band (CR 702.22c). */
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -81,6 +81,8 @@ export type Count =
   | { kind: "wasKicked"; which?: number }
   /** "That much", "that many" in a triggered ability: the damage its event dealt. */
   | { kind: "eventAmount" }
+  /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
+  | { kind: "colorsSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
@@ -245,7 +247,7 @@ export interface TokenSpec {
  */
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
-  | { kind: "addTypes"; types: string[]; subtypes: string[] } // layer 4, "in addition to its other types"
+  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
   | { kind: "setTypes"; types: string[]; subtypes: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   | { kind: "setColors"; colors: Color[] } // layer 5
@@ -280,6 +282,8 @@ export type Modification =
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Creatures with power less than ~'s power can't block it" (CR 509.1b). */
   | { kind: "cantBeBlockedByLesserPower" }
+  /** The Ring-bearer: "can't be blocked by creatures with greater power" (CR 701.54c). */
+  | { kind: "cantBeBlockedByGreaterPower" }
   /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */
   | { kind: "cantAttackAlone" }
   | { kind: "cantBlockAlone" }
@@ -340,6 +344,8 @@ export type StaticCondition =
   | { kind: "yourTurn" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** "If you don't control a Ring-bearer" (CR 701.54e); `self`: "as long as ~ is your Ring-bearer". */
+  | { kind: "ringBearer"; not?: true; self?: true }
   /** Max speed (CR 702.178a, 702.179e): your speed is 4. */
   | { kind: "maxSpeed" }
   /**
@@ -407,6 +413,8 @@ export type Effect =
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   | { type: "exileIfDies"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
+  /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
+  | { type: "mustBlockSource"; what: ObjRef }
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
@@ -490,6 +498,12 @@ export type Effect =
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   | { type: "surveil"; n: Amount } // CR 701.25
+  /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
+  | { type: "orderTop"; who: PlayerRef; n: Amount }
+  /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
+  | { type: "addCombatMana"; n: Amount }
+  /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
+  | { type: "shuffle"; who: PlayerRef }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   | { type: "bite"; a: ObjRef; b: ObjRef } // a deals damage equal to its power to b
   /** Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead". */
@@ -517,6 +531,10 @@ export type Effect =
   | { type: "castFromExileFree" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
+  /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
+  | { type: "ringTempts" }
+  /** "~ phases out", "target creature phases out" (CR 702.26b). */
+  | { type: "phaseOut"; what: ObjRef }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
   /**
@@ -604,6 +622,14 @@ export type TriggerEvent =
   | "selfDealsCombatDamage"
   | "monarchEndStep" // the monarch's inherent abilities (CR 725.2): no source, fired by the game
   | "monarchDamaged"
+  /** The Ring's abilities (CR 701.54c), from the player's emblem: fired by the game for their Ring-bearer. */
+  | "ringBearerAttacks"
+  | "ringBearerBlocked"
+  | "ringBearerDamagesPlayer"
+  /** "Whenever the Ring tempts you" (CR 701.54d); see TriggeredAbility.ifOtherBearer. */
+  | "ringTemptsYou"
+  /** "Whenever you choose a creature as your Ring-bearer". */
+  | "youChooseRingBearer"
   | "anotherCreatureYouControlEnters"
   | "landYouControlEnters" // landfall: "Whenever a land you control enters"
   | "creatureYouControlAttacksAlone" // exalted (CR 702.83a)
@@ -699,6 +725,8 @@ export interface TriggeredAbility {
   ifEcho?: boolean;
   /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
   ifSoulbond?: boolean;
+  /** "Whenever the Ring tempts you, if you chose a creature other than ~ as your Ring-bearer" (CR 603.4). */
+  ifOtherBearer?: boolean;
   /** It has the ability only while this is true, like "Max speed — Whenever ..." (CR 702.178a): not an intervening if. */
   activeIf?: StaticCondition;
 }
@@ -759,6 +787,8 @@ export interface ManaAbility {
   energyCost?: number;
   /** "{T}, Remove a charge counter from ~: Add one mana of any color." */
   removeCounters?: { counter: CounterKind; n: number };
+  /** "{T}, Tap an untapped creature you control: Add one mana of any color." (Springleaf Drum) */
+  tapCost?: Extract<AdditionalCost, { kind: "tap" }>;
   produces: ManaProduce;
   /** Painlands: "~ deals 1 damage to you." */
   selfDamage?: number;
@@ -812,7 +842,12 @@ export type AdditionalCost =
   | { kind: "payLife"; n: number }
   | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
-  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean };
+  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean }
+  /**
+   * "Tap an untapped creature you control", "tap two untapped Wizards you control" (CR 602.2b). Any of them, summoning
+   * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.
+   */
+  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean };
 
 /**
  * Ways to cast a card from a graveyard (CR 601.3e): flashback (702.34), jump-start (702.133) and
@@ -876,6 +911,8 @@ export interface CompiledCard {
    * always that kind ("Modular—Sunburst", 702.44c).
    */
   sunburst?: { counter?: "+1/+1" };
+  /** Something on it counts the colors of mana spent to cast it (sunburst, converge): paying wants many colors. */
+  countsColors?: boolean;
   /**
    * "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller
    * of the permanent it becomes sacrifices it at the beginning of the next cleanup step."
@@ -893,6 +930,11 @@ export interface CompiledCard {
    * where X is the number of creatures devoured this way".
    */
   devour?: { n: number | "devoured"; filter: TargetSpec };
+  /**
+   * "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~." (Phantom Centaur): every bit
+   * of damage is prevented, and one counter removed per damage event, even when there's none left to remove.
+   */
+  phantom?: boolean;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */

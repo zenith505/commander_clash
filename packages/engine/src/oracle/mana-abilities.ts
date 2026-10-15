@@ -2,7 +2,7 @@ import type { CounterKind, ManaAbility, ManaProduce } from "../abilities";
 import type { ManaType } from "../types";
 import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf } from "./words";
 import { energyIn } from "./activated";
-import { parseTargetPhrase } from "./targets";
+import { parseTargetPhrase, pickFilter } from "./targets";
 
 /**
  * A mana ability (CR 605.1a): "{T}: Add {G}.", "{T}: Add {W} or {U}. ~ deals 1 damage to you.",
@@ -11,7 +11,7 @@ import { parseTargetPhrase } from "./targets";
  * we can run (mana that can only be spent on some spells, "in any combination", ...).
  */
 export function parseManaAbility(line: string): ManaAbility | null {
-  const part = String.raw`\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~`;
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
@@ -21,9 +21,16 @@ export function parseManaAbility(line: string): ManaAbility | null {
   let lifeCost: number | undefined;
   let energyCost: number | undefined;
   let removeCounters: ManaAbility["removeCounters"];
+  let tapCost: ManaAbility["tapCost"];
   for (const c of costs) {
     const rc = removeCounterCost(c);
+    const tc = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(c);
     if (rc) removeCounters = rc;
+    else if (tc) {
+      const filter = pickFilter(tc[2]!);
+      if (!filter || tapCost) return null;
+      tapCost = { kind: "tap", filter: { ...filter, text: `untapped ${filter.text} you control` }, n: num(tc[1]!), ...(costs.includes("{T}") ? { other: true } : {}) };
+    }
     else if (c === "{T}") tap = true;
     else if (c === "Sacrifice ~") sacrificeSelf = true;
     else if (/^Pay \d+ life$/.test(c)) lifeCost = Number(/\d+/.exec(c)![0]);
@@ -33,7 +40,7 @@ export function parseManaAbility(line: string): ManaAbility | null {
   }
   const produces = parseManaProduced(m[2]!);
   if (!produces) return null;
-  const out: ManaAbility = { text: line, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}) };
+  const out: ManaAbility = { text: line, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}) };
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);

@@ -34,6 +34,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "skipUntap", what }] : null;
   }
+  // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
+  if ((m = /^(.+?) phases? out$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
+    return what ? [{ type: "phaseOut", what }] : null;
+  }
   // Regeneration (CR 701.19a)
   if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

@@ -36,6 +36,8 @@ export interface ResolveCtx {
   event?: TriggerEventInfo;
   /** Kicker costs paid for it (CR 702.33d). */
   kicked?: number[];
+  /** Colors of mana spent to cast it, or the spell its permanent was (CR 207.2c). */
+  colorsSpent?: number;
   /** What was sacrificed to cast it, as it last existed. */
   sacrificed?: LastKnown[];
   /** The creature type or color chosen as it resolves, or else as its source entered. */
@@ -96,6 +98,7 @@ export function continueResolution(s: GameState): Resolution {
     x: item.x,
     event: item.event,
     kicked: item.kicked,
+    colorsSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.colorsSpent?.length ?? 0) : item.colorsSpent,
     sacrificed: item.sacrificed,
   };
   Object.defineProperty(ctx, "chosen", { get: () => r.chosen ?? sourceChosen(s, ctx), enumerable: true });
@@ -251,6 +254,7 @@ const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   event: ctx.event,
   lki: ctx.lki,
   kicked: ctx.kicked,
+  colorsSpent: ctx.colorsSpent,
   sacrificed: ctx.sacrificed,
   chosen: ctx.chosen,
   objects: (r) => {
@@ -297,10 +301,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "draw":
     case "getEnergy":
     case "becomeMonarch":
+    case "ringTempts":
     case "increaseSpeed":
     case "ascend":
     case "gainLife":
     case "loseLife":
+    case "addCombatMana":
     case "fight":
     case "bite":
       return runBasicsEffect(s, e, ctx, src);
@@ -331,6 +337,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":
+    case "mustBlockSource":
+    case "phaseOut":
     case "proliferate":
     case "amass":
     case "connive":
@@ -362,6 +370,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "discard":
     case "scry":
     case "surveil":
+    case "orderTop":
+    case "shuffle":
     case "search":
     case "dig":
       return runLibraryEffect(s, e, ctx, src);

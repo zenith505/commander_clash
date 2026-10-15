@@ -36,6 +36,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (spec?.kind !== "object") return null;
     return { count: { kind: "greatestPower", filter: { ...spec, text: m[2]! }, ...(m[1] ? { other: true as const } : {}) } };
   }
+  // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
+  if (!each && (m = /^the greatest mana value among (.+?) you control$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} you control`, { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return { count: { kind: "greatestManaValue", filter: { ...spec, text: `${m[1]} you control` } } };
+  }
   if (!each) {
     const nb = /^the number of (.+)$/i.exec(p);
     if (nb) return parseCount(nb[1]!, ctx, true);
@@ -92,13 +98,17 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(Aura|Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
     return count({ kind: "attachedToSelf", subtypes: [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls)(?: ((?:with|of the chosen|of that|that aren't) .+))?$/i.exec(p))) {
+  // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls)(?: ((?:with|of the chosen|of that|that aren't) .+))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
-    const suffix = who === "you control" ? " you control" : who === "on the battlefield" ? "" : " an opponent controls";
+    const theirs = /^(target|that) /.test(who);
+    const suffix = who === "you control" ? " you control" : who === "on the battlefield" || theirs ? "" : " an opponent controls";
     const spec = parseTargetPhrase(`${words}${suffix}${m[4] ? ` ${m[4]}` : ""}`, { chosen: true });
     if (spec?.kind !== "object") return null;
-    return count({ kind: "permanents", filter: { ...spec, text: `${m[1] ?? ""}${m[2]} ${m[3]}` }, ...(m[1] ? { other: true } : {}) });
+    const whose = theirs ? whosePlayer(who.replace(/ controls$/, "'s"), ctx) : undefined;
+    if (whose === null) return null;
+    return count({ kind: "permanents", filter: { ...spec, text: `${m[1] ?? ""}${m[2]} ${m[3]}` }, ...(m[1] ? { other: true } : {}), ...(whose ? { whose } : {}) });
   }
   // "attacking creature", "tapped creature": any controller.
   if ((m = /^(attacking|blocking|tapped) (creatures?)$/i.exec(p))) {

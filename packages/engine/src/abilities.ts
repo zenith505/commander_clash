@@ -60,8 +60,11 @@ export interface AmountExpr {
 export type Count =
   /** The X chosen while casting or activating it (CR 107.3a), or the spell's X for its permanent's ETB (CR 107.3m). */
   | { kind: "x" }
-  /** "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view. */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean }
+  /**
+   * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
+   * `whose`: "creatures target player controls", controlled by those players.
+   */
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   | { kind: "cardsInLibrary"; who: PlayerRef }
@@ -86,6 +89,8 @@ export type Count =
   | { kind: "graveyardCardTypes"; who: PlayerRef }
   /** "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). */
   | { kind: "greatestPower"; filter: TargetSpec; other?: boolean }
+  /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
+  | { kind: "greatestManaValue"; filter: TargetSpec }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */
@@ -284,6 +289,8 @@ export type PlayerRef =
   | { ref: "enchantedPlayer" }
   /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
   | { ref: "opponentsAttackingEventPlayer" }
+  /** The players who chose to in the "each player may ..." being resolved (see the eachMay effect). */
+  | { ref: "choseThisWay" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" };
 
@@ -498,6 +505,10 @@ export type StaticCondition =
   | { kind: "onBattlefield"; filter: TargetSpec; max: number }
   /** "If an opponent lost life this turn". */
   | { kind: "opponentLostLife" }
+  /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
+  | { kind: "opponentDealtDamage"; n: number }
+  /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
+  | { kind: "attackedWith"; n: number }
   /** "If you've drawn two or more cards this turn". */
   | { kind: "drawn"; n: number }
   /** "If you descended this turn": a permanent card was put into your graveyard this turn (CR 700.11). */
@@ -605,6 +616,11 @@ export type Effect =
    * what it enchants (CR 303.4f).
    */
   | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; may: boolean; any?: boolean }
+  /**
+   * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
+   * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
+   */
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
   | {
@@ -802,7 +818,8 @@ export type Effect =
   | { type: "addCombatMana"; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
    * stack (CR 605.1, 605.5a). `chosen` adds that much mana of the color chosen just before (a "choose" effect). */
-  | { type: "addMana"; mana?: string; chosen?: number }
+  /** `times`: "Add {R} for each card in target opponent's hand" (Jeska's Will). */
+  | { type: "addMana"; mana?: string; chosen?: number; times?: Amount }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec }
@@ -840,6 +857,12 @@ export type Effect =
    * (CR 608.2d). Its targets were still chosen when it was put on the stack (CR 603.3d).
    */
   | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean }
+  /**
+   * "Each player may discard their hand and draw five cards" (Will of the Jeskai): each of them decides in APNAP order,
+   * knowing the earlier answers (CR 101.4), then `effects` happen to those who chose to ({ ref: "choseThisWay" }).
+   * `wheel`: the number of cards drawn, for the bots' answer.
+   */
+  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.

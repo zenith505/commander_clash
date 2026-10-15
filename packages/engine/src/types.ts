@@ -298,6 +298,11 @@ export interface Player {
   firstDrawStepDraw?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
+  /**
+   * The creatures this player declared as attackers this turn ("id@zoneChanges"): one declared in two combats counts once,
+   * one put onto the battlefield attacking not at all (Windbrisk Heights rulings).
+   */
+  attackedWith?: { turn: number; keys: string[] };
   /** The players this player attacked with creatures in the latest combat, and its turn (melee, CR 702.121a). */
   attackedPlayers?: { turn: number; players: PlayerId[] };
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
@@ -524,7 +529,7 @@ export type PendingDecision =
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
   | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -665,6 +670,8 @@ export interface GameState {
   descendedThisTurn?: PlayerId[];
   /** Players dealt damage this turn, for bloodthirst (CR 702.54a). */
   damagedThisTurn?: PlayerId[];
+  /** How much damage each player was dealt this turn (Spinerock Knoll). */
+  damageThisTurn?: Record<number, number>;
   /**
    * Power and toughness of permanents as they last existed on the battlefield (CR 608.2h), for
    * "destroy target creature; you gain life equal to its power". `zc` is its zoneChanges while it
@@ -784,6 +791,9 @@ export interface Resolving {
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
     ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
+    mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)
+    mayers?: PlayerId[]; // and those who chose to
+    mayStep?: number; // how many of its instructions are done
     paid?: boolean; // the answer to "unless that player pays ..."
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
     paidBy?: PlayerId[]; // and those who paid

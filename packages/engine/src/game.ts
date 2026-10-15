@@ -1320,6 +1320,7 @@ function startNextTurn(s: GameState) {
   for (const p of s.players) p.landsPlayedThisTurn = 0;
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
   s.damagedThisTurn = undefined;
+  s.damageThisTurn = undefined;
   s.diedThisTurn = undefined;
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
@@ -3318,7 +3319,8 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     return;
   }
   (r.scratch ??= {}).may = yes;
-  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "")}.`);
+  // The prompt speaks to the player ("discard your hand"); the log is about them.
+  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/\byour\b/g, "their")}.`);
   s.pending = null;
   continueResolution(s);
 }
@@ -3518,6 +3520,9 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
+  const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
+  const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
+  if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])] };
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };

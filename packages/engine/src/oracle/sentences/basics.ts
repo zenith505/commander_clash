@@ -116,6 +116,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Adding mana from a spell or a non-mana triggered ability (CR 605.5a: it uses the stack): "Add {B}{B}{B}" (Dark
   // Ritual), "add one mana of any color", "add three mana of any one color" (the color is chosen as it resolves).
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+)$/.exec(s))) return [{ type: "addMana", mana: m[1]! }];
+  // "Add {R} for each card in target opponent's hand" (Jeska's Will): counted as it resolves.
+  if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+) for each (.+)$/.exec(s))) {
+    const times = parseCount(m[2]!, ctx, true);
+    return times && [{ type: "addMana", mana: m[1]!, times }];
+  }
   if ((m = new RegExp(`^[Aa]dd ${NUM} mana of any (one )?color$`).exec(s)) && (num(m[1]!) === 1 || m[2])) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: num(m[1]!) }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
@@ -200,7 +205,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Drawing
   if ((m = new RegExp(`^(?:You )?[Dd]raw ${NUMX} cards?$`).exec(s))) return [{ type: "draw", who: { ref: "you" }, n: amt(m[1]!) }];
-  if ((m = new RegExp(`^(.+?) draws? ${NUMX} cards?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(.+?) draws? ${NUMX} cards?$`, "i").exec(s)) && !/ may /i.test(m[1]!)) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "draw", who, n: amt(m[2]!) }] : null;
   }

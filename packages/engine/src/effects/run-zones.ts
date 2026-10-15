@@ -523,6 +523,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}) }); // CR 110.2a
       }
       return;
+    case "returnAllFromGraveyard": {
+      // All at once, as one move: under your control (CR 110.2a) or, with "under their owners' control", each owner's.
+      // Only permanent cards can be put onto the battlefield (CR 110.4b); never Auras (see the effect).
+      const ids: ObjectId[] = [];
+      for (const pid of players(s, e.who, ctx))
+        for (const id of player(s, pid).graveyard) {
+          const d = defOf(s, s.objects[id]!);
+          if (isPermanentCard(d) && !d.subtypes.includes("Aura") && printedMatches(e.filter, d)) ids.push(id);
+        }
+      if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
+      for (const id of ids) moveObject(s, id, "battlefield", { controller: e.owners ? s.objects[id]!.owner : ctx.controller, tapped: e.tapped });
+      return;
+    }
     case "putInLibrary":
       for (const o of objects(s, e.what, ctx)) {
         let position = e.position;

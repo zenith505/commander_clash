@@ -1,8 +1,8 @@
 // Sentences about sacrificing, milling, discarding, scry/surveil, fighting, counterspells, and copying spells.
 
 import { parseCount } from "../counts";
-import type { Effect, TargetSpec } from "../../abilities";
-import { NUMX, amt, isGroup, isSeveral } from "../words";
+import type { Effect, PlayerRef, TargetSpec } from "../../abilities";
+import { NUM, NUMX, amt, isGroup, isSeveral, num } from "../words";
 import { parseUnlessPays, addTarget } from "../body";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
 import { parseSentence } from "../sentence";
@@ -33,6 +33,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
   }
+  // "Target player mills twice X cards" (Drown in Dreams).
+  if ((m = /^(.+?) mills? twice X cards$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "mill", who, n: { count: { kind: "x" }, times: 2 } }] : null;
+  }
   // "That player exiles the top card of their library" (ingest's text); "you" exiling your own goes through impulse draw.
   if ((m = new RegExp(`^(.+?) exiles the top (card|${NUMX} cards) of (?:their|his or her) library$`, "i").exec(s)) && !/^you$/i.test(m[1]!)) {
     const who = parsePlayer(m[1]!, ctx);
@@ -51,6 +56,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(.+?) reveals? (?:their|his or her) hand$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who, reveal: true }] : null;
+  }
+  // "Each player may discard their hand and draw five cards" (Will of the Jeskai, Ruin Grinder): each decides (CR 101.4),
+  // then those who chose to discard their hands at the same time, then draw (CR 608.2c).
+  if ((m = new RegExp(`^Each (player|opponent) may discard their hand and draw ${NUM} cards$`, "i").exec(s))) {
+    const who: PlayerRef = { ref: m[1]!.toLowerCase() === "player" ? "eachPlayer" : "eachOpponent" };
+    const n = num(m[2]!);
+    return [{ type: "eachMay", who, text: `discard your hand and draw ${m[2]} cards`, wheel: n, effects: [{ type: "discard", who: { ref: "choseThisWay" }, n: 0, hand: true }, { type: "draw", who: { ref: "choseThisWay" }, n }] }];
   }
   // "Discard your hand", "each opponent discards their hand", "discard all the cards in your hand" (CR 701.9b: no
   // choice to make). Wheels: "each player discards their hand, then draws seven cards" (all of them discard, then all

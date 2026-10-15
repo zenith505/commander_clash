@@ -7,7 +7,7 @@ import { defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
 import { choiceOptions, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, objects, runEffect, amountNow, gifteeOf } from "./resolve";
+import { ResolveCtx, apnap, objects, players, runEffect, amountNow, gifteeOf } from "./resolve";
 import { kickedMatches } from "./run-spells";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
@@ -38,6 +38,27 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
+      return;
+    }
+    case "eachMay": {
+      // Each player decides in APNAP order, seeing the earlier answers (CR 101.4); then it happens to those who chose to.
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.mayQueue) {
+        sc.mayQueue = apnap(s, players(s, e.who, ctx));
+        sc.mayers = [];
+      }
+      while (sc.mayQueue.length) {
+        const pid = sc.mayQueue[0]!;
+        if (sc.may === undefined) {
+          s.pending = { kind: "chooseMay", player: pid, prompt: e.text, source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}) };
+          return "paused";
+        }
+        if (sc.may) sc.mayers!.push(pid);
+        sc.may = undefined;
+        sc.mayQueue.shift();
+      }
+      // Each instruction once, also when one of them waits on a player (a draw that stops for dredge).
+      for (sc.mayStep ??= 0; sc.mayStep < e.effects.length; sc.mayStep++) if (runEffect(s, e.effects[sc.mayStep]!, ctx) === "paused") return "paused";
       return;
     }
     case "cumulativeUpkeep": {

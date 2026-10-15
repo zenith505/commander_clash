@@ -130,6 +130,7 @@ export function dealDamage(
       log(s, `${src.name} deals ${n} damage to ${p.name}${lost < n ? ` (their life total can't go below ${floor})` : ""}.`);
     }
     if (!(s.damagedThisTurn ??= []).includes(p.id)) s.damagedThisTurn.push(p.id);
+    (s.damageThisTurn ??= {})[p.id] = (s.damageThisTurn[p.id] ?? 0) + n;
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     if (src.id) fireEvent(s, { type: "damagedPlayer", source: src.id, player: p.id, amount: n, combat: !!opts.combat });
     if (opts.combat) {

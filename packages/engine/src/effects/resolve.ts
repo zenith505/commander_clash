@@ -232,6 +232,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.attachedToPlayer : lk && lk.zc === ctx.sourceZc ? lk.attachedToPlayer : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "choseThisWay":
+      return (s.resolving?.scratch?.mayers ?? []).filter((p) => !player(s, p).lost);
     case "giftee": {
       const p = gifteeOf(s, ctx);
       return p !== undefined && !player(s, p).lost ? [p] : [];
@@ -379,6 +381,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
+    case "returnAllFromGraveyard":
     case "putFromHand":
     case "putInLibrary":
     case "exileGraveyard":
@@ -469,6 +472,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "takeInitiative":
       return runDungeonsEffect(s, e, ctx, src);
     case "may":
+    case "eachMay":
     case "cumulativeUpkeep":
     case "choose":
     case "if":

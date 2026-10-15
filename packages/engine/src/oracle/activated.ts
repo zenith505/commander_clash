@@ -102,8 +102,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "Sacrifice ~: It deals damage equal to its power to ...": "it" is the source.
   const body = parseBody(effectText.replace(/^It (?=deals\b)/, "~ "), { activated: true, ...(returnsSelf ? { selfCard: true } : {}) });
   if (!body) return "fail";
-  // "{T}, Exert ~: Add two mana" is a mana ability (CR 605.1a), which an activated ability here isn't.
-  if (/Exert ~/.test(costs) && body.effects.some((e) => e.type === "addMana")) return "fail";
+  // An activated ability without a target that could add mana is a mana ability (CR 605.1a): "{T}, Exert ~: Add two
+  // mana", "{2}, {T}: Add {B} for each black creature card in your graveyard". Those don't use the stack, which an
+  // activated ability here does. (Mana abilities with other costs, like Ashnod's Altar's, still go here: see ROADMAP.)
+  const json = JSON.stringify(body);
+  if ((/Exert ~/.test(costs) || (!json.includes('"targets":[{') && json.includes('"times":'))) && json.includes('"type":"addMana"')) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
   return {

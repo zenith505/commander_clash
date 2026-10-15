@@ -106,6 +106,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
     if (pend.kind === "chooseMay" && pend.clash) return [{ type: "chooseMay", player: pid, yes: !wantOnTop(s, pid, pend.card!) }];
+    // "Each player may discard their hand and draw five cards": when that's more cards than we'd throw away.
+    if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? millExplored(s, pid, pend.card) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {

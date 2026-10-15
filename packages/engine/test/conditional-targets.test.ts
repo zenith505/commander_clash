@@ -155,7 +155,7 @@ describe("targets only an optional part needs", () => {
     expect(s.objects[g]!.zone).toBe("graveyard");
     const { s: s1, ap: ap1, opp: opp1, ids: ids1 } = setup([fightWithFire]);
     const g1 = putOnBattlefield(s1, opp1, giant());
-    const split: TargetChoice[] = [{ ...target(g1), amount: 4 }, { kind: "player", id: opp1, amount: 6 }, ...none.slice(2)];
+    const split: TargetChoice[] = [{ kind: "object", id: g1, amount: 4 }, { kind: "player", id: opp1, amount: 6 }, ...none.slice(2)];
     expect(castProblem(s1, ap1, ids1[0]!, [NONE, ...split], undefined, undefined, undefined, undefined, { kicks: [0] })).toMatch(MANA_ONLY);
     s = settle(run(s1, planCast(s1, ap1, ids1[0]!, [NONE, ...split], undefined, "auto", undefined, { kicks: [0] })));
     expect(s.objects[g1]!.zone).toBe("graveyard");

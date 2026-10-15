@@ -309,6 +309,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "pumpPerBlocker":
     case "draw":
     case "getEnergy":
+    case "poison":
     case "becomeMonarch":
     case "ringTempts":
     case "increaseSpeed":
@@ -316,6 +317,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "gainLife":
     case "loseLife":
     case "addCombatMana":
+    case "addMana":
+    case "cantBlockRule":
     case "fight":
     case "bite":
     case "extraTurn":
@@ -397,6 +400,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTop":
     case "revealTopToHand":
     case "discard":
+    case "takeFromHand":
     case "scry":
     case "clash":
     case "surveil":

@@ -1,5 +1,5 @@
 import { allEffects } from "../abilities";
-import type { AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, TargetSpec } from "../abilities";
+import type { AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec } from "../abilities";
 import { CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
@@ -496,7 +496,9 @@ export function compile(d: CardDef): CompiledCard {
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
     if (extra) {
       const cost = parseAdditionalCost(extra[1]!);
+      const or = cost ? null : parseCostOr(extra[1]!);
       if (cost) (out.additionalCosts ??= []).push(cost);
+      else if (or && !out.costOr) out.costOr = or;
       else out.unsupported.push(raw);
       continue;
     }
@@ -618,6 +620,10 @@ export function compile(d: CardDef): CompiledCard {
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
     if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
       out.phantom = true;
+      continue;
+    }
+    if (line === "Cast ~ only if you've cast another spell this turn.") {
+      out.castOnlyAfterAnother = true;
       continue;
     }
     if (/^~ can't be countered\.$/.test(line)) {
@@ -897,6 +903,24 @@ function joinModes(lines: string[]): string[] {
     const prev = out[out.length - 1];
     if (/^\s*•/.test(line) && prev !== undefined && /—\s*(•.*)?$/.test(prev)) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
+  }
+  return out;
+}
+
+/**
+ * "Sacrifice a creature or pay {3}{B}", "pay 5 life or pay {2}", "sacrifice a creature, discard a card, or pay 3 life":
+ * a choice between additional costs (CR 601.2b). "Sacrifice an artifact or creature" is one cost, not a choice.
+ */
+function parseCostOr(text: string): CostOption[] | null {
+  const parts = text.split(/,? or (?=(?:pay|sacrifice|discard|reveal|exile) )|, (?=(?:pay|sacrifice|discard|reveal|exile) )/);
+  if (parts.length < 2) return null;
+  const out: CostOption[] = [];
+  for (const p of parts) {
+    const mana = /^pay ((?:\{(?:\d+|[WUBRGC])\})+)$/.exec(p);
+    const cost = mana ? null : parseAdditionalCost(p);
+    if (mana) out.push({ mana: mana[1]!, text: p });
+    else if (cost) out.push({ cost, text: p });
+    else return null;
   }
   return out;
 }

@@ -275,7 +275,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   }
   // "... with flying", "... without flying", "... with power 4 or greater", "... with mana value 3 or less"
   let m: RegExpExecArray | null;
-  if ((m = / with (power|toughness|mana value) (\d+) or (greater|less)$/.exec(p))) {
+  if ((m = /(?:^| )with (power|toughness|mana value) (\d+) or (greater|less)$/.exec(p))) {
     const n = Number(m[2]);
     const key = m[1] === "mana value" ? "manaValue" : (m[1] as "power" | "toughness");
     extra[key] = m[3] === "greater" ? { min: n } : { max: n };

@@ -402,6 +402,10 @@ export interface CostChoices {
   exileCards?: ObjectId[];
   /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
   tap?: ObjectId[];
+  /** Cards in hand revealed for "reveal a Pirate card from your hand". */
+  reveal?: ObjectId[];
+  /** Which way to pay "sacrifice a creature or pay {3}{B}" (an index into CompiledCard.costOr, CR 601.2b). */
+  costOr?: number;
   /** Permanents to return to their owner's hand: ninjutsu's unblocked attacker (CR 702.49a). */
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
@@ -479,7 +483,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -528,6 +532,8 @@ export interface GameState {
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
   castThisTurn?: { player: PlayerId; card: string }[];
+  /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
+  cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** Each spell cast this turn as it was cast, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
   castItems?: Record<string, StackItem>;
   seed: number;

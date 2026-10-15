@@ -1,6 +1,6 @@
 # Roadmap
 
-14,569 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+14,792 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,15 +14,16 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (a long tail of 3-card lines): "~ enters tapped unless you control a legendary creature",
-   "equip abilities you activate that target ~ cost {N} less", "when ~ enters, manifest dread, then attach ~ to that
-   creature", "if you would draw a card except the first one you draw in each of your draw steps", "damage that would
-   reduce your life total to less than N reduces it to N instead", "Put a -N/-N counter on ~: Untap ~", "~ becomes
-   the color of your choice until end of turn", "if you descended this turn", "when ~ enters, add one mana of any
-   color", "whenever ~ attacks and isn't blocked, defending player gets a poison counter", "exile up to three target
-   cards from a single graveyard", "sacrifice a creature or pay {N}{B}", "creatures without flying can't block this
-   turn", "destroy target creature an opponent controls that was dealt damage this turn", "activate no more than
-   twice each turn", "each opponent sacrifices a permanent of their choice unless they pay {N}".
+1. By `npm run blockers` (a long tail of 3-card lines): "equip abilities you activate that target ~ cost {N} less",
+   "when ~ enters, manifest dread, then attach ~ to that creature", "if you would draw a card except the first one you
+   draw in each of your draw steps", "damage that would reduce your life total to less than N reduces it to N
+   instead", "Put a -N/-N counter on ~: Untap ~" (Devoted Druid), "~ becomes the color of your choice until end of
+   turn", "if you descended this turn", "exile up to three target cards from a single graveyard", "destroy target
+   creature an opponent controls that was dealt damage this turn", "each opponent sacrifices a permanent of their
+   choice unless they pay {N}", "whenever ~ becomes tapped, you gain N life and scry N", "enchanted land is a Swamp"
+   (CR 305.7), "when you cast a creature spell, sacrifice ~", Glyph Keeper's "becomes the target ... for the first
+   time each turn", Hellfire Mongrel, "~ has hexproof as long as it's untapped", "if you would gain life, you gain
+   that much life plus N instead".
 
 ## Known gaps (from earlier rounds)
 
@@ -52,8 +53,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".
 - "Copy target activated or triggered ability" (Strionic Resonator). Changing the target of a spell with more than one
-  target; Redirect Lightning's "pay 5 life or pay {2}"; Misdirection's pitch cost. Counters with a mixed target ("triggered
-  ability or colorless spell", Consign to Memory, Tale's End) and Mirrorshell Crab's channel ability.
+  target; Misdirection's pitch cost; Mirrorshell Crab's channel ability.
 - "Activate only during your turn, before attackers are declared" assumes one combat per turn (the engine has no
   extra combats). Random discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with
   something else ("create a 2/2 black Zombie", Kalitas). "Prevent all damage that would be dealt by target instant or
@@ -190,6 +190,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "Whenever a creature is dealt damage" (Death Pits of Rath, Shriveling Rot), "becomes tapped or is dealt damage"
   (Cryoshatter). Old-Growth Troll and Harold and Bob (they return as Auras). Mayhem without a cost (a land, CR
   702.187c). "You recruit" after a cast trigger (The Queen of Dale), "if that spell's mana value was 2 or less, recruit".
+- Hand disruption: "nonlegendary, nonland card" (Lay Bare the Heart); taking a card "until ~ leaves the battlefield"
+  (Kitesail Freebooter, Brain Maggot); Mesmeric Fiend and Tidehollow Sculler.
+- Mana: "Activate only if" on a mana ability (corrupted: The Seedcore, Glistening Sphere); "add N mana in any
+  combination of colors" from a spell or trigger; mana that stays ("until end of turn, you don't lose this mana");
+  Rite of Flame's count. Bots cast rituals only when the mana lets them cast a card they couldn't otherwise.
+- Other "cast this spell only ..." restrictions (only "if you've cast another spell this turn" is supported).
+- Aerial Modification ("as long as enchanted permanent is a Vehicle, it's an artifact creature"): layer dependency.
 
 ## Later
 

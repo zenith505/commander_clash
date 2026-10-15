@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { DamageRecipient, Effect, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
+import { NUM, NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseSearch } from "../search";
@@ -61,6 +61,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "That player draws an additional card" (Howling Mine): just another draw.
   if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);
+  // Poison counters on a player (CR 122.1f): "defending player gets a poison counter", "each opponent gets two".
+  if ((m = new RegExp(`^(.+?) gets? (a|${NUMX}) poison counters?$`).exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && [{ type: "poison", who, n: m[2] === "a" ? 1 : amt(m[2]!) }];
+  }
+  // Adding mana from a spell or a non-mana triggered ability (CR 605.5a: it uses the stack): "Add {B}{B}{B}" (Dark
+  // Ritual), "add one mana of any color", "add three mana of any one color" (the color is chosen as it resolves).
+  if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+)$/.exec(s))) return [{ type: "addMana", mana: m[1]! }];
+  if ((m = new RegExp(`^[Aa]dd ${NUM} mana of any (one )?color$`).exec(s)) && (num(m[1]!) === 1 || m[2])) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: num(m[1]!) }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} \\{E\\}$`).exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: amt(m[1]!) }];

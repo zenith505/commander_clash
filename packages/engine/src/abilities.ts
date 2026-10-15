@@ -437,6 +437,10 @@ export type StaticCondition =
   | { kind: "onBattlefield"; filter: TargetSpec; max: number }
   /** "If an opponent lost life this turn". */
   | { kind: "opponentLostLife" }
+  /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
+  | { kind: "attachedIs"; filter: TargetSpec }
+  /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
+  | { kind: "opponentPoison"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
   /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
@@ -637,6 +641,12 @@ export type Effect =
   | { type: "champion"; filter: TargetSpec }
   /** Champion's second: "When this permanent leaves the battlefield, return the exiled card to the battlefield under its owner's control." */
   | { type: "returnChampioned" }
+  /**
+   * "Target opponent reveals their hand. You choose a nonland card from it. That player discards that card." (CR 701.9b:
+   * another player chooses the card), "... and exile that card": the ability's controller picks one matching card from
+   * that player's hand, if there is one.
+   */
+  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile" }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
@@ -649,6 +659,12 @@ export type Effect =
   | { type: "orderTop"; who: PlayerRef; n: Amount }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
   | { type: "addCombatMana"; n: Amount }
+  /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
+   * stack (CR 605.1, 605.5a). `chosen` adds that much mana of the color chosen just before (a "choose" effect). */
+  | { type: "addMana"; mana?: string; chosen?: number }
+  /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
+   * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
+  | { type: "cantBlockRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
   | { type: "shuffle"; who: PlayerRef }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
@@ -678,6 +694,8 @@ export type Effect =
    * age counter on it; if you don't, sacrifice it.
    */
   | { type: "cumulativeUpkeep"; pay: PayCost } // "If you don't, ...": fabricate (CR 702.123a)
+  /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
+  | { type: "poison"; who: PlayerRef; n: Amount }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */
@@ -980,6 +998,8 @@ export interface ActivatedAbility {
   crew?: number;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
+  /** "Activate no more than twice each turn" (CR 602.5b). */
+  maxPerTurn?: number;
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -1138,7 +1158,15 @@ export type AdditionalCost =
    * "Tap an untapped creature you control", "tap two untapped Wizards you control" (CR 602.2b). Any of them, summoning
    * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.
    */
-  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean };
+  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean }
+  /** "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. */
+  | { kind: "reveal"; filter: TargetSpec; n: number };
+
+/**
+ * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,
+ * 601.2b): extra mana added to the total cost (601.2f), or a cost beyond mana.
+ */
+export type CostOption = { mana: string; cost?: undefined; text: string } | { cost: AdditionalCost; mana?: undefined; text: string };
 
 /**
  * Ways to cast a card from a graveyard (CR 601.3e): flashback (702.34), jump-start (702.133) and
@@ -1244,6 +1272,8 @@ export interface CompiledCard {
   phantom?: boolean;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
+  /** "Cast this spell only if you've cast another spell this turn." (Illusory Angel; CR 601.3) */
+  castOnlyAfterAnother?: boolean;
   /**
    * "Each player can't cast more than one spell each turn" (Rule of Law), "... one noncreature spell": counting every
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
@@ -1311,6 +1341,8 @@ export interface CompiledCard {
   kicker?: { costs: string[]; multi?: boolean; replicate?: boolean; squad?: boolean; offspring?: boolean };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];
+  /** "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}": exactly one of these, announced as it's cast (CR 601.2b). */
+  costOr?: CostOption[];
   /** Flashback, jump-start, retrace, escape: casting it from your graveyard. */
   fromGraveyard?: CastFromGraveyard[];
   /** "~ escapes with N +1/+1 counters on it" (CR 702.138c). */

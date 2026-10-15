@@ -120,6 +120,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "poison":
+      for (const pid of players(s, e.who, ctx)) {
+        const n = amountNow(s, e.n, ctx);
+        if (n <= 0) continue;
+        const p = player(s, pid);
+        p.poison = (p.poison ?? 0) + n;
+        log(s, `${p.name} gets ${n === 1 ? "a poison counter" : `${n} poison counters`}.`);
+      }
+      return;
     case "getEnergy":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);
@@ -143,6 +152,19 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${p.name}'s speed increases to ${p.speed}${p.speed === 4 ? " (max speed)" : ""}.`);
       return;
     }
+    case "addMana": {
+      // The mana empties from the pool as the step or phase ends (CR 106.4).
+      const p = player(s, ctx.controller);
+      const color = s.resolving?.chosen?.color;
+      const added = e.mana ?? (color && e.chosen ? `{${color}}`.repeat(e.chosen) : "");
+      for (const m of added.matchAll(/\{([WUBRGC])\}/g)) p.manaPool[m[1] as "W"]++;
+      if (added) log(s, `${p.name} adds ${added}.`);
+      return;
+    }
+    case "cantBlockRule":
+      (s.cantBlockThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
+      log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't block this turn.`);
+      return;
     case "addCombatMana": {
       // Firebending (CR 702.189a): red mana that stays in the pool until end of combat (see advanceStep).
       const n = amountNow(s, e.n, ctx);

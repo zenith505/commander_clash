@@ -120,6 +120,8 @@ export function dealDamage(
       log(s, `${src.name} deals ${n} damage to ${p.name}.`);
     }
     if (!(s.damagedThisTurn ??= []).includes(p.id)) s.damagedThisTurn.push(p.id);
+    // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
+    if (src.id) fireEvent(s, { type: "damagedPlayer", source: src.id, player: p.id, amount: n, combat: !!opts.combat });
     if (opts.combat) {
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
       const toxic = toxicValue(src.keywords);

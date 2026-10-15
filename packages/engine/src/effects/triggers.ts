@@ -73,6 +73,8 @@ export type TriggerSourceEvent =
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** A permanent dealt damage to a player, in combat or not. */
+  | { type: "damagedPlayer"; source: ObjectId; player: PlayerId; amount: number; combat: boolean }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
@@ -149,6 +151,8 @@ function trains(s: GameState, o: GameObject): boolean {
 }
 
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
+  // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
+  let hosting: GameObject | null = null;
   // Abilities that trigger on the battlefield use the permanent's abilities right now;
   // leaves-the-battlefield triggers look back in time (CR 603.10a), so "dies" passes them in.
   const add = (
@@ -166,6 +170,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   ) => {
     const printed = compileCard(defOf(s, o)).triggers;
     triggers.forEach((t, index) => {
+      // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
+      if (hosting ? !t.host : t.host === "attached") return;
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
@@ -188,6 +194,23 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ...(event ? { event } : {}),
         });
     });
+  };
+  /**
+   * The same event for the Auras and Equipment attached to `host` (TriggeredAbility.host): `subject` is the creature
+   * by default ("put a +1/+1 counter on it"). `player`: the player it dealt damage to, for "an opponent".
+   */
+  const addHosted = (host: GameObject, pred: (event: string, t: TriggeredAbility) => boolean, cause?: string, subject: GameObject = host, event?: TriggerEventInfo) => {
+    for (const id of s.battlefield) {
+      const a = s.objects[id]!;
+      if (a.attachedTo !== host.id || id === host.id) continue;
+      const you = controllerOf(s, a);
+      hosting = host;
+      try {
+        add(a, you, (e, t) => pred(e, t) && !(t.toOpponent && event?.player === you), undefined, cause, subject, undefined, undefined, undefined, event);
+      } finally {
+        hosting = null;
+      }
+    }
   };
   if (ev.type === "enters") {
     // Static effects apply as it enters, before checking what triggers (CR 611.3c).
@@ -274,6 +297,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (o.blocking) {
         // Blocking several creatures, "blocks" still triggers once; "blocks a creature" once for each (CR 509.3a-b).
         add(o, you, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
+        addHosted(o, (e) => e === "selfBlocks" || e === "selfBlocksOrBecomesBlocked" || e === "selfAttacksOrBlocks");
         for (const a of o.blocking) {
           const at = s.objects[a];
           if (at) add(o, you, (e, t) => (e === "selfBlocksCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, at, you), undefined, undefined, at);
@@ -282,6 +306,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (o.attacking !== undefined && o.blockedBy?.length) {
         // "Defending player" (afflict) is the player it's attacking.
         add(o, you, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        addHosted(o, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, o, { player: o.attacking });
         const bearer = isRingBearer(s, o);
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
@@ -320,6 +345,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
     add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.training || trains(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
@@ -364,17 +390,31 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "dealtDamage") {
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
     const o = s.objects[ev.id];
-    if (o?.zone === "battlefield")
+    if (o?.zone === "battlefield") {
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
+      addHosted(o, (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
+    }
+  } else if (ev.type === "damagedPlayer") {
+    // "Whenever ~ deals damage to a player / an opponent": once for each player dealt damage (CR 603.2c).
+    const o = s.objects[ev.source];
+    const info = { player: ev.player, amount: ev.amount };
+    if (o?.zone === "battlefield") {
+      const you = controllerOf(s, o);
+      add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      addHosted(o, (e) => e === "selfDealsDamageToPlayer", undefined, o, info);
+    }
   } else if (ev.type === "damagedCreature") {
     const o = s.objects[ev.source];
     const hit = s.objects[ev.id];
-    if (o?.zone === "battlefield" && hit)
+    if (o?.zone === "battlefield" && hit) {
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
+      addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, { amount: ev.amount });
+    }
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };
-    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);
     // "Whenever one or more creatures a player controls deal combat damage to the player who has the initiative, the
@@ -423,6 +463,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (!o || o.zone !== "battlefield") continue;
       const you = controllerOf(s, o);
       add(o, you, (e) => (e === "becomesTargetOfOpponent" && you !== item!.controller) || e === "selfBecomesTarget", undefined, ev.stackId);
+      addHosted(o, (e) => e === "selfBecomesTarget", ev.stackId);
     }
   } else if (ev.type === "exploits") {
     const lki = { power: ev.chars.power, toughness: ev.chars.toughness };

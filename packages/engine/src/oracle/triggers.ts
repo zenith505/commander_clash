@@ -26,6 +26,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   // Revisit when battles are (CR 310).
   [/^Whenever ~ deals combat damage to a player(?: or battle)?, (.+)$/, "selfDealsCombatDamageToPlayer"],
   [/^Whenever ~ deals combat damage, (.+)$/, "selfDealsCombatDamage"],
+  [/^Whenever ~ deals damage to a player, (.+)$/, "selfDealsDamageToPlayer"],
   [/^Whenever ~ deals damage, (.+)$/, "selfDealsDamage"],
   [/^Whenever another creature you control enters, (.+)$/, "anotherCreatureYouControlEnters"],
   [/^Whenever another creature enters the battlefield under your control, (.+)$/, "anotherCreatureYouControlEnters"],
@@ -53,8 +54,61 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer",
 ];
+
+/** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
+const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; creature?: true }][] = [
+  [/^attacks or blocks, (.+)$/, "selfAttacksOrBlocks", {}],
+  [/^attacks, (.+)$/, "selfAttacks", { defending: true }],
+  [/^blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked", {}],
+  [/^becomes blocked, (.+)$/, "selfBecomesBlocked", { defending: true }],
+  [/^blocks, (.+)$/, "selfBlocks", {}],
+  // An attacking creature's combat damage to a player is dealt to the player it attacks (CR 510.1a); a blocking
+  // creature deals none to players. So "defending player" is that player.
+  [/^deals combat damage to (?:a player(?: or battle)?|defending player), (.+)$/, "selfDealsCombatDamageToPlayer", { thatMuch: true, eventPlayer: true }],
+  [/^deals combat damage to an opponent, (.+)$/, "selfDealsCombatDamageToPlayer", { thatMuch: true, eventPlayer: true, toOpponent: true }],
+  [/^deals damage to a player, (.+)$/, "selfDealsDamageToPlayer", { thatMuch: true, eventPlayer: true }],
+  [/^deals damage to an opponent, (.+)$/, "selfDealsDamageToPlayer", { thatMuch: true, eventPlayer: true, toOpponent: true }],
+  [/^deals combat damage to a creature, (.+)$/, "selfDealsCombatDamageToCreature", { thatMuch: true, creature: true }],
+  [/^deals damage to a creature, (.+)$/, "selfDealsDamageToCreature", { thatMuch: true, creature: true }],
+  [/^deals combat damage, (.+)$/, "selfDealsCombatDamage", { thatMuch: true }],
+  [/^deals damage, (.+)$/, "selfDealsDamage", { thatMuch: true }],
+  [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
+];
+
+/**
+ * "Whenever enchanted creature deals damage, you gain that much life", "Whenever equipped creature attacks, put a
+ * +1/+1 counter on it", "Whenever ~ or equipped creature deals combat damage to a player, draw a card": triggered
+ * abilities of an Aura or Equipment about the creature it's attached to as the event happens. "It" and "that
+ * creature" are that creature (the subject); after "deals damage to a creature", the creature dealt damage
+ * ("the other creature"). "Enchanted creature" in the effect is whatever it's attached to as it resolves.
+ */
+function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) creature (.+)$/.exec(line);
+  if (!m) return null;
+  for (const [re, event, o] of HOST_TRIGGERS) {
+    const h = re.exec(m[2]!);
+    if (!h) continue;
+    let text = h[1]!;
+    // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm).
+    if (m[1] && /\b(it|its|that creature)\b/i.test(text)) return "fail";
+    if (o.creature) {
+      if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
+      text = text.replace(/\bthe other creature\b/g, "that creature");
+    }
+    const thatMuch = o.thatMuch && /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch) {
+      if (/\bX\b/.test(text)) return "fail";
+      text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    }
+    let body = parseBody(text, { ...(o.creature ? { subject: true } : { subjectIt: true }), ...(o.eventPlayer ? { eventPlayer: true } : {}), ...(o.defending ? { defending: true } : {}) });
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
+    return { event, body, host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}) };
+  }
+  return null; // "whenever equipped creature dies" is parseDiesTrigger's
+}
 
 /**
  * "Whenever ~ blocks a creature", "Whenever ~ becomes blocked by a creature", "Whenever ~ blocks or
@@ -271,6 +325,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(heroic[1]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
     return body ? { event: "selfTargetedByYourSpell", body } : "fail";
   }
+  const hosted = parseHostTrigger(line);
+  if (hosted) return hosted;
+  // "Whenever ~ deals damage to an opponent": an opponent of its controller.
+  const toOpp = /^Whenever ~ deals damage to an opponent, (.+)$/.exec(line);
+  if (toOpp) {
+    const t = parseTrigger(`Whenever ~ deals damage to a player, ${toOpp[1]}`);
+    return t && t !== "fail" ? { ...t, toOpponent: true } : "fail";
+  }
   const cast = parseCastTrigger(line);
   if (cast) return cast;
   const block = parseBlockTrigger(line);
@@ -310,7 +372,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       let text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const amount = event === "selfDealsDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
+      const amount = event === "selfDealsDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
       const thatMuch = amount && /\bthat (?:much|many)\b/.test(text);
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;
@@ -319,7 +381,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
     }

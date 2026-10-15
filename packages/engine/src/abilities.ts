@@ -650,6 +650,8 @@ export type TriggerEvent =
   /** Enlist's trigger (CR 702.154a), "Whenever ~ enlists a creature": the subject is the enlisted creature. */
   | "selfEnlists"
   | "selfDealsCombatDamageToPlayer"
+  /** "Whenever ~ deals damage to a player" (combat or not): once for each player dealt damage (CR 603.2c). */
+  | "selfDealsDamageToPlayer"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
@@ -766,6 +768,14 @@ export interface TriggeredAbility {
   ifOtherBearer?: boolean;
   /** It has the ability only while this is true, like "Max speed — Whenever ..." (CR 702.178a): not an intervening if. */
   activeIf?: StaticCondition;
+  /**
+   * "Whenever enchanted creature deals damage", "whenever equipped creature attacks": a "self" event about the
+   * permanent this Aura or Equipment is attached to, which is the subject ("it", "that creature"). "orSelf": "whenever
+   * ~ or equipped creature ...", about either.
+   */
+  host?: "attached" | "orSelf";
+  /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
+  toOpponent?: true;
 }
 
 export interface ActivatedAbility {

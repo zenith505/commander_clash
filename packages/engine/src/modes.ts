@@ -5,7 +5,7 @@
 // whose text is just the chosen modes, in printed order (CR 608.2c), which is what
 // `withModes` builds.
 
-import type { AbilityBody } from "./abilities";
+import type { AbilityBody, SpellCondition, TargetSpec } from "./abilities";
 
 /** Why `modes` isn't a valid choice for this modal body (ignoring targets), or null. `both`: see modeRange. */
 export function modeCountProblem(body: AbilityBody, modes: number[], both = false): string | null {
@@ -77,3 +77,39 @@ function shiftTargets<T>(x: T, offset: number): T {
   if (refersToTarget && typeof o.index === "number") copy.index = o.index + offset;
   return copy as T;
 }
+
+/** The optional costs announced for a spell (CR 601.2b) that decide which of its targets it has (see TargetSpec.onlyIf). */
+export interface CastHow {
+  kicks?: number[];
+  bargained?: boolean;
+  teamwork?: boolean;
+  gift?: boolean;
+}
+
+/** Whether a spell cast this way meets a condition on how it was cast ("if ~ was kicked", "if the gift was promised"). */
+export function castConditionMet(cond: SpellCondition, how: CastHow): boolean {
+  switch (cond.kind) {
+    case "kicked":
+      return cond.which === undefined ? !!how.kicks?.length : !!how.kicks?.includes(cond.which);
+    case "bargained":
+      return !!how.bargained;
+    case "teamwork":
+      return !!how.teamwork;
+    case "gift":
+      return !!how.gift;
+    default:
+      return true;
+  }
+}
+
+/**
+ * The targets a spell cast this way has: one only a part it won't do would need is skipped, so nothing is chosen for it
+ * (CR 702.33g, 702.166d, 702.194c, 702.174m: "the spell is cast as if it did not have those targets").
+ */
+export function gateTargets(specs: TargetSpec[], how: CastHow = {}): TargetSpec[] {
+  if (!specs.some((t) => t.onlyIf)) return specs;
+  return specs.map((t) => (t.onlyIf && castConditionMet(t.onlyIf.cond, how) === !!t.onlyIf.not ? { ...t, skip: true } : t));
+}
+
+/** Whether some of these targets depend on how the spell is cast (see gateTargets). */
+export const hasGatedTargets = (specs: TargetSpec[]) => specs.some((t) => t.onlyIf);

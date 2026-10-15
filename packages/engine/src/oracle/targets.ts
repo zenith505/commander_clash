@@ -179,11 +179,15 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   return { ref: "target", index: first, ...(n > 1 ? { n } : {}) };
 }
 
-/** "creatures you control" -> "creature you control", "creature cards from your graveyard" -> "creature card from your graveyard". */
+/**
+ * "creatures you control" -> "creature you control", "creature cards from your graveyard" -> "creature card from your
+ * graveyard". "Artifacts and/or enchantments" -> "artifact or enchantment": each target is one or the other. "Creature
+ * cards each with mana value 2 or less" -> "creature card with mana value 2 or less".
+ */
 function singularPhrase(p: string): string {
-  const words = p.trim().split(" ");
-  const i = words.findIndex((w) => /^(creatures|cards|permanents|artifacts|enchantments|lands|planeswalkers|battles)$/i.test(w));
-  if (i >= 0) words[i] = singular(words[i]!);
+  const words = p.trim().replace(/ and\/or /g, " or ").replace(/ each (?=with )/, " ").split(" ");
+  const plural = (w: string) => /^(creatures|cards|permanents|artifacts|enchantments|lands|planeswalkers|battles)$/i.test(w);
+  if (words.some(plural)) words.forEach((w, i) => plural(w) && (words[i] = singular(w)));
   else {
     // A creature type: "two target Goblins", "up to two target Elves you control".
     const j = words.findIndex((w) => /^[A-Z]/.test(w) && CREATURE_TYPES.has(singular(w)) && w !== singular(w));

@@ -1,9 +1,9 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
-import { withModes } from "./modes";
+import { withModes, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   abilityProblem,
   faceUpWays,
@@ -434,6 +434,11 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
   };
   for (let i = 0; i < body.targets.length; i++) {
     const spec = body.targets[i]!;
+    // A target the spell is cast as if it didn't have (CR 702.33g).
+    if (spec.skip) {
+      out.push({ kind: "none" });
+      continue;
+    }
     if (spec.divided?.first === i) {
       const picks = spec.divided.counter === "+1/+1" ? distributeCounters(s, pid, body, i, out, forced, sourceId) : divideDamage(s, pid, body, i, out, forced, sourceId);
       if (!picks) return null;
@@ -475,7 +480,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
     out.push(copying ? worst(s, pid, pool) : best(s, pid, pool, harm[i]!, damageTo(body, i, x) + fightDamage(i)));
   }
   // Only "up to" targets, none of them worth choosing: not worth doing.
-  if (!forced && out.length && out.every((t) => t.kind === "none")) return null;
+  if (!forced && body.targets.some((t) => !t.skip) && out.every((t) => t.kind === "none")) return null;
   return out;
 }
 
@@ -825,8 +830,27 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
 
 function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via: CastFromGraveyardKind | undefined, alt: AltCostKind | undefined, modes: number[] | undefined, teamwork?: ObjectId[]): Action[] | null {
   const printed = castingBody(castDef(s, id, alt));
-  const body = printed && withModes(printed, modes);
-  const specs = spellTargets(s, id, modes, alt);
+  const all = printed && withModes(printed, modes);
+  // Targets that only a kicked (bargained, ...) part needs (CR 702.33g): with those costs paid first, then without.
+  if (all && hasGatedTargets(all.targets)) {
+    const conds = all.targets.flatMap((t) => (t.onlyIf ? [t.onlyIf.cond] : []));
+    return castPlanPaying(s, pid, id, free, x, via, alt, modes, teamwork, { paid: true, conds }) ?? castPlanPaying(s, pid, id, free, x, via, alt, modes, teamwork, { paid: false, conds });
+  }
+  return castPlanPaying(s, pid, id, free, x, via, alt, modes, teamwork);
+}
+
+/**
+ * Casting it with these modes. `gate`: the optional costs some of its targets depend on, all of them paid or none (an
+ * undefined gate leaves them to the usual choices below).
+ */
+function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via: CastFromGraveyardKind | undefined, alt: AltCostKind | undefined, modes: number[] | undefined, teamwork: ObjectId[] | undefined, gate?: { paid: boolean; conds: SpellCondition[] }): Action[] | null {
+  const printed = castingBody(castDef(s, id, alt));
+  // Whether a cost of this kind must be paid (true), must not be (false), or is up to the usual choice (undefined).
+  const must = (kind: SpellCondition["kind"]) => (gate && gate.conds.some((c) => c.kind === kind) ? gate.paid : undefined);
+  const kickOk = (kicks: number[]) => !gate || !gate.conds.some((c) => c.kind === "kicked") || gate.conds.filter((c) => c.kind === "kicked").every((c) => castConditionMet(c, { kicks }) === gate.paid);
+  const how: CastHow = gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true } : {};
+  const body = printed && gateBody(withModes(printed, modes), how);
+  const specs = body?.targets ?? spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
   if (specs.length && !targets) return null;
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
@@ -857,20 +881,24 @@ function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolea
       .map((x) => obj(s, x))
       .filter((o) => o.isToken && o.id !== victim?.id && !extra.sacrifice?.includes(o.id) && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && worth(s, pid, o) <= 2)
       .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
-    if (spare) extra.bargain = spare.id;
+    if (spare && must("bargained") !== false) extra.bargain = spare.id;
+    if (must("bargained") && !spare) return null;
     const c = compileCard(defOf(s, obj(s, id)));
     const busy = (o: ObjectId) => o === victim?.id || o === spare?.id || !!extra.sacrifice?.includes(o) || (targets ?? []).some((t) => t.kind === "object" && t.id === o);
     // Teamwork: with creatures that wouldn't be attacking or blocking anyway; a "choose both" spell gets it with both modes.
-    const tw = teamwork ?? (c.teamwork !== undefined && !c.spell?.modal?.both ? spareTappers(s, pid, id, c.teamwork, busy) : undefined);
+    const tw = teamwork ?? (c.teamwork !== undefined && !c.spell?.modal?.both && must("teamwork") !== false ? spareTappers(s, pid, id, c.teamwork, busy) : undefined);
     if (tw) extra.teamwork = tw;
+    if (must("teamwork") && !tw) return null;
     // Conspire (CR 702.78a): two such creatures for a copy of the spell.
     if (c.conspire) {
       const two = conspireCandidates(s, pid, id).filter((o) => !busy(o) && !tw?.includes(o) && spare_(s, pid, o)).slice(0, 2);
       if (two.length === 2) extra.conspire = two;
     }
     // Gift (CR 702.174): promised only for a small gift that turns on something of the spell's own.
-    const giftee = c.gift ? chooseGiftee(s, pid, c) : undefined;
+    // When it has targets only with the gift promised, it's promised for those.
+    const giftee = !c.gift || must("gift") === false ? undefined : (chooseGiftee(s, pid, c) ?? (must("gift") ? [...opponents(s, pid)].sort((a, b) => player(s, a).life - player(s, b).life)[0] : undefined));
     if (giftee !== undefined) extra.gift = giftee;
+    if (must("gift") && giftee === undefined) return null;
   }
   if (!extra) return null;
   if (alt) extra.alt = alt;
@@ -886,7 +914,7 @@ function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolea
   // Buy it back if we can afford to (CR 702.27a), then kick it if we can: the most kicker costs first (CR 702.33).
   const buybacks = compileCard(defOf(s, obj(s, id))).buyback && !via ? [true, false] : [false];
   for (const buyback of buybacks)
-    for (const kicks of kickOptions(s, pid, id, free)) {
+    for (const kicks of kickOptions(s, pid, id, free).filter(kickOk)) {
       const plan = planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...extra, ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}) });
       // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
       if (plan && targets && !canAlsoPayWard(s, pid, plan, targets)) continue;
@@ -894,6 +922,8 @@ function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolea
     }
   return null;
 }
+
+const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
 
 /** Kicker choices to try, most kicked first, ending with not kicking it. */
 function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): number[][] {

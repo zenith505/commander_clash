@@ -34,6 +34,7 @@ import {
   withModes,
   planActivate,
   spellTargets,
+  castHow,
   isSummoningSick,
   legalActions,
   manaAbilitiesOn,
@@ -312,6 +313,13 @@ type XPick =
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
 /** How many "up to" targets in a row start at `i`. */
+/** Targets chosen so far, then nothing for each next one the spell is cast as if it didn't have (CR 702.33g). */
+const skipped = (specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice[] => {
+  const out = [...chosen];
+  while (out.length < specs.length && specs[out.length]!.skip) out.push({ kind: "none" });
+  return out;
+};
+
 const optionalLeft = (specs: TargetSpec[], i: number) => {
   let n = 0;
   while (specs[i + n]?.optional) n++;
@@ -374,7 +382,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setDiscards([]);
     setTapPick(null);
     if (pending?.kind === "chooseTargets") setTargeting({ mode: "trigger", specs: pending.specs, chosen: [], label: pending.description });
-    else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: [], label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
+    else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
     else setTargeting((t) => (answering(t) ? null : t));
   }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" ? pending.stackId : ""]);
@@ -445,14 +453,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     finishTargets(chosen);
   }
 
-  function finishTargets(chosen: TargetChoice[], divided?: Targeting) {
+  function finishTargets(chosen0: TargetChoice[], divided?: Targeting) {
     const tg = divided ?? targeting;
     if (!tg) return;
+    const chosen = skipped(tg.specs, chosen0);
     if (chosen.length < tg.specs.length) return setTargeting({ ...tg, chosen });
     setTargeting(null);
     setDividing(null);
     // Then how a divided amount is split among them (CR 601.2d); a copy keeps the division it has.
-    if (!divided && tg.mode !== "copy" && tg.mode !== "change" && tg.specs.some((x) => x.divided)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
+    if (!divided && tg.mode !== "copy" && tg.mode !== "change" && tg.specs.some((x) => x.divided && !x.skip)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
     if (tg.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "change") return dispatch([{ type: "changeTarget", player: HUMAN, target: chosen[0]! }]);
@@ -557,8 +566,17 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: card.manaCost, max, value: max });
     }
-    const specs = spellTargets(s, d.objectId, d.modes, d.alt);
-    if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: [], label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
+    // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is
+    // asked before them when a target depends on it.
+    const gated = spellTargets(s, d.objectId, d.modes, d.alt, { bargained: true });
+    if (d.bargain === undefined && compiled.bargain && gated.some((t) => t.onlyIf?.cond.kind === "bargained")) {
+      const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.casualty?.includes(id));
+      if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
+    }
+    const specs = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
+    // Every target skipped: it's cast as if it had none.
+    if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
+    if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d)) {
       if (c.kind === "payLife" || c.kind === "tap" || (c.kind === "discard" && c.random)) continue; // no spell asks to tap a permanent yet
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
@@ -568,7 +586,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const me = s.players[HUMAN]!;
       const candidates =
         c.kind === "sacrifice"
-          ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
+          ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !d.bargain?.includes(id) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
           : c.kind === "discard" || c.kind === "reveal"
             ? me.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))))
             : me.graveyard.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
@@ -882,7 +900,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <div className="targeting">
               <span>
                 <strong>{targeting.label}</strong>: choose {nextSpec?.text}{" "}
-                {nextSpec?.optional ? `(optional, up to ${optionalLeft(targeting.specs, targeting.chosen.length)} more)` : `(${targeting.chosen.length + 1}/${targeting.specs.length})`}
+                {nextSpec?.optional ? `(optional, up to ${optionalLeft(targeting.specs, targeting.chosen.length)} more)` : `(${targeting.specs.slice(0, targeting.chosen.length).filter((t) => !t.skip).length + 1}/${targeting.specs.filter((t) => !t.skip).length})`}
               </span>
               {nextSpec?.optional && <button onClick={skipTargets}>{targeting.chosen.some((c) => c.kind !== "none") ? "Done" : "Choose none"}</button>}
               {targeting.mode === "copy" && pending?.kind === "copyTargets" && (

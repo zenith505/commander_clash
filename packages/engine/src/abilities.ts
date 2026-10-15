@@ -206,6 +206,15 @@ export interface TargetSpec {
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
    */
   targetsWhat?: TargetSpec | "you";
+  /**
+   * A target of a part of a spell that has its effect only if it was kicked, bargained, cast using teamwork or its gift
+   * was promised (`not`: only if it wasn't, for the part an "instead" replaces): it's chosen only then, and otherwise
+   * the spell is cast as if it didn't have it (CR 702.33g, 702.166d, 702.194c, 702.174m).
+   * See `gateTargets`.
+   */
+  onlyIf?: { cond: SpellCondition; not?: true };
+  /** Set by `gateTargets` for a target the spell is cast as if it didn't have: nothing ({ kind: "none" }) is chosen. */
+  skip?: true;
   /** Original text, for display. */
   text: string;
 }
@@ -587,7 +596,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control": only those, or tied for it. */ greatest?: "power"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**

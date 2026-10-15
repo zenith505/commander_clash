@@ -402,6 +402,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "copySpell":
     case "nextCast":
     case "cascade":
+    case "ripple":
     case "counterUnlessPays":
     case "counterCause":
     case "counterSpell":

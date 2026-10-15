@@ -64,12 +64,27 @@ describe("look at the top N cards", () => {
     const { s, ap, ids } = setup([dig]);
     const top = stack(s, ap, [forest, forest]);
     let t = castIt(s, ap, ids[0]!);
-    t = settle(act(t, { type: "searchLibrary", player: ap, found: [] }));
-    expect(new Set(t.players[ap]!.library.slice(-2))).toEqual(new Set(top));
+    t = act(t, { type: "searchLibrary", player: ap, found: [] });
+    // "In any order": the owner orders them (CR 401.4).
+    expect(t.pending).toMatchObject({ kind: "arrangeTop", how: "bottom", player: ap });
+    t = settle(act(t, { type: "arrangeTop", player: ap, top: [top[1]!, top[0]!], away: [] }));
+    expect(t.players[ap]!.library.slice(-2)).toEqual([top[1], top[0]]);
   });
 
-  it("no matching card: nothing to pick, everything goes to the bottom without a prompt", () => {
+  it("no matching card: nothing to pick, only the order of the cards going to the bottom", () => {
     const dig = spell("Seek Test", "Look at the top two cards of your library. You may reveal a creature card from among them and put it into your hand. Put the rest on the bottom of your library in any order.");
+    const { s, ap, ids } = setup([dig]);
+    const top = stack(s, ap, [forest, forest]);
+    let t = castIt(s, ap, ids[0]!);
+    expect(t.pending).toMatchObject({ kind: "arrangeTop", how: "bottom", cards: top });
+    expect(() => act(t, { type: "arrangeTop", player: ap, top: [top[0]!], away: [top[1]!] })).toThrow();
+    t = settle(act(t, { type: "arrangeTop", player: ap, top: [top[1]!, top[0]!], away: [] }));
+    expect(t.pending).toBeNull();
+    expect(t.players[ap]!.library.slice(-2)).toEqual([top[1], top[0]]);
+  });
+
+  it("in a random order: no prompt", () => {
+    const dig = spell("Seek Test", "Look at the top two cards of your library. You may reveal a creature card from among them and put it into your hand. Put the rest on the bottom of your library in a random order.");
     const { s, ap, ids } = setup([dig]);
     const top = stack(s, ap, [forest, forest]);
     const t = castIt(s, ap, ids[0]!);

@@ -2,10 +2,11 @@ import type { Effect, PayCost } from "../abilities";
 import { parseManaCost } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { draw, log, player } from "../game";
+import { draw, log, obj, player } from "../game";
+import { defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
-import { choiceOptions, pickOptions } from "./targeting";
+import { choiceOptions, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, objects, runEffect, amountNow } from "./resolve";
 import { kickedMatches } from "./run-spells";
 import { describePay } from "./describe";
@@ -114,14 +115,14 @@ function timesMana(mana: string, n: number): string {
  */
 function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
   for (const e of effects) {
-    if (e.type === "discard" && e.who.ref === "you" && !player(s, ctx.controller).hand.length) return false;
+    if (e.type === "discard" && e.who.ref === "you" && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).length) return false;
     // Damage to a target that's no longer legal isn't dealt (CR 608.2b); a creature that's gone deals none.
     if (e.type === "damage" && "index" in e.to && !ctx.legal[e.to.index]) return false;
     if (e.type === "bite" && (!objects(s, e.a, ctx).length || !objects(s, e.b, ctx).length)) return false;
     // "Unless you return a non-Lair land you control": you can't if you have none.
-    if (e.type === "pick" && e.who.ref === "you" && pickOptions(s, e, ctx.controller).length < amountNow(s, e.n, ctx)) return false;
+    if (e.type === "pick" && e.who.ref === "you" && pickOptions(s, e, ctx.controller, ctx.sourceId).length < amountNow(s, e.n, ctx)) return false;
   }
   return true;
 }

@@ -71,12 +71,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
-        const hand = player(s, pid).hand;
+        const hand = player(s, pid).hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
         if (!e.hand && hand.length > n) {
-          s.pending = { kind: "discard", player: pid, count: n, source: src };
+          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(e.filter ? { filter: e.filter } : {}) };
           return "paused";
         }
-        sc.chosen![pid] = [...hand]; // no choice to make: the whole hand
+        sc.chosen![pid] = [...hand]; // no choice to make: the whole hand (all the cards that match)
         sc.queue.shift();
       }
       for (const pid of apnap(s, who)) discardCards(s, pid, sc.chosen![pid] ?? [], "", false, false, ctx.controller);
@@ -349,9 +349,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const looked = sc.looked;
       const found = (sc.found ?? []).filter((id) => looked.includes(id));
-      const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
       const faceDown = e.into === "manifest" || e.into === "cloak" ? e.into : undefined;
+      // Resuming after the owner ordered the rest for the bottom: the cards taken have already moved.
+      if (sc.moved) return toBottom(s, pid, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false);
+      const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
@@ -374,15 +376,36 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
       } else {
-        // "On the bottom in any order" or "in a random order": random either way.
-        const bottom = [...rest];
-        shuffle(s, bottom);
-        p.library = [...p.library.filter((x) => !rest.includes(x)), ...bottom];
-        if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "a card" : `${rest.length} cards`} on the bottom of their library.`);
+        sc.moved = true;
+        return toBottom(s, pid, rest, src, !!e.random);
       }
       return;
     }
   }
+}
+
+/**
+ * Cards of `pid`'s library (or elsewhere) going to the bottom of `pid`'s library at the same time. Their owner orders
+ * them (CR 401.4), "paused" while they choose; `random`: "in a random order".
+ */
+export function toBottom(s: GameState, pid: PlayerId, ids: ObjectId[], src: string, random: boolean): "paused" | undefined {
+  const p = player(s, pid);
+  const sc = (s.resolving!.scratch ??= {});
+  let order = [...ids];
+  if (random) shuffle(s, order);
+  else if (ids.length > 1) {
+    if (!sc.arranged) {
+      s.pending = { kind: "arrangeTop", player: pid, how: "bottom", cards: ids, source: src };
+      return "paused";
+    }
+    order = sc.arranged.top.filter((id) => ids.includes(id));
+  }
+  for (const id of order) {
+    if (obj(s, id).zone === "library") p.library = [...p.library.filter((x) => x !== id), id];
+    else moveObject(s, id, "library"); // to the bottom
+  }
+  if (order.length) log(s, `${p.name} puts ${order.length === 1 ? "a card" : `${order.length} cards`} on the bottom of their library${random && order.length > 1 ? " in a random order" : ""}.`);
+  return undefined;
 }
 
 /**

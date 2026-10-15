@@ -668,6 +668,11 @@ export type Effect =
   | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
+  /**
+   * Ripple N as it resolves (CR 702.60a): reveal the top N cards, cast any with the same name as the spell for free,
+   * the rest to the bottom in any order. `of`: "cause" when the ripple was given to the spell that triggered it.
+   */
+  | { type: "ripple"; n: number; of?: "cause" }
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
   | { type: "evolve" }
   /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
@@ -709,7 +714,8 @@ export type Effect =
    */
   | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile"; until?: "sourceLeaves"; linked?: boolean }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true } // CR 701.9
+  /** `filter`: "discard a creature card" (only such cards can be chosen). */
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
@@ -822,7 +828,7 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak"; rest: "graveyard" | "bottom" | "shuffle"; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak"; rest: "graveyard" | "bottom" | "shuffle"; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
@@ -1066,6 +1072,8 @@ export interface TriggeredAbility {
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */
   ifEvoked?: boolean;
+  /** "When ~ enters, if his sneak cost was paid" (CR 702.190a). */
+  ifSneaked?: boolean;
   /** Ravenous's "if X is 5 or more" (CR 702.156a): the X of the spell it was (CR 107.3m), which can't change. */
   ifX?: number;
   /** Casualty's "if a casualty cost was paid for it" (CR 702.153a). */
@@ -1303,7 +1311,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell";
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
@@ -1475,6 +1483,15 @@ export interface CompiledCard {
   extraLands?: number;
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
+  /**
+   * "You may play lands from the top of your library" (Courser of Kruphix), "you may cast creature spells from the top
+   * of your library" (Garruk's Horde): its controller may play the top card of their library (CR 401.5).
+   */
+  fromTop?: { lands: boolean; spells?: TargetSpec | "any" };
+  /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
+  revealTop?: "you" | "players";
+  /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */
+  revealHands?: "players" | "opponents";
   /** Convoke (CR 702.51): creatures you tap while casting it help pay its cost. */
   convoke?: boolean;
   /** Improvise (CR 702.126a): artifacts you tap while casting it each pay for {1}. */

@@ -21,12 +21,13 @@ import { parseCopiesSentence } from "./sentences/copies";
  */
 export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>): Extract<Effect, { type: "dig" }> | "more" | null {
   const REST = "(into your graveyard|on the bottom of your library(?: in (?:any|a random) order)?)";
-  const restOf = (r: string) => (r === "into your graveyard" ? "graveyard" : "bottom");
+  // Without "in a random order", the owner arranges the cards going to the bottom (CR 401.4).
+  const restOf = (r: string) => (r === "into your graveyard" ? { rest: "graveyard" as const } : / random /.test(r) ? { rest: "bottom" as const, random: true as const } : { rest: "bottom" as const });
   let m: RegExpExecArray | null;
   if (dig.into === undefined) {
     if ((m = new RegExp(`^Put (one|two|three) of (?:them|those cards) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
       Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand" });
-      if (m[2]) dig.rest = restOf(m[2]);
+      if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put it|put (an? .+?) from among them) into your hand$/.exec(s))) {
       const filter = parseSearchFilter((m[1] ?? m[2])!.replace(/^an? /, ""));
       if (!filter) return null;
@@ -36,7 +37,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     } else return null;
     return dig.rest ? (dig as Extract<Effect, { type: "dig" }>) : "more";
   }
-  if ((m = new RegExp(`^Put the rest ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: restOf(m[1]!) };
+  if ((m = new RegExp(`^Put the rest ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
   return null;
 }
 

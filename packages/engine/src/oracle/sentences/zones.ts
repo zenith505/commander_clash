@@ -170,6 +170,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   }
   // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
   // of their choice", "return a land you control to its owner's hand" (CR 701.21).
+  // "Return another creature you control to its owner's hand" (Ambush Krotiq): not the source.
+  if ((m = /^Return another (?!target )(.+?) you control to its owner's hand$/i.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "bounce" }];
+  }
   if ((m = new RegExp(`^Return ${NUM} (.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];

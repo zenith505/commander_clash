@@ -6,7 +6,7 @@ import type { DamageRecipient, Effect, ObjRef, PlayerRef, TargetSpec } from "../
 import { NUM, NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget } from "../body";
 import { parseCount } from "../counts";
-import { parseSearch } from "../search";
+import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
@@ -71,12 +71,28 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const discard: Effect = { type: "discard", who: { ref: "you" }, n: 1, ...(m[2] ? { random: true } : {}) };
     return [{ type: "may", effects: [discard], otherwise: [sacrificeSelf], keep: true, text: `Discard a card${m[2] ?? ""} to keep ~` }];
   }
-  // The Lairs: "sacrifice it unless you return a non-Lair land you control to its owner's hand". Returning one keeps it;
-  // with none to return, it's sacrificed.
-  if ((m = /^[Ss]acrifice (~|it) unless you return (an? .+?) you control to its owner's hand$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
-    const filter = pickFilter(m[2]!.replace(/^an? /, ""));
+  // "Sacrifice ~ unless you discard a land card" (Fallow Wurm), "exile it unless you discard a creature card" (Body
+  // Snatcher): only such a card can be discarded; with none, it's sacrificed (exiled).
+  if ((m = /^(Sacrifice|Exile) (~|it) unless you discard (an? .+? card)$/i.exec(s)) && (m[2] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = parseSearchFilter(m[3]!.replace(/^an? /, ""));
     if (!filter) return null;
-    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
+    const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : { type: "exile", what: { ref: "self" } };
+    return [{ type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1, filter }], otherwise: [away], keep: true, text: `Discard ${m[3]} to keep ~` }];
+  }
+  // "Then discard two cards unless you discard a creature card" (Mystic Meditation, Thirst for Knowledge): a card of
+  // that kind, or two cards. With none of that kind, two cards (rulings).
+  if ((m = new RegExp(`^(?:[Tt]hen )?[Dd]iscard (two|three|\\d+) cards unless you discard (an? .+? card)$`).exec(s))) {
+    const filter = parseSearchFilter(m[2]!.replace(/^an? /, ""));
+    if (!filter) return null;
+    return [{ type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1, filter }], otherwise: [{ type: "discard", who: { ref: "you" }, n: num(m[1]!) }], keep: true, text: `Discard ${m[2]} rather than ${m[1]} cards` }];
+  }
+  // The Lairs: "sacrifice it unless you return a non-Lair land you control to its owner's hand". Returning one keeps it;
+  // with none to return, it's sacrificed. Quickling: "unless you return another creature you control".
+  if ((m = /^[Ss]acrifice (~|it) unless you return (an? .+?|another .+?) you control to its owner's hand$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const another = /^another /.test(m[2]!);
+    const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
+    if (!filter) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
   }
   // "That player draws an additional card" (Howling Mine): just another draw.
   if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);

@@ -1,6 +1,6 @@
 # Roadmap
 
-15,502 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,576 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,12 +14,16 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (a long tail of 2- and 3-card lines): "backup N", "ripple N" (needs a choice of bottom
-   order), "Partner—Friends forever", "Sneak {N}{B}", Rageform-style "it becomes an Aura ... manifest the top card",
-   "players play with their hands / the top card of their libraries revealed", "for each other attacking Aurochs",
-   "untap all creatures that attacked this turn ... additional combat phase", "draw three cards, then discard two
-   unless you discard a creature card", "when ~ enters, return another creature you control to its owner's hand".
-   Left from the earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed, Monastery Raid),
+1. By `npm run blockers` (a long tail of 2- and 3-card lines): Rageform-style "it becomes an Aura ... manifest the
+   top card", "untap all creatures that attacked this turn ... additional combat phase" (Relentless Assault; the
+   engine has one combat per turn), "for each other attacking ~" naming the card itself (Aurochs Herd) and Shared
+   Animosity's "that share a creature type with it". Left from the ripple/sneak round: Karai's "if a sneak cost was
+   paid this turn", sneak conditions on Last Ronin's Technique and Turncoat Kunoichi, "you may look at the top card
+   of your library any time" (Vizier of the Menagerie, Experimental Frenzy), "once each turn, you may cast ... from
+   the top" and conditional play-from-top (Bolas's Citadel's life payment, Melek, Mistbreath Elder, Precognition
+   Field), putting cards from a hand on the bottom in any order (Arjun, Mindmoil), granting cascade, and the owner's
+   order when several target spells or permanents go to the bottom at once (CR 401.4). Left from the
+   earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed, Monastery Raid),
    "if this spell was cast from exile" conditions on foretell cards (Haunting Voyage, Cosmos Charger), Earth
    Rumble's reflexive earthbend trigger and Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
    Death's lures with extra clauses, Kingpin of Crime.
@@ -54,8 +58,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   Mana Flare (which has no restriction) could be.
 - "One or more creatures enter/die" (once per batch), "whenever ~ connives", "while ~ is in your graveyard".
 - Choosing what to proliferate. "Exile any number of them and put the rest back in any order".
-- Effects on the attackers as a group; impulse draw from an opponent's library; "play lands from the top of your
-  library"; Glacierwood Siege's modal choice.
+- Effects on the attackers as a group; impulse draw from an opponent's library; Glacierwood Siege's modal choice.
 - Vorinclex (counters on players, halving), Academy Manufactor.
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".

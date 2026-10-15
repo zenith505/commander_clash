@@ -8,7 +8,7 @@ import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
-import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending } from "./keyword-abilities";
+import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition } from "./statics";
 import { parseTrigger } from "./triggers";
 import { parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
@@ -18,6 +18,7 @@ import { parseGroup, parseTargetPhrase } from "./targets";
 import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept } from "./tokens";
+import { parseSearchFilter } from "./search";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -551,6 +552,27 @@ export function compile(d: CardDef): CompiledCard {
       out.landsFromGraveyard = true;
       continue;
     }
+    // Information that's public while the permanent is on the battlefield (CR 401.5; hands, CR 402.3).
+    if (line === "Play with the top card of your library revealed." || line === "Players play with the top card of their libraries revealed.") {
+      out.revealTop = /^Players/.test(line) ? "players" : "you";
+      continue;
+    }
+    if (line === "Players play with their hands revealed." || line === "Your opponents play with their hands revealed.") {
+      out.revealHands = /^Players/.test(line) ? "players" : "opponents";
+      continue;
+    }
+    // "You may play lands from the top of your library", "you may play lands and cast spells from the top of your
+    // library", "you may cast creature spells from the top of your library": at their usual timing, a land still using
+    // the turn's land play (rulings on Courser of Kruphix and Future Sight).
+    const top = /^You may (play lands|play lands and cast spells|cast (.+?) spells) from the top of your library\.$/.exec(line);
+    if (top) {
+      const lands = /^play lands/.test(top[1]!);
+      const kinds = top[2]?.replace(/ and /g, " or ");
+      const spells = /cast spells$/.test(top[1]!) ? ("any" as const) : kinds ? parseSearchFilter(`${kinds} card`) : undefined;
+      if (spells === null || (kinds && !spells)) out.unsupported.push(raw);
+      else out.fromTop = { lands, ...(spells ? { spells } : {}) };
+      continue;
+    }
     const extraLand = new RegExp(`^You may play ${NUM} additional lands? on each of your turns\\.$`).exec(line);
     if (extraLand) {
       out.extraLands = (out.extraLands ?? 0) + num(extraLand[1]!);
@@ -771,6 +793,9 @@ export function compile(d: CardDef): CompiledCard {
       );
       continue;
     }
+    // "Partner—Friends forever" and the other "partner—[text]" abilities only matter for deck building (CR 702.124i; see
+    // commanderPairProblem).
+    if (/^Partner—(?:Character select|Father & son|Friends forever|Survivors)$/.test(line)) continue;
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
@@ -788,6 +813,13 @@ export function compile(d: CardDef): CompiledCard {
       const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.every((m) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k)));
       if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => ({ ...m, spares: true as const })) as typeof st.mods, text: line });
       else out.unsupported.push(raw);
+      continue;
+    }
+    // Thrumming Stone: "Spells you cast have ripple 4." Each spell's granted ripple triggers as it's cast (CR 702.60a),
+    // like a "whenever you cast a spell" ability; spells cast by ripple trigger it too (rulings).
+    const grantedRipple = /^Spells you cast have ripple (\d+)\.$/.exec(line);
+    if (grantedRipple) {
+      out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
     }
     const st = parseStatic(line) ?? parseConditionalStatic(line);

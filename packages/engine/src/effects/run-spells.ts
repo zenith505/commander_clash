@@ -9,7 +9,7 @@ import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackIt
 import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, stampTargets } from "./targeting";
 import { ResolveCtx, objects, amountNow } from "./resolve";
 import { fireEvent } from "./triggers";
-import { discardCards } from "./run-library";
+import { discardCards, toBottom } from "./run-library";
 
 /**
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
@@ -135,6 +135,29 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const id of rest) moveObject(s, id, "library"); // to the bottom, in a random order
       if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
       return;
+    }
+    case "ripple": {
+      // CR 702.60a. The spell's name as it last existed, even if it has left the stack (CR 608.2h).
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const name = e.of === "cause" ? (ctx.lki?.copyKey ? s.cards[ctx.lki.copyKey]?.name : undefined) : ctx.sourceDef.name;
+      if (!sc.ripple) {
+        const revealed = p.library.slice(0, e.n); // all of them if there are fewer (702.60a)
+        if (!revealed.length) return;
+        log(s, `${p.name} reveals the top ${revealed.length === 1 ? "card" : `${revealed.length} cards`} of their library for ripple (${revealed.map((id) => defOf(s, obj(s, id)).name).join(", ")}).`);
+        sc.ripple = { revealed, queue: revealed.filter((id) => defOf(s, obj(s, id)).name === name) };
+      }
+      // Each card with that name, one at a time, cast as this resolves (its card type's timing doesn't matter).
+      while (sc.ripple.queue.length) {
+        const id = sc.ripple.queue.shift()!;
+        if (obj(s, id).zone !== "library") continue;
+        s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
+        if (castProblem(s, p.id, id) === null) return "paused";
+        s.pending = null;
+        log(s, `${defOf(s, obj(s, id)).name} can't be cast.`);
+      }
+      const rest = sc.ripple.revealed.filter((id) => s.objects[id]?.zone === "library");
+      return toBottom(s, p.id, rest, src, false);
     }
     case "counterUnlessPays": {
       // Ward (CR 702.21a) and "counter it unless that player pays": the spell or ability that triggered this.

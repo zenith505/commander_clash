@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   abilityProblem,
+  altCost,
+  castProblem,
+  topPlayable,
   invalidateCharacteristics,
   abilitiesOf,
   applyAction,
@@ -109,6 +112,11 @@ function stackOpeningHand(s: GameState) {
 /** Can the human do something right now besides tapping mana: an instant, flash spell, cycling, or activated ability? */
 function hasInstantPlay(s: GameState): boolean {
   const me = s.players[HUMAN]!;
+  // An instant on top of your library you may cast (Future Sight).
+  for (const id of topPlayable(s, HUMAN)) {
+    const d = cardOf(s, id);
+    if ((isType(d, "Instant") || d.keywords.includes("Flash")) && planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
+  }
   for (const id of me.hand) {
     const d = cardOf(s, id);
     // Cycling works at instant speed from your hand (CR 702.29a).
@@ -126,6 +134,13 @@ function hasInstantPlay(s: GameState): boolean {
       if (!problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, id, i))) return true;
     }
   }
+  // Sneak once blockers are declared (CR 702.190a): an alternative cost that returns an unblocked attacker.
+  if (s.activePlayer === HUMAN && s.step === "declareBlockers")
+    for (const id of [...me.hand, ...me.command]) {
+      if (!altCost(cardOf(s, id), "sneak")) continue;
+      const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt: "sneak" });
+      if (!problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt: "sneak" }))) return true;
+    }
   // Turning a face-down permanent face up is a special action, any time you have priority (CR 702.37e).
   for (const id of s.battlefield) {
     const o = obj(s, id);

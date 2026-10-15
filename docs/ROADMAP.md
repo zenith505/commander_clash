@@ -31,7 +31,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Protection from a player; Auras whose protection doesn't remove themselves.
 - "One or more creatures enter/die" (once per batch), "whenever ~ connives", "while ~ is in your graveyard".
 - Choosing what to proliferate. "Exile any number of them and put the rest back in any order".
-- Effects on the attackers as a group; impulse draw from an opponent's library; lands from the library (Future Sight-style "play lands from the top of your library"), Glacierwood Siege's modal choice.
+- Effects on the attackers as a group; impulse draw from an opponent's library; "play lands from the top of your
+  library"; Glacierwood Siege's modal choice.
 - Vorinclex (counters on players, halving), Academy Manufactor.
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".

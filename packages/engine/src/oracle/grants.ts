@@ -81,12 +81,17 @@ export function parseGrants(text: string): Modification[] | null {
   const kws: string[] = [];
   for (const w of words) {
     if (w === "\u0000") continue;
+    // Keywords that are triggered abilities: each grant is its own instance, which triggers separately (CR 702.121b).
+    if (/^melee$/i.test(w)) {
+      out.push({ kind: "addAbility", text: "Melee" });
+      continue;
+    }
     const k = parseKeywordList(w);
     if (!k) return null;
     kws.push(...k);
   }
   if (words.filter((w) => w === "\u0000").length !== quoted.length) return null;
-  if (kws.length) out.push({ kind: "addKeywords", keywords: kws });
+  if (kws.length) out.unshift({ kind: "addKeywords", keywords: kws });
   for (const q of quoted) {
     if (!grantable(q)) return null;
     out.push({ kind: "addAbility", text: q });

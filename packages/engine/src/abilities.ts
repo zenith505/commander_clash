@@ -87,6 +87,8 @@ export type Count =
   | { kind: "colorsSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
+  /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
+  | { kind: "opponentsAttacked" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef };
 

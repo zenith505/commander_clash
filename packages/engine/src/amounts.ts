@@ -108,6 +108,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
     case "colorsSpent":
       return ctx.colorsSpent ?? 0;
+    case "opponentsAttacked": {
+      const a = s.players[ctx.controller]?.attackedPlayers;
+      return a?.turn === s.turn ? a.players.filter((pid) => pid !== ctx.controller).length : 0;
+    }
     case "devoured": {
       // "For each creature it devoured" (CR 702.82b): the source, also after it left the battlefield (CR 608.2h).
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

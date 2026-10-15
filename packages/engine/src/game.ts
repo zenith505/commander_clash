@@ -2494,6 +2494,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     log(s, `${defOf(s, o).name} attacks ${player(s, a.defender).name}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
+  p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.map((a) => a.defender))] }; // melee
   s.pending = null;
   if (attacks.length === 0) {
     log(s, `${p.name} declares no attackers.`);

@@ -3,14 +3,14 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passUntil, putOnBattlefield, setup } from "./helpers";
-import { isFullySupported, planCast, waitingOn, type CardDef, type GameState } from "../src";
+import { isFullySupported, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState) => {
   for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
   return s;
 };
-const toHand = (s: GameState, pid: string, def: CardDef) => {
+const toHand = (s: GameState, pid: PlayerId, def: CardDef) => {
   const id = putOnBattlefield(s, pid, def);
   s.battlefield.splice(s.battlefield.indexOf(id), 1);
   s.objects[id]!.zone = "hand";

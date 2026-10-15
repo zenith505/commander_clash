@@ -212,6 +212,8 @@ export interface Player {
   draws?: { turn: number; n: number };
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
+  /** The players this player attacked with creatures in the latest combat, and its turn (melee, CR 702.121a). */
+  attackedPlayers?: { turn: number; players: PlayerId[] };
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
   citysBlessing?: boolean;
   /**

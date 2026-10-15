@@ -75,6 +75,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   const name = characteristics(s, o).name;
   if (!ab) return `${name} has no such mana ability`;
   if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
+  if (characteristics(s, o).cantActivate === "all") return `${name}'s activated abilities can't be activated`; // Arrest: mana abilities too (CR 605.1a)
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;

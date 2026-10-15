@@ -100,6 +100,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
+    case "party":
+      return partySize(s, ctx.controller, view);
     case "kicked":
       return (ctx.kicked ?? []).filter((i) => c.which === undefined || i === c.which).length;
     case "wasKicked":
@@ -173,6 +175,39 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
   }
 }
 
+export const PARTY_TYPES = ["Cleric", "Rogue", "Warrior", "Wizard"] as const;
+
+/**
+ * The number of creatures in a player's party (CR 700.8): up to one each of Cleric, Rogue, Warrior and Wizard among
+ * creatures they control, each creature counted once, the largest such number (rulings: a Cleric and a Cleric Wizard
+ * make two). Changelings have every creature type (CR 702.73a).
+ */
+export function partySize(s: GameState, pid: PlayerId, view: (o: GameObject) => Characteristics | undefined = (o) => characteristics(s, o)): number {
+  const roles: number[][] = []; // for each creature, the party types it could fill
+  for (const id of s.battlefield) {
+    const c = view(s.objects[id]!);
+    if (!c || c.controller !== pid || !c.types.includes("Creature")) continue;
+    const r = PARTY_TYPES.flatMap((t, i) => (c.allCreatureTypes || c.subtypes.includes(t) ? [i] : []));
+    if (r.length) roles.push(r);
+  }
+  // Largest matching of creatures to the four types, by augmenting paths.
+  const filledBy: (number | undefined)[] = [];
+  const place = (k: number, seen: Set<number>): boolean => {
+    for (const t of roles[k]!) {
+      if (seen.has(t)) continue;
+      seen.add(t);
+      if (filledBy[t] === undefined || place(filledBy[t]!, seen)) {
+        filledBy[t] = k;
+        return true;
+      }
+    }
+    return false;
+  };
+  let n = 0;
+  for (let k = 0; k < roles.length && n < 4; k++) if (place(k, new Set())) n++;
+  return n;
+}
+
 /** For display: "X", "the number of creatures you control", "2". */
 export function describeAmount(a: Amount): string {
   if (typeof a === "number") return String(a);
@@ -199,6 +234,8 @@ function describeCount(c: Count): string {
       return "life";
     case "speed":
       return "speed";
+    case "party":
+      return "#creatures in your party";
     case "devotion":
       return "devotion";
     case "attachedToSelf":

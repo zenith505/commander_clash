@@ -409,6 +409,13 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.130a: "Whenever this creature becomes blocked, defending player loses N life."
       const n = Number(m[1]);
       out.triggers.push({ event: "selfBecomesBlocked", body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eventPlayer" }, n }], text: `Afflict ${n}: defending player loses ${n} life.` } });
+    } else if ((m = /^annihilator (\d+)$/i.exec(p))) {
+      // CR 702.86a: "Whenever this creature attacks, defending player sacrifices N permanents of their choice."
+      const n = Number(m[1]);
+      out.triggers.push({ event: "selfAttacks", body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", text: "permanent" }, n, action: "sacrifice" }], text: `Annihilator ${n}: defending player sacrifices ${n} permanent${n === 1 ? "" : "s"}.` } });
+    } else if (/^ingest$/i.test(p)) {
+      // CR 702.115a: "Whenever this creature deals combat damage to a player, that player exiles the top card of their library."
+      out.triggers.push({ event: "selfDealsCombatDamageToPlayer", body: { targets: [], effects: [{ type: "exileTop", who: { ref: "eventPlayer" }, n: 1 }], text: "Ingest: that player exiles the top card of their library." } });
     } else if (/^dethrone$/i.test(p)) {
       // CR 702.105a: "Whenever this creature attacks the player with the most life or tied for most life, put a +1/+1 counter on this creature."
       out.triggers.push({ event: "selfAttacks", attacksMostLife: true, body: { targets: [], effects: [plus(1)], text: "Dethrone: put a +1/+1 counter on ~." } });

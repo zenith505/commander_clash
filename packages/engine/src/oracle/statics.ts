@@ -130,6 +130,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
+  if (/^you have a full party$/.test(text)) return { kind: "fullParty" }; // CR 700.8a
   if ((m = /^you (don't )?control a Ring-bearer$/.exec(text))) return { kind: "ringBearer", ...(m[1] ? { not: true as const } : {}) };
   if (/^~ is your Ring-bearer$/.test(text)) return { kind: "ringBearer", self: true };
   if (/^no opponent has more life than that player$/.test(text)) return { kind: "defenderMostLife" };
@@ -223,6 +224,11 @@ export function parseExtraBlocks(text: string): Modification | null {
 /** "get +1/+1", "have flying and vigilance", "get +2/+0 and have first strike", "can't block". */
 function parseStaticMods(rest: string): Modification[] | null {
   let m: RegExpExecArray | null;
+  // Arrest: "can't attack or block, and its activated abilities can't be activated" (mana abilities too, CR 605.1a).
+  if ((m = /^(.+?),? and its activated abilities can't be activated( unless they're mana abilities)?$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    return first && [...first, { kind: "cantActivate", ...(m[2] ? { exceptMana: true as const } : {}) }];
+  }
   // "Gets +0/+3 and can block an additional creature each combat", "gets +2/+2, has vigilance, and can block ...".
   if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?)(?:,? and|, (?:has|have) (.+?),? and) (can block .+)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
@@ -259,6 +265,7 @@ function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
   if (/^can't be blocked$/.test(rest)) return [{ kind: "cantBeBlocked" }];
   if (/^can't be blocked by more than one creature$/.test(rest)) return [{ kind: "maxOneBlocker" }];
+  if ((m = new RegExp(`^can't be blocked except by ${NUM} or more creatures$`).exec(rest)) && num(m[1]!) >= 2) return [{ kind: "minBlockers", n: num(m[1]!) }];
   if ((m = /^can't be blocked by (.+)$/.exec(rest))) {
     // "creatures with power 2 or less", "Walls", "blue creatures", "artifact creatures" (CR 509.1b)
     // In the singular, as parseTargetPhrase reads it: "creature with power 2 or less", "Wall", "blue creature".
@@ -276,6 +283,8 @@ function parseStaticMods(rest: string): Modification[] | null {
 
 export function parseStatic(line: string): StaticAbility | null {
   let text = line.replace(/\.$/, "");
+  const noAbilities = /^Enchanted (creature|permanent|artifact|land)'s activated abilities can't be activated( unless they're mana abilities)?$/.exec(text);
+  if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
   // "You control enchanted creature." (Mind Control)
   if (/^You control enchanted (creature|permanent|artifact|land)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
   const cda = parseDefinedPT(text);

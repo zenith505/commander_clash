@@ -114,7 +114,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
 /** "Creature that player controls" in a trigger about a player: the phrase without it, and whether it was there. */
 function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   const m = / that player controls$/i.exec(phrase);
-  return m && ctx.eventPlayer ? [phrase.slice(0, m.index), true] : [phrase, false];
+  if (m && ctx.eventPlayer) return [phrase.slice(0, m.index), true];
+  // "Whenever ~ attacks, tap target creature defending player controls": the player it's attacking (CR 506.2, rulings).
+  const d = / defending player controls$/i.exec(phrase);
+  return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];
 }
 
 const SEVERAL_TARGETS = /^(?:(up to )?(one|two|three|four|five|six|\d+) (other )?|(another) |(one or two|one, two, or three) )target (.+)$/i;

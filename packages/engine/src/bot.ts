@@ -12,6 +12,7 @@ import {
   provokerOf,
   tapCostCandidates,
   maxBlocks,
+  blockersNeeded,
   canEnterUntapped,
   conditionHolds,
   isSummoningSick,
@@ -1298,7 +1299,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // must be blocked if able gets our sturdiest blocker (two against menace).
   for (const at of incoming.filter((a) => characteristics(s, a).allMustBlock && !characteristics(s, a).maxOneBlocker)) {
     const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
-    if (able.length < (objHasKeyword(s, at, "Menace") ? 2 : 1)) continue;
+    if (able.length < blockersNeeded(s, at)) continue;
     for (const b of able) {
       used.add(b.id);
       blocks.push({ blocker: b.id, attacker: at.id });
@@ -1308,16 +1309,16 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   for (const b of mine) {
     const at = provokerOf(s, b);
     if (!at || used.has(b.id) || blockProblem(s, b, at)) continue;
-    const helper = objHasKeyword(s, at, "Menace") ? mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x))[0] : undefined;
-    if (objHasKeyword(s, at, "Menace") && !helper) continue;
-    for (const o of [b, ...(helper ? [helper] : [])]) {
+    const helpers = mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x)).slice(0, blockersNeeded(s, at) - 1);
+    if (helpers.length < blockersNeeded(s, at) - 1) continue;
+    for (const o of [b, ...helpers]) {
       used.add(o.id);
       blocks.push({ blocker: o.id, attacker: at.id });
     }
   }
   for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {
     const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at)).sort((a, b) => toughness(s, b) - toughness(s, a));
-    const n = objHasKeyword(s, at, "Menace") ? 2 : 1;
+    const n = blockersNeeded(s, at);
     if (able.length < n) continue;
     for (const b of able.slice(0, n)) {
       used.add(b.id);
@@ -1326,7 +1327,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   }
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
     if (blocks.some((b) => b.attacker === at.id)) continue;
-    if (objHasKeyword(s, at, "Menace") || characteristics(s, at).cantBeBlocked) continue;
+    if (blockersNeeded(s, at) > 1 || characteristics(s, at).cantBeBlocked) continue;
     const canBlock = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
     const good = canBlock.find((b) => toughness(s, b) > power(s, at) && !objHasKeyword(s, at, "Deathtouch"));
     const trade = canBlock.find((b) => power(s, b) >= toughness(s, at));
@@ -1340,7 +1341,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // as it survives all of them together.
   const hurt = (b: GameObject) => blocks.filter((x) => x.blocker === b.id).reduce((n, x) => n + (objHasKeyword(s, obj(s, x.attacker), "Deathtouch") ? Infinity : Math.max(0, power(s, obj(s, x.attacker)))), 0);
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
-    if (blocks.some((b) => b.attacker === at.id) || objHasKeyword(s, at, "Menace") || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
+    if (blocks.some((b) => b.attacker === at.id) || blockersNeeded(s, at) > 1 || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
     const extra = mine.find((b) => used.has(b.id) && blocks.filter((x) => x.blocker === b.id).length < maxBlocks(s, b) && !blockProblem(s, b, at) && toughness(s, b) > hurt(b) + power(s, at));
     if (extra) blocks.push({ blocker: extra.id, attacker: at.id });
   }

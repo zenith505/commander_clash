@@ -38,6 +38,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Life and hands.
   if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
+  // "For each creature in your party", "the number of creatures in your party" (CR 700.8).
+  if (/^creatures? in your party$/i.test(p)) return count({ kind: "party" });
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });

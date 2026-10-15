@@ -367,6 +367,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterSpell":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
+    case "exileTop":
     case "discard":
     case "scry":
     case "surveil":

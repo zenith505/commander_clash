@@ -17,7 +17,7 @@
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
 import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec } from "./abilities";
-import { evalAmount } from "./amounts";
+import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { bindChosenKeywords, subtypeSet } from "./keywords";
@@ -98,6 +98,10 @@ export interface Characteristics {
   cantBeBlockedBy: TargetSpec[];
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   maxOneBlocker: boolean;
+  /** "Its activated abilities can't be activated": "all" (mana abilities too, CR 605.1a), "nonMana", or false. */
+  cantActivate: false | "all" | "nonMana";
+  /** "Can't be blocked except by three or more creatures": the most such an ability asks for, 0 if none (CR 509.1b). */
+  minBlockers: number;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
@@ -150,6 +154,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attacksIfAble: false,
     cantBeBlockedBy: [],
     maxOneBlocker: false,
+    minBlockers: 0,
+    cantActivate: false,
     attackUnless: [],
     cantBeBlockedByLesserPower: false,
     cantBeBlockedByGreaterPower: false,
@@ -286,6 +292,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.activePlayer === you;
     case "monarch":
       return s.monarch === you;
+    case "fullParty":
+      return partySize(s, you, (o) => chars.get(o.id)) === 4;
     case "ringBearer": {
       // On the battlefield under your control, with the designation (CR 701.54e).
       const b = s.players[you]?.ring?.bearer;
@@ -487,6 +495,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "maxOneBlocker":
       c.maxOneBlocker = true;
+      return;
+    case "cantActivate":
+      if (c.cantActivate !== "all") c.cantActivate = m.exceptMana ? "nonMana" : "all";
+      return;
+    case "minBlockers":
+      c.minBlockers = Math.max(c.minBlockers, m.n);
       return;
     case "cantAttackUnless":
       c.attackUnless.push(m.defenderControls);

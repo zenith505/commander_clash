@@ -69,6 +69,8 @@ export type Count =
   | { kind: "life"; who: PlayerRef }
   /** "Your speed": 0 if you have none (CR 702.179f). */
   | { kind: "speed" }
+  /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
+  | { kind: "party" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
@@ -278,6 +280,10 @@ export type Modification =
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   | { kind: "maxOneBlocker" }
+  /** "Its activated abilities can't be activated" (Arrest), mana abilities included (CR 605.1a) unless `exceptMana`. */
+  | { kind: "cantActivate"; exceptMana?: true }
+  /** "Can't be blocked except by three or more creatures" (CR 509.1b; menace is the same with two, 702.111b). */
+  | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Creatures with power less than ~'s power can't block it" (CR 509.1b). */
@@ -344,6 +350,8 @@ export type StaticCondition =
   | { kind: "yourTurn" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** "If you have a full party" (CR 700.8a): four creatures in your party. */
+  | { kind: "fullParty" }
   /** "If you don't control a Ring-bearer" (CR 701.54e); `self`: "as long as ~ is your Ring-bearer". */
   | { kind: "ringBearer"; not?: true; self?: true }
   /** Max speed (CR 702.178a, 702.179e): your speed is 4. */
@@ -495,6 +503,8 @@ export type Effect =
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
   | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean }
   | { type: "mill"; who: PlayerRef; n: Amount }
+  /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
+  | { type: "exileTop"; who: PlayerRef; n: Amount }
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   | { type: "surveil"; n: Amount } // CR 701.25

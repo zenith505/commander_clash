@@ -572,6 +572,8 @@ export function compile(d: CardDef): CompiledCard {
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
   linkExile(out);
+  // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled.
+  if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield"))) out.unsupported.push("(an Aura returning itself to the battlefield)");
   const json = JSON.stringify(out);
   if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;

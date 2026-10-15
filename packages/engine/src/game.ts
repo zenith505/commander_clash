@@ -1868,6 +1868,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Unearth works only while the card is in your graveyard (CR 702.84a).
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
   } else if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
+  else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid)) return "activate only as a sorcery";
@@ -2483,6 +2484,11 @@ function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
  * How many attackers a creature may block (CR 509.1a): one, plus each "can block an additional creature"
  * (they add up, rulings), or any number.
  */
+/** How many creatures it takes to block this attacker: two with menace (CR 702.111b), three or more with "can't be blocked except by three or more creatures" (509.1b). */
+export function blockersNeeded(s: GameState, at: GameObject): number {
+  return Math.max(objHasKeyword(s, at, "Menace") ? 2 : 1, characteristics(s, at).minBlockers);
+}
+
 export function maxBlocks(s: GameState, o: GameObject): number {
   const c = characteristics(s, o);
   return c.blockAny ? Infinity : 1 + Math.max(0, c.extraBlocks);
@@ -2511,7 +2517,8 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     count[at.id] = (count[at.id] ?? 0) + 1;
   }
   for (const [atId, n] of Object.entries(count)) {
-    if (n < 2 && objHasKeyword(s, obj(s, atId), "Menace")) throw new RulesError(`${nameOf(s, atId)} has menace`); // CR 702.111b
+    const need = blockersNeeded(s, obj(s, atId));
+    if (n < need) throw new RulesError(need === 2 && objHasKeyword(s, obj(s, atId), "Menace") ? `${nameOf(s, atId)} has menace` : `${nameOf(s, atId)} can't be blocked except by ${need} or more creatures`); // CR 702.111b, 509.1b
     if (n > 1 && characteristics(s, obj(s, atId)).maxOneBlocker) throw new RulesError(`${nameOf(s, atId)} can't be blocked by more than one creature`); // CR 509.1b
   }
   // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
@@ -2568,17 +2575,17 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokerOf(s, b)?.id === x);
   };
   // Provoke (CR 702.39a): the provoked creature blocks the creature that provoked it if able. With menace, that
-  // takes another creature able to block it too (CR 702.111b).
+  // takes another creature able to block it too (CR 702.111b), two more with "except by three or more" (509.1b).
   for (const b of mine) {
     const at = provokerOf(s, b);
     if (!at || (blocking.get(b.id) ?? []).includes(at.id) || blockProblem(s, b, at) || full(b)) continue;
-    if (objHasKeyword(s, at, "Menace") && !mine.some((o) => o.id !== b.id && !blockProblem(s, o, at))) continue;
+    if (mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length < blockersNeeded(s, at) - 1) continue;
     return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
   }
   for (const at of demanding) {
     const ac = characteristics(s, at);
     const could = mine.filter((b) => !blockProblem(s, b, at));
-    if (could.length < (objHasKeyword(s, at, "Menace") ? 2 : 1)) continue;
+    if (could.length < blockersNeeded(s, at)) continue;
     if (ac.allMustBlock && !ac.maxOneBlocker) {
       const shirk = could.find((b) => !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));
       if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (all creatures able to block it do so)`;

@@ -19,6 +19,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
       }
       return;
+    case "exileTop":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        const ids = p.library.slice(0, amountNow(s, e.n, ctx));
+        for (const id of ids) moveObject(s, id, "exile");
+        // An empty library: nothing happens (ingest rulings).
+        if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
+      }
+      return;
     case "discard": {
       const who = players(s, e.who, ctx);
       // Worked out once, before anyone discards.

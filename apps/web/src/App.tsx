@@ -66,6 +66,10 @@ import {
   autoCrew,
   casualtyCandidates,
   bargainCandidates,
+  bothModes,
+  teamworkCandidates,
+  teamworkPower,
+  conspireCandidates,
   dredgeOptions,
   madnessCastOf,
   planSuspend,
@@ -222,13 +226,15 @@ function evenDivision(specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice
 }
 
 /** The human is choosing modes for a modal spell or activated ability they're casting (CR 700.2a). */
-type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
+type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[]; teamwork?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
 
 /** Picking creatures to tap: to crew a Vehicle (CR 702.122a), to station (CR 702.184a, one creature) or to convoke a spell (CR 702.51a). */
 type TapPick =
   | { kind: "crew"; objectId: string; index: number; n: number; chosen: string[]; saddle?: boolean }
   | { kind: "station"; objectId: string; index: number; chosen: string[] }
-  | { kind: "convoke"; objectId: string; chosen: string[] };
+  | { kind: "convoke"; objectId: string; chosen: string[] }
+  /** Teamwork N: tap creatures with total power N or more as you cast it, or none. */
+  | { kind: "teamwork"; objectId: string; n: number; chosen: string[]; convoke?: string[] };
 
 /**
  * A spell being cast, built up step by step in the order of CR 601.2b-h: modes, kicker, X,
@@ -263,6 +269,12 @@ type CastDraft = {
   reveal?: string[];
   /** Which way to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
   costOr?: number;
+  /** Creatures tapped for teamwork; empty when it isn't paid. */
+  teamwork?: string[];
+  /** The two creatures tapped for conspire (CR 702.78a), or none. */
+  conspire?: string[];
+  /** The opponent promised the gift (CR 702.174a), or null for no gift. */
+  gift?: PlayerId | null;
 };
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -270,6 +282,9 @@ type CostOrPick = { draft: CastDraft; label: string; options: string[] };
 
 /** Choosing cards to exile for delve: any number up to `max`. */
 type DelvePick = { draft: CastDraft; label: string; max: number; candidates: string[]; chosen: string[] };
+
+/** Promising a gift to an opponent, or not (CR 702.174a). */
+type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[] };
 
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string };
@@ -279,7 +294,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire";
   label: string;
   what: string;
   n: number;
@@ -335,6 +350,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [xPick, setXPick] = useState<XPick | null>(null);
   const [kickPick, setKickPick] = useState<KickPick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
+  const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
   const [costOrPick, setCostOrPick] = useState<CostOrPick | null>(null);
   const [costPick, setCostPick] = useState<CostPick | null>(null);
   const [delvePick, setDelvePick] = useState<DelvePick | null>(null);
@@ -372,7 +388,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, controllerOf(s, s.objects[id]!), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || costOrPick || delvePick || dividing);
+  const picking = !!(xPick || kickPick || costPick || costOrPick || delvePick || dividing || giftPick || buybackPick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -387,6 +403,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setKickPick(null);
         setCostPick(null);
         setCostOrPick(null);
+        setGiftPick(null);
         setAim(null);
         setBlocker(null);
         setTargeting((t) => (answering(t) ? t : null));
@@ -527,12 +544,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}) };
+    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     if (d.kicks === undefined && compiled.kicker)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
     if (d.buyback === undefined && compiled.buyback) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback });
     if (d.costOr === undefined && compiled.costOr) return setCostOrPick({ draft: d, label: card.name, options: compiled.costOr.map((c) => c.text) });
+    // Gift: you may promise an opponent a gift as you cast it (CR 702.174a), announced with the other costs (601.2b).
+    if (d.gift === undefined && compiled.gift && opps.length) return setGiftPick({ draft: d, label: card.name, what: compiled.gift.what, options: opps });
     // Cast without paying its mana cost, X is 0 (CR 107.3b).
     if (d.x === undefined && parseManaCost(card.manaCost).hasX && !free && !d.via && !d.alt) {
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
@@ -568,10 +587,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.sacrifice?.includes(id) && !d.casualty?.includes(id));
       if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
     }
+    // Conspire: you may tap two untapped creatures you control that share a color with it (CR 702.78a).
+    if (d.conspire === undefined && compiled.conspire) {
+      const candidates = conspireCandidates(s, HUMAN, d.objectId).filter((id) => !d.convoke?.includes(id) && !d.teamwork?.includes(id));
+      if (candidates.length >= 2)
+        return setCostPick({ draft: d, kind: "conspire", label: card.name, what: "conspire: you may tap two untapped creatures you control that share a color with it to copy it", n: 2, candidates, chosen: [] });
+    }
     const choices = {
       ...kicks,
       ...(d.casualty?.length ? { casualty: d.casualty[0]! } : {}),
       ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
+      ...(d.conspire?.length ? { conspire: d.conspire } : {}),
+      ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -611,7 +638,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
    * Start casting a card from your hand or command zone. A convoke spell first asks which
    * creatures to tap (suggesting some only when your mana can't pay), then modes, then targets.
    */
-  function startCast(id: string, convoke?: string[], via?: CastFromGraveyardKind, alt?: AltCostKind) {
+  function startCast(id: string, convoke?: string[], via?: CastFromGraveyardKind, alt?: AltCostKind, teamwork?: string[]) {
     if (!s) return;
     const d = cardOf(s, id);
     if (via) return continueCast({ objectId: id, via }); // from a graveyard: the usual steps, without convoke
@@ -622,19 +649,33 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const auto = fromMana ? null : autoConvoke(s, HUMAN, total.cost, total.extra);
       return setTapPick({ kind: "convoke", objectId: id, chosen: auto?.creatures ?? [] });
     }
+    // Teamwork N: you may tap creatures with total power N or more as you cast it, when you have enough.
+    const tw = compileCard(d).teamwork;
+    if (teamwork === undefined && tw !== undefined) {
+      const candidates = teamworkCandidates(s, HUMAN).filter((c) => !convoke?.includes(c));
+      if (candidates.reduce((n, c) => n + teamworkPower(s, c), 0) >= tw) return setTapPick({ kind: "teamwork", objectId: id, n: tw, chosen: [], ...(convoke ? { convoke } : {}) });
+    }
     const modal = spellModes(s, id);
     const specs = spellTargets(s, id);
     if (modal || specs.length || parseManaCost(d.manaCost).hasX || compileCard(d).kicker || compileCard(d).additionalCosts) {
-      if (!canCastWithTaps(s, id, convoke)) return dispatch([{ type: "castSpell", player: HUMAN, objectId: id, ...(convoke?.length ? { convoke } : {}) }]); // shows why not
-      if (modal) return setModePick({ mode: "cast", objectId: id, label: d.name, body: { targets: [], effects: [], text: d.oracleText, modal }, convoke });
+      if (!canCastWithTaps(s, id, convoke, teamwork)) return dispatch([{ type: "castSpell", player: HUMAN, objectId: id, ...(convoke?.length ? { convoke } : {}), ...(teamwork?.length ? { teamwork } : {}) }]); // shows why not
+      if (modal) {
+        const body = { targets: [], effects: [], text: d.oracleText, modal };
+        const both = bothModes(s, HUMAN, body, { ...(teamwork?.length ? { teamwork } : {}) });
+        // "If this spell was cast using teamwork, choose both instead": no choice left to make.
+        if (both && modal.both === "teamwork") return continueCast({ objectId: id, convoke, teamwork, modes: [0, 1] });
+        // "If you control a commander as you cast this spell, you may choose both instead."
+        return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: 2 } } : body, convoke, teamwork });
+      }
     }
-    return continueCast({ objectId: id, convoke });
+    return continueCast({ objectId: id, convoke, teamwork });
   }
 
   function finishTapPick() {
     if (!s || !tapPick) return;
     setTapPick(null);
     if (tapPick.kind === "convoke") return startCast(tapPick.objectId, tapPick.chosen);
+    if (tapPick.kind === "teamwork") return startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, tapPick.chosen);
     const { objectId, index, chosen } = tapPick;
     dispatch(planActivate(s, HUMAN, objectId, index, undefined, undefined, chosen) ?? [{ type: "activateAbility", player: HUMAN, objectId, index, tapCreatures: chosen }]);
   }
@@ -644,7 +685,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setModePick(null);
     if (pending?.kind === "chooseModes") return dispatch([{ type: "chooseModes", player: HUMAN, modes }]);
     if (!pick) return;
-    if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke });
+    if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke, teamwork: pick.teamwork });
     else useAbility(pick.objectId, pick.index, modes);
   }
 
@@ -998,7 +1039,51 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onClose={() => setMenu(null)}
             />
           )}
-          {tapPick && <TapPickBar s={s} pick={tapPick} onDone={finishTapPick} onCancel={() => setTapPick(null)} />}
+          {tapPick && (
+            <TapPickBar
+              s={s}
+              pick={tapPick}
+              onDone={finishTapPick}
+              onSkip={
+                tapPick.kind === "teamwork"
+                  ? () => {
+                      setTapPick(null);
+                      startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, []);
+                    }
+                  : undefined
+              }
+              onCancel={() => setTapPick(null)}
+            />
+          )}
+          {giftPick && (
+            <div className="targeting gift-pick">
+              <span>
+                <strong>{giftPick.label}</strong>: promise an opponent a gift ({giftPick.what})?
+              </span>
+              {giftPick.options.map((pid) => (
+                <button
+                  key={pid}
+                  onClick={() => {
+                    setGiftPick(null);
+                    continueCast({ ...giftPick.draft, gift: pid });
+                  }}
+                >
+                  Gift {s.players[pid]!.name}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  setGiftPick(null);
+                  continueCast({ ...giftPick.draft, gift: null });
+                }}
+              >
+                No gift
+              </button>
+              <button className="ghost" onClick={() => setGiftPick(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
           {xPick && <XPickBar pick={xPick} onChange={(value) => setXPick({ ...xPick, value })} onDone={finishXPick} onCancel={() => setXPick(null)} />}
           {buybackPick && (
             <div className="targeting">
@@ -1061,11 +1146,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "tap") && (
+          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "tap" || costPick.kind === "conspire") && (
             <CostPickBar
               pick={costPick}
               onDone={() => finishCostPick(costPick)}
-              onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
+              onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "conspire" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -1088,7 +1173,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && (
+          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "conspire" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -1195,8 +1280,21 @@ function graveyardOptions(s: GameState, id: string): boolean {
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
-function canCastWithTaps(s: GameState, id: string, convoke?: string[]) {
+function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?: string[]) {
+  if (teamwork?.length) return planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork }) !== null;
   if ((!convoke && canCast(s, HUMAN, id)) || planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto") !== null) return true;
+  // "You may cast this as though it had flash if it's cast using teamwork": try tapping the strongest creatures.
+  const c = s.objects[id] && compileCard(cardOf(s, id));
+  if (teamwork === undefined && c?.teamworkFlash && c.teamwork !== undefined) {
+    const pick: string[] = [];
+    let total = 0;
+    for (const x of teamworkCandidates(s, HUMAN).sort((a, b) => teamworkPower(s, b) - teamworkPower(s, a))) {
+      if (total >= c.teamwork) break;
+      pick.push(x);
+      total += teamworkPower(s, x);
+    }
+    if (total >= c.teamwork && pick.length && planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork: pick }) !== null) return true;
+  }
   // With delve's help: as many cards from your graveyard as it can use (CR 702.66a).
   const room = convoke ? 0 : delveRoom(s, HUMAN, id);
   return room > 0 && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { delve: s.players[HUMAN]!.graveyard.filter((c) => c !== id).slice(0, room) }) !== null;
@@ -1232,6 +1330,7 @@ const convokers = (s: GameState) => s.battlefield.map((id) => s.objects[id]!).fi
 
 /** Creatures that can be clicked for a crew or convoke pick: your untapped creatures, other than the Vehicle being crewed. */
 function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
+  if (pick.kind === "teamwork") return convokers(s).filter((o) => !pick.convoke?.includes(o.id));
   return convokers(s).filter((o) => !(pick.kind !== "convoke" && o.id === pick.objectId));
 }
 
@@ -1349,7 +1448,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
@@ -1412,8 +1511,25 @@ function CardChoice({
   );
 }
 
-function TapPickBar({ s, pick, onDone, onCancel }: { s: GameState; pick: TapPick; onDone: () => void; onCancel: () => void }) {
+function TapPickBar({ s, pick, onDone, onSkip, onCancel }: { s: GameState; pick: TapPick; onDone: () => void; onSkip?: () => void; onCancel: () => void }) {
   const name = cardOf(s, pick.objectId).name;
+  if (pick.kind === "teamwork") {
+    const total = pick.chosen.reduce((n, id) => n + teamworkPower(s, id), 0);
+    return (
+      <div className="targeting teamwork-pick">
+        <span title="An optional additional cost. Tapping creatures this way isn't a {T} cost, so summoning-sick creatures can help.">
+          <strong>Teamwork {pick.n}:</strong> tap creatures with total power {pick.n} or more to cast {name} using teamwork (now {total})
+        </span>
+        <button disabled={total < pick.n || !canCastWithTaps(s, pick.objectId, pick.convoke, pick.chosen)} onClick={onDone}>
+          Tap and cast
+        </button>
+        {onSkip && <button onClick={onSkip}>Cast without</button>}
+        <button className="ghost" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
   if (pick.kind === "crew") {
     const total = pick.chosen.reduce((n, id) => n + crewPower(s, s.objects[id]!, pick.saddle), 0);
     const verb = pick.saddle ? "Saddle" : "Crew";
@@ -1932,8 +2048,9 @@ function Seat({
 
 function ZoneTop({ s, o, count, onHover }: { s: GameState; o: GameObject | undefined; count: number; onHover: (d: CardDef | null) => void }) {
   if (!o) return <div className="zone-empty">empty</div>;
-  // Someone else's foretold card is face down (CR 702.143a).
+  // Someone else's foretold card is face down (CR 702.143a); a hideaway card, to those who haven't controlled its permanent (CR 702.75a).
   if (o.foretold && o.owner !== HUMAN) return <CardBack count={count} label="Foretold" />;
+  if (o.hiddenExile && !o.hiddenExile.seen.includes(HUMAN)) return <CardBack count={count} label="Hideaway" />;
   const d = cardOf(s, o.id);
   return (
     <div className="card" data-obj={o.id} {...hoverProps(d, onHover)}>
@@ -1977,6 +2094,9 @@ function ZoneViewer({
             const pickable = canPick(id);
             // Someone else's foretold card is face down; only its owner may look at it (CR 702.143a).
             if (s.objects[id]!.foretold && s.objects[id]!.owner !== HUMAN) return <CardBack key={id} label="Foretold" />;
+            // Exiled face down with hideaway: only players who controlled its permanent may look (CR 702.75a).
+            const hidden = s.objects[id]!.hiddenExile;
+            if (hidden && !hidden.seen.includes(HUMAN)) return <CardBack key={id} label="Hideaway" />;
             return (
               <div
                 key={id}
@@ -1989,6 +2109,11 @@ function ZoneViewer({
                 {view.zone === "exile" && s.objects[id]!.foretold && (
                   <span className="zone-tag" title={`Foretold: only you can see it. On a later turn, cast it for ${compileCard(d).foretell ?? "its foretell cost"}.`}>
                     foretold
+                  </span>
+                )}
+                {view.zone === "exile" && hidden && (
+                  <span className="zone-tag" title="Exiled face down with hideaway: only you can see it.">
+                    hideaway
                   </span>
                 )}
                 {view.zone === "exile" && !!s.objects[id]!.counters.time && (
@@ -2766,7 +2891,7 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tribute" || pending.what === "tributePay") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -2824,10 +2949,12 @@ function Controls({
                 ? `click the blocked attackers that assign their combat damage to the player they're attacking, as though they weren't blocked (the rest damage their blockers).`
                 : pending.action === "champion"
                 ? `champion: click another ${pending.what} of yours to exile until ${pending.source} leaves the battlefield, or exile none and sacrifice ${pending.source}.`
+                : pending.action === "encode"
+                ? `cipher: click a creature of yours to exile ${pending.source} encoded on it. Whenever that creature deals combat damage to a player, you may cast a copy of ${pending.source} for free.`
                 : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

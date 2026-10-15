@@ -51,6 +51,16 @@ export interface ResolveCtx {
 export type Resolution = "fizzled" | "done" | "paused";
 
 /**
+ * The opponent the gift was promised to (CR 702.174a, k): a spell's own choice, or for a permanent's gift trigger, the
+ * choice its spell made, carried by the trigger (CR 702.174b). Undefined if no gift was promised.
+ */
+export function gifteeOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
+  const item = s.resolving?.item;
+  if (item?.kind === "spell") return s.objects[item.objectId ?? ""]?.gift;
+  return ctx.event?.gift;
+}
+
+/**
  * Start resolving a spell or ability whose stack item has been removed from the stack.
  * Targets are re-checked first: if every target is now illegal it does nothing (CR 608.2b),
  * and effects aimed at individual illegal targets are skipped. Effects then run in order
@@ -222,6 +232,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.attachedToPlayer : lk && lk.zc === ctx.sourceZc ? lk.attachedToPlayer : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "giftee": {
+      const p = gifteeOf(s, ctx);
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "opponentsAttackingEventPlayer": {
       // "A player is attacking another player if they control a creature that's attacking that player" (rulings).
       const p = ctx.event?.player;
@@ -358,6 +372,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "regenerate":
     case "exile":
     case "returnLinked":
+    case "playLinked":
+    case "cipher":
     case "grantFlashback":
     case "pick":
     case "empowerJace":
@@ -421,6 +437,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "createToken":
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
+    case "castCipher":
     case "copySpell":
     case "nextCast":
     case "cascade":
@@ -436,6 +453,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "discard":
     case "takeFromHand":
     case "scry":
+    case "hideaway":
     case "clash":
     case "surveil":
     case "orderTop":

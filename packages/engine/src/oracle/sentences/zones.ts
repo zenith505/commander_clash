@@ -5,6 +5,7 @@ import { NUM, amt, num } from "../words";
 import { mayBeAura, parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
+import { parseStaticCondition } from "../statics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -140,6 +141,15 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
   if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
     return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand" }];
+  // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
+  if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
+  // Hideaway (CR 702.75a): "You may play the exiled card without paying its mana cost", the card its hideaway exiled;
+  // "... if each player has no cards in hand": only if that's true as it resolves.
+  if ((m = /^You may play the exiled card without paying its mana cost(?: if (.+))?$/.exec(s)) && !ctx.spell) {
+    if (!m[1]) return [{ type: "playLinked" }];
+    const cond = parseStaticCondition(m[1], { affects: { kind: "self" }, mods: [], text: "" });
+    return cond ? [{ type: "if", cond: { kind: "state", cond }, effects: [{ type: "playLinked" }] }] : null;
+  }
   // "Exile target creature an opponent controls until ~ leaves the battlefield" (CR 610.3).
   if ((m = /^Exile (target .+|up to one target .+|another target .+) until ~ leaves the battlefield$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);

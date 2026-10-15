@@ -7,14 +7,25 @@
 
 import type { AbilityBody } from "./abilities";
 
-/** Why `modes` isn't a valid choice for this modal body (ignoring targets), or null. */
-export function modeCountProblem(body: AbilityBody, modes: number[]): string | null {
+/** Why `modes` isn't a valid choice for this modal body (ignoring targets), or null. `both`: see modeRange. */
+export function modeCountProblem(body: AbilityBody, modes: number[], both = false): string | null {
   const m = body.modal;
   if (!m) return modes.length ? "this isn't modal" : null;
   if (modes.some((i) => !Number.isInteger(i) || i < 0 || i >= m.modes.length)) return "no such mode";
   if (new Set(modes).size !== modes.length) return "each mode can be chosen only once"; // CR 700.2d
-  if (modes.length < m.min || (modes.length > m.max && !entwined(body, modes))) return `choose ${describeCount(m.min, m.max)}${m.entwine ? ", or all of them (entwine)" : ""}`;
+  const [min, max] = modeRange(body, both);
+  if (modes.length < min || (modes.length > max && !entwined(body, modes))) return `choose ${describeCount(min, max)}${m.entwine ? ", or all of them (entwine)" : ""}`;
   return null;
+}
+
+/**
+ * How many modes may be chosen. `both`: "If this spell was cast using teamwork, choose both instead" (exactly two) or
+ * "If you control a commander as you cast this spell, you may choose both instead" (one or both) applies.
+ */
+export function modeRange(body: AbilityBody, both = false): [number, number] {
+  const m = body.modal!;
+  if (!both || !m.both) return [m.min, m.max];
+  return m.both === "teamwork" ? [2, 2] : [1, 2];
 }
 
 /** All the modes of a spell with entwine were chosen, so it costs its entwine cost more (CR 702.42a). */

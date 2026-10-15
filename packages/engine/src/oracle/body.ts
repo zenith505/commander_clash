@@ -20,6 +20,8 @@ export interface Ctx {
   selfCard?: boolean;
   /** Index of the most recent object target, for "it" / "its controller". */
   lastObjectTarget?: number;
+  /** An earlier sentence acted on "enchanted creature" (or equipped): a later "it" means that creature. */
+  lastAttached?: boolean;
   /** The most recent "up to two target creatures", for "they" / "those creatures". */
   lastTargets?: { index: number; n?: number };
   /**
@@ -121,7 +123,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   for (let si = 0; si < sentences.length; si++) {
-    let s = sentences[si]!.replace(/^Then,? /, "");
+    let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     [prevStart, curStart] = [curStart, effects.length];
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(s);
@@ -228,15 +230,19 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "If ~ was bargained, that creature also gains flying", "... it deals twice X damage to that permanent instead"
-    // (CR 702.166b). Targets only the bargained part would need aren't modeled (CR 702.166d), so none may be added.
-    const bargained = ctx.spell ? /^If ~ was bargained, (.+)$/.exec(s) : null;
-    if (bargained) {
+    // (CR 702.166b); "If this spell was cast using teamwork, draw a card", "Also put a +1/+1 counter on that creature if
+    // this spell was cast using teamwork", "Then discard a card unless this spell was cast using teamwork"; "If the gift
+    // was promised, ..." (CR 702.174b). Targets only the optional part would need aren't modeled (CR 702.166d,
+    // 702.174m), so none may be added.
+    const howCast = parseHowCast(s, ctx);
+    if (howCast) {
       const before = ctx.targets.length;
-      const fx = parseKicked(bargained[1]!, effects.slice(prevStart), ctx);
+      const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx);
       if (!fx || ctx.targets.length !== before) return null;
-      const cond: SpellCondition = { kind: "bargained" };
-      if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
-      else effects.push({ type: "if", cond, effects: fx.effects });
+      if (howCast.not && fx.instead) return null;
+      if (howCast.not) effects.push({ type: "if", cond: howCast.cond, effects: [], otherwise: fx.effects });
+      else if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: howCast.cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
+      else effects.push({ type: "if", cond: howCast.cond, effects: fx.effects });
       continue;
     }
     // "If this spell was foretold, scry 2", "... create X of those tokens instead" (CR 702.143c).
@@ -344,7 +350,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
-    const may = /^[Yy]ou may (.+)$/.exec(s);
+    // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
+    const may = /^[Yy]ou may (?!play the exiled card )(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -463,13 +470,40 @@ export function parsePayCost(text: string): PayCost | null {
  * What "If ~ was kicked, ..." does. With "instead", it replaces the sentence before (`previous`).
  * Targets only the kicked part would need are chosen only if it's kicked (CR 702.33g): not modeled.
  */
+/** The ways a spell can have been cast that a sentence may depend on, as said in its text. */
+const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true }[] = [
+  { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
+  { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
+  { re: "the gift was promised", cond: { kind: "gift" } },
+  { re: "the gift wasn't promised", cond: { kind: "gift" }, not: true },
+];
+
+/**
+ * "If ~ was bargained, X", "X if ~ was cast using teamwork", "Also X if ...", "X instead if ...", "X unless ~ was cast
+ * using teamwork" (the same as "if it wasn't"): the condition, and X ("instead" kept for parseKicked).
+ */
+function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string } | null {
+  for (const h of HOW_CAST) {
+    if (h.spellOnly && !ctx.spell) continue;
+    const lead = new RegExp(`^If ${h.re}, (.+)$`).exec(s);
+    if (lead) return { cond: h.cond, not: !!h.not, text: lead[1]! };
+    const trail = new RegExp(`^(?:Also )?(.+?)( instead)? (if|unless) ${h.re}$`).exec(s);
+    if (trail) {
+      const not = !!h.not !== (trail[3] === "unless");
+      if (trail[3] === "unless" && trail[2]) return null;
+      return { cond: h.cond, not, text: `${trail[1]!}${trail[2] ?? ""}` };
+    }
+  }
+  return null;
+}
+
 function parseKicked(text: string, previous: Effect[], ctx: Ctx): { effects: Effect[]; instead: boolean } | null {
   let t = text;
   const instead = /^instead,? /i.test(t) || / instead$/i.test(t);
   t = t.replace(/^instead,? /i, "").replace(/ instead$/i, "");
   t = t.charAt(0).toUpperCase() + t.slice(1);
   // "That creature also gains flying": in addition to what the sentence before did.
-  if (!instead) t = t.replace(/^(That creature|That player|It) also /, "$1 ");
+  if (!instead) t = t.replace(/^(That creature|That player|It|~|Permanents you control|Creatures you control) also (?=(?:gains?|gets?|deals?|has|have|loses?) )/, "$1 ");
   if (instead && !previous.length) return null;
   // "~ deals 2 damage to any target. If ~ was kicked, it deals 5 damage instead": the same damage, more of it.
   const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|it))?$/.exec(t);
@@ -506,12 +540,13 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
 
 /** Run a parse that may fail halfway, undoing any targets it added. */
 function attempt<T>(ctx: Ctx, f: () => T | null): T | null {
-  const saved = { n: ctx.targets.length, o: ctx.lastObjectTarget, p: ctx.lastPlayerTarget };
+  const saved = { n: ctx.targets.length, o: ctx.lastObjectTarget, p: ctx.lastPlayerTarget, a: ctx.lastAttached };
   const r = f();
   if (r === null) {
     ctx.targets.length = saved.n;
     ctx.lastObjectTarget = saved.o;
     ctx.lastPlayerTarget = saved.p;
+    ctx.lastAttached = saved.a;
   }
   return r;
 }
@@ -650,7 +685,8 @@ const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
 function parseModal(count: string, bullets: string, text: string, spell?: boolean): AbilityBody | null {
   const modes: AbilityBody[] = [];
   for (const b of bullets.split("•").map((x) => x.trim()).filter(Boolean)) {
-    const body = parseBody(b, { spell });
+    // "Street Justice — Exile target creature ...": a mode's name is a flavor word, with no rules meaning (CR 207.2d).
+    const body = parseBody(b.replace(/^[A-Z][A-Za-z' ,!-]* — /, ""), { spell });
     if (!body) return null; // every mode has to work, or the card isn't supported
     modes.push(body);
   }

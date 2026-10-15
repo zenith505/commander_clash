@@ -7,7 +7,7 @@ import { defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
 import { choiceOptions, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, objects, runEffect, amountNow } from "./resolve";
+import { ResolveCtx, objects, runEffect, amountNow, gifteeOf } from "./resolve";
 import { kickedMatches } from "./run-spells";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
@@ -74,6 +74,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
+            : e.cond.kind === "teamwork"
+            ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
+            : e.cond.kind === "gift"
+            ? gifteeOf(s, ctx) !== undefined
             : e.cond.kind === "state"
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)
             : kickedMatches(ctx.kicked, e.cond);

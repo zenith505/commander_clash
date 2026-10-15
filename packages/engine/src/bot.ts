@@ -43,6 +43,10 @@ import {
   casualtyCandidates,
   bargainCandidates,
   castExtraCosts,
+  bothModes,
+  teamworkCandidates,
+  teamworkPower,
+  conspireCandidates,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
@@ -116,6 +120,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // From an opponent's revealed hand: take their most expensive card.
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    // Hideaway: the most expensive card, to play for free later.
+    if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
@@ -138,6 +144,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const here = !!me && me.zone === "battlefield" && (me.zoneChanges ?? 0) === r?.sourceZc;
       return [{ type: "pickPermanents", player: pid, ids: here ? choosePicks(s, pid, pend.options, 1, "sacrifice") : [] }];
     }
+    // Cipher: encode it on the creature most likely to deal combat damage to a player.
+    if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined) return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
@@ -146,6 +154,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const counter = pend.what === "riot" ? !haste : player(s, pid).life > 12;
       return [{ type: "chooseOption", player: pid, choice: counter ? ENTERS_COUNTER : pend.options[1]! }];
     }
+    // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
+    if (pend.kind === "chooseOption" && pend.what === "tribute") {
+      const best = [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: best }];
+    }
+    if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
     if (pend.kind === "chooseOption" && pend.what === "copy") {
       // Clone the best permanent, but not a legendary one we already control (the legend rule, CR 704.5j).
       const ids = pend.options.filter((x) => x !== "none" && s.objects[x]);
@@ -705,6 +719,60 @@ function chooseDredge(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectI
   return ok.sort((a, b) => mv(s, b) - mv(s, a))[0];
 }
 
+/** Cipher (CR 702.99a): an evasive creature first, then the strongest; always encode, the card is otherwise lost to the graveyard. */
+function chooseEncode(s: GameState, options: ObjectId[]): ObjectId[] {
+  const evasive = (id: ObjectId) => (["Flying", "Shadow", "Horsemanship", "Fear", "Intimidate", "Menace", "Trample"].some((k) => objHasKeyword(s, obj(s, id), k)) ? 10 : 0);
+  const best = [...options].sort((a, b) => evasive(b) + power(s, obj(s, b)) - evasive(a) - power(s, obj(s, a)))[0];
+  return best ? [best] : [];
+}
+
+/** A creature we can tap for a cost without losing an attack or a block: it can't attack this turn, or combat is over. */
+function spare_(s: GameState, pid: PlayerId, id: ObjectId): boolean {
+  const o = obj(s, id);
+  const afterCombat = s.activePlayer === pid && (s.step === "main2" || s.step === "end");
+  return afterCombat || o.controlledSinceTurn >= s.turn;
+}
+
+/** Spare creatures (see spare_) with total power `n` or more for teamwork, the strongest first, or undefined. */
+function spareTappers(s: GameState, pid: PlayerId, spell: ObjectId, n: number, busy: (id: ObjectId) => boolean = () => false): ObjectId[] | undefined {
+  if (n <= 0) return undefined;
+  const pool = teamworkCandidates(s, pid)
+    .filter((id) => id !== spell && !busy(id) && spare_(s, pid, id) && teamworkPower(s, id) > 0)
+    .sort((a, b) => teamworkPower(s, b) - teamworkPower(s, a));
+  const out: ObjectId[] = [];
+  let total = 0;
+  for (const id of pool) {
+    if (total >= n) break;
+    out.push(id);
+    total += teamworkPower(s, id);
+  }
+  return total >= n ? out : undefined;
+}
+
+/**
+ * Whom to promise a gift to, or undefined not to: only a card, a Food, a Treasure or a tapped Fish, and only when the
+ * card does more with the gift promised ("if the gift was promised, ..."). The opponent with the least life gets it.
+ */
+function chooseGiftee(s: GameState, pid: PlayerId, c: CompiledCard): PlayerId | undefined {
+  if (!["a card", "a Food", "a Treasure", "a tapped Fish"].includes(c.gift!.what)) return undefined;
+  const bodies = [...(c.spell ? [c.spell] : []), ...c.triggers.filter((t) => !(t.ifGift && t.body.effects === c.gift!.effects)).map((t) => ({ ...t.body, ifGift: t.ifGift }))];
+  const better = bodies.some((b) => ("ifGift" in b && b.ifGift) || allEffects(b.effects).some((e) => e.type === "if" && e.cond.kind === "gift" && e.effects.length > 0 && e.effects !== c.gift!.effects));
+  if (!better) return undefined;
+  return [...opponents(s, pid)].sort((a, b) => player(s, a).life - player(s, b).life)[0];
+}
+
+/**
+ * Asked to pay tribute on an opponent's creature: pay (making it bigger) unless its "if tribute wasn't paid" ability
+ * only helps its controller a little (gaining life, haste, a bonus until end of turn), or the counters are many.
+ */
+function payTribute(s: GameState, id: ObjectId): boolean {
+  const c = compileCard(defOf(s, obj(s, id)));
+  const n = c.tribute ?? 0;
+  const mild = (e: Effect) => e.type === "gainLife" || (e.type === "continuous" && e.what.ref === "self");
+  const unpaid = c.triggers.filter((t) => t.ifTributeUnpaid).flatMap((t) => allEffects(t.body.effects));
+  return n <= 4 && unpaid.some((e) => !mild(e));
+}
+
 /** Casting a card from our graveyard (flashback, escape, ...): the first way that works. */
 function graveyardCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   for (const g of graveyardWays(s, obj(s, id))) {
@@ -737,6 +805,15 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
     const plan = castPlanWithModes(s, pid, id, free, x, via, alt, printed.modal.modes.map((_, i) => i));
     if (plan) return plan;
   }
+  // "Choose both instead" (teamwork, or controlling a commander): both modes when both can be chosen.
+  const both = printed?.modal?.both;
+  if (both && legalModes(s, printed!, pid).every(Boolean)) {
+    const tw = both === "teamwork" ? spareTappers(s, pid, id, compileCard(defOf(s, obj(s, id))).teamwork ?? 0) : undefined;
+    if (both === "commander" ? bothModes(s, pid, printed!) : tw) {
+      const plan = castPlanWithModes(s, pid, id, free, x, via, alt, [0, 1], tw);
+      if (plan) return plan;
+    }
+  }
   if (!printed?.modal?.costs) return castPlanWithModes(s, pid, id, free, x, via, alt, choice?.modes);
   // Spree (CR 702.172a): each mode costs more, so the most useful modes we can pay for.
   for (let n = choice!.ranked.length; n >= 1; n--) {
@@ -746,7 +823,7 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   return null;
 }
 
-function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via: CastFromGraveyardKind | undefined, alt: AltCostKind | undefined, modes: number[] | undefined): Action[] | null {
+function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolean, x: number | undefined, via: CastFromGraveyardKind | undefined, alt: AltCostKind | undefined, modes: number[] | undefined, teamwork?: ObjectId[]): Action[] | null {
   const printed = castingBody(castDef(s, id, alt));
   const body = printed && withModes(printed, modes);
   const specs = spellTargets(s, id, modes, alt);
@@ -781,6 +858,19 @@ function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolea
       .filter((o) => o.isToken && o.id !== victim?.id && !extra.sacrifice?.includes(o.id) && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && worth(s, pid, o) <= 2)
       .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
     if (spare) extra.bargain = spare.id;
+    const c = compileCard(defOf(s, obj(s, id)));
+    const busy = (o: ObjectId) => o === victim?.id || o === spare?.id || !!extra.sacrifice?.includes(o) || (targets ?? []).some((t) => t.kind === "object" && t.id === o);
+    // Teamwork: with creatures that wouldn't be attacking or blocking anyway; a "choose both" spell gets it with both modes.
+    const tw = teamwork ?? (c.teamwork !== undefined && !c.spell?.modal?.both ? spareTappers(s, pid, id, c.teamwork, busy) : undefined);
+    if (tw) extra.teamwork = tw;
+    // Conspire (CR 702.78a): two such creatures for a copy of the spell.
+    if (c.conspire) {
+      const two = conspireCandidates(s, pid, id).filter((o) => !busy(o) && !tw?.includes(o) && spare_(s, pid, o)).slice(0, 2);
+      if (two.length === 2) extra.conspire = two;
+    }
+    // Gift (CR 702.174): promised only for a small gift that turns on something of the spell's own.
+    const giftee = c.gift ? chooseGiftee(s, pid, c) : undefined;
+    if (giftee !== undefined) extra.gift = giftee;
   }
   if (!extra) return null;
   if (alt) extra.alt = alt;

@@ -853,6 +853,31 @@ export interface ManaAbility {
 }
 
 /**
+ * A triggered mana ability (CR 605.1b) that triggers when a permanent is tapped for mana, that is, when one of its
+ * mana abilities with {T} in the cost resolves and makes mana (CR 106.12-106.12a). It resolves right after that
+ * ability, without the stack (CR 605.4a), and the player who tapped it adds the mana: "its controller adds", "that
+ * player adds", or with "whenever you tap", this ability's controller, who is that player.
+ */
+export interface ManaTrigger {
+  text: string;
+  /** "Enchanted land", "fortified land": the permanent this is attached to (and it matches `filter`). */
+  attached?: true;
+  /** What's tapped: "a land", "a Swamp", "a creature", "a basic land". */
+  filter?: TargetSpec;
+  /** "Whenever you tap ...": only when this ability's controller taps it. */
+  you?: true;
+  /** "... is tapped for mana of the chosen color": only when it made mana of the color chosen for this permanent. */
+  ofChosen?: true;
+  /**
+   * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
+   * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
+   * any type that land produced" (picking one of them if it made several, rulings on Mana Flare). The mana has none
+   * of the riders of the mana that permanent made (rulings on Mana Flare).
+   */
+  adds: { kind: "fixed"; mana: ManaType[] } | { kind: "anyColor"; n: number } | { kind: "chosenColor" } | { kind: "produced" };
+}
+
+/**
  * What restricted mana can be spent on (CR 106.6): the total cost of casting matching spells, additional and
  * alternative costs included, and/or the costs of activating abilities ("any", or of permanents matching).
  */
@@ -1016,6 +1041,8 @@ export interface CompiledCard {
   castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /** "Whenever enchanted land is tapped for mana, its controller adds an additional {G}" and the like (CR 605.1b). */
+  manaTriggers?: ManaTrigger[];
   countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;

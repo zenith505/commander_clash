@@ -216,7 +216,7 @@ type BuybackPick = { draft: CastDraft; label: string; cost: string };
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[] };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
-type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType }; draft?: undefined; activate?: undefined }) & {
+type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
   kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "tap";
   label: string;
   what: string;
@@ -417,7 +417,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setCostPick(null);
     if (pick.mana) {
       // A mana ability that taps other permanents too (Springleaf Drum).
-      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen);
+      const plan = s && planManaAbility(s, HUMAN, pick.mana.objectId, pick.mana.ability, pick.mana.mana, pick.chosen, pick.mana.extra);
       if (plan) dispatch(plan);
       return;
     }
@@ -626,7 +626,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
       if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0)) return setMenu(o.id);
-      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana);
+      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra);
       if (plan) dispatch(plan);
     }
   }
@@ -798,9 +798,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 const tapCost = manaAbilitiesOn(s, s.objects[menu]!)[x.ability]?.tapCost;
                 if (tapCost) {
                   const candidates = tapCostCandidates(s, HUMAN, s.objects[menu]!, tapCost);
-                  return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
+                  return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
                 }
-                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana);
+                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra);
                 if (plan) dispatch(plan);
               }}
               onPlay={(untapped) => {
@@ -2273,7 +2273,7 @@ function AbilityMenu({
           const ab = manaAbilitiesOn(s, o)[x.ability]!;
           const cost = ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it");
           return (
-            <button key={`${x.ability}-${x.mana}`} className="ghost" onClick={() => onMana(x)}>
+            <button key={`${x.ability}-${x.mana}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>

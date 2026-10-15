@@ -1,4 +1,4 @@
-import type { CounterKind, ManaAbility, ManaProduce, ManaSpend, TargetSpec } from "../abilities";
+import type { CounterKind, ManaAbility, ManaProduce, ManaSpend, ManaTrigger, TargetSpec } from "../abilities";
 import type { ManaType } from "../types";
 import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } from "./words";
 import { energyIn } from "./activated";
@@ -59,6 +59,40 @@ export function parseManaAbility(line: string): ManaAbility | null {
     } else return null;
   }
   return out;
+}
+
+/**
+ * A triggered mana ability about a permanent being tapped for mana (CR 605.1b, 106.12a): "Whenever enchanted land is
+ * tapped for mana, its controller adds an additional one mana of any color." (Fertile Ground), "Whenever a player taps
+ * a land for mana, that player adds one mana of any type that land produced." (Mana Flare), "Whenever you tap a Swamp
+ * for mana, add an additional {B}." (Crypt Ghast). Null if the line isn't one; "fail" if it is one we can't run.
+ */
+export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
+  let m: RegExpExecArray | null;
+  let what: string;
+  const out: Partial<ManaTrigger> = { text: line };
+  let adds: string;
+  if ((m = /^Whenever (?:(enchanted|fortified) |an? )(.+?) is tapped for mana( of the chosen color)?, its controller adds (?:an additional )?(.+)\.$/.exec(line))) {
+    if (m[1]) out.attached = true;
+    what = m[2]!;
+    if (m[3]) out.ofChosen = true;
+    adds = m[4]!;
+  } else if ((m = /^Whenever (a player taps|you tap) an? (.+?) for mana, (that player adds|add) (?:an additional )?(.+)\.$/.exec(line))) {
+    if ((m[1] === "you tap") !== (m[3] === "add")) return "fail";
+    if (m[1] === "you tap") out.you = true;
+    what = m[2]!;
+    adds = m[4]!;
+  } else return null;
+  const filter = parseTargetPhrase(what);
+  if (filter?.kind !== "object" || filter.controller || filter.chosen || filter.tapped || filter.combat) return "fail";
+  out.filter = { ...filter, text: what };
+  if (/^(\{[WUBRGC]\})+$/.test(adds)) out.adds = { kind: "fixed", mana: [...adds.matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1] as ManaType) };
+  else if (adds === "one mana of any color") out.adds = { kind: "anyColor", n: 1 };
+  else if (adds === "two mana in any combination of colors") out.adds = { kind: "anyColor", n: 2 };
+  else if (adds === "one mana of the chosen color" || (adds === "one mana of that color" && out.ofChosen)) out.adds = { kind: "chosenColor" };
+  else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && what.endsWith(m[1]!)) out.adds = { kind: "produced" };
+  else return "fail";
+  return out as ManaTrigger;
 }
 
 /** "Remove three spore counters from ~", "Remove a +1/+1 counter from ~" as part of a cost. */

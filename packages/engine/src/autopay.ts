@@ -14,6 +14,8 @@ interface Option {
   ability: number;
   mana: ManaType;
   adds: ManaType[];
+  /** The mana picked for the triggered mana abilities it triggers. */
+  extra?: ManaType[];
   /** The mana part of its cost, if any (a Signet's {1}). */
   cost: ParsedCost | null;
   penalty: number;
@@ -56,7 +58,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
     .sort((a, b) => Number(isCreature(a.id)) - Number(isCreature(b.id)) || a.colors - b.colors);
 }
 
-const toAction = (pid: PlayerId, x: Option): Action => ({ type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.taps ? { tap: x.taps } : {}) });
+const toAction = (pid: PlayerId, x: Option): Action => ({ type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}) });
 
 /**
  * What to tap for "Tap an untapped creature you control", best first: what makes no mana itself, then what's
@@ -108,11 +110,14 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
       reserved[m]++;
     }
   };
+  // Colored mana the cost names: of two ways to use one source (Fertile Ground's "GW" and "GU"), the one adding more of it.
+  const named = namedColors(cost);
+  const useful = (x: Option) => x.adds.filter((m) => named.has(m)).length;
   const free = (pred: (x: Option) => boolean) =>
     sources
       .filter((src) => !used.has(src.id))
       .flatMap((src, order) => src.options.filter((x) => !x.cost && pred(x) && tapsFor(x, used)).map((x) => ({ x, order })))
-      .sort((a, b) => a.x.penalty - b.x.penalty || a.order - b.order)[0]?.x;
+      .sort((a, b) => a.x.penalty - b.x.penalty || a.order - b.order || useful(b.x) - useful(a.x))[0]?.x;
   for (const sym of cost.symbols) {
     if (sym.kind !== "colored" && sym.kind !== "phyrexian" && sym.kind !== "twoHybrid") continue;
     const c = sym.color;
@@ -394,14 +399,14 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
 }
 
 /** The actions to activate one mana ability, paying any mana it costs first. */
-export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[]): Action[] | null {
+export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[], extra?: ManaType[]): Action[] | null {
   const o = obj(s, objectId);
   if (manaAbilityProblem(s, pid, o, ability, true, tap)) return null;
   const ab = manaAbilitiesOn(s, o)[ability]!;
   // "Tap an untapped creature you control": what's given, or the best to tap.
   const tapped = ab.tapCost ? (tap ?? tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost)).slice(0, ab.tapCost.n)) : undefined;
   const taps = ab.manaCost ? planMana(s, pid, parseManaCost(ab.manaCost), 0, objectId, tapped, { ability: o }) : [];
-  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(tapped ? { tap: tapped } : {}) }] : null;
+  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}) }] : null;
 }
 
 /** Tap what's needed and turn a face-down permanent face up (CR 702.37e), or null if that can't be done now. */

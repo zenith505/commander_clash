@@ -7,7 +7,7 @@ import { withModes } from "../modes";
 import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
-import { parseManaAbility } from "./mana-abilities";
+import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
@@ -250,6 +250,12 @@ export function compile(d: CardDef): CompiledCard {
     const manaAb = parseManaAbility(line);
     if (manaAb) {
       out.mana.push(manaAb);
+      continue;
+    }
+    const manaTrigger = parseManaTrigger(line);
+    if (manaTrigger) {
+      if (manaTrigger === "fail") out.unsupported.push(raw);
+      else (out.manaTriggers ??= []).push(manaTrigger);
       continue;
     }
     const backup = /^Backup (\d+)((?:, backup \d+)*)$/.exec(line);

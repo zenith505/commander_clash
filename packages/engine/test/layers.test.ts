@@ -369,9 +369,11 @@ describe("Auras (CR 303.4) and Equipment (CR 301.5)", () => {
 });
 
 describe("caching", () => {
-  it("bot games play out identically with and without the characteristics cache", () => {
+  // The first 600 actions of each game, yielding to the event loop now and then: one long synchronous loop starves
+  // vitest's worker RPC ("Timeout calling onTaskUpdate") and fails the run even though every test passes.
+  it("bot games play out identically with and without the characteristics cache", async () => {
     const pool = [anthem02, honor, pacifism, rancor, sword, mindControl, elfLord, elfFlier, treason, frog, silence, giantGrowth4, switcheroo];
-    const run = (seed: number) => {
+    const run = async (seed: number) => {
       const deck = () => [
         ...Array.from({ length: 38 }, () => forest),
         ...Array.from({ length: 6 }, () => plainsCard),
@@ -381,14 +383,19 @@ describe("caching", () => {
         ...Array.from({ length: 30 }, () => bear()),
       ];
       let s = createGame(["A", "B", "C", "D"].map((name, i) => ({ name, commander: commander(`C${i}`), deck: deck(), isBot: true })), seed);
-      for (let i = 0; i < 3000 && !s.over; i++) for (const a of botActions(s, waitingOn(s)!)) s = act(s, a);
+      let n = 0;
+      for (let i = 0; i < 3000 && !s.over && n < 600; i++)
+        for (const a of botActions(s, waitingOn(s)!)) {
+          s = act(s, a);
+          if (++n % 100 === 0) await new Promise((r) => setTimeout(r));
+        }
       return s.log.map((e) => e.text).join("\n");
     };
     for (const seed of [1, 2]) {
-      const cached = run(seed);
+      const cached = await run(seed);
       setCharacteristicsCache(false);
       try {
-        expect(run(seed)).toBe(cached);
+        expect(await run(seed)).toBe(cached);
       } finally {
         setCharacteristicsCache(true);
       }

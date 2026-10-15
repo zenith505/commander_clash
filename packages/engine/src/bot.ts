@@ -9,6 +9,7 @@ import {
   returnCandidates,
   attackProblem,
   blockProblem,
+  provokerOf,
   maxBlocks,
   canEnterUntapped,
   conditionHolds,
@@ -352,6 +353,13 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
       : reanimate
         ? all
         : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)));
+    // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
+    const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);
+    if (provoke && sourceId && s.objects[sourceId]) {
+      const good = all.filter((t) => t.kind === "object" && provokeGood(s, obj(s, sourceId), obj(s, t.id)));
+      out.push(good.length ? best(s, pid, good, true, 0) : all[0] ?? { kind: "none" });
+      continue;
+    }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
     const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
     if (!pool.length) {
@@ -616,10 +624,22 @@ function millExplored(s: GameState, pid: PlayerId, card: string): boolean {
   return manaValue(parseManaCost(defOf(s, obj(s, card)).manaCost)) > lands + 1;
 }
 
+/** Provoking `target` into blocking `attacker` is good for us: it dies in the block, and ours doesn't. */
+function provokeGood(s: GameState, attacker: GameObject, target: GameObject): boolean {
+  const deadly = (a: GameObject) => objHasKeyword(s, a, "Deathtouch");
+  return (power(s, attacker) >= toughness(s, target) || deadly(attacker)) && power(s, target) < toughness(s, attacker) && !deadly(target);
+}
+
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
   if (!r || e?.type !== "may") return true;
+  const provoke = e.effects.find((x) => x.type === "mustBlockSource");
+  if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
+    const t = r.item.targets?.[provoke.what.index];
+    const src = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
+    return !!src && t?.kind === "object" && !!s.objects[t.id] && provokeGood(s, src, obj(s, t.id));
+  }
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
   let v = 0;
@@ -1245,6 +1265,17 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     for (const b of able) {
       used.add(b.id);
       blocks.push({ blocker: b.id, attacker: at.id });
+    }
+  }
+  // A provoked creature blocks the creature that provoked it (CR 702.39a), with a second blocker against menace.
+  for (const b of mine) {
+    const at = provokerOf(s, b);
+    if (!at || used.has(b.id) || blockProblem(s, b, at)) continue;
+    const helper = objHasKeyword(s, at, "Menace") ? mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x))[0] : undefined;
+    if (objHasKeyword(s, at, "Menace") && !helper) continue;
+    for (const o of [b, ...(helper ? [helper] : [])]) {
+      used.add(o.id);
+      blocks.push({ blocker: o.id, attacker: at.id });
     }
   }
   for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {

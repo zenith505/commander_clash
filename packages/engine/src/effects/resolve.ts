@@ -305,6 +305,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ascend":
     case "gainLife":
     case "loseLife":
+    case "addCombatMana":
     case "fight":
     case "bite":
       return runBasicsEffect(s, e, ctx, src);
@@ -335,6 +336,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":
+    case "mustBlockSource":
     case "proliferate":
     case "amass":
     case "connive":

@@ -8,7 +8,7 @@ import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
 import { parseManaAbility } from "./mana-abilities";
-import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine } from "./keyword-abilities";
+import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
 import { parseActivated } from "./activated";
@@ -241,6 +241,14 @@ export function compile(d: CardDef): CompiledCard {
       ascendSpell = true;
       continue;
     }
+    // "Firebending X, where X is ~'s power" (CR 702.189a): X is counted as the ability resolves.
+    const fireX = /^Firebending X, where X is (.+)\.$/.exec(line);
+    if (fireX) {
+      const def = parseCount(fireX[1]!, null);
+      if (def) out.triggers.push(firebending(def, "Firebending X"));
+      else out.unsupported.push(raw);
+      continue;
+    }
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
     const kwLine = line.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2");
     if (isKeywordLine(kwLine)) {
@@ -434,6 +442,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
+      continue;
+    }
+    // The Phantom creatures' prevention shield (CR 615): see dealDamage.
+    if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
+      out.phantom = true;
       continue;
     }
     if (/^~ can't be countered\.$/.test(line)) {

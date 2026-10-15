@@ -89,6 +89,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${p.name}'s speed increases to ${p.speed}${p.speed === 4 ? " (max speed)" : ""}.`);
       return;
     }
+    case "addCombatMana": {
+      // Firebending (CR 702.189a): red mana that stays in the pool until end of combat (see advanceStep).
+      const n = amountNow(s, e.n, ctx);
+      const p = player(s, ctx.controller);
+      p.manaPool.R += n;
+      p.combatMana = (p.combatMana ?? 0) + n;
+      if (n) log(s, `${p.name} adds ${"{R}".repeat(n)} (until end of combat).`);
+      return;
+    }
     case "gainLife":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);

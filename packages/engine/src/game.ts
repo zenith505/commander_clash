@@ -916,15 +916,29 @@ const STEP_ORDER: Step[] = [
   "cleanup",
 ];
 
+/** Steps that firebending's mana survives the end of: every combat step but the last (CR 702.189a). */
+const KEEPS_COMBAT_MANA = new Set<Step>(["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage"]);
+
 function advanceStep(s: GameState): void {
-  for (const p of s.players) p.manaPool = emptyPool(); // CR 500.4
+  for (const p of s.players) {
+    // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a). Red mana
+    // spent is spent from the rest first, so what's kept is the red left, up to firebending's.
+    const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R) : 0;
+    p.manaPool = emptyPool();
+    p.manaPool.R = keep;
+    p.combatMana = keep || undefined;
+  }
   if (s.step === "cleanup" && s.cleanupAgain) {
     s.cleanupAgain = undefined;
     return beginStep(s, "cleanup"); // CR 514.3a
   }
   if (s.step === "cleanup") return startNextTurn(s);
-  // CR 511.3: as the end of combat step ends, everything is removed from combat.
-  if (s.step === "endCombat") for (const o of attackersAndBlockers(s)) clearCombat(o);
+  // CR 511.3: as the end of combat step ends, everything is removed from combat. Provoke's requirement was for
+  // this combat only (CR 702.39a).
+  if (s.step === "endCombat") {
+    for (const o of attackersAndBlockers(s)) clearCombat(o);
+    for (const id of s.battlefield) obj(s, id).provokedBy = undefined;
+  }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
   beginStep(s, next);
 }
@@ -2514,7 +2528,8 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
 export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked);
-  if (!demanding.length) return null;
+  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o));
+  if (!demanding.length && !provoked.length) return null;
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
@@ -2522,8 +2537,16 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
-    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x));
+    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokerOf(s, b)?.id === x);
   };
+  // Provoke (CR 702.39a): the provoked creature blocks the creature that provoked it if able. With menace, that
+  // takes another creature able to block it too (CR 702.111b).
+  for (const b of mine) {
+    const at = provokerOf(s, b);
+    if (!at || (blocking.get(b.id) ?? []).includes(at.id) || blockProblem(s, b, at) || full(b)) continue;
+    if (objHasKeyword(s, at, "Menace") && !mine.some((o) => o.id !== b.id && !blockProblem(s, o, at))) continue;
+    return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
+  }
   for (const at of demanding) {
     const ac = characteristics(s, at);
     const could = mine.filter((b) => !blockProblem(s, b, at));
@@ -2536,6 +2559,12 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     if (!blocked && could.some((b) => !full(b))) return `${ac.name} must be blocked if able`;
   }
   return null;
+}
+
+/** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
+export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
+  const at = b.provokedBy && s.objects[b.provokedBy.id];
+  return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === b.provokedBy!.zc && at.attacking === controllerOf(s, b) ? at : undefined;
 }
 
 const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Island", Forestwalk: "Forest", Mountainwalk: "Mountain", Plainswalk: "Plains" };

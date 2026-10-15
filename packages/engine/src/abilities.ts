@@ -409,6 +409,8 @@ export type Effect =
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   | { type: "exileIfDies"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
+  /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
+  | { type: "mustBlockSource"; what: ObjRef }
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
@@ -494,6 +496,8 @@ export type Effect =
   | { type: "surveil"; n: Amount } // CR 701.25
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount }
+  /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
+  | { type: "addCombatMana"; n: Amount }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
   | { type: "shuffle"; who: PlayerRef }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
@@ -901,6 +905,11 @@ export interface CompiledCard {
    * where X is the number of creatures devoured this way".
    */
   devour?: { n: number | "devoured"; filter: TargetSpec };
+  /**
+   * "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~." (Phantom Centaur): every bit
+   * of damage is prevented, and one counter removed per damage event, even when there's none left to remove.
+   */
+  phantom?: boolean;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */

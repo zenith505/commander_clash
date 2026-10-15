@@ -53,6 +53,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         else untapPermanent(s, o);
       }
       return;
+    case "mustBlockSource": {
+      // Provoke (CR 702.39a): only the creature that provoked it, as long as it's still that object.
+      if (!ctx.sourceId) return;
+      const source = s.objects[ctx.sourceId];
+      if (!source || source.zone !== "battlefield" || (source.zoneChanges ?? 0) !== ctx.sourceZc) return;
+      for (const o of objects(s, e.what, ctx)) {
+        o.provokedBy = { id: source.id, zc: source.zoneChanges ?? 0 };
+        log(s, `${characteristics(s, o).name} must block ${characteristics(s, source).name} this combat if able.`);
+      }
+      return;
+    }
     case "proliferate":
       return proliferate(s, ctx.controller, src);
     case "amass": {

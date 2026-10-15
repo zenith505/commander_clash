@@ -93,6 +93,8 @@ export interface GameObject {
   mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn"; turn: number };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
+  /** Provoked: it must block this attacking creature this combat if able (CR 702.39a). Cleared at end of combat. */
+  provokedBy?: { id: ObjectId; zc: number };
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
   blocking?: ObjectId[];
   blockedBy?: ObjectId[];
@@ -110,6 +112,8 @@ export interface GameObject {
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
+  /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
+  phantomEvent?: string;
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   castVia?: CastFromGraveyardKind;
@@ -161,6 +165,8 @@ export interface Player {
   exile: ObjectId[];
   command: ObjectId[];
   manaPool: Record<ManaType, number>;
+  /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
+  combatMana?: number;
   landsPlayedThisTurn: number;
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;

@@ -9,6 +9,7 @@ import {
   turnFaceUpProblem,
   delveRoom,
   graveyardCast,
+  castExtraCosts,
   mayPlayFromExile,
   mayPlayLandFromGraveyard,
   assistedRemaining,
@@ -190,6 +191,8 @@ type CastDraft = {
   sacrifice?: string[];
   discard?: string[];
   exileCards?: string[];
+  /** A Borderpost's basic land returned to hand. */
+  returnToHand?: string[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
@@ -419,7 +422,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
-    else if (pick.kind !== "returnToHand" && pick.kind !== "tap") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
+    else if (pick.kind !== "tap") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
   /**
@@ -443,10 +446,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     const specs = spellTargets(s, d.objectId, d.modes, d.alt);
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: [], label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
-    for (const c of [...(compiled.additionalCosts ?? []), ...(graveyardCast(card, d.via)?.costs ?? [])]) {
-      if (c.kind === "payLife" || c.kind === "returnToHand" || c.kind === "tap") continue; // no spell asks to return or tap a permanent yet
+    for (const c of castExtraCosts(card, d)) {
+      if (c.kind === "payLife" || c.kind === "tap") continue; // no spell asks to tap a permanent yet
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
+      if (c.kind === "returnToHand")
+        return setCostPick({ draft: d, kind: "returnToHand", label: card.name, what: `return ${c.n === 1 ? "a" : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
       const me = s.players[HUMAN]!;
       const candidates =
         c.kind === "sacrifice"
@@ -470,6 +475,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
+      ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -958,7 +964,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp" };
+const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -966,6 +972,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   madness: "",
   blitz: "haste, and you draw a card when it dies; sacrificed at the end step",
   warp: "exiled at the end step; you may cast it from exile on a later turn",
+  alternative: "an alternative cost: it's still the same spell, with the same mana value",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape" };

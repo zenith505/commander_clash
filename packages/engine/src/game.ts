@@ -1774,7 +1774,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
-  const sacrificed = payAdditionalCosts(s, p, d, choices, via?.costs ?? []);
+  const sacrificed = payAdditionalCosts(s, p, d, choices, [...(via?.costs ?? []), ...(altCost(d, choices.alt)?.costs ?? [])]);
   if (sacrificed.length) item.sacrificed = sacrificed;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
@@ -1859,7 +1859,12 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
 function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, choices?.via)?.costs ?? [])], choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, choices), choices, `cast ${d.name}`);
+}
+
+/** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt">): AdditionalCost[] {
+  return [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
 }
 
 /**

@@ -66,7 +66,7 @@ export function parseCostKeyword(
   line: string,
   d: CardDef,
 ): {
-  alt?: { kind: AltCostKind; mana: string };
+  alt?: { kind: AltCostKind; mana: string; costs?: AdditionalCost[] };
   trigger?: TriggeredAbility;
   activated?: ActivatedAbility;
   delve?: true;
@@ -79,6 +79,13 @@ export function parseCostKeyword(
   dredge?: number;
 } | "fail" | null {
   let m: RegExpExecArray | null;
+  // "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (Bringers), "You may pay {1} and return a basic land you
+  // control to its owner's hand rather than pay ~'s mana cost" (Borderposts): an alternative cost (CR 118.9). The returned
+  // land may be one just tapped for mana (rulings: mana abilities come before costs are paid, CR 601.2g-h).
+  if ((m = /^You may pay ((?:\{[^}]+\})+)( and return a basic land you control to its owner's hand)? rather than pay ~'s mana cost\.?$/.exec(line)))
+    return plainMana(m[1]!)
+      ? { alt: { kind: "alternative", mana: m[1]!, ...(m[2] ? { costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Land"], supertypes: ["Basic"], controller: "you", text: "basic land you control" }, n: 1 }] } : {}) } }
+      : "fail";
   // Bestow (CR 702.103a); "Bestow—{R}, Collect evidence 6" isn't modeled. (Cast bestowed, the card is an Aura: see bestowedDef.)
   if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
   // Madness (CR 702.35a): "Madness—{1}{B}, Pay 1 life" and X madness costs aren't modeled.

@@ -32,6 +32,7 @@ import {
   exilePlayable,
   castDef,
   casualtyCandidates,
+  castExtraCosts,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
@@ -549,7 +550,7 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
-  const extra = chooseExtraCosts(s, pid, id, targets ?? [], via);
+  const extra = chooseExtraCosts(s, pid, id, targets ?? [], via, alt);
   if (extra) {
     // Casualty: a token or a cheap creature for a copy of the spell (CR 702.153a).
     const victim = casualtyCandidates(s, pid, castDef(s, id, alt))
@@ -600,12 +601,21 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): nu
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, via)?.costs ?? [])]) {
-    if (c.kind === "payLife") {
+  for (const c of castExtraCosts(d, { via, alt })) {
+    if (c.kind === "returnToHand") {
+      // A Borderpost's basic land: a tapped one (its mana may already be paying for this), and only with lands to spare.
+      const pool = returnCandidates(s, pid, c)
+        .map((x) => obj(s, x))
+        .filter((o) => !targeted.has(o.id))
+        .sort((a, b) => Number(b.tapped) - Number(a.tapped));
+      if (pool.length < c.n || lands(s, pid) < 4) return null;
+      out.returnToHand = pool.slice(0, c.n).map((o) => o.id);
+    } else if (c.kind === "tap") return null; // no spell asks for that
+    else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
     } else if (c.kind === "sacrifice") {
       const value = (o: GameObject) => (o.isToken ? 0 : 1 + mv(s, o.id));

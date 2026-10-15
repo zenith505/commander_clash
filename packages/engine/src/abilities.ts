@@ -924,7 +924,8 @@ export type AdditionalCost =
  * Alternative costs (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a), bestow (CR 702.103a) and blitz (CR 702.152a);
  * warp (CR 702.185a) only from your hand; madness (CR 702.35a) only as its trigger resolves, from exile.
  */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp";
+/** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative";
 
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
 export interface CastFromGraveyard {
@@ -1059,7 +1060,7 @@ export interface CompiledCard {
   /** Rebound (CR 702.88). */
   rebound?: boolean;
   /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
-  altCosts?: { kind: AltCostKind; mana: string }[];
+  altCosts?: { kind: AltCostKind; mana: string; /** Paid along with it: a Borderpost's "return a basic land you control to its owner's hand". */ costs?: AdditionalCost[] }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */

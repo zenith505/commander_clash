@@ -512,6 +512,11 @@ export function compile(d: CardDef): CompiledCard {
       out.entersTappedChoice = choice;
       continue;
     }
+    // Darksteel Colossus: a replacement effect that works from every zone (CR 614.1a, 113.6c-style "from anywhere").
+    if (/^If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead\.$/.test(line)) {
+      out.shuffleInsteadOfGraveyard = true;
+      continue;
+    }
     if (line === "You may play lands from your graveyard.") {
       out.landsFromGraveyard = true;
       continue;

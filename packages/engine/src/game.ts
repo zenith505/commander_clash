@@ -479,6 +479,15 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
   o.exileIfDiesTurn = undefined;
+  // Darksteel Colossus: "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's
+  // library instead" (CR 614.1a). On the battlefield it's the permanent's ability now (it could have lost it);
+  // elsewhere the card's. If an "exile it instead" effect also applies, its owner would choose the order (CR 616.1):
+  // those were applied above, so the card goes to exile.
+  const shuffleIn = to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).shuffleInsteadOfGraveyard;
+  if (shuffleIn) {
+    to = "library";
+    log(s, `${player(s, o.owner).name} reveals ${defOf(s, o).name} and shuffles it into their library instead.`);
+  }
   // A commander that would be put into its owner's library goes to the command zone instead, if its owner
   // wants (CR 903.9b); owners always do. Into a hand it stays: it can be cast from there without tax.
   if (o.isCommander && to === "library" && fromZone !== "library") {
@@ -592,6 +601,7 @@ export function moveObject(
   // triggers say "put into a graveyard" or "leaves the battlefield".
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
+  if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
 
@@ -769,6 +779,16 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
 }
 
 /**
+ * Tap a permanent (CR 701.26a). Only an untapped one can be: then it "becomes tapped", which triggers abilities
+ * (rulings: tapping a tapped permanent, or one entering tapped, doesn't).
+ */
+export function tapPermanent(s: GameState, o: GameObject) {
+  if (o.tapped) return;
+  o.tapped = true;
+  if (o.zone === "battlefield") fireEvent(s, { type: "tapped", id: o.id });
+}
+
+/**
  * Untap a permanent. A stun counter replaces that: one is removed instead (CR 122.1d). Untapping
  * an untapped permanent isn't an untap, so the counter stays.
  */
@@ -806,7 +826,7 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
     o.regenShields! -= 1;
     o.damage = 0;
     o.deathtouchDamage = false;
-    o.tapped = true;
+    tapPermanent(s, o);
     if (o.attacking !== undefined || o.blocking !== undefined) {
       removeFromCombat(s, o);
       clearCombat(o);
@@ -1377,8 +1397,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const src = objectSource(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
-  if (ab.tap) o.tapped = true;
-  for (const t of tap ?? []) obj(s, t).tapped = true;
+  if (ab.tap) tapPermanent(s, o);
+  for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
@@ -1724,7 +1744,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
     log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
   }
-  for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
+  for (const c of [...(convoke ?? []), ...(improvise ?? [])]) tapPermanent(s, obj(s, c));
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
@@ -1975,7 +1995,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       }
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];
-      for (const id of ids) obj(s, id).tapped = true;
+      for (const id of ids) tapPermanent(s, obj(s, id));
       log(s, `${p.name} taps ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
       loseLife(s, p.id, c.n);
@@ -2121,8 +2141,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     invalidateCharacteristics(s);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
-  if (ab.tap) o.tapped = true;
-  for (const c of tapCreatures ?? []) obj(s, c).tapped = true;
+  if (ab.tap) tapPermanent(s, o);
+  for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
@@ -2629,7 +2649,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const o = obj(s, a.attacker);
     o.attacking = a.defender;
     if (a.planeswalker !== undefined) o.attackingPermanent = { id: a.planeswalker, zc: obj(s, a.planeswalker).zoneChanges ?? 0 };
-    if (!objHasKeyword(s, o, "Vigilance")) o.tapped = true; // CR 508.1f
+    if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o); // CR 508.1f
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
@@ -2726,7 +2746,7 @@ function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
   d.enlist.shift();
   const c = ids[0];
   if (c) {
-    obj(s, c).tapped = true;
+    tapPermanent(s, obj(s, c));
     d.enlisted.push([at, c]);
     log(s, `${nameOf(s, at)} enlists ${nameOf(s, c)}.`);
   }

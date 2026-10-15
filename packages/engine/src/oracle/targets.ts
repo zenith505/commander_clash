@@ -348,6 +348,9 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   // "red or green creature" means a creature that's red or green. Mixing colors with several
   // different type alternatives ("red creature or green artifact") isn't modeled.
   if (colors.length && alts.filter((a) => a.split(/\s+/).some((w) => TYPE_WORDS[w])).length > 1) return null;
+  // "Swamp, Mountain, black permanent, or red permanent": a color in only some alternatives would need
+  // per-alternative filters too (the fields of a filter must all match).
+  if (colors.length && alts.length > 1 && alts.some((a) => !a.trim().split(/\s+/).some((w) => COLOR_WORDS[w]))) return null;
   // Supertypes are "and" requirements ("basic land"); with alternatives they'd need per-alternative filters.
   if ((supertypes.length || notSupertypes.length) && alts.length > 1) return null;
   // Subtypes mixed with card types in alternatives ("Wall or artifact") would need per-alternative filters too.

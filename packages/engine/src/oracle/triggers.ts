@@ -45,6 +45,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of each player's draw step, (.+)$/, "eachDrawStep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
+  [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^When(?:ever)? ~ exploits a creature, (.+)$/, "selfExploits"],
   // Heroic (an ability word): "Whenever you cast a spell that targets ~".
   [/^Whenever you cast a spell that targets ~, (.+)$/, "selfTargetedByYourSpell"],
@@ -54,7 +55,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped",
 ];
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
@@ -75,6 +76,7 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^deals combat damage, (.+)$/, "selfDealsCombatDamage", { thatMuch: true }],
   [/^deals damage, (.+)$/, "selfDealsDamage", { thatMuch: true }],
   [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
+  [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
 ];
 
 /**
@@ -85,11 +87,13 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
  * ("the other creature"). "Enchanted creature" in the effect is whatever it's attached to as it resolves.
  */
 function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) creature (.+)$/.exec(line);
+  // "Whenever enchanted land becomes tapped": an Aura on something other than a creature can only see that.
+  const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) (creature|land|artifact|permanent) (.+)$/.exec(line);
   if (!m) return null;
   for (const [re, event, o] of HOST_TRIGGERS) {
-    const h = re.exec(m[2]!);
+    const h = re.exec(m[3]!);
     if (!h) continue;
+    if (m[2] !== "creature" && event !== "selfBecomesTapped") return "fail";
     let text = h[1]!;
     // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm).
     if (m[1] && /\b(it|its|that creature)\b/i.test(text)) return "fail";
@@ -352,6 +356,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const cast = parseCastTrigger(line);
   if (cast) return cast;
+  // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped".
+  const tapped = /^Whenever an? (.+?) becomes tapped, (.+)$/.exec(line);
+  if (tapped) {
+    const filter = parseTargetPhrase(tapped[1]!);
+    const body = filter && filter.kind === "object" && parseBody(tapped[2]!, { subjectIt: true });
+    return filter && body ? { event: "permanentBecomesTapped", tappedFilter: filter, body } : "fail";
+  }
   const block = parseBlockTrigger(line);
   if (block) return block;
   const damages = parseDamagesCreatureTrigger(line);

@@ -1,6 +1,6 @@
 import type { Effect, TokenSpec } from "../abilities";
 import { defOf, isType, objIsType, power, toughness } from "../cards";
-import { draw, log, moveObject, obj, player, untapPermanent } from "../game";
+import { draw, log, moveObject, obj, player, tapPermanent, untapPermanent } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
@@ -50,7 +50,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "tap":
     case "untap":
       for (const o of objects(s, e.what, ctx)) {
-        if (e.type === "tap") o.tapped = true;
+        if (e.type === "tap") tapPermanent(s, o);
         else untapPermanent(s, o);
       }
       return;

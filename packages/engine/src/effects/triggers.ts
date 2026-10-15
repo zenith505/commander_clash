@@ -60,6 +60,8 @@ export type TriggerSourceEvent =
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
   | { type: "lifeLost"; player: PlayerId; amount: number }
   | { type: "attacks"; id: ObjectId }
+  /** A permanent became tapped (CR 701.26a). */
+  | { type: "tapped"; id: ObjectId }
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
   | { type: "groupAttack"; controller: PlayerId; ids: ObjectId[] }
   /** In one combat damage step, these creatures of `controller` dealt `player` combat damage. */
@@ -360,6 +362,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) !== ev.player) continue;
       add(o, ev.player, (e, t) => (e === "ringTemptsYou" && (!t.ifOtherBearer || (ev.chosen !== undefined && ev.chosen !== o.id))) || (e === "youChooseRingBearer" && ev.chosen !== undefined));
+    }
+  } else if (ev.type === "tapped") {
+    // "Whenever ~ becomes tapped", "whenever enchanted land becomes tapped", "whenever a Dwarf you control becomes
+    // tapped" (the tapped permanent is the subject: "put a wind counter on it").
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfBecomesTapped");
+    addHosted(o, (e) => e === "selfBecomesTapped");
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     }
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);

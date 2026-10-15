@@ -659,6 +659,8 @@ export type TriggerEvent =
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
+  | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
+  | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
   | "permanentEnters"
   /** "Whenever another creature dies", "a creature you control", "equipped creature": see TriggeredAbility.dies. */
@@ -732,6 +734,8 @@ export type TriggerEvent =
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** For "permanentBecomesTapped": which permanent ("a Dwarf you control"); it's the subject ("put a wind counter on it"). */
+  tappedFilter?: TargetSpec;
   /**
    * "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": an ability whose
    * effect moves the card out of a zone works only in that zone (CR 113.6m), and its owner controls it there.
@@ -1007,6 +1011,8 @@ export interface CompiledCard {
   /** For Auras: what it can enchant, which is also what the Aura spell targets. CR 303.4a, 702.5 */
   enchant?: TargetSpec;
   entersTapped: boolean;
+  /** "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead." */
+  shuffleInsteadOfGraveyard?: boolean;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

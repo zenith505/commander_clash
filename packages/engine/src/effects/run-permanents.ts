@@ -72,8 +72,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const source = s.objects[ctx.sourceId];
       if (!source || source.zone !== "battlefield" || (source.zoneChanges ?? 0) !== ctx.sourceZc) return;
       for (const o of objects(s, e.what, ctx)) {
-        o.provokedBy = { id: source.id, zc: source.zoneChanges ?? 0 };
-        log(s, `${characteristics(s, o).name} must block ${characteristics(s, source).name} this combat if able.`);
+        o.provokedBy = { id: source.id, zc: source.zoneChanges ?? 0, ...(e.thisTurn ? { turn: s.turn } : {}) };
+        log(s, `${characteristics(s, o).name} must block ${characteristics(s, source).name} this ${e.thisTurn ? "turn" : "combat"} if able.`);
       }
       return;
     }

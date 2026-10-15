@@ -71,6 +71,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
   // "You may put a land card from your hand onto the battlefield (tapped)".
+  // Brainstorm: "put two cards from your hand on top of your library in any order", "put a card from your hand on top
+  // of your library".
+  if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
+    return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
   if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?$/.exec(s))) {
     const filter = parseSearchFilter(m[3]!);
     if (filter === null || mayBeAura(filter)) return null;

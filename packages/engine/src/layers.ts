@@ -132,6 +132,7 @@ export interface Characteristics {
   cantBlockAlone: boolean;
   mustBeBlocked: boolean;
   allMustBlock: boolean;
+  mustBlock: boolean;
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
   extraBlocks: number;
   blockAny: boolean;
@@ -189,6 +190,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBlockAlone: false,
     mustBeBlocked: false,
     allMustBlock: false,
+    mustBlock: false,
     extraBlocks: 0,
     blockAny: false,
   };
@@ -640,6 +642,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBlockAlone":
     case "mustBeBlocked":
     case "allMustBlock":
+    case "mustBlock":
       c[m.kind] = true;
       return;
     case "blockAdditional":

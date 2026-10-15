@@ -381,6 +381,8 @@ export type Modification =
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked" }
   | { kind: "allMustBlock" }
+  /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
+  | { kind: "mustBlock" }
   /**
    * "Can block an additional creature each combat", "an additional seven creatures", "any number of creatures":
    * how many attackers it may block (CR 509.1a). Additional ones add up (rulings).
@@ -580,7 +582,8 @@ export type Effect =
   | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
   /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
-  | { type: "mustBlockSource"; what: ObjRef }
+  /** Provoke and "target creature blocks ~ this turn if able": for this combat, or the rest of the turn (CR 509.1c). */
+  | { type: "mustBlockSource"; what: ObjRef; thisTurn?: true }
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
@@ -708,6 +711,8 @@ export type Effect =
   | { type: "surveil"; n: Amount } // CR 701.25
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount }
+  /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
+  | { type: "handToTop"; n: Amount }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
   | { type: "addCombatMana"; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the

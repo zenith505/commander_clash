@@ -377,7 +377,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   if (!s) return null;
   const me = s.players[HUMAN]!;
   // Discarding, mulligans and bottoming mean looking at or picking from your hand, so it comes out even if you'd tucked it away.
-  const pickingFromHand = pending?.kind === "discard" || pending?.kind === "discardToHandSize" || pending?.kind === "bottomCards";
+  const pickingFromHand = pending?.kind === "discard" || pending?.kind === "discardToHandSize" || pending?.kind === "bottomCards" || pending?.kind === "handToTop";
   const handTucked = handMinimized && !pickingFromHand && pending?.kind !== "mulligan";
 
   const nextSpec = targeting ? targeting.specs[targeting.chosen.length] : undefined;
@@ -680,7 +680,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (pending?.kind === "chooseMay" || pending?.kind === "payUnless" || pending?.kind === "mulligan") return;
-    if (pending?.kind === "discardToHandSize" || pending?.kind === "discard" || pending?.kind === "bottomCards") {
+    if (pending?.kind === "discardToHandSize" || pending?.kind === "discard" || pending?.kind === "bottomCards" || pending?.kind === "handToTop") {
       if (o.zone === "hand" && o.owner === HUMAN)
         setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id].slice(-pending.count)));
       return;
@@ -2895,6 +2895,17 @@ function Controls({
         </span>
         <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "bottomCards", player: HUMAN, objectIds: discards }])}>
           Put on bottom
+        </button>
+      </div>
+    );
+  if (pending?.kind === "handToTop" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}: </strong>click {pending.count} card{pending.count === 1 ? "" : "s"} to put on top of your library{pending.count > 1 ? " (first pick ends on top)" : ""}.
+        </span>
+        <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
+          Put on top
         </button>
       </div>
     );

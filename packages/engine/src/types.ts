@@ -133,8 +133,11 @@ export interface GameObject {
    * but is still attacking (CR 506.4c).
    */
   attackingPermanent?: { id: ObjectId; zc: number };
-  /** Provoked: it must block this attacking creature this combat if able (CR 702.39a). Cleared at end of combat. */
-  provokedBy?: { id: ObjectId; zc: number };
+  /**
+   * Provoked: it must block this attacking creature this combat if able (CR 702.39a), cleared at end of combat; or,
+   * with `turn`, any combat of that turn ("target creature blocks ~ this turn if able").
+   */
+  provokedBy?: { id: ObjectId; zc: number; turn?: number };
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
   blocking?: ObjectId[];
   blockedBy?: ObjectId[];
@@ -459,6 +462,8 @@ export type PendingDecision =
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string }
+  /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order"; cards: ObjectId[]; source: string; owner?: PlayerId }
@@ -767,6 +772,8 @@ export type Action =
   | { type: "mulligan"; player: PlayerId; keep: boolean }
   /** Answer to bottomCards: these cards go on the bottom of the library, the first one lowest. */
   | { type: "bottomCards"; player: PlayerId; objectIds: ObjectId[] }
+  /** Answers "handToTop": the cards from the hand, the first one ending on top of the library. */
+  | { type: "handToTop"; player: PlayerId; objectIds: ObjectId[] }
   /** Exile a card from your hand with suspend, paying its suspend cost: a special action (CR 116.2f, 702.62a). */
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
   /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */

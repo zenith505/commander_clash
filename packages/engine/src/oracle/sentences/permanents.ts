@@ -41,6 +41,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "continuous", what, mods: [{ kind: "allMustBlock" }], duration: "endOfTurn" }] : null;
   }
+  // "Target creature blocks ~ this turn if able" (Matsu-Tribe Decoy), "target creature defending player controls blocks
+  // it this combat if able" in ~'s own attack trigger: a blocking requirement (CR 509.1c), like provoke's.
+  if ((m = /^((?:up to one )?target .+?) blocks (~|it) this (turn|combat) if able$/i.exec(s)) && (m[2] === "~" || ctx.selfIt)) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
+  }
+  // "Target creature blocks this turn if able": any attacking creature (CR 509.1c).
+  if ((m = /^(target .+?|it|that creature|each creature(?: your opponents control)?) blocks this turn if able$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "mustBlock" }], duration: "endOfTurn" }] : null;
+  }
   // Recruit (CR 701.70a): "recruit", "you recruit".
   if (/^(?:you )?recruit$/i.test(s)) return [{ type: "recruit" }];
   // "If that creature would die this turn, exile it instead" (CR 614.1a), for what an earlier sentence targeted

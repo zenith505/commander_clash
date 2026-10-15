@@ -106,6 +106,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
+    // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
+    if (pend.kind === "handToTop") return [{ type: "handToTop", player: pid, objectIds: chooseDiscards(s, pid, pend.count).reverse() }];
     // Free from the hand: the most expensive card is the best deal.
     // From an opponent's revealed hand: take their most expensive card.
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
@@ -1705,6 +1707,17 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     if (!at || used.has(b.id) || blockProblem(s, b, at)) continue;
     const helpers = mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x)).slice(0, blockersNeeded(s, at) - 1);
     if (helpers.length < blockersNeeded(s, at) - 1) continue;
+    for (const o of [b, ...helpers]) {
+      used.add(o.id);
+      blocks.push({ blocker: o.id, attacker: at.id });
+    }
+  }
+  // One that must block this turn blocks the attacker it fares best against (CR 509.1c).
+  for (const b of mine.filter((o) => characteristics(s, o).mustBlock && !used.has(o.id))) {
+    const able = incoming.filter((at) => !blockProblem(s, b, at) && mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).length >= blockersNeeded(s, at) - 1);
+    const at = able.find((a) => toughness(s, b) > power(s, a)) ?? able.find((a) => power(s, b) >= toughness(s, a)) ?? able[0];
+    if (!at) continue;
+    const helpers = mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x)).slice(0, blockersNeeded(s, at) - 1);
     for (const o of [b, ...helpers]) {
       used.add(o.id);
       blocks.push({ blocker: o.id, attacker: at.id });

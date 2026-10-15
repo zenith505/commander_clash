@@ -365,6 +365,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "mulligan":
       declareMulligan(s, p, action.keep);
       break;
+    case "handToTop":
+      chooseHandToTop(s, p, action.objectIds);
+      break;
     case "bottomCards":
       bottomCards(s, p, action.objectIds);
       break;
@@ -1183,7 +1186,7 @@ function advanceStep(s: GameState): void {
   // this combat only (CR 702.39a).
   if (s.step === "endCombat") {
     for (const o of attackersAndBlockers(s)) clearCombat(o);
-    for (const id of s.battlefield) obj(s, id).provokedBy = undefined;
+    for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
   beginStep(s, next);
@@ -2606,6 +2609,17 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   continueResolution(s);
 }
 
+/** Brainstorm's "put two cards from your hand on top of your library in any order": the cards, top one first. */
+function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "handToTop" || pend.player !== p.id || !r) throw new RulesError("no cards to put on top");
+  if (new Set(ids).size !== pend.count || ids.length !== pend.count || ids.some((id) => !p.hand.includes(id))) throw new RulesError(`choose exactly ${pend.count} card(s) from your hand`);
+  ((r.scratch ??= {}).chosen ??= {})[p.id] = ids;
+  s.pending = null;
+  continueResolution(s);
+}
+
 /** "Sacrifice a creature", "return a land you control": the permanents this player picked (see the "pick" effect). */
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
@@ -3300,7 +3314,7 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
 export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked);
-  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o));
+  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o) || characteristics(s, o).mustBlock);
   if (!demanding.length && !provoked.length) return null;
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
@@ -3319,6 +3333,13 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     if (mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length < blockersNeeded(s, at) - 1) continue;
     return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
   }
+  // "Target creature blocks this turn if able": it blocks some attacking creature if one it can block, with another
+  // creature beside it against menace (CR 509.1c).
+  for (const b of mine) {
+    if (!characteristics(s, b).mustBlock || blocking.has(b.id)) continue;
+    if (incoming.some((at) => !blockProblem(s, b, at) && mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length >= blockersNeeded(s, at) - 1))
+      return `${characteristics(s, b).name} must block this turn if able`;
+  }
   for (const at of demanding) {
     const ac = characteristics(s, at);
     const could = mine.filter((b) => !blockProblem(s, b, at));
@@ -3336,6 +3357,7 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
 /** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
 export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
   const at = b.provokedBy && s.objects[b.provokedBy.id];
+  if (b.provokedBy?.turn !== undefined && b.provokedBy.turn !== s.turn) return undefined;
   return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === b.provokedBy!.zc && at.attacking === controllerOf(s, b) ? at : undefined;
 }
 

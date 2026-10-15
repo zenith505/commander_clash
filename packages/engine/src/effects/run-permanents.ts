@@ -1,6 +1,6 @@
 import type { Effect, TokenSpec } from "../abilities";
 import { defOf, isType, objIsType, power, toughness } from "../cards";
-import { draw, log, moveObject, obj, player, tapPermanent, untapPermanent } from "../game";
+import { clearCombat, draw, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
@@ -47,6 +47,14 @@ export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun";
 /** Changing permanents: tap, counters, connive, explore, renown, evolve, continuous effects, attaching. */
 export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "removeFromCombat":
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield" || (o.attacking === undefined && o.blocking === undefined)) continue;
+        removeFromCombat(s, o);
+        clearCombat(o);
+        log(s, `${src} removes ${defOf(s, o).name} from combat.`);
+      }
+      return;
     case "tap":
     case "untap":
       for (const o of objects(s, e.what, ctx)) {

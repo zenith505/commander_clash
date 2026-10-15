@@ -16,6 +16,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "tap", what }, { type: "skipUntap", what }] : null;
   }
+  // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
+  if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
+    if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;
+    const what = parseObject(m[2] ?? m[3]!, ctx);
+    if (!what || isGroup(what)) return null;
+    return [...(m[1] ? [{ type: "untap" as const, what }] : []), { type: "removeFromCombat", what }];
+  }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);

@@ -427,6 +427,8 @@ export type Effect =
    * what it enchants (CR 303.4f).
    */
   | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; may: boolean; any?: boolean }
+  /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
+  | { type: "removeFromCombat"; what: ObjRef }
   | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean; /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */ attachToSubject?: boolean }
   /** "Put target card from your graveyard on top of / on the bottom of its owner's library". */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }

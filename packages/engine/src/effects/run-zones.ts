@@ -358,6 +358,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${player(s, o.attacking).name}` : ""} (ninjutsu).`);
       return;
     }
+    case "warpExile":
+      for (const o of objects(s, { ref: "subject" }, ctx)) {
+        log(s, `${defOf(s, o).name} is exiled (warp). Its owner may cast it after this turn.`);
+        moveObject(s, o.id, "exile");
+        // The card, while it stays exiled (CR 702.185a, 400.7); a token has stopped existing (CR 111.8).
+        if (o.zone === "exile" && !o.isToken) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "warp", turn: s.turn };
+      }
+      return;
     case "impulse": {
       // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
       const p = player(s, ctx.controller);

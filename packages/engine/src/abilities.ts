@@ -69,6 +69,8 @@ export type Count =
   | { kind: "life"; who: PlayerRef }
   /** "Your speed": 0 if you have none (CR 702.179f). */
   | { kind: "speed" }
+  /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
+  | { kind: "party" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
@@ -239,6 +241,8 @@ export interface TokenSpec {
   keywords: string[];
   /** Rules text of other abilities, e.g. a Treasure's "{T}, Sacrifice this token: Add one mana of any color." */
   abilities?: string;
+  /** A double-faced token's back face (CR 111.10i): an Incubator's Phyrexian. */
+  back?: TokenSpec;
 }
 
 /**
@@ -250,6 +254,7 @@ export type Modification =
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
   | { kind: "setTypes"; types: string[]; subtypes: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
+  | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   | { kind: "setColors"; colors: Color[] } // layer 5
   | { kind: "addKeywords"; keywords: string[] } // layer 6
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
@@ -274,10 +279,16 @@ export type Modification =
   | { kind: "doesntUntap" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
   | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
+  /** Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able. */
+  | { kind: "goad" }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   | { kind: "maxOneBlocker" }
+  /** "Its activated abilities can't be activated" (Arrest), mana abilities included (CR 605.1a) unless `exceptMana`. */
+  | { kind: "cantActivate"; exceptMana?: true }
+  /** "Can't be blocked except by three or more creatures" (CR 509.1b; menace is the same with two, 702.111b). */
+  | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Creatures with power less than ~'s power can't block it" (CR 509.1b). */
@@ -338,12 +349,14 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** "If you have a full party" (CR 700.8a): four creatures in your party. */
+  | { kind: "fullParty" }
   /** "If you don't control a Ring-bearer" (CR 701.54e); `self`: "as long as ~ is your Ring-bearer". */
   | { kind: "ringBearer"; not?: true; self?: true }
   /** Max speed (CR 702.178a, 702.179e): your speed is 4. */
@@ -459,6 +472,8 @@ export type Effect =
   | { type: "suspendCast" }
   /** "Exile ~ with three time counters on it": the resolving spell suspends itself again (Arc Blade). */
   | { type: "exileSelfWithTime"; n: number }
+  /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
+  | { type: "warpExile" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
@@ -481,8 +496,12 @@ export type Effect =
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
   | { type: "evolve" }
   /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game"; notSource?: boolean }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn"; notSource?: boolean }
   | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
+  /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
+  | { type: "transformSelf" }
+  /** Reconfigure's "Unattach this permanent" (CR 702.151a, 701.3d). */
+  | { type: "unattachSelf" }
   /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
   /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
   | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean }
@@ -493,8 +512,10 @@ export type Effect =
    */
   | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" }
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
-  | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean }
+  | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean; /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */ counters?: { counter: CounterKind; n: Amount } }
   | { type: "mill"; who: PlayerRef; n: Amount }
+  /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
+  | { type: "exileTop"; who: PlayerRef; n: Amount }
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   | { type: "surveil"; n: Amount } // CR 701.25
@@ -564,7 +585,11 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop"; rest: "graveyard" | "bottom"; reveal: boolean }
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop" | "battlefield"; rest: "graveyard" | "bottom" | "shuffle"; reveal: boolean; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
+  /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
+  | { type: "venture"; undercity?: true }
+  /** "You take the initiative" (CR 726). */
+  | { type: "takeInitiative"; who: PlayerRef }
   /**
    * "Choose a creature type." / "Choose a color." while it resolves: later instructions use the
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
@@ -621,6 +646,7 @@ export type TriggerEvent =
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
   | "monarchEndStep" // the monarch's inherent abilities (CR 725.2): no source, fired by the game
+  | "ventureRoom" // a dungeon's room abilities (CR 309.4c) and the initiative's (CR 726.2), fired by the game
   | "monarchDamaged"
   /** The Ring's abilities (CR 701.54c), from the player's emblem: fired by the game for their Ring-bearer. */
   | "ringBearerAttacks"
@@ -856,10 +882,10 @@ export type AdditionalCost =
  * going anywhere else when it leaves the stack.
  */
 /**
- * Alternative costs (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a) and bestow (CR 702.103a) from your hand;
- * madness (CR 702.35a) only as its trigger resolves, from exile.
+ * Alternative costs (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a), bestow (CR 702.103a) and blitz (CR 702.152a);
+ * warp (CR 702.185a) only from your hand; madness (CR 702.35a) only as its trigger resolves, from exile.
  */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness";
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp";
 
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
 export interface CastFromGraveyard {
@@ -979,18 +1005,24 @@ export interface CompiledCard {
   buyback?: string;
   /** Rebound (CR 702.88). */
   rebound?: boolean;
-  /** Evoke, dash and bestow (CR 702.74, 702.109, 702.103): alternative costs for casting it from your hand. */
+  /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
   altCosts?: { kind: AltCostKind; mana: string }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */
   suspend?: { n: number; cost: string };
+  /** Reconfigure (CR 702.151): attached to a creature, this Equipment isn't a creature (702.151b). */
+  reconfigure?: true;
+  /** Plot [cost] (CR 702.170a): exile it from your hand as a special action, and cast it free on a later turn (702.170d). */
+  plot?: string;
   /** Dredge N (CR 702.52a): in your graveyard, a draw may be replaced by milling N and returning it to your hand. */
   dredge?: number;
   /** Casualty N (CR 702.153a): you may sacrifice a creature with power N or greater as you cast it, to copy it. */
   casualty?: number;
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
+  /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */
+  assist?: true;
   /** Morph, megamorph, disguise (CR 702.37, 702.168): cast face down for {3}, turned face up for `cost`. */
   faceDownCast?: { kind: FaceDownKind; cost: string };
   /** Keywords spelled out only in the text ("Protection from black", "Toxic 2"); see textKeywords in oracle.ts. */

@@ -1,5 +1,6 @@
 // Sentences about damage, drawing, life, energy, the monarch, prevention, and "at end of combat" delayed triggers.
 
+import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { DamageRecipient, Effect, ObjRef, PlayerRef } from "../../abilities";
 import { NUMX, amt, plainMana, sacrificeSelf } from "../words";
@@ -55,6 +56,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
+  // The initiative (CR 726), which ventures into Undercity; and venturing into Undercity itself (CR 701.49d). Plain
+  // "venture into the dungeon" lets its player pick a dungeon that isn't modeled yet (see oracle/dungeons.ts).
+  if (/^(?:You )?take the initiative$/i.test(s)) return dungeonSupported(UNDERCITY) ? [{ type: "takeInitiative", who: { ref: "you" } }] : null;
+  if (/^(?:You )?venture into Undercity$/i.test(s)) return dungeonSupported(UNDERCITY) ? [{ type: "venture", undercity: true }] : null;
+  if (/^(?:You )?venture into the dungeon$/i.test(s)) return DUNGEONS.length > 1 && DUNGEONS.every(dungeonSupported) ? [{ type: "venture" }] : null;
   // The Ring tempts you (CR 701.54).
   if (/^the Ring tempts you$/i.test(s)) return [{ type: "ringTempts" }];
   if (/^Target player becomes the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "target", index: addTarget(ctx, { kind: "player", text: "target player" }) } }];

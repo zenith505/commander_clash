@@ -10,6 +10,8 @@ import {
   delveRoom,
   graveyardCast,
   mayPlayFromExile,
+  assistedRemaining,
+  dungeonByName,
   commanderTax,
   abilitiesOf,
   controllerOf,
@@ -54,6 +56,9 @@ import {
   madnessCastOf,
   planSuspend,
   suspendProblem,
+  planPlot,
+  plotProblem,
+  plottedCast,
   compileCard,
   kickerName,
   canEnterUntapped,
@@ -193,6 +198,8 @@ type CastDraft = {
   delve?: string[];
   /** The creature sacrificed for casualty, or none (CR 702.153a). */
   casualty?: string[];
+  /** Assist (CR 702.132a): the player asked to help pay its generic mana. */
+  assist?: PlayerId;
 };
 
 /** Choosing cards to exile for delve: any number up to `max`. */
@@ -474,6 +481,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setDelvePick({ draft: d, label: card.name, max, candidates, chosen: candidates.slice(0, need) });
       }
     }
+    // Assist: the other player chooses first, then you pay the rest (CR 702.132a).
+    if (d.assist !== undefined)
+      return dispatch([{ type: "castSpell", player: HUMAN, objectId: d.objectId, targets: d.targets, modes: d.modes, ...(d.convoke?.length ? { convoke: d.convoke } : {}), ...(d.x ? { x: d.x } : {}), ...choices, assist: d.assist }]);
     dispatch(
       planCast(s, HUMAN, d.objectId, d.targets, d.modes, d.convoke ?? "auto", d.x, choices) ?? [
         { type: "castSpell", player: HUMAN, objectId: d.objectId, targets: d.targets, modes: d.modes, ...(d.convoke?.length ? { convoke: d.convoke } : {}), ...(d.x ? { x: d.x } : {}), ...choices },
@@ -599,7 +609,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
-    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend)) return setMenu(o.id);
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && compileCard(cardOf(s, o.id)).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
@@ -799,6 +809,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 startCast(menu, undefined, undefined, alt);
               }}
+              onCastAssist={(pid) => {
+                setMenu(null);
+                continueCast({ objectId: menu, assist: pid });
+              }}
               onCastFaceDown={() => {
                 setMenu(null);
                 dispatch(planCast(s, HUMAN, menu, undefined, undefined, "auto", undefined, { faceDown: true }) ?? [{ type: "castSpell", player: HUMAN, objectId: menu, faceDown: true }]);
@@ -806,6 +820,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onSuspend={() => {
                 setMenu(null);
                 dispatch(planSuspend(s, HUMAN, menu) ?? [{ type: "suspend", player: HUMAN, objectId: menu }]);
+              }}
+              onPlot={() => {
+                setMenu(null);
+                dispatch(planPlot(s, HUMAN, menu) ?? [{ type: "plot", player: HUMAN, objectId: menu }]);
               }}
               onTurnFaceUp={() => {
                 setMenu(null);
@@ -939,12 +957,14 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness" };
+const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
   bestow: "an Aura on a creature; a creature again if it's ever unattached",
   madness: "",
+  blitz: "haste, and you draw a card when it dies; sacrificed at the end step",
+  warp: "exiled at the end step; you may cast it from exile on a later turn",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape" };
@@ -983,6 +1003,12 @@ function canCastWithTaps(s: GameState, id: string, convoke?: string[]) {
   // With delve's help: as many cards from your graveyard as it can use (CR 702.66a).
   const room = convoke ? 0 : delveRoom(s, HUMAN, id);
   return room > 0 && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { delve: s.players[HUMAN]!.graveyard.filter((c) => c !== id).slice(0, room) }) !== null;
+}
+
+/** Could you begin casting this card now if mana were no object? With assist, another player may pay some of it. */
+function canCastNowIgnoringMana(s: GameState, id: string) {
+  const problem = castProblem(s, HUMAN, id);
+  return !problem || /not enough mana/.test(problem);
 }
 
 /** Could you cast this card from your hand for its evoke or dash cost now, tapping mana as needed? */
@@ -1526,6 +1552,24 @@ function Seat({
         {s.monarch === pid && (
           <span className="monarch" title="The monarch: draws a card at the beginning of their end step. Deal combat damage to them to take it.">
             👑 Monarch
+          </span>
+        )}
+        {s.initiative === pid && (
+          <span className="monarch" title="The initiative: ventures into Undercity as they take it and at the beginning of their upkeep. Deal combat damage to them to take it.">
+            🗝 Initiative
+          </span>
+        )}
+        {p.dungeon && (
+          <span
+            className="monarch"
+            title={`${p.dungeon.name}, in ${dungeonByName(p.dungeon.name)?.rooms[p.dungeon.room]?.name ?? "?"}. Rooms: ${(dungeonByName(p.dungeon.name)?.rooms ?? []).map((r) => `${r.name}: ${r.text}`).join(" | ")}${p.completedDungeons?.length ? `. Completed: ${p.completedDungeons.join(", ")}` : ""}`}
+          >
+            🏰 {dungeonByName(p.dungeon.name)?.rooms[p.dungeon.room]?.name}
+          </span>
+        )}
+        {!p.dungeon && !!p.completedDungeons?.length && (
+          <span className="monarch" title={`Completed dungeons: ${p.completedDungeons.join(", ")}`}>
+            🏰 {p.completedDungeons.length} completed
           </span>
         )}
         {p.citysBlessing && (
@@ -2104,8 +2148,10 @@ function AbilityMenu({
   onPlay,
   onCastVia,
   onCastAlt,
+  onCastAssist,
   onCastFaceDown,
   onSuspend,
+  onPlot,
   onTurnFaceUp,
   onClose,
 }: {
@@ -2119,10 +2165,14 @@ function AbilityMenu({
   onCastVia: (via: CastFromGraveyardKind) => void;
   /** For a card in hand: cast it for its evoke or dash cost. */
   onCastAlt: (alt: AltCostKind) => void;
+  /** For a card with assist: cast it, asking this player to help pay (CR 702.132a). */
+  onCastAssist: (pid: PlayerId) => void;
   /** For a card in hand with morph or disguise: cast it face down for {3}. */
   onCastFaceDown: () => void;
   /** For a card in hand with suspend: exile it with time counters (CR 702.62a). */
   onSuspend: () => void;
+  /** For a card in hand with plot: exile it, to cast it free on a later turn (CR 702.170a). */
+  onPlot: () => void;
   /** For your face-down permanent: turn it face up. */
   onTurnFaceUp: () => void;
   onClose: () => void;
@@ -2133,6 +2183,7 @@ function AbilityMenu({
   const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
+  const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
   const upCost = o.zone === "battlefield" ? faceUpCost(s, o) : undefined;
   const inYard = o.zone === "graveyard";
   const land = isLand(s, objectId);
@@ -2148,7 +2199,7 @@ function AbilityMenu({
       )}
       {inHand && (
         <button disabled={!playable} onClick={() => onPlay()}>
-          {land ? (choice ? "Play it tapped" : "Play it") : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
+          {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
       {inHand &&
@@ -2161,9 +2212,24 @@ function AbilityMenu({
             </button>
           );
         })}
+      {inHand &&
+        !land &&
+        compileCard(d).assist &&
+        s.turnOrder
+          .filter((pid) => pid !== HUMAN && !s.players[pid]!.lost)
+          .map((pid) => (
+            <button key={`assist-${pid}`} className="ghost" disabled={!canCastNowIgnoringMana(s, objectId)} title={`Assist: ${s.players[pid]!.name} may pay for some of its generic mana, then you pay the rest.`} onClick={() => onCastAssist(pid)}>
+              Cast, asking {s.players[pid]!.name} to assist
+            </button>
+          ))}
       {suspend && (
         <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.n} time counter${suspend.n === 1 ? "" : "s"}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
           Suspend {suspend.n} <ManaCost cost={suspend.cost} size="sm" />
+        </button>
+      )}
+      {plot && (
+        <button disabled={!planPlot(s, HUMAN, objectId)} title={plotProblem(s, HUMAN, objectId) ?? "Exile it now. On a later turn you may cast it without paying its mana cost, during your main phase."} onClick={onPlot}>
+          Plot <ManaCost cost={plot} size="sm" />
         </button>
       )}
       {faceDownCast && (
@@ -2452,6 +2518,59 @@ function Controls({
               <ManaCost cost={`{${c}}`} size="sm" /> {COLOR_NAMES[c]}
             </button>
           ))}
+      </div>
+    );
+  if (pending?.kind === "assist" && pending.player === HUMAN) {
+    const caster = s.players[pending.caster]!.name;
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> {caster} asks you to help pay for it (assist): up to {"{"}
+          {pending.max}
+          {"}"} of its generic mana.
+        </span>
+        <button className="ghost" onClick={() => dispatch([{ type: "assist", player: HUMAN, n: 0 }])}>
+          Don&apos;t help
+        </button>
+        {Array.from({ length: pending.max }, (_, i) => i + 1).map((n) => {
+          const taps = planMana(s, HUMAN, parseManaCost(`{${n}}`));
+          return (
+            <button key={n} disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "assist", player: HUMAN, n }])}>
+              Pay <ManaCost cost={`{${n}}`} size="sm" />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  if (pending?.kind === "assistCast" && pending.player === HUMAN) {
+    const rest = assistedRemaining(s);
+    const taps = rest && planMana(s, HUMAN, rest.cost, rest.extra);
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> {pending.n ? `${s.players[pending.helper]!.name} pays {${pending.n}}.` : `${s.players[pending.helper]!.name} doesn't help.`} Pay the rest?
+        </span>
+        <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "finishAssistedCast", player: HUMAN }])}>
+          Cast it
+        </button>
+        <button className="ghost" onClick={() => dispatch([{ type: "finishAssistedCast", player: HUMAN, cancel: true }])}>
+          Don&apos;t cast it
+        </button>
+      </div>
+    );
+  }
+  if (pending?.kind === "chooseOption" && pending.what === "venture" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> {pending.labels ? "venture into which room?" : "venture into which dungeon?"}
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} className="ghost" title={pending.labels?.[i]} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o}
+          </button>
+        ))}
       </div>
     );
   if (pending?.kind === "chooseOption")
@@ -2917,7 +3036,7 @@ function Hand({ s, ids, cardProps, tucked, onToggle }: { s: GameState; ids: stri
                 className="fan-slot"
                 style={{ ["--rot" as string]: `${off * step}deg`, ["--drop" as string]: (off / Math.max(1, mid)) ** 2 * 0.06 }}
               >
-                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null)} />
+                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).plot && planPlot(s, HUMAN, id) !== null)} />
               </div>
             );
           })}

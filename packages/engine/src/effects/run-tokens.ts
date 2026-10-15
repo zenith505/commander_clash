@@ -72,7 +72,8 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const k = tokensToCreate(s, pid, e.token, n);
         // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
         const defender = e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
-        for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: e.tapped || e.attacking, attacking: defender });
+        const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
+        for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: e.tapped || e.attacking, attacking: defender, ...(counters ? { counters } : {}) });
         if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${e.tapped || e.attacking ? " tapped" : ""}${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
       }
       return;
@@ -82,7 +83,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
 
 export function tokenDef(t: TokenSpec): CardDef {
   return {
-    oracleId: `token:${t.name}:${t.power ?? ""}/${t.toughness ?? ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}`,
+    oracleId: `token:${t.name}:${t.power ?? ""}/${t.toughness ?? ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
     name: `${t.name} Token`,
     manaCost: "",
     cmc: 0,
@@ -95,13 +96,15 @@ export function tokenDef(t: TokenSpec): CardDef {
     colors: t.colors,
     colorIdentity: t.colors,
     keywords: t.keywords,
+    ...(t.back ? { tokenBack: tokenDef(t.back) } : {}),
   };
 }
 
-export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId } = {}) {
+export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number> } = {}) {
   const o = newObject(s, tokenDef(t), pid, "exile");
   o.isToken = true;
-  moveObject(s, o.id, "battlefield", opts.tapped ? { tapped: true } : {}); // enters like any permanent, so ETB triggers see it
+  // It enters like any permanent, so ETB triggers see it, with any counters it's created with (CR 122.6, 614.1c).
+  moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
   if (opts.attacking !== undefined && o.zone === "battlefield") o.attacking = opts.attacking;
   s.resolving?.created?.push(o.id);
 }

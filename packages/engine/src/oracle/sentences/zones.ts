@@ -14,6 +14,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
 
   // Graveyards. Cards in a graveyard (CR 109.2a): returning them, reanimating them, exiling them.
+  // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j): the card itself,
+  // while it's still the object whose ability was activated (CR 400.7).
+  if (ctx.selfCard && ctx.activated && (m = /^Return ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s)))
+    return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all) graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =
@@ -66,11 +70,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   }
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.
-  if ((m = /^(.+?) can't (block|attack|attack or block|be blocked) this turn$/i.exec(s))) {
+  // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
+  if ((m = /^(.+?) can't (block|attack|attack or block|be blocked) (this turn|until your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods: Modification[] =
       m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : m[2] === "be blocked" ? [{ kind: "cantBeBlocked" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
-    return what ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
+    return what ? [{ type: "continuous", what, mods, duration: m[3] === "this turn" ? "endOfTurn" : "yourNextTurn" }] : null;
   }
   // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
   // of their choice", "return a land you control to its owner's hand" (CR 701.21).

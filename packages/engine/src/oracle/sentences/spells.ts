@@ -22,6 +22,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
   }
+  // "That player exiles the top card of their library" (ingest's text); "you" exiling your own goes through impulse draw.
+  if ((m = new RegExp(`^(.+?) exiles the top (card|${NUMX} cards) of (?:their|his or her) library$`, "i").exec(s)) && !/^you$/i.test(m[1]!)) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "exileTop", who, n: m[2] === "card" ? 1 : amt(m[3]!) }] : null;
+  }
   // Discarding (CR 701.9): "Target player discards two cards", "Each opponent discards a card at random", "Discard a card"
   if ((m = new RegExp(`^Discard ${NUMX} cards?( at random)?$`, "i").exec(s))) return [{ type: "discard", who: { ref: "you" }, n: amt(m[1]!), random: !!m[2] }];
   if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {

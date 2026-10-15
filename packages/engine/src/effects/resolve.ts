@@ -9,6 +9,7 @@ import { cardSource, objectSource, type DamageSource } from "../damage";
 import type { CardDef, Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, StackItem, TriggerEventInfo } from "../types";
 import { objectMatches, bindChosen, sourceQuality, isLegalTarget, lesserPowerOk } from "./targeting";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
+import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
 import { runTokensEffect, createToken } from "./run-tokens";
@@ -334,6 +335,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "suspendTick":
     case "suspendCast":
     case "exileSelfWithTime":
+    case "warpExile":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":
@@ -352,6 +354,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "explore":
     case "continuous":
     case "attach":
+    case "unattachSelf":
+    case "transformSelf":
       return runPermanentsEffect(s, e, ctx, src);
     case "becomeCopy":
       return runCopiesEffect(s, e, ctx);
@@ -367,6 +371,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterSpell":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
+    case "exileTop":
     case "discard":
     case "scry":
     case "surveil":
@@ -375,6 +380,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "search":
     case "dig":
       return runLibraryEffect(s, e, ctx, src);
+    case "venture":
+    case "takeInitiative":
+      return runDungeonsEffect(s, e, ctx, src);
     case "may":
     case "cumulativeUpkeep":
     case "choose":

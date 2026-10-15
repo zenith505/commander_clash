@@ -1,17 +1,19 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
-import { autoCrew, planActivate, planCast, planMana, planSuspend, planTurnFaceUp } from "./autopay";
+import { autoCrew, planActivate, planCast, planMana, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes } from "./modes";
 import {
   abilityProblem,
+  assistedRemaining,
   returnCandidates,
   attackProblem,
   blockProblem,
   provokerOf,
   tapCostCandidates,
   maxBlocks,
+  blockersNeeded,
   canEnterUntapped,
   conditionHolds,
   isSummoningSick,
@@ -118,6 +120,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = ok.sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - worth(s, pid, obj(s, a)) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
+    // Assist (CR 702.132a): everyone else is an opponent, so we don't help pay for their spells.
+    if (pend.kind === "assist") return [{ type: "assist", player: pid, n: 0 }];
+    if (pend.kind === "assistCast") {
+      const rest = assistedRemaining(s);
+      const taps = rest && planMana(s, pid, rest.cost, rest.extra);
+      return taps ? [...taps, { type: "finishAssistedCast", player: pid }] : [{ type: "finishAssistedCast", player: pid, cancel: true }];
+    }
+    if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
@@ -193,12 +203,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
       .sort((a, b) => b.mv - a.mv);
-    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile"));
+    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && /Turn$/.test(obj(s, a.objectId).mayPlay?.until ?? "")));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
     // Suspend what we can't cast now (CR 702.62a).
     const sus = chooseSuspend(s, pid);
     if (sus) return sus;
+    // Plot what we can't cast now with the mana left at the end of our turn (CR 702.170a).
+    if (s.step === "main2") {
+      const plot = choosePlot(s, pid);
+      if (plot) return plot;
+    }
     // Unearth a creature to attack with this turn (CR 702.84a).
     if (s.step === "main1") {
       const dig = chooseUnearth(s, pid);
@@ -456,6 +471,29 @@ function chooseSuspend(s: GameState, pid: PlayerId): Action[] | null {
     if (plan) return plan;
   }
   return null;
+}
+
+/** A card to plot (CR 702.170a) with mana we'd otherwise not use this turn: the biggest one, cast free on a later turn. */
+function choosePlot(s: GameState, pid: PlayerId): Action[] | null {
+  const options = player(s, pid)
+    .hand.filter((id) => compileCard(defOf(s, obj(s, id))).plot)
+    .sort((a, b) => mv(s, b) - mv(s, a));
+  for (const id of options) {
+    const plan = planPlot(s, pid, id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Which room to venture into, or which dungeon to start (CR 701.49): damage and bodies first, the counters only with a
+ * creature to put them on, goad only with an opponent's creature to goad.
+ */
+function chooseRoom(s: GameState, pid: PlayerId, options: string[]): string {
+  const creatures = (mine: boolean) => s.battlefield.some((id) => objIsType(s, obj(s, id), "Creature") && (controllerOf(s, obj(s, id)) === pid) === mine);
+  const score = (room: string) =>
+    ({ "Trap!": 5, Catacombs: 4, Forge: creatures(true) ? 4 : 0, Stash: 3, Archives: 3, "Lost Well": 2, Arena: creatures(false) ? 2 : 0 })[room] ?? 1;
+  return [...options].sort((a, b) => score(b) - score(a))[0]!;
 }
 
 /**
@@ -996,6 +1034,9 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
+      if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
+      // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
+      if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
@@ -1279,6 +1320,14 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
       .map((o) => ({ attacker: o.id, defender: target })),
     ...must.map((o) => ({ attacker: o.id, defender: attackProblem(s, o, target) ? opps.find((d) => !attackProblem(s, o, d))! : target })),
   ];
+  // A goaded creature attacks someone other than who goaded it, if it can (CR 701.15b).
+  attacks = attacks.map((a) => {
+    const o = obj(s, a.attacker);
+    const by = characteristics(s, o).goadedBy;
+    if (!by.includes(a.defender)) return a;
+    const other = opps.find((d) => !by.includes(d) && !attackProblem(s, o, d));
+    return other !== undefined ? { ...a, defender: other } : a;
+  });
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   return { type: "declareAttackers", player: pid, attacks };
@@ -1298,7 +1347,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // must be blocked if able gets our sturdiest blocker (two against menace).
   for (const at of incoming.filter((a) => characteristics(s, a).allMustBlock && !characteristics(s, a).maxOneBlocker)) {
     const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
-    if (able.length < (objHasKeyword(s, at, "Menace") ? 2 : 1)) continue;
+    if (able.length < blockersNeeded(s, at)) continue;
     for (const b of able) {
       used.add(b.id);
       blocks.push({ blocker: b.id, attacker: at.id });
@@ -1308,16 +1357,16 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   for (const b of mine) {
     const at = provokerOf(s, b);
     if (!at || used.has(b.id) || blockProblem(s, b, at)) continue;
-    const helper = objHasKeyword(s, at, "Menace") ? mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x))[0] : undefined;
-    if (objHasKeyword(s, at, "Menace") && !helper) continue;
-    for (const o of [b, ...(helper ? [helper] : [])]) {
+    const helpers = mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x)).slice(0, blockersNeeded(s, at) - 1);
+    if (helpers.length < blockersNeeded(s, at) - 1) continue;
+    for (const o of [b, ...helpers]) {
       used.add(o.id);
       blocks.push({ blocker: o.id, attacker: at.id });
     }
   }
   for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {
     const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at)).sort((a, b) => toughness(s, b) - toughness(s, a));
-    const n = objHasKeyword(s, at, "Menace") ? 2 : 1;
+    const n = blockersNeeded(s, at);
     if (able.length < n) continue;
     for (const b of able.slice(0, n)) {
       used.add(b.id);
@@ -1326,7 +1375,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   }
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
     if (blocks.some((b) => b.attacker === at.id)) continue;
-    if (objHasKeyword(s, at, "Menace") || characteristics(s, at).cantBeBlocked) continue;
+    if (blockersNeeded(s, at) > 1 || characteristics(s, at).cantBeBlocked) continue;
     const canBlock = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
     const good = canBlock.find((b) => toughness(s, b) > power(s, at) && !objHasKeyword(s, at, "Deathtouch"));
     const trade = canBlock.find((b) => power(s, b) >= toughness(s, at));
@@ -1340,7 +1389,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // as it survives all of them together.
   const hurt = (b: GameObject) => blocks.filter((x) => x.blocker === b.id).reduce((n, x) => n + (objHasKeyword(s, obj(s, x.attacker), "Deathtouch") ? Infinity : Math.max(0, power(s, obj(s, x.attacker)))), 0);
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
-    if (blocks.some((b) => b.attacker === at.id) || objHasKeyword(s, at, "Menace") || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
+    if (blocks.some((b) => b.attacker === at.id) || blockersNeeded(s, at) > 1 || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
     const extra = mine.find((b) => used.has(b.id) && blocks.filter((x) => x.blocker === b.id).length < maxBlocks(s, b) && !blockProblem(s, b, at) && toughness(s, b) > hurt(b) + power(s, at));
     if (extra) blocks.push({ blocker: extra.id, attacker: at.id });
   }

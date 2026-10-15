@@ -64,15 +64,18 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const symbols = [...costs.replace(/Pay (?:\{E\})+|Pay \w+ \{E\}/, "").matchAll(/\{([^}]+)\}/g)].map((x) => x[1]!);
   if (symbols.some((x) => x === "Q" || x === "E")) return "fail";
   const tap = symbols.includes("T");
-  // "{3}, Exile this card from your graveyard: ...": it works only from your graveyard (CR 113.6j).
-  const fromYard = /Exile ~ from your graveyard/.test(costs);
+  // "{3}, Exile this card from your graveyard: ...", "{2}{B}: Return this card from your graveyard to your hand":
+  // it works only from your graveyard (CR 113.6j), where "~" is the card.
+  const returnsSelf = /^Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)\./.test(effectText);
+  const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf;
   if (fromYard && (tap || /Sacrifice ~|Remove /.test(costs))) return "fail";
+  if (returnsSelf && /Exile ~ from your graveyard/.test(costs)) return "fail";
   const manaCost = symbols
     .filter((x) => x !== "T")
     .map((x) => `{${x}}`)
     .join("");
   // "Sacrifice ~: It deals damage equal to its power to ...": "it" is the source.
-  const body = parseBody(effectText.replace(/^It (?=deals\b)/, "~ "), { activated: true });
+  const body = parseBody(effectText.replace(/^It (?=deals\b)/, "~ "), { activated: true, ...(returnsSelf ? { selfCard: true } : {}) });
   if (!body) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
@@ -83,7 +86,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     sorcerySpeed,
     body,
     text: raw,
-    ...(fromYard ? { zone: "graveyard" as const, exileSelf: true } : {}),
+    ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf ? {} : { exileSelf: true }) } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),

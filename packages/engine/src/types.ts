@@ -28,6 +28,8 @@ export interface CardDef {
   colorIdentity: Color[];
   keywords: string[];
   producedMana?: ManaType[];
+  /** A double-faced token's back face (CR 111.10i, 712): what it becomes as it transforms (CR 701.27a). */
+  tokenBack?: CardDef;
   imageUrl?: string;
   artUrl?: string;
 }
@@ -88,9 +90,11 @@ export interface GameObject {
   exileIfDiesTurn?: number;
   /**
    * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
-   * while it's still the same object (`zc`), until the end of this turn or of their next turn.
+   * while it's still the same object (`zc`), until the end of this turn or of their next turn. A warped card
+   * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
+   * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery.
    */
-  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn"; turn: number };
+  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot"; turn: number };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
   /** Provoked: it must block this attacking creature this combat if able (CR 702.39a). Cleared at end of combat. */
@@ -206,6 +210,10 @@ export interface Player {
    * times it has tempted them, and their Ring-bearer (CR 701.54a-b), the creature it was as it was chosen.
    */
   ring?: { tempted: number; timestamp: number; bearer?: { id: ObjectId; zc: number } };
+  /** The dungeon card they own in the command zone and the room their venture marker is on (CR 309.4). */
+  dungeon?: { name: string; room: number };
+  /** The dungeons they've completed, in order (CR 309.7). */
+  completedDungeons?: string[];
   isBot: boolean;
 }
 
@@ -340,6 +348,10 @@ export interface CostChoices {
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
   casualty?: ObjectId;
+  /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
+  assist?: PlayerId;
+  /** How much of that generic mana they pay, from their mana pool: set by the game once they've chosen. */
+  assisted?: number;
 }
 
 /**
@@ -354,8 +366,12 @@ export interface ContinuousEffect {
   controller: PlayerId;
   sourceName: string;
   sourceId?: ObjectId;
-  /** "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a). */
-  duration: "endOfTurn" | "game";
+  /**
+   * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
+   * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m).
+   */
+  duration: "endOfTurn" | "game" | "yourNextTurn";
+  turnOf?: PlayerId;
   affected: ObjectId[];
   mods: Modification[];
 }
@@ -381,6 +397,13 @@ export type PendingDecision =
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
    */
+  /**
+   * Assist (CR 702.132a): `caster` chose this player, who may activate mana abilities and then pay up to `max` of the
+   * generic mana in the spell's total cost. The spell isn't on the stack yet; `cast` is the caster's cast.
+   */
+  | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
+  /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
+  | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
   | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
@@ -404,7 +427,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption; options: string[]; labels?: string[]; objectId?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture"; options: string[]; labels?: string[]; objectId?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -472,6 +495,8 @@ export interface GameState {
   delayed?: DelayedTrigger[];
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
+  /** The player who has the initiative (CR 726), once someone has taken it. */
+  initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
   lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string }>;
   nextTimestamp: number;
@@ -556,6 +581,7 @@ export interface Resolving {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
+    venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     may?: boolean; // the answer to "you may ..."
     paid?: boolean; // the answer to "unless that player pays ..."
@@ -608,6 +634,12 @@ export type Action =
   | { type: "bottomCards"; player: PlayerId; objectIds: ObjectId[] }
   /** Exile a card from your hand with suspend, paying its suspend cost: a special action (CR 116.2f, 702.62a). */
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
+  /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
+  | { type: "plot"; player: PlayerId; objectId: ObjectId }
+  /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */
+  | { type: "assist"; player: PlayerId; n: number }
+  /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */
+  | { type: "finishAssistedCast"; player: PlayerId; cancel?: boolean }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */

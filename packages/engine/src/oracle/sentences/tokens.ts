@@ -4,7 +4,7 @@ import type { Effect } from "../../abilities";
 import { allEffects } from "../../abilities";
 import { NUMX, amt, singularWord, isGroup } from "../words";
 import { parsePlayer, parseObject } from "../targets";
-import { PREDEFINED_TOKENS, parseToken, parseCopyExcept } from "../tokens";
+import { INCUBATOR, PREDEFINED_TOKENS, parseToken, parseCopyExcept } from "../tokens";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
 
@@ -35,6 +35,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const verb = m[1]!.toLowerCase();
     const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : "nextEndStep";
     return [{ type: "delayed", when, each: "created", effects: [verb === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~` }];
+  }
+  // Incubate N (CR 701.53a): an Incubator token that enters with N +1/+1 counters on it. "Its controller incubates X".
+  if ((m = new RegExp(`^(?:(.+?) )?[Ii]ncubates? ${NUMX}$`).exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    if (!who) return null;
+    return [{ type: "createToken", who, n: 1, token: INCUBATOR, counters: { counter: "+1/+1", n: amt(m[2]!) } }];
   }
   // Predefined tokens (CR 111.10): "Create a Treasure token", "Its controller creates two Treasure tokens"
   if ((m = new RegExp(`^(?:(.+?) creates?|Create) ${NUMX} (Treasure|Food|Clue) tokens?$`, "i").exec(s))) {

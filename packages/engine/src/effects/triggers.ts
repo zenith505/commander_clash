@@ -7,6 +7,8 @@ import { compileCard } from "../oracle";
 import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneName } from "../types";
 import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes } from "./targeting";
 import { monarchTrigger } from "./run-basics";
+import { initiativeTrigger } from "./run-dungeons";
+import { INITIATIVE } from "../oracle";
 import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
 import { isSuspended } from "./run-zones";
@@ -368,6 +370,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);
+    // "Whenever one or more creatures a player controls deal combat damage to the player who has the initiative, the
+    // controller of those creatures takes the initiative" (CR 726.2): once for each such player in a damage step.
+    const by = controllerOf(s, o);
+    if (ev.player === s.initiative && objIsType(s, o, "Creature") && !s.triggerQueue.some((t) => t.sourceCardId === INITIATIVE.oracleId && t.index === 1 && t.event?.player === by))
+      initiativeTrigger(s, 1, s.initiative, by);
     // "Whenever your Ring-bearer deals combat damage to a player, each opponent loses 3 life" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 2);
   } else if (ev.type === "cast") {
@@ -458,6 +465,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);
+    // "At the beginning of the upkeep of the player who has the initiative, that player ventures into Undercity" (CR 726.2).
+    if (ev.step === "upkeep" && s.initiative === ev.active) initiativeTrigger(s, 0, ev.active);
     // Suspend's second ability works in exile (CR 702.62a): "At the beginning of your upkeep, if this card is
     // suspended, remove a time counter from it." Its owner controls it (CR 113.8).
     if (ev.step === "upkeep")

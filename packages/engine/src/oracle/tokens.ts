@@ -13,6 +13,17 @@ export const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
   Clue: { name: "Clue", colors: [], types: ["Artifact"], subtypes: ["Clue"], keywords: [], abilities: "{2}, Sacrifice this token: Draw a card." },
 };
 
+/** An Incubator token (CR 701.53b, 111.10i): a colorless Incubator artifact, and on its back a 0/0 Phyrexian artifact creature. */
+export const INCUBATOR: TokenSpec = {
+  name: "Incubator",
+  colors: [],
+  types: ["Artifact"],
+  subtypes: ["Incubator"],
+  keywords: [],
+  abilities: "{2}: Transform this token.",
+  back: { name: "Phyrexian", power: 0, toughness: 0, colors: [], types: ["Artifact", "Creature"], subtypes: ["Phyrexian"], keywords: [] },
+};
+
 export function parseToken(power: number, toughness: number, desc: string, withText?: string): TokenSpec | null {
   // desc: "white Soldier", "green and white Elf Warrior", "colorless Thopter artifact"
   const words = desc.split(/\s+/);

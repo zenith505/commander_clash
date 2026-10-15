@@ -1,9 +1,9 @@
 import { kickerName } from "./abilities";
-import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
@@ -268,10 +268,17 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "activateMana":
       // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
       // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
-      if (s.pending?.kind !== "payUnless" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
+      // And while helping to pay for a spell with assist, or paying the rest of it (CR 702.132a).
+      if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
       activateMana(s, p, action.objectId, action.mana, action.ability, action.tap);
       break;
     case "castSpell":
+      if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
+      if (action.assist !== undefined && freeCastOf(s, p.id) !== action.objectId) {
+        requireNoPending(s);
+        askAssist(s, p, action);
+        break;
+      }
       if (freeCastOf(s, p.id) === action.objectId) {
         // Cascade's "you may cast it without paying its mana cost", as the ability resolves.
         castSpell(s, p, action.objectId, action.targets, action.modes, undefined, undefined, action.x, action);
@@ -338,6 +345,16 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "suspend":
       requireNoPending(s);
       suspendCard(s, p, action.objectId);
+      break;
+    case "plot":
+      requireNoPending(s);
+      plotCard(s, p, action.objectId);
+      break;
+    case "assist":
+      assistPays(s, p, action.n);
+      break;
+    case "finishAssistedCast":
+      finishAssistedCast(s, p, action.cancel);
       break;
     case "dredge":
       chooseDredge(s, p, action.objectId);
@@ -957,6 +974,11 @@ function startNextTurn(s: GameState) {
     if (order[i] === s.activePlayer || began.size >= order.length) break;
   }
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
+  const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
+  if (ending.length) {
+    s.effects = s.effects.filter((e) => !ending.includes(e));
+    invalidateCharacteristics(s);
+  }
   releasePhased(s, began);
   s.turn++;
   for (const p of s.players) p.landsPlayedThisTurn = 0;
@@ -1067,7 +1089,7 @@ function finishCleanup(s: GameState) {
   for (const q of s.players)
     for (const id of q.exile) {
       const m = obj(s, id).mayPlay;
-      if (m && (m.until === "thisTurn" || (s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
+      if (m && (m.until === "thisTurn" || (m.until === "nextTurn" && s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
     }
   // Abilities that triggered during cleanup (madness, from discarding down to hand size): players get priority, then
   // there's another cleanup step (CR 514.3a).
@@ -1148,6 +1170,8 @@ function resolveTop(s: GameState) {
     log(s, `${d.name} resolves and enters the battlefield.`);
     moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}) });
     if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
+    if (o.zone === "battlefield" && o.castAlt === "blitz") blitzed(s, o, item.controller);
+    if (o.zone === "battlefield" && o.castAlt === "warp") warped(s, o, item.controller);
     return;
   }
   const body = item.body ?? compileCard(d).spell;
@@ -1169,6 +1193,37 @@ function resolveTop(s: GameState) {
 function dashed(s: GameState, o: GameObject, controller: PlayerId) {
   s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller, sourceName: defOf(s, o).name, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
   addDelayed(s, "nextEndStep", controller, o, { targets: [], effects: [{ type: "bounce", what: { ref: "subject" } }], text: "Return ~ to its owner's hand (dash)." });
+}
+
+/**
+ * Blitz (CR 702.152a): "As long as this permanent's blitz cost was paid, it has haste and 'When this permanent is put
+ * into a graveyard from the battlefield, draw a card'", and "sacrifice the permanent this spell becomes at the beginning
+ * of the next end step". Only this object has them: a copy of it doesn't (rulings).
+ */
+function blitzed(s: GameState, o: GameObject, controller: PlayerId) {
+  s.effects.push({
+    id: `e${s.nextId++}`,
+    timestamp: s.nextTimestamp++,
+    controller,
+    sourceName: defOf(s, o).name,
+    sourceId: o.id,
+    duration: "game",
+    affected: [o.id],
+    mods: [
+      { kind: "addKeywords", keywords: ["Haste"] },
+      { kind: "addAbility", text: "When ~ dies, draw a card." }, // "dies" is put into a graveyard from the battlefield (CR 700.4)
+    ],
+  });
+  invalidateCharacteristics(s);
+  addDelayed(s, "nextEndStep", controller, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~ (blitz)." });
+}
+
+/**
+ * Warp (CR 702.185a): "exile the permanent this spell becomes at the beginning of the next end step. Its owner may
+ * cast this card after the current turn has ended for as long as it remains exiled."
+ */
+function warped(s: GameState, o: GameObject, controller: PlayerId) {
+  addDelayed(s, "nextEndStep", controller, o, { targets: [], effects: [{ type: "warpExile" }], text: "Exile ~ (warp). Its owner may cast it after this turn." });
 }
 
 // ---------------------------------------------------------------------------
@@ -1215,7 +1270,17 @@ export function checkAscend(s: GameState) {
 
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return o.zone === "exile" && o.mayPlay?.player === pid && o.mayPlay.zc === (o.zoneChanges ?? 0);
+  if (o.zone !== "exile" || o.mayPlay?.player !== pid || o.mayPlay.zc !== (o.zoneChanges ?? 0)) return false;
+  // A warped or plotted card: only on a later turn (CR 702.185a, 702.170d), and only cast, not played as a land.
+  return !castOnlyFromExile(o) || (s.turn > o.mayPlay.turn && !isType(defOf(s, o), "Land"));
+}
+
+/** A warped or plotted card in exile, which its owner may cast on a later turn (CR 702.185a, 702.170d). */
+const castOnlyFromExile = (o: GameObject) => o.mayPlay?.until === "warp" || o.mayPlay?.until === "plot";
+
+/** A plotted card `pid` may cast now, without paying its mana cost (CR 702.170d). */
+export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  return o.mayPlay?.until === "plot" && mayPlayFromExile(s, o, pid);
 }
 
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
@@ -1339,8 +1404,10 @@ export function castProblem(
   const fromCommand = o.zone === "command";
   const free = freeCastOf(s, pid) === id;
   const madness = madnessCastOf(s, pid, id);
+  // Cast plotted, without paying its mana cost: an alternative cost (CR 702.170d, 118.9a).
+  const plotted = !free && plottedCast(s, pid, o);
   // Casting it face down is an alternative cost: no other one can go with it (CR 118.9a).
-  if (choices?.faceDown && (free || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
+  if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   const via = graveyardCast(d, choices?.via);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
@@ -1353,16 +1420,19 @@ export function castProblem(
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
     if (!altCost(d, choices.alt)) return `${d.name} doesn't have ${choices.alt}`;
     // Only one alternative cost can be applied to a spell (CR 118.9a).
-    if (via || free) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
+    if (via || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
+    if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
   if (isType(d, "Land")) return "lands are played, not cast";
   // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
-  if (!d.manaCost && !free && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
+  if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
   const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice;
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
+  // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
+  if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
   if (spell?.modal) {
     if (modes === undefined) {
@@ -1382,7 +1452,7 @@ export function castProblem(
   const xp = xProblem(parseManaCost(d.manaCost), x);
   if (xp) return xp;
   // Cast without paying its mana cost, the only choice for X is 0 (CR 107.3b).
-  if (free && !madness && x) return "X is 0 when a spell is cast without paying its mana cost";
+  if ((free || plotted) && !madness && x) return "X is 0 when a spell is cast without paying its mana cost";
   if (madness && x && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
@@ -1393,6 +1463,8 @@ export function castProblem(
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
   if (typeof cost === "string") return cost;
+  if (choices?.assisted && (choices.assist === undefined || !payFromPool(parseManaCost(`{${choices.assisted}}`), player(s, choices.assist).manaPool)))
+    return "the assisting player can't pay that much";
   if (!payFromPool(cost.cost, p.manaPool, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
 }
@@ -1412,7 +1484,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
   // increases (CR 118.9d, 601.2f).
   const madness = madnessCastOf(s, pid, o.id);
-  if (freeCastOf(s, pid) === o.id && !madness) return { cost: parseManaCost(kickCost), extra: Math.max(0, mods.more - mods.less) };
+  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o))) return { cost: parseManaCost(kickCost), extra: Math.max(0, mods.more - mods.less) };
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
@@ -1479,6 +1551,12 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     if (problem) return problem;
     const reduced = payGenericWith(cost, extra, improvise.length);
     if (!reduced) return `that's more artifacts than ${d.name}'s cost has generic mana for`;
+    ({ cost, extra } = reduced);
+  }
+  if (how.assisted) {
+    // The assisting player pays for generic mana only (CR 702.132a).
+    const reduced = payGenericWith(cost, extra, how.assisted);
+    if (!reduced) return `that's more than ${d.name}'s generic mana`;
     ({ cost, extra } = reduced);
   }
   if (how.delve?.length) {
@@ -1592,6 +1670,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const colorsSpent = COLORS.filter((c) => paid.pool[c] < p.manaPool[c]);
   p.manaPool = paid.pool;
   loseLife(s, p.id, paid.lifePaid);
+  if (choices.assisted && choices.assist !== undefined) {
+    const helper = player(s, choices.assist);
+    helper.manaPool = payFromPool(parseManaCost(`{${choices.assisted}}`), helper.manaPool)!.pool;
+    log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
+  }
   for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
@@ -1868,6 +1951,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Unearth works only while the card is in your graveyard (CR 702.84a).
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
   } else if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
+  else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid)) return "activate only as a sorcery";
@@ -2126,7 +2210,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: pend.source, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
       log(s, `${pend.source} enters ${choice === ENTERS_COUNTER ? "with a +1/+1 counter" : pend.what === "riot" ? "with haste" : "without a counter"} (${pend.what}).`);
     } else {
-      o.chosen = withChoice(o.chosen, pend.what, choice);
+      o.chosen = withChoice(o.chosen, pend.what as ChoiceKind, choice);
       log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
     }
     invalidateCharacteristics(s);
@@ -2135,6 +2219,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   const r = s.resolving;
   if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
+  if (pend.what === "venture") {
+    (r.scratch ??= {}).venture = choice; // which dungeon, or which room the arrows lead to (CR 701.49a-b)
+    continueResolution(s);
+    return;
+  }
   r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${choice}.`);
   continueResolution(s);
@@ -2375,6 +2464,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0),
   );
   if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
+  // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d).
+  for (const a of attacks) {
+    const o = obj(s, a.attacker);
+    const by = characteristics(s, o).goadedBy;
+    if (by.includes(a.defender) && opps.some((d) => !by.includes(d) && !attackProblem(s, o, d)))
+      throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
+  }
   for (const a of attacks) {
     const o = obj(s, a.attacker);
     o.attacking = a.defender;
@@ -2483,6 +2579,11 @@ function enlistChosen(s: GameState, at: ObjectId, ids: ObjectId[]) {
  * How many attackers a creature may block (CR 509.1a): one, plus each "can block an additional creature"
  * (they add up, rulings), or any number.
  */
+/** How many creatures it takes to block this attacker: two with menace (CR 702.111b), three or more with "can't be blocked except by three or more creatures" (509.1b). */
+export function blockersNeeded(s: GameState, at: GameObject): number {
+  return Math.max(objHasKeyword(s, at, "Menace") ? 2 : 1, characteristics(s, at).minBlockers);
+}
+
 export function maxBlocks(s: GameState, o: GameObject): number {
   const c = characteristics(s, o);
   return c.blockAny ? Infinity : 1 + Math.max(0, c.extraBlocks);
@@ -2511,7 +2612,8 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     count[at.id] = (count[at.id] ?? 0) + 1;
   }
   for (const [atId, n] of Object.entries(count)) {
-    if (n < 2 && objHasKeyword(s, obj(s, atId), "Menace")) throw new RulesError(`${nameOf(s, atId)} has menace`); // CR 702.111b
+    const need = blockersNeeded(s, obj(s, atId));
+    if (n < need) throw new RulesError(need === 2 && objHasKeyword(s, obj(s, atId), "Menace") ? `${nameOf(s, atId)} has menace` : `${nameOf(s, atId)} can't be blocked except by ${need} or more creatures`); // CR 702.111b, 509.1b
     if (n > 1 && characteristics(s, obj(s, atId)).maxOneBlocker) throw new RulesError(`${nameOf(s, atId)} can't be blocked by more than one creature`); // CR 509.1b
   }
   // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
@@ -2568,17 +2670,17 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokerOf(s, b)?.id === x);
   };
   // Provoke (CR 702.39a): the provoked creature blocks the creature that provoked it if able. With menace, that
-  // takes another creature able to block it too (CR 702.111b).
+  // takes another creature able to block it too (CR 702.111b), two more with "except by three or more" (509.1b).
   for (const b of mine) {
     const at = provokerOf(s, b);
     if (!at || (blocking.get(b.id) ?? []).includes(at.id) || blockProblem(s, b, at) || full(b)) continue;
-    if (objHasKeyword(s, at, "Menace") && !mine.some((o) => o.id !== b.id && !blockProblem(s, o, at))) continue;
+    if (mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length < blockersNeeded(s, at) - 1) continue;
     return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
   }
   for (const at of demanding) {
     const ac = characteristics(s, at);
     const could = mine.filter((b) => !blockProblem(s, b, at));
-    if (could.length < (objHasKeyword(s, at, "Menace") ? 2 : 1)) continue;
+    if (could.length < blockersNeeded(s, at)) continue;
     if (ac.allMustBlock && !ac.maxOneBlocker) {
       const shirk = could.find((b) => !(blocking.get(b.id) ?? []).includes(at.id) && !full(b));
       if (shirk) return `${characteristics(s, shirk).name} must block ${ac.name} (all creatures able to block it do so)`;
@@ -2856,6 +2958,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       } else seen.set(key, id);
     }
     if (attachmentSBAs(s)) changed = true;
+    if (dungeonSBAs(s)) changed = true; // 704.5t
     // Commanders in graveyard/exile may return to the command zone (903.9a). Owners always choose yes for now.
     for (const o of Object.values(s.objects)) {
       if (o.justMovedForCommander && (o.zone === "graveyard" || o.zone === "exile")) {
@@ -2991,6 +3094,8 @@ function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
       s.pending = next !== undefined ? { ...s.pending, player: next, remaining: rest } : null;
     } else s.pending = null;
   }
+  // An assisted cast waiting on a player who left: it isn't cast.
+  if ((s.pending?.kind === "assist" && s.pending.caster === pid) || (s.pending?.kind === "assistCast" && s.pending.helper === pid)) s.pending = null;
   if (s.monarch === pid) {
     // The active player becomes the monarch, or if it's them leaving, the next player in turn order (CR 725.4).
     s.monarch = undefined;
@@ -2998,6 +3103,14 @@ function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
     const from = order.indexOf(s.activePlayer);
     const next = [0, 1, 2, 3, 4, 5, 6, 7].slice(0, order.length).map((i) => order[(from + i) % order.length]!).find((id) => !player(s, id).lost);
     if (next !== undefined) becomeMonarch(s, next);
+  }
+  if (s.initiative === pid) {
+    // The active player takes the initiative, or if it's them leaving, the next player in turn order (CR 726.4).
+    s.initiative = undefined;
+    const order = s.turnOrder;
+    const from = order.indexOf(s.activePlayer);
+    const next = [0, 1, 2, 3, 4, 5, 6, 7].slice(0, order.length).map((i) => order[(from + i) % order.length]!).find((id) => !player(s, id).lost);
+    if (next !== undefined && livingPlayers(s).length > 1) takeInitiative(s, next);
   }
   if (livingPlayers(s).length <= 1) return true;
   if (s.mulligans) {
@@ -3049,6 +3162,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
       if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid)) out.push({ type: "playLand", player: pid, objectId: id });
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
+    if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
   }
   for (const id of p.command) if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
   for (const id of s.battlefield) {
@@ -3093,6 +3207,88 @@ function suspendCard(s: GameState, p: Player, id: ObjectId) {
   moveObject(s, id, "exile");
   o.counters.time = sus.n;
   log(s, `${p.name} suspends ${d.name} with ${sus.n} time counter${sus.n === 1 ? "" : "s"} (${sus.cost}).`);
+  s.passedInSuccession = [];
+}
+
+/**
+ * Assist (CR 702.132a): before paying, the caster chooses another player, who may activate mana abilities and pay for
+ * any amount of the generic mana in the spell's total cost; then the caster pays the rest. The cast waits on them.
+ */
+function askAssist(s: GameState, p: Player, action: Extract<Action, { type: "castSpell" }>) {
+  const o = obj(s, action.objectId);
+  const d = defOf(s, o);
+  if (!compileCard(d).assist) throw new RulesError(`${d.name} doesn't have assist`);
+  const helper = action.assist!;
+  if (helper === p.id || !s.players[helper] || player(s, helper).lost) throw new RulesError("choose another player in the game to assist");
+  const { assist: _, ...rest } = action;
+  const problem = castProblem(s, p.id, o.id, action.targets, action.modes, action.convoke, action.improvise, action.x, rest);
+  if (problem && !/not enough mana/.test(problem)) throw new RulesError(problem);
+  const cost = costToPay(s, p.id, o, action.convoke, action.improvise, action.x, action.kicks, { ...rest, targets: action.targets });
+  const generic = typeof cost === "string" ? 0 : splitGeneric(cost.cost, cost.extra).extra;
+  if (!generic) throw new RulesError(`${d.name}'s total cost has no generic mana for another player to pay`);
+  s.pending = { kind: "assist", player: helper, caster: p.id, source: d.name, max: generic, cast: action };
+  log(s, `${p.name} asks ${player(s, helper).name} to help pay for ${d.name} (assist, up to {${generic}}).`);
+}
+
+function assistPays(s: GameState, p: Player, n: number) {
+  const pend = s.pending;
+  if (pend?.kind !== "assist" || pend.player !== p.id) throw new RulesError("no spell to assist");
+  if (!Number.isInteger(n) || n < 0 || n > pend.max) throw new RulesError(`pay from 0 to ${pend.max}`);
+  if (n && !payFromPool(parseManaCost(`{${n}}`), p.manaPool)) throw new RulesError(`not enough mana in your pool to pay {${n}}`);
+  log(s, n ? `${p.name} will pay {${n}} of ${pend.source}'s cost.` : `${p.name} doesn't help pay for ${pend.source}.`);
+  s.pending = { kind: "assistCast", player: pend.caster, helper: p.id, source: pend.source, n, cast: { ...pend.cast, ...(n ? { assisted: n } : { assist: undefined }) } };
+}
+
+/** The caster pays what's left and casts it; or, if they can't or won't, the cast is undone (CR 733.1). */
+function finishAssistedCast(s: GameState, p: Player, cancel?: boolean) {
+  const pend = s.pending;
+  if (pend?.kind !== "assistCast" || pend.player !== p.id) throw new RulesError("no assisted spell to cast");
+  s.pending = null;
+  if (cancel) {
+    log(s, `${p.name} doesn't cast ${pend.source}.`);
+    return;
+  }
+  const a = pend.cast;
+  castSpell(s, p, a.objectId, a.targets, a.modes, a.convoke, a.improvise, a.x, a);
+  s.passedInSuccession = [];
+}
+
+/** What the caster still pays for an assisted spell, once the helper has chosen (for planning mana). */
+export function assistedRemaining(s: GameState): { cost: ParsedCost; extra: number } | null {
+  const pend = s.pending;
+  if (pend?.kind !== "assistCast") return null;
+  const a = pend.cast;
+  const cost = costToPay(s, pend.player, obj(s, a.objectId), a.convoke, a.improvise, a.x, a.kicks, { ...a, targets: a.targets });
+  return typeof cost === "string" ? null : cost;
+}
+
+/**
+ * Why `pid` can't plot this card right now, or null (with the mana in their pool). Plotting is a special action
+ * (CR 116.2k) any time they have priority during their main phase while the stack is empty (CR 702.170a).
+ */
+export function plotProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const o = s.objects[id];
+  if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be plotted";
+  const d = defOf(s, o);
+  const cost = compileCard(d).plot;
+  if (!cost) return `${d.name} doesn't have plot`;
+  if (s.priority !== pid || s.pending) return "you don't have priority";
+  if (!canActAtSorcerySpeed(s, pid)) return "you can only plot during your main phase while the stack is empty";
+  if (!payFromPool(parseManaCost(cost), player(s, pid).manaPool)) return `not enough mana to plot ${d.name} (${cost})`;
+  return null;
+}
+
+/** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */
+function plotCard(s: GameState, p: Player, id: ObjectId) {
+  const problem = plotProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const o = obj(s, id);
+  const d = defOf(s, o);
+  const cost = compileCard(d).plot!;
+  p.manaPool = payFromPool(parseManaCost(cost), p.manaPool)!.pool;
+  moveObject(s, id, "exile");
+  o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
+  log(s, `${p.name} plots ${d.name} (${cost}). They may cast it without paying its mana cost on a later turn.`);
   s.passedInSuccession = [];
 }
 

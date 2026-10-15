@@ -60,7 +60,7 @@ export function parseGraveyardKeyword(
 /**
  * Keywords about costs: echo (CR 702.30), cumulative upkeep (702.24), evoke (702.74), dash (702.109),
  * delve (702.66), living weapon (702.92) and For Mirrodin! (702.163), scavenge (702.97), bestow (702.103), madness (702.35),
- * suspend (702.62), casualty (702.153), dredge (702.52).
+ * suspend (702.62), casualty (702.153), dredge (702.52), plot (702.170), blitz (702.152), warp (702.185).
  */
 export function parseCostKeyword(
   line: string,
@@ -70,9 +70,11 @@ export function parseCostKeyword(
   trigger?: TriggeredAbility;
   activated?: ActivatedAbility;
   delve?: true;
+  assist?: true;
   faceDown?: { kind: FaceDownKind; cost: string };
   madness?: string;
   suspend?: { n: number; cost: string };
+  plot?: string;
   casualty?: number;
   dredge?: number;
 } | "fail" | null {
@@ -125,6 +127,17 @@ export function parseCostKeyword(
       },
     };
   }
+  // Plot [cost] (CR 702.170a): exile it from your hand as a special action, cast it free on a later turn.
+  if ((m = /^Plot ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !d.types.includes("Land") ? { plot: m[1]! } : "fail";
+  if (/^Plot\b/.test(line)) return "fail";
+  // Blitz [cost] (CR 702.152a) and warp [cost] (CR 702.185a): alternative costs that send the permanent away at the next
+  // end step. "Blitz—{2}{B}{B}, Discard a card" and "Warp—{B}, Pay 2 life" aren't modeled.
+  if ((m = /^(Blitz|Warp)(?: |—)(.+?)\.?$/.exec(line))) {
+    const mana = m[2]!;
+    if (!/^(\{[^}]+\})+$/.test(mana) || !plainMana(mana)) return "fail";
+    if (m[1] === "Blitz") return d.types.includes("Creature") ? { alt: { kind: "blitz", mana } } : "fail";
+    return d.types.some((ty) => ["Creature", "Artifact", "Enchantment", "Planeswalker", "Battle"].includes(ty)) ? { alt: { kind: "warp", mana } } : "fail";
+  }
   if ((m = /^(Evoke|Dash) ((?:\{[^}]+\})+)$/.exec(line))) {
     const mana = m[2]!;
     if (!plainMana(mana)) return "fail";
@@ -135,6 +148,7 @@ export function parseCostKeyword(
     };
   }
   if (line === "Delve") return { delve: true };
+  if (line === "Assist") return { assist: true }; // CR 702.132a
   if (line === "Living weapon") {
     if (!d.subtypes.includes("Equipment")) return "fail";
     const germ: TokenSpec = { name: "Phyrexian Germ", power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: ["Phyrexian", "Germ"], keywords: [] };
@@ -409,6 +423,13 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.130a: "Whenever this creature becomes blocked, defending player loses N life."
       const n = Number(m[1]);
       out.triggers.push({ event: "selfBecomesBlocked", body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eventPlayer" }, n }], text: `Afflict ${n}: defending player loses ${n} life.` } });
+    } else if ((m = /^annihilator (\d+)$/i.exec(p))) {
+      // CR 702.86a: "Whenever this creature attacks, defending player sacrifices N permanents of their choice."
+      const n = Number(m[1]);
+      out.triggers.push({ event: "selfAttacks", body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", text: "permanent" }, n, action: "sacrifice" }], text: `Annihilator ${n}: defending player sacrifices ${n} permanent${n === 1 ? "" : "s"}.` } });
+    } else if (/^ingest$/i.test(p)) {
+      // CR 702.115a: "Whenever this creature deals combat damage to a player, that player exiles the top card of their library."
+      out.triggers.push({ event: "selfDealsCombatDamageToPlayer", body: { targets: [], effects: [{ type: "exileTop", who: { ref: "eventPlayer" }, n: 1 }], text: "Ingest: that player exiles the top card of their library." } });
     } else if (/^dethrone$/i.test(p)) {
       // CR 702.105a: "Whenever this creature attacks the player with the most life or tied for most life, put a +1/+1 counter on this creature."
       out.triggers.push({ event: "selfAttacks", attacksMostLife: true, body: { targets: [], effects: [plus(1)], text: "Dethrone: put a +1/+1 counter on ~." } });

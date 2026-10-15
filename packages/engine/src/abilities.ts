@@ -533,6 +533,8 @@ export type Effect =
   | { type: "becomeMonarch"; who: PlayerRef }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
+  /** "~ phases out", "target creature phases out" (CR 702.26b). */
+  | { type: "phaseOut"; what: ObjRef }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
   /**

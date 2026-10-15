@@ -338,6 +338,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "tap":
     case "untap":
     case "mustBlockSource":
+    case "phaseOut":
     case "proliferate":
     case "amass":
     case "connive":

@@ -11,6 +11,7 @@ import { createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
+import { phaseOut } from "../phasing";
 
 /**
  * Proliferate (CR 701.27a): choose any number of permanents and players with counters; each gets another of
@@ -52,6 +53,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (e.type === "tap") o.tapped = true;
         else untapPermanent(s, o);
       }
+      return;
+    case "phaseOut":
+      // Only what's on the battlefield: "it" may have left (CR 702.26b).
+      phaseOut(s, objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id));
       return;
     case "mustBlockSource": {
       // Provoke (CR 702.39a): only the creature that provoked it, as long as it's still that object.

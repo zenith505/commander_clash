@@ -115,8 +115,7 @@ describe("the Ring tempts you", () => {
     const pick = bot(s);
     expect(pick?.type === "pickPermanents" && pick.ids).not.toEqual([twin1]);
     // Chosen anyway, its controller keeps one of the two (CR 704.5j).
-    let t = act(s, { type: "pickPermanents", player: ap, ids: [twin1] });
-    if (t.pending?.kind === "legendRule") t = act(t, bot(t)!);
+    const t = act(s, { type: "pickPermanents", player: ap, ids: [twin1] });
     expect([twin1, twin2].filter((id) => t.objects[id]!.zone === "battlefield")).toHaveLength(1);
   });
 });

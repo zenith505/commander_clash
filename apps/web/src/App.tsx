@@ -61,6 +61,7 @@ import {
   potentialAttackers,
   returnCandidates,
   tapCostCandidates,
+  ringBearer,
   power,
   toughness,
   waitingOn,
@@ -1499,6 +1500,7 @@ function Seat({
   const mine = s.battlefield
     .map((id) => s.objects[id]!)
     .filter((o) => controllerOf(s, o) === pid && !(o.attachedTo && onField.has(o.attachedTo)));
+  const phasedOut = (s.phasedOut ?? []).filter((id) => s.objects[id]!.phased?.by === pid);
   const lands = mine.filter((o) => isLand(s, o.id));
   const others = mine.filter((o) => !isLand(s, o.id));
   const topOf = (ids: string[]) => (ids.length ? s.objects[ids[ids.length - 1]!] : undefined);
@@ -1529,6 +1531,20 @@ function Seat({
         {p.citysBlessing && (
           <span className="monarch blessing" title="The city's blessing (ascend): kept for the rest of the game.">
             🏙 City's blessing
+          </span>
+        )}
+        {p.ring && (
+          <span
+            className="monarch"
+            title={`The Ring has tempted ${p.name} ${p.ring.tempted} time${p.ring.tempted === 1 ? "" : "s"}. Their Ring-bearer is legendary and can't be blocked by creatures with greater power${p.ring.tempted >= 2 ? "; when it attacks, they draw then discard a card" : ""}${p.ring.tempted >= 3 ? "; a creature blocking it is sacrificed at end of combat" : ""}${p.ring.tempted >= 4 ? "; when it deals combat damage to a player, each opponent loses 3 life" : ""}.`}
+          >
+            💍 {p.ring.tempted}
+            {ringBearer(s, pid) ? `: ${cardOf(s, ringBearer(s, pid)!.id).name}` : ""}
+          </span>
+        )}
+        {phasedOut.length > 0 && (
+          <span className="muted" title={`Phased out (treated as though they don't exist until they phase in during their controller's untap step): ${phasedOut.map((id) => cardOf(s, id).name).join(", ")}`}>
+            ◌ Phased out {phasedOut.length}
           </span>
         )}
         {(p.energy ?? 0) > 0 && (

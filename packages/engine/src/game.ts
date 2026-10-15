@@ -2,6 +2,7 @@ import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
+import { untapStepPhasing, releasePhased } from "./phasing";
 import { loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
@@ -419,6 +420,8 @@ function zoneList(s: GameState, o: GameObject): ObjectId[] | null {
       return p.command;
     case "battlefield":
       return s.battlefield;
+    case "phasedOut":
+      return (s.phasedOut ??= []);
     case "stack":
       return null; // tracked through s.stack
   }
@@ -823,7 +826,7 @@ function checkPairs(s: GameState) {
   }
 }
 
-function removeFromCombat(s: GameState, o: GameObject) {
+export function removeFromCombat(s: GameState, o: GameObject) {
   for (const a of o.blocking ?? []) {
     const att = s.objects[a];
     if (att?.blockedBy) att.blockedBy = att.blockedBy.filter((b) => b !== o.id);
@@ -954,6 +957,7 @@ function startNextTurn(s: GameState) {
     if (order[i] === s.activePlayer || began.size >= order.length) break;
   }
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
+  releasePhased(s, began);
   s.turn++;
   for (const p of s.players) p.landsPlayedThisTurn = 0;
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
@@ -974,6 +978,7 @@ function beginStep(s: GameState, step: Step): void {
   const ap = s.activePlayer;
   switch (step) {
     case "untap":
+      untapStepPhasing(s, ap); // CR 502.1, 702.26a
       for (const id of s.battlefield) {
         const o = obj(s, id);
         if (controllerOf(s, o) !== ap) continue;
@@ -1048,9 +1053,9 @@ function finishCleanup(s: GameState) {
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
-  for (const id of s.battlefield) {
+  for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
     const o = obj(s, id);
-    o.damage = 0; // CR 514.2
+    o.damage = 0; // CR 514.2, phased-out permanents too
     o.damagedBy = undefined;
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
@@ -1750,7 +1755,9 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
-      c.kind === "sacrifice" || c.kind === "tap"
+      c.kind === "sacrifice"
+        ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
+        : c.kind === "tap"
         ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
         : c.kind === "discard"
           ? c.filter
@@ -2341,7 +2348,7 @@ const attackersAndBlockers = (s: GameState) =>
 const hasFirstOrDouble = (s: GameState, o: GameObject) =>
   objHasKeyword(s, o, "First strike") || objHasKeyword(s, o, "Double strike");
 
-function clearCombat(o: GameObject) {
+export function clearCombat(o: GameObject) {
   o.attacking = undefined;
   o.blocking = undefined;
   o.blockedBy = undefined;
@@ -2860,7 +2867,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     }
     // Tokens that left the battlefield cease to exist (704.5d).
     for (const o of Object.values(s.objects)) {
-      if (!o.isToken || o.zone === "battlefield" || o.zone === "stack") continue;
+      // A phased-out token still exists on the battlefield (CR 702.26d).
+      if (!o.isToken || o.zone === "battlefield" || o.zone === "stack" || o.zone === "phasedOut") continue;
       const list = zoneList(s, o);
       if (list) list.splice(list.indexOf(o.id), 1);
       delete s.objects[o.id];
@@ -2966,6 +2974,13 @@ function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
       delete s.objects[id];
     }
   }
+  // Phased-out permanents they own leave too (CR 702.26k).
+  if (s.phasedOut)
+    s.phasedOut = s.phasedOut.filter((id) => {
+      if (s.objects[id]!.owner !== pid) return true;
+      delete s.objects[id];
+      return false;
+    });
   for (const other of s.battlefield) if (s.objects[other]!.attachedTo && !s.objects[s.objects[other]!.attachedTo!]) s.objects[other]!.attachedTo = undefined;
   invalidateCharacteristics(s);
   for (const o of attackers(s)) if (o.attacking === pid) clearCombat(o);

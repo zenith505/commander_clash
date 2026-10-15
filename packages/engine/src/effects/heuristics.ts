@@ -26,7 +26,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "damage" && "index" in e.to) mark(e.to.index, "n" in e.to ? e.to.n : 1);
     // Returning a card from a graveyard to its owner's hand helps its owner.
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
-    if (["destroy", "exile", "bounce", "tap", "skipUntap"].includes(e.type) && "what" in e && e.what.ref === "target") mark(e.what.index, e.what.n);
+    // Phasing out removes a permanent until its controller's next turn: used against opponents' things.
+    if (["destroy", "exile", "bounce", "tap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
     if ((e.type === "loseLife" || e.type === "mill") && e.who.ref === "target") mark(e.who.index);

@@ -35,7 +35,7 @@ export interface CardDef {
 /** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */
 export type FaceDownKind = "morph" | "megamorph" | "disguise";
 
-export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command";
+export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command" | "phasedOut";
 
 /** A game object (card or token) in some zone. CR 109 */
 export interface GameObject {
@@ -114,6 +114,14 @@ export interface GameObject {
   colorsSpent?: Color[];
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
   phantomEvent?: string;
+  /**
+   * Phased out (CR 702.26b): `zone` is "phasedOut", but it hasn't changed zones (CR 702.26d), so it keeps its
+   * zoneChanges. `by`: the player it phased out under the control of, whose untap step phases it in (702.26a).
+   * `indirect`: it phased out with the permanent it's attached to, and phases in with it (702.26g).
+   * `host`: for an Aura or Equipment that phased out directly, what it was attached to (702.26i).
+   * `released`: `by` left the game and their next turn would have begun, so it phases in at the next untap step (702.26n).
+   */
+  phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   castVia?: CastFromGraveyardKind;
@@ -420,6 +428,8 @@ export interface GameEvent {
 }
 
 export interface GameState {
+  /** Phased-out permanents (CR 702.26b), which are treated as though they don't exist. */
+  phasedOut?: ObjectId[];
   /**
    * Permanents that left the battlefield in the current event (one effect, or one pass of state-based
    * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).

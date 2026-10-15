@@ -26,6 +26,7 @@ export const SUPPORTED_KEYWORDS = [
   "Mountainwalk",
   "Plainswalk",
   "Horsemanship", // CR 702.31b: can't be blocked except by creatures with horsemanship
+  "Phasing", // CR 702.26a: phases out and in during its controller's untap step
   "Skulk", // CR 702.118b: can't be blocked by creatures with greater power
   // Targeting and damage (CR 702.18 shroud, 702.16 protection, 702.90 infect, 702.80 wither).
   // Protection is modeled for the five colors only; "Toxic N" is a keyword with a number, see toxicValue.

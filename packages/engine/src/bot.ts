@@ -775,7 +775,7 @@ function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, card?: CardD
     }
     if (!("what" in e) || typeof e.what !== "object" || e.what.ref !== "each") continue;
     const objs = group(e.what);
-    if (e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "tap" || e.type === "putInLibrary") add(objs, true);
+    if (e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "tap" || e.type === "putInLibrary" || e.type === "phaseOut") add(objs, true);
     else if (e.type === "untap") add(objs.filter((o) => o.tapped), false, () => 0.5);
     else if (e.type === "counters") add(objs, harmfulCounter(e.counter), () => estimate(e.n) / 2);
     else if (e.type === "continuous") add(objs, modsAreHarmful(e.mods), () => 0.5);
@@ -867,6 +867,9 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         break;
       case "bounce":
         v += e.what.ref === "target" ? 5 : 0;
+        break;
+      case "phaseOut":
+        v += e.what.ref === "target" ? 3 : 0;
         break;
       case "putOntoBattlefield":
         v += 8;
@@ -994,6 +997,8 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
+      // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
+      if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;

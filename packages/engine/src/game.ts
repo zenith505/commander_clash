@@ -1509,6 +1509,11 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "");
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
+  // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
+  for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
+    const t = s.objects[id];
+    if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
+  }
   // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
   // increases (CR 118.9d, 601.2f).
   const madness = madnessCastOf(s, pid, o.id);

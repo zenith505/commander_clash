@@ -1027,6 +1027,8 @@ export interface CompiledCard {
   costLessIf?: { n: number; cond: StaticCondition }[];
   /** "This spell costs {3} less to cast if it targets a tapped creature" (CR 601.2f). */
   costLessIfTargets?: { n: number; filter: TargetSpec }[];
+  /** "Spells your opponents cast that target ~ cost {2} more to cast": once per spell however often it targets it (rulings). */
+  targetTax?: number;
   /**
    * A permanent's static abilities that make spells cost more or less: "Creature spells you cast cost
    * {1} less to cast", "Noncreature spells cost {1} more to cast" (CR 601.2f).

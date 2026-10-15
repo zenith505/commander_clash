@@ -130,6 +130,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
+  if ((m = /^you (don't )?control a Ring-bearer$/.exec(text))) return { kind: "ringBearer", ...(m[1] ? { not: true as const } : {}) };
+  if (/^~ is your Ring-bearer$/.test(text)) return { kind: "ringBearer", self: true };
   if (/^no opponent has more life than that player$/.test(text)) return { kind: "defenderMostLife" };
   if ((m = /^(?:~|it)(?:'s| is) (not )?paired with (another creature|a creature with soulbond)$/.exec(text)) && st.affects.kind === "self")
     return { kind: "paired", ...(m[2] === "a creature with soulbond" ? { withKeyword: "Soulbond" } : {}), ...(m[1] ? { not: true as const } : {}) };

@@ -2,7 +2,7 @@ import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
-import { addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
@@ -2610,6 +2610,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
+  if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it (Ring-bearer)`; // CR 701.54c
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
@@ -2937,6 +2938,7 @@ function syncControl(s: GameState) {
     if (o.seenController === undefined) o.seenController = now;
     else if (o.seenController !== now) {
       o.seenController = now;
+      loseRingBearer(s, o.id); // CR 701.54a
       o.controlledSinceTurn = s.turn;
       if (o.attacking !== undefined || o.blocking !== undefined) {
         removeFromCombat(s, o);

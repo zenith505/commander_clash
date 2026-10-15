@@ -7,6 +7,7 @@ import { compileCard } from "../oracle";
 import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneName } from "../types";
 import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes } from "./targeting";
 import { monarchTrigger } from "./run-basics";
+import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
 import { isSuspended } from "./run-zones";
 
@@ -70,6 +71,8 @@ export type TriggerSourceEvent =
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
+  | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
   | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
@@ -275,9 +278,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (o.attacking !== undefined && o.blockedBy?.length) {
         // "Defending player" (afflict) is the player it's attacking.
         add(o, you, (e) => e === "selfBecomesBlocked" || e === "selfBlocksOrBecomesBlocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        const bearer = isRingBearer(s, o);
         for (const b of o.blockedBy) {
           const bl = s.objects[b];
           if (bl) add(o, you, (e, t) => (e === "selfBlockedByCreature" || e === "selfBlocksOrBlockedByCreature") && fits(t, bl, you), undefined, undefined, bl);
+          // "Whenever your Ring-bearer becomes blocked by a creature, the blocking creature's controller sacrifices
+          // it at end of combat" (CR 701.54c).
+          if (bl && bearer) ringTrigger(s, you, 1, bl);
         }
       }
     }
@@ -294,6 +301,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (you !== ev.player) add(o, you, (e) => e === "opponentLosesLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
+  } else if (ev.type === "ringTempted") {
+    // "Whenever the Ring tempts you" (CR 701.54d), "if you chose a creature other than ~ as your Ring-bearer" (CR 603.4);
+    // "whenever you choose a creature as your Ring-bearer".
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) !== ev.player) continue;
+      add(o, ev.player, (e, t) => (e === "ringTemptsYou" && (!t.ifOtherBearer || (ev.chosen !== undefined && ev.chosen !== o.id))) || (e === "youChooseRingBearer" && ev.chosen !== undefined));
+    }
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
@@ -301,6 +316,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
     add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.training || trains(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
+    if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     for (const id of s.battlefield) {
@@ -351,6 +368,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);
+    // "Whenever your Ring-bearer deals combat damage to a player, each opponent loses 3 life" (CR 701.54c).
+    if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 2);
   } else if (ev.type === "cast") {
     // "When you cast this spell" abilities work from the stack (CR 702.85a, 603.2).
     const item = s.stack.find((x) => x.id === ev.stackId);

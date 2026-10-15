@@ -7,6 +7,7 @@ import { dealDamage, objectSource } from "../damage";
 import type { GameObject, GameState, PlayerId } from "../types";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
+import { ringTempts } from "./run-ring";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -77,6 +78,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} gets ${"{E}".repeat(Math.min(n, 10))}${n > 10 ? ` (${n})` : ""}.`);
       }
       return;
+    case "ringTempts":
+      return ringTempts(s, ctx, src);
     case "becomeMonarch":
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
       return;

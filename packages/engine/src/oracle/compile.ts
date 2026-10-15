@@ -25,6 +25,7 @@ export function compileCard(d: CardDef): CompiledCard {
   if (hit) return hit;
   const out = compile(d);
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
+  if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   cache.set(d.oracleId, out);
   return out;
 }
@@ -59,6 +60,40 @@ const MONARCH_TRIGGERS: TriggeredAbility[] = [
       effects: [{ type: "becomeMonarch", who: { ref: "subjectController" } }],
       text: "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch.",
     },
+  },
+];
+
+/**
+ * The Ring, the emblem a player gets the first time the Ring tempts them (CR 701.54c). It stands in as the source
+ * of its triggered abilities, which the game fires for that player's Ring-bearer once the Ring has tempted them
+ * enough times. Its static ability ("Your Ring-bearer is legendary and can't be blocked by creatures with greater
+ * power") is applied by the layers.
+ */
+export const RING: CardDef = { ...MONARCH, oracleId: "the-ring", name: "The Ring" };
+const RING_TRIGGERS: TriggeredAbility[] = [
+  {
+    event: "ringBearerAttacks",
+    body: {
+      targets: [],
+      effects: [
+        { type: "draw", who: { ref: "you" }, n: 1 },
+        { type: "discard", who: { ref: "you" }, n: 1, random: false },
+      ],
+      text: "Whenever your Ring-bearer attacks, draw a card, then discard a card.",
+    },
+  },
+  {
+    // The subject is the blocking creature.
+    event: "ringBearerBlocked",
+    body: {
+      targets: [],
+      effects: [{ type: "delayed", when: "endOfCombat", each: "subject", effects: [{ type: "sacrifice", what: { ref: "subject" }, byController: true }], text: "the blocking creature's controller sacrifices it" }],
+      text: "Whenever your Ring-bearer becomes blocked by a creature, the blocking creature's controller sacrifices it at end of combat.",
+    },
+  },
+  {
+    event: "ringBearerDamagesPlayer",
+    body: { targets: [], effects: [{ type: "loseLife", who: { ref: "eachOpponent" }, n: 3 }], text: "Whenever your Ring-bearer deals combat damage to a player, each opponent loses 3 life." },
   },
 ];
 
@@ -177,6 +212,8 @@ export function compile(d: CardDef): CompiledCard {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own.
     const line = raw.trim().replace(/^Converge — /, "");
     if (!line) continue;
+    // Deck construction, not play: the deck checker reads it (deckLimit).
+    if (/^A deck can have (?:any number of|up to \w+) cards named ~\.$/.test(line)) continue;
     if (line === "Start your engines!") {
       out.startYourEngines = true; // CR 702.179a
       continue;

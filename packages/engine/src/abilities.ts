@@ -22,7 +22,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "band": attacking creatures declared to be in a band (CR 702.22c). */
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -247,7 +247,7 @@ export interface TokenSpec {
  */
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
-  | { kind: "addTypes"; types: string[]; subtypes: string[] } // layer 4, "in addition to its other types"
+  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
   | { kind: "setTypes"; types: string[]; subtypes: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   | { kind: "setColors"; colors: Color[] } // layer 5
@@ -282,6 +282,8 @@ export type Modification =
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
   /** "Creatures with power less than ~'s power can't block it" (CR 509.1b). */
   | { kind: "cantBeBlockedByLesserPower" }
+  /** The Ring-bearer: "can't be blocked by creatures with greater power" (CR 701.54c). */
+  | { kind: "cantBeBlockedByGreaterPower" }
   /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */
   | { kind: "cantAttackAlone" }
   | { kind: "cantBlockAlone" }
@@ -342,6 +344,8 @@ export type StaticCondition =
   | { kind: "yourTurn" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** "If you don't control a Ring-bearer" (CR 701.54e); `self`: "as long as ~ is your Ring-bearer". */
+  | { kind: "ringBearer"; not?: true; self?: true }
   /** Max speed (CR 702.178a, 702.179e): your speed is 4. */
   | { kind: "maxSpeed" }
   /**
@@ -527,6 +531,8 @@ export type Effect =
   | { type: "castFromExileFree" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
+  /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
+  | { type: "ringTempts" }
   /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
   | { type: "increaseSpeed" }
   /**
@@ -614,6 +620,14 @@ export type TriggerEvent =
   | "selfDealsCombatDamage"
   | "monarchEndStep" // the monarch's inherent abilities (CR 725.2): no source, fired by the game
   | "monarchDamaged"
+  /** The Ring's abilities (CR 701.54c), from the player's emblem: fired by the game for their Ring-bearer. */
+  | "ringBearerAttacks"
+  | "ringBearerBlocked"
+  | "ringBearerDamagesPlayer"
+  /** "Whenever the Ring tempts you" (CR 701.54d); see TriggeredAbility.ifOtherBearer. */
+  | "ringTemptsYou"
+  /** "Whenever you choose a creature as your Ring-bearer". */
+  | "youChooseRingBearer"
   | "anotherCreatureYouControlEnters"
   | "landYouControlEnters" // landfall: "Whenever a land you control enters"
   | "creatureYouControlAttacksAlone" // exalted (CR 702.83a)
@@ -709,6 +723,8 @@ export interface TriggeredAbility {
   ifEcho?: boolean;
   /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
   ifSoulbond?: boolean;
+  /** "Whenever the Ring tempts you, if you chose a creature other than ~ as your Ring-bearer" (CR 603.4). */
+  ifOtherBearer?: boolean;
   /** It has the ability only while this is true, like "Max speed — Whenever ..." (CR 702.178a): not an intervening if. */
   activeIf?: StaticCondition;
 }

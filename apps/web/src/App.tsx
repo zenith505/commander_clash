@@ -2382,7 +2382,9 @@ function Controls({
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong>{" "}
-          {pending.action === "pair"
+          {pending.action === "ringBearer"
+            ? `the Ring tempts you: click a creature of yours to be your Ring-bearer. It's legendary and can't be blocked by creatures with greater power, and gains the Ring's other abilities as the Ring tempts you more times.`
+            : pending.action === "pair"
             ? pending.options.length === 1
               ? `click ${cardOf(s, pending.options[0]!).name} to pair the two (soulbond), if you want.`
               : "click a creature of yours to pair it with (soulbond), if you want."
@@ -2397,7 +2399,7 @@ function Controls({
                 : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

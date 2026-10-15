@@ -97,6 +97,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
+    if (pend.kind === "pickPermanents" && pend.action === "ringBearer") return [{ type: "pickPermanents", player: pid, ids: [chooseRingBearer(s, pid, pend.options)] }];
     if (pend.kind === "pickPermanents" && pend.action === "band") return [{ type: "pickPermanents", player: pid, ids: [] }];
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
@@ -585,6 +586,24 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
   }
   return out;
+}
+
+/**
+ * The Ring tempts us (CR 701.54a): our best creature, but not one the legend rule would then make us lose (another
+ * legendary permanent of ours has its name, CR 704.5j), and not one whose "if you chose a creature other than ~" ability would then miss.
+ */
+function chooseRingBearer(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId {
+  const score = (id: ObjectId) => {
+    const o = obj(s, id);
+    const c = characteristics(s, o);
+    const clash = !c.supertypes.includes("Legendary") && s.battlefield.some((x) => {
+      const other = characteristics(s, obj(s, x));
+      return x !== id && other.controller === pid && other.name === c.name && other.supertypes.includes("Legendary");
+    });
+    const wantsOther = abilitiesOf(s, o).triggers.some((t) => t.event === "ringTemptsYou" && t.ifOtherBearer);
+    return worth(s, pid, o) - (clash ? 1000 : 0) - (wantsOther ? 100 : 0);
+  };
+  return [...options].sort((a, b) => score(b) - score(a))[0]!;
 }
 
 /**

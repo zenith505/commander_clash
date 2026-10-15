@@ -55,6 +55,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
+  // The Ring tempts you (CR 701.54).
+  if (/^the Ring tempts you$/i.test(s)) return [{ type: "ringTempts" }];
   if (/^Target player becomes the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "target", index: addTarget(ctx, { kind: "player", text: "target player" }) } }];
   // "Choose a creature type." / "Choose a color." (the rest of the text says what it's for).
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))

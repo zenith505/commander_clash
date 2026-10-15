@@ -36,6 +36,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ becomes blocked, (.+)$/, "selfBecomesBlocked"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
+  [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
   [/^At the beginning of each (?:player's )?upkeep, (.+)$/, "eachUpkeep"],
@@ -225,6 +226,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // "Whenever the Ring tempts you" (CR 701.54d). "If you chose a creature other than ~ as your Ring-bearer" is an
+  // intervening if (CR 603.4) about the choice just made, so it can't change by the time it resolves.
+  const ring = /^Whenever the Ring tempts you, (if you chose a creature other than ~ as your Ring-bearer, )?(.+)$/.exec(line);
+  if (ring) {
+    const body = parseBody(ring[2]!, {});
+    return body ? { event: "ringTemptsYou", body, ...(ring[1] ? { ifOtherBearer: true } : {}) } : "fail";
+  }
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);

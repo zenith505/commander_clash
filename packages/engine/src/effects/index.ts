@@ -11,6 +11,7 @@
 export { objectMatches, bindChosen, ENTERS_COUNTER, choiceOptions, withChoice, sourceQuality, printedMatches, isLegalTarget, legalTargets, sameTarget, canChooseTarget, targetProblem, stampTargets, hasLegalTargets, legalModes, canChooseModes, modesProblem, pickOptions } from "./targeting";
 export { beginResolution, continueResolution, type Resolution } from "./resolve";
 export { becomeMonarch } from "./run-basics";
+export { ringBearer, isRingBearer, timesTempted, loseRingBearer, ringBearerOptions } from "./run-ring";
 export { harmfulCounter } from "./run-permanents";
 export { tokenDef } from "./run-tokens";
 export { unlessCost, addDelayed, kickedMatches } from "./run-spells";

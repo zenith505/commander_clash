@@ -193,6 +193,11 @@ export interface Player {
   attackedTurn?: number;
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
   citysBlessing?: boolean;
+  /**
+   * The Ring (CR 701.54c): the emblem this player got the first time the Ring tempted them (`timestamp`), how many
+   * times it has tempted them, and their Ring-bearer (CR 701.54a-b), the creature it was as it was chosen.
+   */
+  ring?: { tempted: number; timestamp: number; bearer?: { id: ObjectId; zc: number } };
   isBot: boolean;
 }
 

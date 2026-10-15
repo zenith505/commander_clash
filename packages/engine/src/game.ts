@@ -295,7 +295,8 @@ export function applyInPlace(s: GameState, action: Action): void {
       // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
       // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
       // And while helping to pay for a spell with assist, or paying the rest of it (CR 702.132a).
-      if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
+      // And while declaring attackers, to pay what attacking costs (CR 508.1i).
+      if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "declareAttackers" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
       activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra);
       break;
     case "castSpell":
@@ -2675,6 +2676,25 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  * Why `o` can't attack `defender` in particular, or null: "can't attack unless defending player controls
  * an Island" (CR 508.1c). Each attacking creature has its own defending player (CR 506.2).
  */
+/**
+ * What attacking `defender` costs for each creature (Ghostly Prison, Propaganda): generic mana, paid as attackers are
+ * declared (CR 508.1g-h). Attacking their planeswalkers isn't attacking them.
+ */
+export function attackTaxPer(s: GameState, defender: PlayerId): number {
+  let n = 0;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const c = characteristics(s, o);
+    if (c.attackTax && c.controller === defender) n += c.attackTax;
+  }
+  return n;
+}
+
+/** The total attack tax for a declaration. */
+export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
+  return attacks.reduce((n, a) => n + (a.planeswalker === undefined ? attackTaxPer(s, a.defender) : 0), 0);
+}
+
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId): string | null {
   const c = characteristics(s, o);
   for (const f of c.attackUnless)
@@ -2744,8 +2764,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) throw new RulesError(`${nameOf(s, attacks[0]!.attacker)} can't attack alone`);
   // Requirements (CR 508.1d): every creature that "attacks each combat if able" and can attack has to,
   // unless that would break a restriction: one that can't attack alone needn't attack by itself.
+  // A requirement that would need a cost paid to obey (Ghostly Prison) doesn't oblige anyone to pay it (CR 508.1d).
+  const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d);
   const shirking = potentialAttackers(s, p.id).find(
-    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0),
+    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && opps.some((d) => free(o, d)),
   );
   if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
@@ -2755,17 +2777,23 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const by = characteristics(s, o).goadedBy;
     if (!by.length) continue;
     const obeyed = (d: PlayerId) => by.filter((g) => g !== d).length;
-    const best = Math.max(0, ...opps.filter((d) => !attackProblem(s, o, d)).map(obeyed));
+    const best = Math.max(0, ...opps.filter((d) => free(o, d) || d === a.defender).map(obeyed));
     if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
       throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
   }
   // "Attacks that opponent this turn if able" (encore): it attacks one of those players, not a planeswalker, if it can
   // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).
   for (const o of potentialAttackers(s, p.id)) {
-    const able = characteristics(s, o).mustAttack.filter((d) => opps.includes(d) && !attackProblem(s, o, d));
+    const able = characteristics(s, o).mustAttack.filter((d) => opps.includes(d) && free(o, d));
     if (!able.length) continue;
     const a = attacks.find((x) => x.attacker === o.id);
     if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
+  }
+  // Attack costs are totalled and paid, with mana abilities activated first (CR 508.1g-i).
+  const tax = attackTax(s, attacks);
+  if (tax) {
+    if (!spendFromPool(s, p.id, parseManaCost(`{${tax}}`), "other")) throw new RulesError(`attacking these players costs {${tax}}: add the mana first`);
+    log(s, `${p.name} pays {${tax}} to attack.`);
   }
   for (const a of attacks) {
     const o = obj(s, a.attacker);

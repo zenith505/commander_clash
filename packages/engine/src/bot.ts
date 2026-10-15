@@ -9,6 +9,8 @@ import {
   assistedRemaining,
   returnCandidates,
   attackProblem,
+  attackTax,
+  attackTaxPer,
   blockProblem,
   provokerOf,
   tapCostCandidates,
@@ -48,7 +50,7 @@ import { CHOSEN_PROTECTION } from "./keywords";
 export function botActions(s: GameState, pid: PlayerId): Action[] {
   const pend = s.pending;
   if (pend?.player === pid) {
-    if (pend.kind === "declareAttackers") return [chooseAttacks(s, pid)];
+    if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
     if (pend.kind === "declareBlockers") return [chooseBlocks(s, pid)];
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
@@ -1493,7 +1495,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
   return attacks;
 }
 
-function chooseAttacks(s: GameState, pid: PlayerId): Action {
+function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   const opps = opponents(s, pid);
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
   // (CR 725.2) unless someone else is low enough to finish.
@@ -1531,7 +1533,21 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
   }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
-  return { type: "declareAttackers", player: pid, attacks: attackPlaneswalkers(s, pid, attacks) };
+  let declared = attackPlaneswalkers(s, pid, attacks);
+  // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
+  // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
+  for (;;) {
+    const tax = attackTax(s, declared);
+    const taps = tax ? planMana(s, pid, parseManaCost(`{${tax}}`)) : [];
+    if (taps) {
+      if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
+      return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];
+    }
+    const taxed = declared.filter((a) => a.planeswalker === undefined && attackTaxPer(s, a.defender)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
+    const o = obj(s, taxed.attacker);
+    const elsewhere = opps.find((d) => !attackTaxPer(s, d) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
+    declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ ...a, defender: elsewhere }] : []));
+  }
 }
 
 function chooseBlocks(s: GameState, pid: PlayerId): Action {

@@ -102,6 +102,8 @@ export interface Characteristics {
   attacksIfAble: boolean;
   /** Untaps during each other player's untap step too. */
   untapsDuringOthers: boolean;
+  /** Generic mana per creature attacking its controller (Ghostly Prison). */
+  attackTax: number;
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -167,6 +169,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     blocksOnlyFlyers: false,
     attacksIfAble: false,
     untapsDuringOthers: false,
+    attackTax: 0,
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -530,6 +533,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "untapsDuringOthers":
       c.untapsDuringOthers = true;
+      return;
+    case "attackTax":
+      c.attackTax += m.n;
       return;
     case "blocksOnlyFlyers":
       c.blocksOnlyFlyers = true;

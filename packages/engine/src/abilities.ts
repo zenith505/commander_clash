@@ -296,6 +296,11 @@ export type Modification =
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   | { kind: "doesntUntap" }
+  /**
+   * Ghostly Prison: "Creatures can't attack you unless their controller pays {2} for each creature they control that's
+   * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
+   */
+  | { kind: "attackTax"; n: number }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)

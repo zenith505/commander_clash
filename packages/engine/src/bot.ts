@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
-import { autoCrew, planActivate, planCast, planMana, planSuspend, planTurnFaceUp } from "./autopay";
+import { autoCrew, planActivate, planCast, planMana, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -194,12 +194,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
       .sort((a, b) => b.mv - a.mv);
-    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile"));
+    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && /Turn$/.test(obj(s, a.objectId).mayPlay?.until ?? "")));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
     // Suspend what we can't cast now (CR 702.62a).
     const sus = chooseSuspend(s, pid);
     if (sus) return sus;
+    // Plot what we can't cast now with the mana left at the end of our turn (CR 702.170a).
+    if (s.step === "main2") {
+      const plot = choosePlot(s, pid);
+      if (plot) return plot;
+    }
     // Unearth a creature to attack with this turn (CR 702.84a).
     if (s.step === "main1") {
       const dig = chooseUnearth(s, pid);
@@ -454,6 +459,18 @@ function chooseSuspend(s: GameState, pid: PlayerId): Action[] | null {
     .sort((a, b) => a.sus.n - b.sus.n);
   for (const x of options) {
     const plan = planSuspend(s, pid, x.id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/** A card to plot (CR 702.170a) with mana we'd otherwise not use this turn: the biggest one, cast free on a later turn. */
+function choosePlot(s: GameState, pid: PlayerId): Action[] | null {
+  const options = player(s, pid)
+    .hand.filter((id) => compileCard(defOf(s, obj(s, id))).plot)
+    .sort((a, b) => mv(s, b) - mv(s, a));
+  for (const id of options) {
+    const plan = planPlot(s, pid, id);
     if (plan) return plan;
   }
   return null;

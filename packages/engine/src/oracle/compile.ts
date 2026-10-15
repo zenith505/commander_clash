@@ -251,15 +251,16 @@ export function compile(d: CardDef): CompiledCard {
     if (costKw !== null) {
       if (costKw === "fail") out.unsupported.push(raw);
       else {
-        if (costKw.alt) (out.altCosts ??= []).push(costKw.alt);
         if (costKw.delve) out.delve = true;
         // Two of the same: each would work separately (CR 702.153b), which isn't modeled.
-        const twice = (costKw.madness && out.madness) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge);
+        const twice = (costKw.madness && out.madness) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
         if (twice) {
           out.unsupported.push(raw);
           continue;
         }
+        if (costKw.alt) (out.altCosts ??= []).push(costKw.alt);
         if (costKw.madness) out.madness = costKw.madness;
+        if (costKw.plot) out.plot = costKw.plot;
         if (costKw.suspend) out.suspend = costKw.suspend;
         if (costKw.casualty) out.casualty = costKw.casualty;
         if (costKw.dredge) out.dredge = costKw.dredge;

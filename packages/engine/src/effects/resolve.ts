@@ -334,6 +334,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "suspendTick":
     case "suspendCast":
     case "exileSelfWithTime":
+    case "warpExile":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":

@@ -467,6 +467,8 @@ export type Effect =
   | { type: "suspendCast" }
   /** "Exile ~ with three time counters on it": the resolving spell suspends itself again (Arc Blade). */
   | { type: "exileSelfWithTime"; n: number }
+  /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
+  | { type: "warpExile" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
@@ -866,10 +868,10 @@ export type AdditionalCost =
  * going anywhere else when it leaves the stack.
  */
 /**
- * Alternative costs (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a) and bestow (CR 702.103a) from your hand;
- * madness (CR 702.35a) only as its trigger resolves, from exile.
+ * Alternative costs (CR 118.9): evoke (CR 702.74a), dash (CR 702.109a), bestow (CR 702.103a) and blitz (CR 702.152a);
+ * warp (CR 702.185a) only from your hand; madness (CR 702.35a) only as its trigger resolves, from exile.
  */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness";
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp";
 
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
 export interface CastFromGraveyard {
@@ -989,12 +991,14 @@ export interface CompiledCard {
   buyback?: string;
   /** Rebound (CR 702.88). */
   rebound?: boolean;
-  /** Evoke, dash and bestow (CR 702.74, 702.109, 702.103): alternative costs for casting it from your hand. */
+  /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
   altCosts?: { kind: AltCostKind; mana: string }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */
   suspend?: { n: number; cost: string };
+  /** Plot [cost] (CR 702.170a): exile it from your hand as a special action, and cast it free on a later turn (702.170d). */
+  plot?: string;
   /** Dredge N (CR 702.52a): in your graveyard, a draw may be replaced by milling N and returning it to your hand. */
   dredge?: number;
   /** Casualty N (CR 702.153a): you may sacrifice a creature with power N or greater as you cast it, to copy it. */

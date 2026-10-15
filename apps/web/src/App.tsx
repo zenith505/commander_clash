@@ -54,6 +54,9 @@ import {
   madnessCastOf,
   planSuspend,
   suspendProblem,
+  planPlot,
+  plotProblem,
+  plottedCast,
   compileCard,
   kickerName,
   canEnterUntapped,
@@ -599,7 +602,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
-    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend)) return setMenu(o.id);
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot)) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && compileCard(cardOf(s, o.id)).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
@@ -807,6 +810,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 dispatch(planSuspend(s, HUMAN, menu) ?? [{ type: "suspend", player: HUMAN, objectId: menu }]);
               }}
+              onPlot={() => {
+                setMenu(null);
+                dispatch(planPlot(s, HUMAN, menu) ?? [{ type: "plot", player: HUMAN, objectId: menu }]);
+              }}
               onTurnFaceUp={() => {
                 setMenu(null);
                 dispatch(planTurnFaceUp(s, HUMAN, menu) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu }]);
@@ -939,12 +946,14 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness" };
+const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
   bestow: "an Aura on a creature; a creature again if it's ever unattached",
   madness: "",
+  blitz: "haste, and you draw a card when it dies; sacrificed at the end step",
+  warp: "exiled at the end step; you may cast it from exile on a later turn",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape" };
@@ -2106,6 +2115,7 @@ function AbilityMenu({
   onCastAlt,
   onCastFaceDown,
   onSuspend,
+  onPlot,
   onTurnFaceUp,
   onClose,
 }: {
@@ -2123,6 +2133,8 @@ function AbilityMenu({
   onCastFaceDown: () => void;
   /** For a card in hand with suspend: exile it with time counters (CR 702.62a). */
   onSuspend: () => void;
+  /** For a card in hand with plot: exile it, to cast it free on a later turn (CR 702.170a). */
+  onPlot: () => void;
   /** For your face-down permanent: turn it face up. */
   onTurnFaceUp: () => void;
   onClose: () => void;
@@ -2133,6 +2145,7 @@ function AbilityMenu({
   const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
+  const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
   const upCost = o.zone === "battlefield" ? faceUpCost(s, o) : undefined;
   const inYard = o.zone === "graveyard";
   const land = isLand(s, objectId);
@@ -2148,7 +2161,7 @@ function AbilityMenu({
       )}
       {inHand && (
         <button disabled={!playable} onClick={() => onPlay()}>
-          {land ? (choice ? "Play it tapped" : "Play it") : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
+          {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
       {inHand &&
@@ -2164,6 +2177,11 @@ function AbilityMenu({
       {suspend && (
         <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.n} time counter${suspend.n === 1 ? "" : "s"}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
           Suspend {suspend.n} <ManaCost cost={suspend.cost} size="sm" />
+        </button>
+      )}
+      {plot && (
+        <button disabled={!planPlot(s, HUMAN, objectId)} title={plotProblem(s, HUMAN, objectId) ?? "Exile it now. On a later turn you may cast it without paying its mana cost, during your main phase."} onClick={onPlot}>
+          Plot <ManaCost cost={plot} size="sm" />
         </button>
       )}
       {faceDownCast && (
@@ -2917,7 +2935,7 @@ function Hand({ s, ids, cardProps, tucked, onToggle }: { s: GameState; ids: stri
                 className="fan-slot"
                 style={{ ["--rot" as string]: `${off * step}deg`, ["--drop" as string]: (off / Math.max(1, mid)) ** 2 * 0.06 }}
               >
-                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null)} />
+                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || (compileCard(cardOf(s, id)).altCosts ?? []).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).plot && planPlot(s, HUMAN, id) !== null)} />
               </div>
             );
           })}

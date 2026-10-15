@@ -88,9 +88,11 @@ export interface GameObject {
   exileIfDiesTurn?: number;
   /**
    * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
-   * while it's still the same object (`zc`), until the end of this turn or of their next turn.
+   * while it's still the same object (`zc`), until the end of this turn or of their next turn. A warped card
+   * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
+   * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery.
    */
-  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn"; turn: number };
+  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot"; turn: number };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
   /** Provoked: it must block this attacking creature this combat if able (CR 702.39a). Cleared at end of combat. */
@@ -608,6 +610,8 @@ export type Action =
   | { type: "bottomCards"; player: PlayerId; objectIds: ObjectId[] }
   /** Exile a card from your hand with suspend, paying its suspend cost: a special action (CR 116.2f, 702.62a). */
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
+  /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
+  | { type: "plot"; player: PlayerId; objectId: ObjectId }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */

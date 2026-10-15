@@ -30,6 +30,7 @@ card unsupported. Cite the CR number in a comment where the code implements a ru
 3. A new effect type runs in `src/effects/run-<area>.ts`; add its case to the dispatch in `effects/resolve.ts`.
 4. Test in `packages/engine/test/<mechanic>.test.ts` with the helpers in `test/helpers.ts`, using real oracle text
    and asserting `isFullySupported`. Infinite or long loops get CR 732 shortcuts, as in paper Magic.
+5. A new prompt, button or menu entry gets a browser test in `apps/web/e2e/` that clicks through it (see Commands).
 
 ## Commands
 
@@ -41,6 +42,12 @@ card unsupported. Cite the CR number in a comment where the code implements a ru
 - `npm run typecheck` (root), `cd packages/engine && npx vitest run`
 - `npm run coverage` (supported card count), `npm run blockers`, `npm run simulate -- 20` (bot games)
 - `npm run dev`; play-test URL params `?hand=A|B&board=C&yard=D` (cards must be in your deck)
+- `npm run e2e`: browser tests (Playwright, Chromium) that click through the UI's prompts, about 2 minutes; not
+  part of `npx vitest run`. Each test builds its game state with the engine (`scene()` in `apps/web/e2e/scene.ts`:
+  who has what in hand, on the battlefield, in the library) and the dev server opens straight into it. The card
+  definitions they use are in `apps/web/e2e/cards.json`; after quoting a new card name in a test, run
+  `npm run e2e:cards` (needs the unpacked card data). Cloud sessions have Chromium preinstalled; on a PC run
+  `npx playwright install chromium` once.
 
 ## Git
 

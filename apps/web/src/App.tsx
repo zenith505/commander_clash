@@ -128,7 +128,18 @@ const STEP_LABEL: Record<Step, string> = {
   cleanup: "Cleanup",
 };
 
+/**
+ * Browser tests (apps/web/e2e) start the dev server straight into a game state they built with the engine
+ * (`window.__ccTestState`, set before the page loads). Never present in a production build.
+ */
+const testState = import.meta.env.DEV ? (window as { __ccTestState?: GameState }).__ccTestState : undefined;
+
 export function App() {
+  if (testState) return <Table initial={testState} onQuit={() => location.reload()} />;
+  return <DeckLoader />;
+}
+
+function DeckLoader() {
   const [bundle, setBundle] = useState<DeckBundle | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   useEffect(() => {
@@ -628,10 +639,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     else useAbility(pick.objectId, pick.index, modes);
   }
 
-  function clickCard(o: GameObject) {
+  function clickCard(o: GameObject, e?: React.MouseEvent) {
     if (!s) return;
     const d = cardOf(s, o.id);
     if (targeting) {
+      // The click is for this permanent only: it mustn't also reach the seat around it, which would choose its
+      // controller as the target ("any target" would hit the player instead).
+      e?.stopPropagation();
       if (o.zone === "battlefield") pickTarget({ kind: "object", id: o.id });
       return;
     }
@@ -1326,7 +1340,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "returnToHand" ? "Return and activate" : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
+        {pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
@@ -1452,7 +1466,7 @@ interface CardProps {
   targetable: (id: string) => boolean;
   /** Can be declared as an attacker or blocker right now. */
   ready?: (o: GameObject) => boolean;
-  onClick: (o: GameObject) => void;
+  onClick: (o: GameObject, e?: React.MouseEvent) => void;
   onHover: (d: CardDef | null) => void;
   attacks: Record<string, AttackTo>;
   blocks: Record<string, string[]>;
@@ -1491,7 +1505,7 @@ function SingleCard({ o, s, onClick, onHover, attacks, blocks, blocker, discards
   const onField = o.zone === "battlefield";
   return (
     <div className={`slot ${o.tapped ? "slot-tapped" : ""}`}>
-      <div className={classes.join(" ")} data-obj={o.id} onClick={() => onClick(o)} {...hoverProps(seen, onHover)}>
+      <div className={classes.join(" ")} data-obj={o.id} onClick={(e) => onClick(o, e)} {...hoverProps(seen, onHover)}>
         <CardFace d={d} peek={seen !== d ? seen : undefined} />
         {onField && <Modified s={s} o={o} />}
         {o.attacking !== undefined && <span className="badge attack-badge">→ {attackedName(s, o)}</span>}
@@ -3114,10 +3128,12 @@ function targetingArrows(s: GameState, targeting: Targeting | null, intent: Retu
       out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [o.attackingPermanent ? `[data-obj="${o.attackingPermanent.id}"]` : `[data-player="${o.attacking}"]`], color: ATTACK_COLOR });
     for (const a of o.blocking ?? []) out.push({ key: `blk:${id}:${a}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${a}"]`], color: BLOCK_COLOR });
   }
+  // Attacks and blocks still being chosen; for the render right after they're declared, the arrows above have them.
+  const drawn = new Set(out.map((a) => a.key));
   for (const [id, a] of Object.entries(combat.attacks))
-    out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [a.planeswalker ? `[data-obj="${a.planeswalker}"]` : `[data-player="${a.defender}"]`], color: ATTACK_COLOR });
+    if (!drawn.has(`atk:${id}`)) out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [a.planeswalker ? `[data-obj="${a.planeswalker}"]` : `[data-player="${a.defender}"]`], color: ATTACK_COLOR });
   for (const [id, atts] of Object.entries(combat.blocks))
-    for (const att of atts) out.push({ key: `blk:${id}:${att}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${att}"]`], color: BLOCK_COLOR });
+    for (const att of atts) if (!drawn.has(`blk:${id}:${att}`)) out.push({ key: `blk:${id}:${att}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${att}"]`], color: BLOCK_COLOR });
   if (combat.aim) out.push({ key: "aim", from: [`[data-obj="${combat.aim}"]`], to: "cursor", color: ATTACK_COLOR, aiming: true });
   if (combat.blocker) out.push({ key: "aim", from: [`[data-obj="${combat.blocker}"]`], to: "cursor", color: BLOCK_COLOR, aiming: true });
   for (const id of combat.crew?.chosen ?? [])

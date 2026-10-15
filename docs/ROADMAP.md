@@ -1,6 +1,6 @@
 # Roadmap
 
-12,062 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+12,178 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,9 +14,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. **Madness, suspend, bestow, dredge, casualty.**
-2. **CR 732 loop shortcuts.**
-3. Then by `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
+1. **CR 732 loop shortcuts.**
+2. Then by `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
    "assign combat damage as though it weren't blocked", flash with a cleanup sacrifice, Start your engines!.
 
 ## Known gaps (from earlier rounds)
@@ -57,6 +56,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes, Absorbing Man,
   Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection; planeswalkers (Saheeli,
   Oko, Kaya).
+- Madness: "if its madness cost was paid" (Grave Scrabbler), X or non-mana madness costs, granting madness (Falkenrath
+  Gorger), "whenever you discard a card, if it has madness" (Anje Falkenrath). A madness or suspended commander is
+  moved to the command zone (the 903.9a choice is always yes).
+- Suspend: X or non-mana suspend costs; cards that look at or change suspended cards and time counters (Jhoira,
+  Clockspinning, Greater Gargadon, Deep-Sea Kraken, Delay, Dust of Moments, As Foretold, Chronozoa, vanishing).
+- Bestow: non-mana bestow costs. Casualty X (Ob Nixilis), granted casualty (Anhelo). Dredge granted to other cards.
 
 ## Later
 

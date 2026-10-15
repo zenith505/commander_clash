@@ -1,5 +1,5 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
@@ -249,7 +249,8 @@ export function applyAction(state: GameState, action: Action): GameState {
       break;
     case "activateMana":
       // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
-      if (s.pending?.kind !== "payUnless" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana)) requireNoPending(s);
+      // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
+      if (s.pending?.kind !== "payUnless" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
       activateMana(s, p, action.objectId, action.mana, action.ability);
       break;
     case "castSpell":
@@ -316,6 +317,13 @@ export function applyAction(state: GameState, action: Action): GameState {
       requireNoPending(s);
       turnFaceUp(s, p, action.objectId);
       break;
+    case "suspend":
+      requireNoPending(s);
+      suspendCard(s, p, action.objectId);
+      break;
+    case "dredge":
+      chooseDredge(s, p, action.objectId);
+      break;
   }
   // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
@@ -353,9 +361,16 @@ export function log(s: GameState, text: string) {
   s.log.push({ seq: s.log.length, turn: s.turn, text });
 }
 
-/** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"). */
+/** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
 export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.pending?.kind === "castFree" && s.pending.player === pid ? s.pending.objectId : undefined;
+}
+
+/** The madness cost `pid` may cast this card for right now, as its madness ability resolves (CR 702.35a). */
+export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
+  const pend = s.pending;
+  if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || pend.how !== "madness") return undefined;
+  return compileCard(defOf(s, obj(s, id))).madness;
 }
 
 function requireNoPending(s: GameState) {
@@ -471,6 +486,8 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
+    o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
+    o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
     // A face-down spell becomes a face-down permanent (CR 708.4); anywhere else, it's revealed (CR 708.9).
     if (o.faceDown) {
       o.faceDown = undefined;
@@ -784,19 +801,66 @@ function removeFromCombat(s: GameState, o: GameObject) {
   }
 }
 
-export function draw(s: GameState, pid: PlayerId, n = 1) {
-  const p = player(s, pid);
+/**
+ * `pid` draws `n` cards, one at a time (CR 121.2). Dredge can replace each draw (CR 702.52a): when the player has a
+ * card that could, the draws stop for that choice and it returns false; answering it (chooseDredge) does the rest
+ * of them, then carries on with what was drawing (`after`, or the resolving spell or ability).
+ */
+export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep"): boolean {
   for (let i = 0; i < n; i++) {
-    const top = p.library[0];
-    if (!top) {
-      p.drewFromEmptyLibrary = true; // CR 704.5b
-      return;
+    const options = dredgeOptions(s, pid);
+    if (options.length) {
+      s.pending = { kind: "dredge", player: pid, options, left: n - i, ...(after ? { after } : {}) };
+      return false;
     }
-    moveObject(s, top, "hand");
-    // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
-    p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
-    fireEvent(s, { type: "draw", player: pid, nth: p.draws.n });
+    if (!drawOne(s, pid)) break;
   }
+  return true;
+}
+
+function drawOne(s: GameState, pid: PlayerId): boolean {
+  const p = player(s, pid);
+  const top = p.library[0];
+  if (!top) {
+    p.drewFromEmptyLibrary = true; // CR 704.5b
+    return false;
+  }
+  moveObject(s, top, "hand");
+  // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
+  p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
+  fireEvent(s, { type: "draw", player: pid, nth: p.draws.n });
+  return true;
+}
+
+/** Cards in `pid`'s graveyard whose dredge could replace their next draw: dredge N needs N cards in their library (CR 702.52a-b). */
+export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
+  const p = player(s, pid);
+  if (p.lost) return [];
+  return p.graveyard.filter((id) => {
+    const n = compileCard(defOf(s, obj(s, id))).dredge;
+    return n !== undefined && p.library.length >= n;
+  });
+}
+
+/**
+ * Dredge instead of drawing (CR 702.52a): mill N, then return the card to hand; it isn't a draw. Or draw. Then the
+ * rest of the draws, and whatever was drawing carries on.
+ */
+function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
+  const pend = s.pending;
+  if (pend?.kind !== "dredge" || pend.player !== p.id) throw new RulesError("no draw to replace");
+  if (id !== undefined && !pend.options.includes(id)) throw new RulesError("that card can't be dredged");
+  s.pending = null;
+  if (id !== undefined) {
+    const n = compileCard(defOf(s, obj(s, id))).dredge!;
+    const milled = p.library.slice(0, n);
+    for (const c of milled) moveObject(s, c, "graveyard");
+    moveObject(s, id, "hand");
+    log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
+  } else drawOne(s, p.id);
+  if (!draw(s, p.id, pend.left - 1, pend.after)) return;
+  if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
+  else if (s.resolving) continueResolution(s);
 }
 
 // ---------------------------------------------------------------------------
@@ -818,8 +882,12 @@ const STEP_ORDER: Step[] = [
   "cleanup",
 ];
 
-function advanceStep(s: GameState) {
+function advanceStep(s: GameState): void {
   for (const p of s.players) p.manaPool = emptyPool(); // CR 500.4
+  if (s.step === "cleanup" && s.cleanupAgain) {
+    s.cleanupAgain = undefined;
+    return beginStep(s, "cleanup"); // CR 514.3a
+  }
   if (s.step === "cleanup") return startNextTurn(s);
   // CR 511.3: as the end of combat step ends, everything is removed from combat.
   if (s.step === "endCombat") for (const o of attackersAndBlockers(s)) clearCombat(o);
@@ -851,7 +919,7 @@ function startNextTurn(s: GameState) {
 }
 
 /** Enter a step, perform its turn-based actions, and give the active player priority if the step has priority. */
-function beginStep(s: GameState, step: Step) {
+function beginStep(s: GameState, step: Step): void {
   s.step = step;
   s.passedInSuccession = [];
   s.priority = s.activePlayer;
@@ -873,7 +941,7 @@ function beginStep(s: GameState, step: Step) {
       break;
     }
     case "draw":
-      draw(s, ap); // CR 504.1 (no one skips in multiplayer, CR 103.8c)
+      if (!draw(s, ap, 1, "drawStep")) return; // CR 504.1 (no one skips in multiplayer, CR 103.8c); dredge may replace it
       fireEvent(s, { type: "step", step: "draw", active: ap }); // "at the beginning of the draw step" triggers after it (CR 504.2)
       break;
     case "end":
@@ -943,6 +1011,14 @@ function finishCleanup(s: GameState) {
       const m = obj(s, id).mayPlay;
       if (m && (m.until === "thisTurn" || (s.activePlayer === m.player && s.turn > m.turn))) obj(s, id).mayPlay = undefined;
     }
+  // Abilities that triggered during cleanup (madness, from discarding down to hand size): players get priority, then
+  // there's another cleanup step (CR 514.3a).
+  if (s.triggerQueue.length) {
+    s.cleanupAgain = true;
+    s.priority = s.activePlayer;
+    s.passedInSuccession = [];
+    return;
+  }
   advanceStep(s);
 }
 
@@ -994,14 +1070,20 @@ function resolveTop(s: GameState) {
     if (enchant) {
       // An Aura spell's target is checked on resolution like any other (CR 608.2b); it enters attached to it (CR 303.4f).
       const t = item.targets?.[0];
-      if (!t || t.kind !== "object" || !isLegalTarget(s, enchant, t, item.controller, d)) {
+      const legal = !!t && t.kind === "object" && isLegalTarget(s, enchant, t, item.controller, d);
+      if (legal) {
+        log(s, `${d.name} resolves and enters attached to ${nameOf(s, t.id)}.`);
+        moveObject(s, o.id, "battlefield", { controller: item.controller, attachTo: t.id });
+        return;
+      }
+      if (!o.bestowed) {
         log(s, `${d.name} does nothing (its target is gone).`);
         moveObject(s, o.id, "graveyard");
         return;
       }
-      log(s, `${d.name} resolves and enters attached to ${nameOf(s, t.id)}.`);
-      moveObject(s, o.id, "battlefield", { controller: item.controller, attachTo: t.id });
-      return;
+      // A bestowed Aura spell with an illegal target becomes a creature spell and resolves (CR 702.103e, 608.3b).
+      o.bestowed = undefined;
+      log(s, `${d.name}'s target is gone, so it resolves as a creature.`);
     }
     log(s, `${d.name} resolves and enters the battlefield.`);
     moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}) });
@@ -1181,9 +1263,20 @@ export function castProblem(
     }
   }
   if (o.faceDown && !choices?.faceDown) return "a face-down card can't be cast";
+  if (choices?.alt === "bestow" && !o.bestowed) {
+    // Cast bestowed, only its characteristics as an Aura spell are looked at (CR 702.103d).
+    if (!altCost(defOf(s, o), "bestow")) return `${defOf(s, o).name} doesn't have bestow`;
+    o.bestowed = true;
+    try {
+      return castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices);
+    } finally {
+      o.bestowed = undefined;
+    }
+  }
   const d = defOf(s, o);
   const fromCommand = o.zone === "command";
   const free = freeCastOf(s, pid) === id;
+  const madness = madnessCastOf(s, pid, id);
   // Casting it face down is an alternative cost: no other one can go with it (CR 118.9a).
   if (choices?.faceDown && (free || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   const via = graveyardCast(d, choices?.via);
@@ -1195,11 +1288,14 @@ export function castProblem(
     return o.zone === "graveyard" && compileCard(d).fromGraveyard?.length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
+    if (choices.alt === "madness") return "madness is cast as its ability resolves";
     if (!altCost(d, choices.alt)) return `${d.name} doesn't have ${choices.alt}`;
     // Only one alternative cost can be applied to a spell (CR 118.9a).
     if (via || free) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
   }
   if (isType(d, "Land")) return "lands are played, not cast";
+  // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
+  if (!d.manaCost && !free && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
@@ -1224,12 +1320,15 @@ export function castProblem(
   const xp = xProblem(parseManaCost(d.manaCost), x);
   if (xp) return xp;
   // Cast without paying its mana cost, the only choice for X is 0 (CR 107.3b).
-  if (free && x) return "X is 0 when a spell is cast without paying its mana cost";
+  if (free && !madness && x) return "X is 0 when a spell is cast without paying its mana cost";
+  if (madness && x && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
   if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices);
   if (ap) return ap;
+  const cp = casualtyProblem(s, pid, d, choices);
+  if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
   if (typeof cost === "string") return cost;
   if (!payFromPool(cost.cost, p.manaPool, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
@@ -1250,12 +1349,13 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const mods = costModsFor(s, pid, o, d, x);
   // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
   // increases (CR 118.9d, 601.2f).
-  if (freeCastOf(s, pid) === o.id) return { cost: parseManaCost(kickCost), extra: Math.max(0, mods.more - mods.less) };
+  const madness = madnessCastOf(s, pid, o.id);
+  if (freeCastOf(s, pid) === o.id && !madness) return { cost: parseManaCost(kickCost), extra: Math.max(0, mods.more - mods.less) };
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
-  // So do evoke and dash (CR 702.74a, 702.109a).
-  const base = how.faceDown ? "{3}" : (graveyardCast(d, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost);
+  // So do evoke, dash, bestow and madness (CR 702.74a, 702.109a, 702.103a, 702.35a).
+  const base = how.faceDown ? "{3}" : (madness ?? graveyardCast(d, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost);
   const mana = parseManaCost(base + kickCost);
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
@@ -1387,7 +1487,10 @@ function tapCreaturesProblem(s: GameState, pid: PlayerId, ids: ObjectId[], what:
 const convokeProblem = (s: GameState, pid: PlayerId, ids: ObjectId[]) => tapCreaturesProblem(s, pid, ids, "convoke");
 
 /** Target specs a card needs when cast (empty for most permanents). For a modal spell, those of the chosen modes. */
-export const spellTargets = (s: GameState, id: ObjectId, modes?: number[]) => spellTargetSpecs(defOf(s, obj(s, id)), modes);
+export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind) => spellTargetSpecs(castDef(s, id, alt), modes);
+
+/** What casting this card puts on the stack: the card, or for a bestowed cast, the Aura it is then (CR 702.103b, d). */
+export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef => (alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id)));
 
 /** A modal spell's choices, if this card is one (CR 700.2). */
 export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, obj(s, id))).spell?.modal;
@@ -1399,6 +1502,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (problem) throw new RulesError(problem);
     o.faceDown = compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
   }
+  if (choices.alt === "bestow" && !o.bestowed) {
+    const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
+    if (problem) throw new RulesError(problem);
+    o.bestowed = true; // an Aura spell with enchant creature from the moment it's cast (CR 702.103b)
+  }
+  const madness = madnessCastOf(s, p.id, id);
+  const suspended = s.pending?.kind === "castFree" && s.pending.how === "suspend" && s.pending.objectId === id;
   const d = defOf(s, o);
   const spell = compileCard(d).spell;
   // Modes first (CR 601.2b), then the targets they need (601.2c).
@@ -1426,12 +1536,14 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.castFrom = castFrom;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
-  o.castAlt = choices.alt;
+  o.castAlt = madness ? "madness" : choices.alt;
+  // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
+  if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
   if (via?.exile) o.exileIfLeaves = "stack"; // CR 702.34a, 702.133a
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;
-  const free = freeCastOf(s, p.id) === id;
+  const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
   const hasX = parseManaCost(d.manaCost).hasX;
   s.stack.push({
@@ -1454,7 +1566,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
@@ -1463,6 +1576,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const sacrificed = payAdditionalCosts(s, p, d, choices, via?.costs ?? []);
   if (sacrificed.length) item.sacrificed = sacrificed;
+  // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
+  if (choices.casualty) {
+    log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
+    moveObject(s, choices.casualty, "graveyard");
+    item.casualty = true;
+  }
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
@@ -1495,6 +1614,26 @@ function kickProblem(d: CardDef, kicks?: number[]): string | null {
   if (!k) return `${d.name} has no kicker`;
   if (kicks.some((i) => !Number.isInteger(i) || i < 0 || i >= k.costs.length)) return `${d.name} has no such kicker cost`;
   if (!k.multi && new Set(kicks).size !== kicks.length) return "each kicker cost can be paid only once";
+  return null;
+}
+
+/** Creatures `pid` could sacrifice for this card's casualty N: creatures they control with power N or greater (CR 702.153a). */
+export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): ObjectId[] {
+  const n = compileCard(d).casualty;
+  if (n === undefined) return [];
+  return s.battlefield.filter((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n;
+  });
+}
+
+function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {
+  const id = choices?.casualty;
+  if (id === undefined) return null;
+  const n = compileCard(d).casualty;
+  if (n === undefined) return `${d.name} doesn't have casualty`;
+  if (!casualtyCandidates(s, pid, d).includes(id)) return `casualty ${n} sacrifices a creature you control with power ${n} or greater`;
+  if (choices?.sacrifice?.includes(id)) return `${nameOf(s, id)} is already being sacrificed`;
   return null;
 }
 
@@ -1709,7 +1848,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
-  if (ab.discardSelf) moveObject(s, id, "graveyard");
+  if (ab.discardSelf) discardCards(s, p.id, [id], "", true);
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
   s.stack.push({
@@ -2003,10 +2142,7 @@ function discardToHandSize(s: GameState, p: Player, ids: ObjectId[]) {
   if (pend?.kind !== "discardToHandSize" || pend.player !== p.id) throw new RulesError("no discard pending");
   if (new Set(ids).size !== pend.count || ids.some((id) => !p.hand.includes(id)))
     throw new RulesError(`choose exactly ${pend.count} card(s) from your hand`);
-  for (const id of ids) {
-    log(s, `${p.name} discards ${nameOf(s, id)}.`);
-    moveObject(s, id, "graveyard");
-  }
+  discardCards(s, p.id, ids);
   s.pending = null;
   finishCleanup(s);
 }
@@ -2404,7 +2540,14 @@ function attachmentSBAs(s: GameState): boolean {
       const enchant = compileCard(defOf(s, o)).enchant;
       // Protection from the Aura's color makes it illegal too (CR 702.16c).
       const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false, c);
-      if (!legal) {
+      if (!legal && o.bestowed) {
+        // A bestowed Aura becomes unattached and stops being bestowed: it's an enchantment creature (CR 702.103f).
+        o.attachedTo = undefined;
+        o.bestowed = undefined;
+        invalidateCharacteristics(s);
+        log(s, `${c.name} becomes unattached and is a creature again (bestow).`);
+        changed = true;
+      } else if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to anything it can enchant).`);
         moveObject(s, id, "graveyard");
         changed = true;
@@ -2437,6 +2580,11 @@ function syncControl(s: GameState) {
   for (const id of s.battlefield) {
     const o = obj(s, id);
     const now = controllerOf(s, o);
+    // Suspend's haste lasts until its controller loses control of it (CR 702.62a), for good.
+    if (o.suspendHaste !== undefined && o.suspendHaste !== now) {
+      o.suspendHaste = undefined;
+      invalidateCharacteristics(s);
+    }
     if (o.seenController === undefined) o.seenController = now;
     else if (o.seenController !== now) {
       o.seenController = now;
@@ -2534,6 +2682,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     if (isType(d, "Land")) {
       if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid)) out.push({ type: "playLand", player: pid, objectId: id });
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
+    if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
   }
   for (const id of p.command) if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
   for (const id of s.battlefield) {
@@ -2545,6 +2694,39 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     });
   }
   return out;
+}
+
+/**
+ * Why `pid` can't suspend this card right now, or null (with the mana in their pool). Suspending is a special
+ * action (CR 116.2f) they can take whenever they could begin to cast the card from their hand (CR 702.62a, c):
+ * its card type's timing and anything stopping it from being cast count; targets and its mana cost don't (rulings).
+ */
+export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const o = s.objects[id];
+  if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be suspended";
+  const d = defOf(s, o);
+  const sus = compileCard(d).suspend;
+  if (!sus) return `${d.name} doesn't have suspend`;
+  if (s.priority !== pid || s.pending) return "you don't have priority";
+  if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
+  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash");
+  if (!instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be suspended when you could cast it (sorcery speed)`;
+  if (!payFromPool(parseManaCost(sus.cost), player(s, pid).manaPool)) return `not enough mana to suspend ${d.name} (${sus.cost})`;
+  return null;
+}
+
+/** Suspend a card (CR 702.62a): pay its suspend cost and exile it with N time counters on it. It doesn't use the stack. */
+function suspendCard(s: GameState, p: Player, id: ObjectId) {
+  const problem = suspendProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const o = obj(s, id);
+  const d = defOf(s, o);
+  const sus = compileCard(d).suspend!;
+  p.manaPool = payFromPool(parseManaCost(sus.cost), p.manaPool)!.pool;
+  moveObject(s, id, "exile");
+  o.counters.time = sus.n;
+  log(s, `${p.name} suspends ${d.name} with ${sus.n} time counter${sus.n === 1 ? "" : "s"} (${sus.cost}).`);
+  s.passedInSuccession = [];
 }
 
 /**

@@ -125,6 +125,13 @@ export interface GameObject {
   chosen?: Chosen;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
   devoured?: number;
+  /**
+   * Cast bestowed (CR 702.103b): as a spell and as the permanent it becomes, it's an Aura with enchant creature, not a
+   * creature (see defOf). It stops being bestowed when it becomes unattached or resolves with an illegal target (702.103e-f).
+   */
+  bestowed?: boolean;
+  /** A creature spell cast with suspend has haste until this player loses control of it (CR 702.62a). */
+  suspendHaste?: PlayerId;
   /** Soulbond (CR 702.95b): the creature it's paired with (that object, by its zone changes) and who paired them. */
   paired?: { id: ObjectId; zc: number; by: PlayerId };
 }
@@ -224,6 +231,8 @@ export interface StackItem {
   ifCond?: StaticCondition;
   /** For a spell: how many spells were cast before it this turn (storm, CR 702.40a). */
   castNth?: number;
+  /** For a spell: its casualty cost was paid (CR 702.153a). */
+  casualty?: boolean;
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
 }
@@ -298,6 +307,8 @@ export interface CostChoices {
   exileCards?: ObjectId[];
   /** Permanents to return to their owner's hand: ninjutsu's unblocked attacker (CR 702.49a). */
   returnToHand?: ObjectId[];
+  /** The creature sacrificed for casualty (CR 702.153a), if any. */
+  casualty?: ObjectId;
 }
 
 /**
@@ -338,7 +349,12 @@ export type PendingDecision =
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
    */
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" }
+  /**
+   * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
+   * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
+   */
+  | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; after?: "drawStep" }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
    * mulligans this player has taken so far; `bottomIfKept` how many cards keeping now costs.
@@ -425,6 +441,8 @@ export interface GameState {
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
   lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string }>;
   nextTimestamp: number;
+  /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
+  cleanupAgain?: boolean;
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
   mulligans?: MulliganState | null;
@@ -490,6 +508,7 @@ export interface Resolving {
   did?: boolean;
   scratch?: {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
+    drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     may?: boolean; // the answer to "you may ..."
@@ -540,6 +559,10 @@ export type Action =
   | { type: "mulligan"; player: PlayerId; keep: boolean }
   /** Answer to bottomCards: these cards go on the bottom of the library, the first one lowest. */
   | { type: "bottomCards"; player: PlayerId; objectIds: ObjectId[] }
+  /** Exile a card from your hand with suspend, paying its suspend cost: a special action (CR 116.2f, 702.62a). */
+  | { type: "suspend"; player: PlayerId; objectId: ObjectId }
+  /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
+  | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */

@@ -8,6 +8,7 @@ import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigge
 import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { kickedMatches } from "./run-spells";
+import { isSuspended } from "./run-zones";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
 const STEP_TRIGGERS: Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]> = {
@@ -301,6 +302,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
+    // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
+    if (o?.zone === "exile" && ev.counter === "time" && compileCard(defOf(s, o)).suspend)
+      s.triggerQueue.push({
+        sourceId: o.id,
+        sourceCardId: cardIdOf(o),
+        controller: o.owner,
+        index: -1,
+        subject: { id: o.id, zc: o.zoneChanges ?? 0 },
+        body: { targets: [], effects: [{ type: "suspendCast" }], text: "Suspend: the last time counter was removed from ~. You may cast it without paying its mana cost." },
+      });
   } else if (ev.type === "attacksAlone") {
     // Exalted: each permanent its controller controls with exalted triggers (CR 702.83a).
     const attacker = obj(s, ev.id);
@@ -328,7 +339,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       s.nextCast = s.nextCast!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
     }
-    if (spell && !ev.copy) add(spell, ev.controller, (e) => e === "selfCast", compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
+    // Casualty's copy only if its casualty cost was paid (CR 702.153a).
+    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
@@ -401,6 +413,21 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);
+    // Suspend's second ability works in exile (CR 702.62a): "At the beginning of your upkeep, if this card is
+    // suspended, remove a time counter from it." Its owner controls it (CR 113.8).
+    if (ev.step === "upkeep")
+      for (const id of player(s, ev.active).exile) {
+        const o = obj(s, id);
+        if (isSuspended(s, o))
+          s.triggerQueue.push({
+            sourceId: id,
+            sourceCardId: cardIdOf(o),
+            controller: ev.active,
+            index: -1,
+            subject: { id, zc: o.zoneChanges ?? 0 },
+            body: { targets: [], effects: [{ type: "suspendTick" }], text: "Suspend: remove a time counter from ~." },
+          });
+      }
     const [want, each] = STEP_TRIGGERS[ev.step];
     for (const id of s.battlefield) {
       const o = obj(s, id);

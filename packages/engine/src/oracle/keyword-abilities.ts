@@ -59,13 +59,42 @@ export function parseGraveyardKeyword(
 
 /**
  * Keywords about costs: echo (CR 702.30), cumulative upkeep (702.24), evoke (702.74), dash (702.109),
- * delve (702.66), living weapon (702.92), scavenge (702.97).
+ * delve (702.66), living weapon (702.92), scavenge (702.97), bestow (702.103), madness (702.35), suspend (702.62),
+ * casualty (702.153), dredge (702.52).
  */
 export function parseCostKeyword(
   line: string,
   d: CardDef,
-): { alt?: { kind: AltCostKind; mana: string }; trigger?: TriggeredAbility; activated?: ActivatedAbility; delve?: true; faceDown?: { kind: FaceDownKind; cost: string } } | "fail" | null {
+): {
+  alt?: { kind: AltCostKind; mana: string };
+  trigger?: TriggeredAbility;
+  activated?: ActivatedAbility;
+  delve?: true;
+  faceDown?: { kind: FaceDownKind; cost: string };
+  madness?: string;
+  suspend?: { n: number; cost: string };
+  casualty?: number;
+  dredge?: number;
+} | "fail" | null {
   let m: RegExpExecArray | null;
+  // Bestow (CR 702.103a); "Bestow—{R}, Collect evidence 6" isn't modeled. (Cast bestowed, the card is an Aura: see bestowedDef.)
+  if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
+  // Madness (CR 702.35a): "Madness—{1}{B}, Pay 1 life" and X madness costs aren't modeled.
+  if ((m = /^Madness(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { madness: m[1]! } : "fail";
+  // Suspend N—[cost] (CR 702.62a); "Suspend X—{X}{U}. X can't be 0." isn't modeled.
+  if ((m = /^Suspend (\d+)—((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[2]!) ? { suspend: { n: Number(m[1]), cost: m[2]! } } : "fail";
+  if (/^Suspend\b/.test(line)) return "fail";
+  // Casualty N (CR 702.153a): an optional additional cost, and "when you cast this spell, if a casualty cost was paid
+  // for it, copy it. If the spell has any targets, you may choose new targets for the copy."
+  if ((m = /^Casualty (\d+)$/.exec(line))) {
+    return {
+      casualty: Number(m[1]),
+      trigger: { event: "selfCast", ifCasualty: true, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Casualty: copy ~. You may choose new targets for the copy." } },
+    };
+  }
+  if (/^Casualty\b/.test(line)) return "fail";
+  // Dredge N (CR 702.52a).
+  if ((m = /^Dredge (\d+)$/.exec(line))) return { dredge: Number(m[1]) };
   // Morph, megamorph, disguise (CR 702.37, 702.168): costs other than mana ("Reveal a blue card") aren't modeled.
   if ((m = /^(Morph|Megamorph|Disguise)(?: |—)(.+?)\.?$/.exec(line))) {
     const cost = m[2]!;

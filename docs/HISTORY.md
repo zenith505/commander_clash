@@ -44,3 +44,4 @@ the full write-ups were in `docs/PLAN.md` until the restructure: `git show $(git
 | 2026-10-14 | Split second, devour, exploit, ascend and the city's blessing; "activate only if", "if ..., ... instead" | 11,881 | split-second-devour-exploit-ascend.test.ts |
 | 2026-10-14 | Soulbond, Backgrounds and two commanders (partner pairs), blocking additional creatures, "as long as you're the monarch" | 11,952 | soulbond-backgrounds-blocks.test.ts |
 | 2026-10-14 | "Becomes a copy" (CR 707.4) with durations and exceptions: Mirage Mirror, Mirrorweave, Cryptoplasm, Vesuvan Doppelganger, True Polymorph, Cemetery Puca, Shapesharer; ability words before activated abilities | 12,062 | becomes-a-copy.test.ts |
+| 2026-10-14 | Madness, suspend (and spells that suspend themselves again), bestow, dredge, casualty; no-mana-cost cards can't be cast normally (CR 118.6); cleanup gets priority when something triggers (CR 514.3a) | 12,178 | madness-suspend-bestow-dredge-casualty.test.ts |

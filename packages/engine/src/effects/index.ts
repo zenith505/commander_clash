@@ -15,6 +15,7 @@ export { harmfulCounter } from "./run-permanents";
 export { tokenDef } from "./run-tokens";
 export { unlessCost, addDelayed, kickedMatches } from "./run-spells";
 export { discardCards } from "./run-library";
+export { isSuspended } from "./run-zones";
 export { canPayNow, timesPay } from "./run-choices";
 export { COLOR_NAMES, describePay, describeDest, describeMods } from "./describe";
 export { inCombat, attackDefault, echoDue, evolves, fireEvent, processTriggerQueue, checkStateTriggers, triggerBody, pushTrigger, type TriggerSourceEvent } from "./triggers";

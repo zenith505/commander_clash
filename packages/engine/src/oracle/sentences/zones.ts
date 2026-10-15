@@ -1,13 +1,17 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, PlayerRef } from "../../abilities";
-import { NUM, amt } from "../words";
+import { NUM, amt, num } from "../words";
 import { pickFilter, parsePlayer, parseObject, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import type { Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+
+  // An instant or sorcery that exiles itself as it resolves, so it isn't put into the graveyard (CR 608.2n);
+  // with suspend, it's suspended again (Arc Blade). If it doesn't resolve, it isn't exiled.
+  if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
 
   // Graveyards. Cards in a graveyard (CR 109.2a): returning them, reanimating them, exiling them.
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all) graveyards?$/i.exec(s))) {

@@ -20,6 +20,7 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   o.spellCopy = true;
   o.kicked = card.kicked;
   o.castAlt = card.castAlt;
+  o.bestowed = card.bestowed; // a copy of a bestowed Aura spell is one too (CR 702.103c)
   const name = orig.description.replace(/ \(copy\)$/, "");
   const id = `s${s.nextId++}`;
   const { castNth: _, ...rest } = structuredClone(orig);

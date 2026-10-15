@@ -306,12 +306,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?))\.$/.exec(line);
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to that creature)?))\.$/.exec(line);
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
     if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
     if (!YARD_EVENTS.includes(t.event) || t.host) return "fail";
-    const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true });
+    // "Attached to that creature": the entering creature, the trigger's subject.
+    const attach = / attached to that creature$/.test(yard[2]!);
+    if (attach && !(t.event === "permanentEnters" && t.enters?.filter.types?.includes("Creature")) && t.event !== "anotherCreatureYouControlEnters") return "fail";
+    const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true, ...(attach ? { subject: true } : {}) });
     return body ? { ...t, body, zone: "graveyard" } : "fail";
   }
   // "Whenever the Ring tempts you" (CR 701.54d). "If you chose a creature other than ~ as your Ring-bearer" is an

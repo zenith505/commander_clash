@@ -19,6 +19,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // while it's still the object whose ability was activated or triggered (CR 400.7).
   if (ctx.selfCard && (m = /^Return ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s)))
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
+  // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
+  // to the battlefield attached to that creature."
+  if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
+    return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all) graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =

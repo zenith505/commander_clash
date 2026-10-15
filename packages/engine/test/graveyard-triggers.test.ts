@@ -2,7 +2,7 @@
 // only in that zone (CR 113.6m), and the card's owner controls it (CR 113.8). The Eidolons, Squee, Akoum Firebird.
 
 import { describe, expect, it } from "vitest";
-import { act, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, card, cast, passUntil, pt, putOnBattlefield, setup } from "./helpers";
 import { botActions, compileCard, planCast, isFullySupported, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -141,5 +141,32 @@ describe("spell and enchantment subtypes in filters (CR 205.3h, 205.3k)", () => 
     expect(s.pending).toMatchObject({ kind: "chooseMay" });
     s = toChoice(act(s, { type: "chooseMay", player: ap, yes: true }));
     expect(s.objects[o]!.zone).toBe("hand");
+  });
+});
+
+describe("returning an Aura from the graveyard attached to the entering creature (CR 303.4f)", () => {
+  const scales = card("Dragon Scales", "Enchantment — Aura", "{1}{W}", {
+    keywords: ["Enchant"],
+    oracleText: "Enchant creature\nEnchanted creature gets +1/+2 and has vigilance.\nWhen a creature with mana value 6 or greater enters, you may return this card from your graveyard to the battlefield attached to that creature.",
+  });
+  const big = card("Craw Wurm", "Creature — Wurm", "{4}{G}{G}", { power: "6", toughness: "4", cmc: 6 });
+  const bigWhiteProof = card("Wurm of Purity", "Creature — Wurm", "{4}{G}{G}", { power: "6", toughness: "4", cmc: 6, keywords: ["Protection from white"], oracleText: "Protection from white" });
+
+  it("attaches to that creature; one with protection from white can't have it, so it stays (CR 303.4d, 303.4g)", () => {
+    supported(scales);
+    const { s: s0, ap, ids } = setup([big, bigWhiteProof]);
+    const sc = inGraveyard(s0, ap, scales);
+    let s = toChoice(cast(s0, ap, ids[0]!));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = toChoice(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[sc]!.zone).toBe("battlefield");
+    expect(s.objects[sc]!.attachedTo).toBe(ids[0]);
+    expect(pt(s, ids[0]!)).toBe("7/6");
+
+    const t = setup([bigWhiteProof]);
+    const sc2 = inGraveyard(t.s, t.ap, scales);
+    let u = toChoice(cast(t.s, t.ap, t.ids[0]!));
+    u = toChoice(act(u, { type: "chooseMay", player: t.ap, yes: true }));
+    expect(u.objects[sc2]!.zone).toBe("graveyard");
   });
 });

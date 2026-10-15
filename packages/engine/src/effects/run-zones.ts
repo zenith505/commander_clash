@@ -4,7 +4,7 @@ import { attackedName, attackedPlaneswalker, auraHostFor, castProblem, destroyPe
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
-import { pickOptions } from "./targeting";
+import { objectMatches, pickOptions } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
@@ -345,6 +345,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const d = defOf(s, o);
         // An Aura put onto the battlefield this way needs a choice of what it enchants (CR 303.4f);
         // the compiler doesn't produce this effect for cards that could be Auras, so this is a safeguard.
+        if (e.attachToSubject) {
+          // An Aura returned "attached to that creature" (CR 303.4f): only to one it could enchant, protection
+          // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.
+          const enchant = compileCard(d).enchant;
+          const host = ctx.subject && s.objects[ctx.subject.id];
+          const ok = !!enchant && !!host && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && objectMatches(s, enchant, host, ctx.controller, false, d);
+          if (!ok) {
+            log(s, `${d.name} can't be attached to that creature, so it stays in the graveyard.`);
+            continue;
+          }
+          log(s, `${src} returns ${d.name} to the battlefield attached to ${defOf(s, host).name}.`);
+          moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host.id });
+          continue;
+        }
         if (!isPermanentCard(d) || d.subtypes.includes("Aura")) continue;
         const under = e.owner ? o.owner : ctx.controller;
         log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under).name}'s control${e.tapped ? ", tapped" : ""}.`);

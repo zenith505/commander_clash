@@ -279,6 +279,8 @@ export type Modification =
   | { kind: "doesntUntap" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
   | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
+  /** Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able. */
+  | { kind: "goad" }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
@@ -494,7 +496,7 @@ export type Effect =
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
   | { type: "evolve" }
   /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game"; notSource?: boolean }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn"; notSource?: boolean }
   | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
   | { type: "transformSelf" }
@@ -510,7 +512,7 @@ export type Effect =
    */
   | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" }
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
-  | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean }
+  | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean; /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */ counters?: { counter: CounterKind; n: Amount } }
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   | { type: "exileTop"; who: PlayerRef; n: Amount }
@@ -583,7 +585,11 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop"; rest: "graveyard" | "bottom"; reveal: boolean }
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop" | "battlefield"; rest: "graveyard" | "bottom" | "shuffle"; reveal: boolean; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
+  /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
+  | { type: "venture"; undercity?: true }
+  /** "You take the initiative" (CR 726). */
+  | { type: "takeInitiative"; who: PlayerRef }
   /**
    * "Choose a creature type." / "Choose a color." while it resolves: later instructions use the
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
@@ -640,6 +646,7 @@ export type TriggerEvent =
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
   | "monarchEndStep" // the monarch's inherent abilities (CR 725.2): no source, fired by the game
+  | "ventureRoom" // a dungeon's room abilities (CR 309.4c) and the initiative's (CR 726.2), fired by the game
   | "monarchDamaged"
   /** The Ring's abilities (CR 701.54c), from the player's emblem: fired by the game for their Ring-bearer. */
   | "ringBearerAttacks"

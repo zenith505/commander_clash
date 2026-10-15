@@ -16,6 +16,7 @@ import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseTargetPhrase } from "./targets";
 import { backupTriggers } from "./grants";
+import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept } from "./tokens";
 
 const cache = new Map<string, CompiledCard>();
@@ -26,6 +27,9 @@ export function compileCard(d: CardDef): CompiledCard {
   const out = compile(d);
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
+  if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;
+  const rooms = dungeonTriggers(d.oracleId);
+  if (rooms) out.triggers = rooms;
   cache.set(d.oracleId, out);
   return out;
 }
@@ -61,6 +65,25 @@ const MONARCH_TRIGGERS: TriggeredAbility[] = [
       text: "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch.",
     },
   },
+];
+
+/**
+ * Stands in as the "source" of the initiative's three inherent triggered abilities, which have none (CR 726.2). Each
+ * is controlled by the player who had the initiative when it triggered; the second one's "controller of those
+ * creatures" is its event player.
+ */
+export const INITIATIVE: CardDef = { ...MONARCH, oracleId: "initiative", name: "The initiative" };
+const INITIATIVE_TRIGGERS: TriggeredAbility[] = [
+  { event: "ventureRoom", body: { targets: [], effects: [{ type: "venture", undercity: true }], text: "At the beginning of the upkeep of the player who has the initiative, that player ventures into Undercity." } },
+  {
+    event: "ventureRoom",
+    body: {
+      targets: [],
+      effects: [{ type: "takeInitiative", who: { ref: "eventPlayer" } }],
+      text: "Whenever one or more creatures a player controls deal combat damage to the player who has the initiative, the controller of those creatures takes the initiative.",
+    },
+  },
+  { event: "ventureRoom", body: { targets: [], effects: [{ type: "venture", undercity: true }], text: "Whenever a player takes the initiative, that player ventures into Undercity." } },
 ];
 
 /**

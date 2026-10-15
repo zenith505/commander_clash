@@ -165,14 +165,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!sc.looked.length) return;
         const options = sc.looked.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
         const max = Math.min(e.count, options.length);
-        const min = e.upTo || e.filter ? 0 : max;
+        const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {
           const kind = (e.filter?.text ?? "card").replace(/~/g, src);
           // "Take none" says it's optional; "up to" only reads well with a number.
           const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.into === "hand" ? "into your hand" : "back on top of your library";
-          const rest = e.rest === "graveyard" ? "into your graveyard" : "on the bottom of your library";
+          const to = e.into === "hand" ? "into your hand" : e.into === "battlefield" ? "onto the battlefield" : "back on top of your library";
+          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
           return "paused";
         }
@@ -182,12 +182,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const found = (sc.found ?? []).filter((id) => looked.includes(id));
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
-      if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : names(found) + " back on top"}.`);
+      if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
+      if (e.into === "battlefield") r.created = [];
       for (const id of found) {
         if (e.into === "hand") moveObject(s, id, "hand");
-        else p.library = [id, ...p.library.filter((x) => x !== id)];
+        else if (e.into === "battlefield") {
+          moveObject(s, id, "battlefield", { controller: p.id, ...(e.counters ? { counters: { [e.counters.counter]: e.counters.n } } : {}) });
+          if (obj(s, id).zone === "battlefield") r.created!.push(id); // "it" in what follows
+        } else p.library = [id, ...p.library.filter((x) => x !== id)];
       }
-      if (e.rest === "graveyard") {
+      if (e.rest === "shuffle") {
+        shuffle(s, p.library); // "Then shuffle" (CR 701.20)
+        log(s, `${p.name} shuffles their library.`);
+      } else if (e.rest === "graveyard") {
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
       } else {

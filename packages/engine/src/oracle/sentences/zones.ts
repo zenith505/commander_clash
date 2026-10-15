@@ -70,11 +70,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   }
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.
-  if ((m = /^(.+?) can't (block|attack|attack or block|be blocked) this turn$/i.exec(s))) {
+  // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
+  if ((m = /^(.+?) can't (block|attack|attack or block|be blocked) (this turn|until your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods: Modification[] =
       m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : m[2] === "be blocked" ? [{ kind: "cantBeBlocked" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
-    return what ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
+    return what ? [{ type: "continuous", what, mods, duration: m[3] === "this turn" ? "endOfTurn" : "yourNextTurn" }] : null;
   }
   // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
   // of their choice", "return a land you control to its owner's hand" (CR 701.21).

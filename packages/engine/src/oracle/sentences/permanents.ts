@@ -94,10 +94,20 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Continuous changes until end of turn: "X gets +2/+2 and gains flying", "X loses all abilities
   // and becomes a blue Frog with base power and toughness 1/1", "X has base power and toughness 0/1".
-  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?) .+) until end of turn$/i.exec(s))) {
+  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
-    return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
+    return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
+  // Goad (CR 701.15a): "until your next turn, that creature attacks each combat if able and attacks a player other than you if able".
+  if ((m = /^Goad (target .+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
+  }
+  // Detain (CR 701.35a): "until your next turn, that permanent can't attack or block and its activated abilities can't be activated".
+  if ((m = /^Detain (target .+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantActivate" }], duration: "yourNextTurn" }] : null;
   }
   return undefined;
 }

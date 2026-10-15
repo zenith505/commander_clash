@@ -10,6 +10,7 @@ import {
   delveRoom,
   graveyardCast,
   mayPlayFromExile,
+  dungeonByName,
   commanderTax,
   abilitiesOf,
   controllerOf,
@@ -1537,6 +1538,24 @@ function Seat({
             👑 Monarch
           </span>
         )}
+        {s.initiative === pid && (
+          <span className="monarch" title="The initiative: ventures into Undercity as they take it and at the beginning of their upkeep. Deal combat damage to them to take it.">
+            🗝 Initiative
+          </span>
+        )}
+        {p.dungeon && (
+          <span
+            className="monarch"
+            title={`${p.dungeon.name}, in ${dungeonByName(p.dungeon.name)?.rooms[p.dungeon.room]?.name ?? "?"}. Rooms: ${(dungeonByName(p.dungeon.name)?.rooms ?? []).map((r) => `${r.name}: ${r.text}`).join(" | ")}${p.completedDungeons?.length ? `. Completed: ${p.completedDungeons.join(", ")}` : ""}`}
+          >
+            🏰 {dungeonByName(p.dungeon.name)?.rooms[p.dungeon.room]?.name}
+          </span>
+        )}
+        {!p.dungeon && !!p.completedDungeons?.length && (
+          <span className="monarch" title={`Completed dungeons: ${p.completedDungeons.join(", ")}`}>
+            🏰 {p.completedDungeons.length} completed
+          </span>
+        )}
         {p.citysBlessing && (
           <span className="monarch blessing" title="The city's blessing (ascend): kept for the rest of the game.">
             🏙 City's blessing
@@ -2470,6 +2489,19 @@ function Controls({
               <ManaCost cost={`{${c}}`} size="sm" /> {COLOR_NAMES[c]}
             </button>
           ))}
+      </div>
+    );
+  if (pending?.kind === "chooseOption" && pending.what === "venture" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> {pending.labels ? "venture into which room?" : "venture into which dungeon?"}
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} className="ghost" title={pending.labels?.[i]} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o}
+          </button>
+        ))}
       </div>
     );
   if (pending?.kind === "chooseOption")

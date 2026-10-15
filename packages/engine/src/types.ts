@@ -210,6 +210,10 @@ export interface Player {
    * times it has tempted them, and their Ring-bearer (CR 701.54a-b), the creature it was as it was chosen.
    */
   ring?: { tempted: number; timestamp: number; bearer?: { id: ObjectId; zc: number } };
+  /** The dungeon card they own in the command zone and the room their venture marker is on (CR 309.4). */
+  dungeon?: { name: string; room: number };
+  /** The dungeons they've completed, in order (CR 309.7). */
+  completedDungeons?: string[];
   isBot: boolean;
 }
 
@@ -358,8 +362,12 @@ export interface ContinuousEffect {
   controller: PlayerId;
   sourceName: string;
   sourceId?: ObjectId;
-  /** "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a). */
-  duration: "endOfTurn" | "game";
+  /**
+   * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
+   * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m).
+   */
+  duration: "endOfTurn" | "game" | "yourNextTurn";
+  turnOf?: PlayerId;
   affected: ObjectId[];
   mods: Modification[];
 }
@@ -408,7 +416,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption; options: string[]; labels?: string[]; objectId?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture"; options: string[]; labels?: string[]; objectId?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -476,6 +484,8 @@ export interface GameState {
   delayed?: DelayedTrigger[];
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
+  /** The player who has the initiative (CR 726), once someone has taken it. */
+  initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
   lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string }>;
   nextTimestamp: number;
@@ -560,6 +570,7 @@ export interface Resolving {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
+    venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     may?: boolean; // the answer to "you may ..."
     paid?: boolean; // the answer to "unless that player pays ..."

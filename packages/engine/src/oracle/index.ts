@@ -18,10 +18,11 @@
 //   tokens.ts            token descriptions, copy exceptions
 //   words.ts             shared regex pieces and word tables
 
-export { compileCard, MONARCH, RING, isFullySupported, spellTargetSpecs, castingBody, normalizeSelf } from "./compile";
+export { compileCard, MONARCH, RING, INITIATIVE, isFullySupported, spellTargetSpecs, castingBody, normalizeSelf } from "./compile";
 export { parseManaAbility } from "./mana-abilities";
 export { parseBody, usesX } from "./body";
 export { parseCount } from "./counts";
 export { parseTargetPhrase } from "./targets";
 export { compileGranted } from "./grants";
 export { parseCopyExcept } from "./tokens";
+export { UNDERCITY, DUNGEONS, dungeonByName, dungeonDef, dungeonSupported, roomBody, type Dungeon, type DungeonRoom } from "./dungeons";

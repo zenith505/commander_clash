@@ -40,10 +40,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^(?:(.+?) )?[Ii]ncubates? ${NUMX}$`).exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     if (!who) return null;
-    return [
-      { type: "createToken", who, n: 1, token: INCUBATOR },
-      { type: "counters", what: { ref: "created" }, counter: "+1/+1", n: amt(m[2]!) },
-    ];
+    return [{ type: "createToken", who, n: 1, token: INCUBATOR, counters: { counter: "+1/+1", n: amt(m[2]!) } }];
   }
   // Predefined tokens (CR 111.10): "Create a Treasure token", "Its controller creates two Treasure tokens"
   if ((m = new RegExp(`^(?:(.+?) creates?|Create) ${NUMX} (Treasure|Food|Clue) tokens?$`, "i").exec(s))) {

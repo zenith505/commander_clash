@@ -103,6 +103,8 @@ export interface Characteristics {
   cantActivate: false | "all" | "nonMana";
   /** "Can't be blocked except by three or more creatures": the most such an ability asks for, 0 if none (CR 509.1b). */
   minBlockers: number;
+  /** The players who goaded it (CR 701.15): it attacks each combat if able, and a player other than them if able. */
+  goadedBy: PlayerId[];
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
@@ -156,6 +158,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeBlockedBy: [],
     maxOneBlocker: false,
     minBlockers: 0,
+    goadedBy: [],
     cantActivate: false,
     attackUnless: [],
     cantBeBlockedByLesserPower: false,
@@ -180,6 +183,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   pt: [...c.pt],
   cantBeBlockedBy: [...c.cantBeBlockedBy],
   attackUnless: [...c.attackUnless],
+  goadedBy: [...c.goadedBy],
 });
 
 type CharMap = Map<ObjectId, Characteristics>;
@@ -510,6 +514,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantActivate":
       if (c.cantActivate !== "all") c.cantActivate = m.exceptMana ? "nonMana" : "all";
       return;
+    case "goad": {
+      const by = controllerOfInst(e, chars);
+      if (!c.goadedBy.includes(by)) c.goadedBy.push(by);
+      c.attacksIfAble = true;
+      return;
+    }
     case "minBlockers":
       c.minBlockers = Math.max(c.minBlockers, m.n);
       return;

@@ -245,11 +245,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sourceName: src,
         sourceId: ctx.sourceId,
         duration: e.duration,
+        ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}),
         affected,
         mods,
       });
       const names = affected.map((id) => defOf(s, obj(s, id)).name);
-      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : ""}.`);
+      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : ""}.`);
       return;
     }
     case "attach": {

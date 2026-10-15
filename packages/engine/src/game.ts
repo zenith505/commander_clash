@@ -1,9 +1,9 @@
 import { kickerName } from "./abilities";
-import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
@@ -961,6 +961,11 @@ function startNextTurn(s: GameState) {
     if (order[i] === s.activePlayer || began.size >= order.length) break;
   }
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
+  const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
+  if (ending.length) {
+    s.effects = s.effects.filter((e) => !ending.includes(e));
+    invalidateCharacteristics(s);
+  }
   releasePhased(s, began);
   s.turn++;
   for (const p of s.players) p.landsPlayedThisTurn = 0;
@@ -2179,7 +2184,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: pend.source, sourceId: o.id, duration: "game", affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
       log(s, `${pend.source} enters ${choice === ENTERS_COUNTER ? "with a +1/+1 counter" : pend.what === "riot" ? "with haste" : "without a counter"} (${pend.what}).`);
     } else {
-      o.chosen = withChoice(o.chosen, pend.what, choice);
+      o.chosen = withChoice(o.chosen, pend.what as ChoiceKind, choice);
       log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
     }
     invalidateCharacteristics(s);
@@ -2188,6 +2193,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   const r = s.resolving;
   if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
+  if (pend.what === "venture") {
+    (r.scratch ??= {}).venture = choice; // which dungeon, or which room the arrows lead to (CR 701.49a-b)
+    continueResolution(s);
+    return;
+  }
   r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${choice}.`);
   continueResolution(s);
@@ -2428,6 +2438,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0),
   );
   if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
+  // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d).
+  for (const a of attacks) {
+    const o = obj(s, a.attacker);
+    const by = characteristics(s, o).goadedBy;
+    if (by.includes(a.defender) && opps.some((d) => !by.includes(d) && !attackProblem(s, o, d)))
+      throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
+  }
   for (const a of attacks) {
     const o = obj(s, a.attacker);
     o.attacking = a.defender;
@@ -2915,6 +2932,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       } else seen.set(key, id);
     }
     if (attachmentSBAs(s)) changed = true;
+    if (dungeonSBAs(s)) changed = true; // 704.5t
     // Commanders in graveyard/exile may return to the command zone (903.9a). Owners always choose yes for now.
     for (const o of Object.values(s.objects)) {
       if (o.justMovedForCommander && (o.zone === "graveyard" || o.zone === "exile")) {
@@ -3057,6 +3075,14 @@ function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
     const from = order.indexOf(s.activePlayer);
     const next = [0, 1, 2, 3, 4, 5, 6, 7].slice(0, order.length).map((i) => order[(from + i) % order.length]!).find((id) => !player(s, id).lost);
     if (next !== undefined) becomeMonarch(s, next);
+  }
+  if (s.initiative === pid) {
+    // The active player takes the initiative, or if it's them leaving, the next player in turn order (CR 726.4).
+    s.initiative = undefined;
+    const order = s.turnOrder;
+    const from = order.indexOf(s.activePlayer);
+    const next = [0, 1, 2, 3, 4, 5, 6, 7].slice(0, order.length).map((i) => order[(from + i) % order.length]!).find((id) => !player(s, id).lost);
+    if (next !== undefined && livingPlayers(s).length > 1) takeInitiative(s, next);
   }
   if (livingPlayers(s).length <= 1) return true;
   if (s.mulligans) {

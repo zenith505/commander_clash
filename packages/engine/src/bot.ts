@@ -119,6 +119,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = ok.sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - worth(s, pid, obj(s, a)) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
+    if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
@@ -474,6 +475,17 @@ function choosePlot(s: GameState, pid: PlayerId): Action[] | null {
     if (plan) return plan;
   }
   return null;
+}
+
+/**
+ * Which room to venture into, or which dungeon to start (CR 701.49): damage and bodies first, the counters only with a
+ * creature to put them on, goad only with an opponent's creature to goad.
+ */
+function chooseRoom(s: GameState, pid: PlayerId, options: string[]): string {
+  const creatures = (mine: boolean) => s.battlefield.some((id) => objIsType(s, obj(s, id), "Creature") && (controllerOf(s, obj(s, id)) === pid) === mine);
+  const score = (room: string) =>
+    ({ "Trap!": 5, Catacombs: 4, Forge: creatures(true) ? 4 : 0, Stash: 3, Archives: 3, "Lost Well": 2, Arena: creatures(false) ? 2 : 0 })[room] ?? 1;
+  return [...options].sort((a, b) => score(b) - score(a))[0]!;
 }
 
 /**
@@ -1300,6 +1312,14 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
       .map((o) => ({ attacker: o.id, defender: target })),
     ...must.map((o) => ({ attacker: o.id, defender: attackProblem(s, o, target) ? opps.find((d) => !attackProblem(s, o, d))! : target })),
   ];
+  // A goaded creature attacks someone other than who goaded it, if it can (CR 701.15b).
+  attacks = attacks.map((a) => {
+    const o = obj(s, a.attacker);
+    const by = characteristics(s, o).goadedBy;
+    if (!by.includes(a.defender)) return a;
+    const other = opps.find((d) => !by.includes(d) && !attackProblem(s, o, d));
+    return other !== undefined ? { ...a, defender: other } : a;
+  });
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   return { type: "declareAttackers", player: pid, attacks };

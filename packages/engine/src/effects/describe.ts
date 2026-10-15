@@ -38,6 +38,14 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       parts.push("can't be blocked");
       continue;
     }
+    if (m.kind === "goad") {
+      parts.push(`${plural ? "are" : "is"} goaded by ${player(s, controller).name}`);
+      continue;
+    }
+    if (m.kind === "cantActivate") {
+      parts.push(`can't have ${plural ? "their" : "its"} activated abilities activated`);
+      continue;
+    }
     if (m.kind === "doesntUntap") {
       parts.push(plural ? "don't untap" : "doesn't untap");
       continue;

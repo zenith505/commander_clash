@@ -41,12 +41,18 @@ export function parseManaAbility(line: string): ManaAbility | null {
   const produces = parseManaProduced(m[2]!);
   if (!produces) return null;
   const out: ManaAbility = { text: line, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}) };
+  let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
     else if (extra === "Activate only once each turn.") out.oncePerTurn = true;
-    else if (/^Spend this mana only /.test(extra) && !out.spendOnly) {
+    else if ((m2 = /^This mana can't be spent to cast (?:an? )?non([a-z]+) spells?\.$/.exec(extra)) && !out.spendOnly) {
+      // A Powerstone's "can't be spent to cast a nonartifact spell": on anything but those spells (CR 111.10h).
+      const spells = spellFilter(m2[1]!);
+      if (!spells || !spells.types?.length) return null;
+      out.spendOnly = { spells, abilities: "any", other: true, text: extra };
+    } else if (/^Spend this mana only /.test(extra) && !out.spendOnly) {
       const only = parseManaSpend(extra);
       if (!only) return null;
       out.spendOnly = only;

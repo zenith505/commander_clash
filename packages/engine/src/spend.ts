@@ -14,7 +14,7 @@ export type ManaUse = { spell: CardDef } | { ability: GameObject } | "other";
 
 /** Can mana restricted this way be spent on `use`? */
 export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: ManaUse): boolean {
-  if (use === "other") return false;
+  if (use === "other") return !!only.other;
   if ("spell" in use) return !!only.spells && printedMatches(only.spells, use.spell);
   if (only.abilities === "any") return true;
   if (!only.abilities) return false;

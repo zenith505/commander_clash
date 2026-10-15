@@ -1466,8 +1466,8 @@ export function castProblem(
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
   if (typeof cost === "string") return cost;
-  // The helper isn't casting the spell, so mana only for casting spells can't help (CR 106.6, 702.132a).
-  if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), "other")))
+  // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
+  if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
     return "the assisting player can't pay that much";
   if (!canPayFromPool(s, pid, cost.cost, { spell: d }, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
@@ -1676,7 +1676,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   loseLife(s, p.id, paid.lifePaid);
   if (choices.assisted && choices.assist !== undefined) {
     const helper = player(s, choices.assist);
-    spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), "other");
+    spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
     log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
   }
   for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
@@ -3235,7 +3235,8 @@ function assistPays(s: GameState, p: Player, n: number) {
   const pend = s.pending;
   if (pend?.kind !== "assist" || pend.player !== p.id) throw new RulesError("no spell to assist");
   if (!Number.isInteger(n) || n < 0 || n > pend.max) throw new RulesError(`pay from 0 to ${pend.max}`);
-  if (n && !canPayFromPool(s, p.id, parseManaCost(`{${n}}`), "other")) throw new RulesError(`not enough mana in your pool to pay {${n}}`);
+  const spell = pend.cast.faceDown ? FACE_DOWN : castDef(s, pend.cast.objectId, pend.cast.alt);
+  if (n && !canPayFromPool(s, p.id, parseManaCost(`{${n}}`), { spell })) throw new RulesError(`not enough mana in your pool to pay {${n}}`);
   log(s, n ? `${p.name} will pay {${n}} of ${pend.source}'s cost.` : `${p.name} doesn't help pay for ${pend.source}.`);
   s.pending = { kind: "assistCast", player: pend.caster, helper: p.id, source: pend.source, n, cast: { ...pend.cast, ...(n ? { assisted: n } : { assist: undefined }) } };
 }

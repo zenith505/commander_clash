@@ -837,6 +837,8 @@ export interface ManaSpend {
   abilities?: TargetSpec | "any";
   /** "Abilities of artifact sources": in any zone, not only permanents. */
   anyZone?: boolean;
+  /** Any other cost too: a Powerstone's mana "can't be spent to cast a nonartifact spell" (CR 111.10h). */
+  other?: boolean;
   text: string;
 }
 

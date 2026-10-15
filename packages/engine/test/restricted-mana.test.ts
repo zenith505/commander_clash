@@ -157,4 +157,44 @@ describe("restricted mana (CR 106.6)", () => {
     expect(planCast(s0, ap, ids[0]!)).not.toBeNull();
     expect(planCast(s0, ap, ids[0]!, [target(b)], undefined, undefined, undefined, { alt: "bestow" })).toBeNull();
   });
+
+  it("Powerstone tokens: mana for artifact spells and abilities, not nonartifact spells (CR 111.10h)", () => {
+    const opportunist = card("Argothian Opportunist", "Creature — Human Scout", "{2}{G}", {
+      power: "2",
+      toughness: "1",
+      oracleText: "When this creature enters, create a tapped Powerstone token. (It's an artifact with \"{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.\")",
+    });
+    const sternLesson = card("Stern Lesson", "Instant", "{2}{U}", {
+      oracleText: "Draw two cards, then discard a card. Create a tapped Powerstone token. (It's an artifact with \"{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.\")",
+    });
+    supported(opportunist, sternLesson);
+    const { s: s0, ap, ids } = setup([opportunist, mindStone, bear({ manaCost: "{1}" })]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    while (s.stack.length) s = act(s, { type: "passPriority", player: s.priority! });
+    const stones = s.battlefield.filter((id) => s.objects[id]!.isToken);
+    expect(stones).toHaveLength(1);
+    const stone = s.objects[stones[0]!]!;
+    expect(s.cards[stone.cardId]).toMatchObject({ name: "Powerstone Token", types: ["Artifact"], subtypes: ["Powerstone"] });
+    expect(stone.tapped).toBe(true);
+    stone.tapped = false;
+    tapLands(s, ap);
+    // Not for a creature spell; for Mind Stone (an artifact spell), yes.
+    expect(planCast(s, ap, ids[2]!)).toBeNull();
+    s = act(s, { type: "activateMana", player: ap, objectId: stone.id, mana: "C" });
+    expect(castProblem(s, ap, ids[2]!)).toMatch(/not enough mana/);
+    s.players[ap]!.manaPool.C++; // one more {C}, free mana
+    s = act(s, { type: "castSpell", player: ap, objectId: ids[1]! });
+    expect(s.stack.at(-1)?.objectId).toBe(ids[1]);
+    expect(s.players[ap]!.restrictedMana).toBeUndefined();
+  });
+
+  it("Powerstone mana pays other costs, like an ability's", () => {
+    const { s: s0, ap } = setup([]);
+    tapLands(s0, ap);
+    const sorcerer = putOnBattlefield(s0, ap, card("Prodigal Sorcerer", "Creature — Human Wizard", "{2}{U}", { power: "1", toughness: "1", oracleText: "{1}: Prodigal Sorcerer gets +1/+0 until end of turn." }));
+    const tok = card("Powerstone", "Artifact — Powerstone", "", { oracleText: "{T}: Add {C}. This mana can't be spent to cast a nonartifact spell." });
+    const stone = putOnBattlefield(s0, ap, tok);
+    const plan = planActivate(s0, ap, sorcerer, 0);
+    expect(plan?.[0]).toMatchObject({ type: "activateMana", objectId: stone });
+  });
 });

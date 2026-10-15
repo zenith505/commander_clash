@@ -11,6 +11,8 @@ export const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
   Treasure: { name: "Treasure", colors: [], types: ["Artifact"], subtypes: ["Treasure"], keywords: [], abilities: "{T}, Sacrifice this token: Add one mana of any color." },
   Food: { name: "Food", colors: [], types: ["Artifact"], subtypes: ["Food"], keywords: [], abilities: "{2}, {T}, Sacrifice this token: You gain 3 life." },
   Clue: { name: "Clue", colors: [], types: ["Artifact"], subtypes: ["Clue"], keywords: [], abilities: "{2}, Sacrifice this token: Draw a card." },
+  // CR 111.10h
+  Powerstone: { name: "Powerstone", colors: [], types: ["Artifact"], subtypes: ["Powerstone"], keywords: [], abilities: "{T}: Add {C}. This mana can't be spent to cast a nonartifact spell." },
 };
 
 /** An Incubator token (CR 701.53b, 111.10i): a colorless Incubator artifact, and on its back a 0/0 Phyrexian artifact creature. */

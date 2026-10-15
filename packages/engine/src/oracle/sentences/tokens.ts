@@ -43,10 +43,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "createToken", who, n: 1, token: INCUBATOR, counters: { counter: "+1/+1", n: amt(m[2]!) } }];
   }
   // Predefined tokens (CR 111.10): "Create a Treasure token", "Its controller creates two Treasure tokens"
-  if ((m = new RegExp(`^(?:(.+?) creates?|Create) ${NUMX} (Treasure|Food|Clue) tokens?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(?:(.+?) creates?|Create) ${NUMX} (tapped )?(Treasure|Food|Clue|Powerstone) tokens?$`, "i").exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
-    const token = PREDEFINED_TOKENS[m[3]!.charAt(0).toUpperCase() + m[3]!.slice(1).toLowerCase()];
-    return who && token ? [{ type: "createToken", who, n: amt(m[2]!), token }] : null;
+    const token = PREDEFINED_TOKENS[m[4]!.charAt(0).toUpperCase() + m[4]!.slice(1).toLowerCase()];
+    return who && token ? [{ type: "createToken", who, n: amt(m[2]!), token, ...(m[3] ? { tapped: true } : {}) }] : null;
   }
   // "Draw a card at the beginning of the next turn's upkeep" (a delayed trigger, CR 603.7).
   if ((m = /^(.+) at the beginning of the next turn's upkeep$/.exec(s))) {

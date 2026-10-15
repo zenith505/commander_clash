@@ -13,7 +13,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
   [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
-  // Only players can be attacked here (planeswalkers and battles aren't supported as attack targets).
+  // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
   [/^Whenever ~ attacks a player, (.+)$/, "selfAttacks"],
   [/^Whenever ~ enlists a creature, (.+)$/, "selfEnlists"], // CR 702.154c
   [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
@@ -383,7 +383,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
-      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
+      const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
+      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}) } : ("fail" as const);
     }
   }
   return "fail" as const;

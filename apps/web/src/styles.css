@@ -147,6 +147,9 @@ button:disabled { opacity: 0.4; cursor: default; }
   font-size: clamp(11px, calc(var(--card-w) / 8), 15px); font-weight: 700; padding: 1px 5px; border-radius: 4px;
 }
 .pt em { color: var(--attack); font-style: normal; }
+/* A planeswalker's loyalty, in a shield-like badge; above the power/toughness when it's also a creature. */
+.pt.loyalty { background: #2b2b3a; border: 1px solid #c9b37e; color: #f3e6c4; border-radius: 4px 4px 10px 10px; }
+.pt.loyalty.with-pt { bottom: calc(3px + 1.6em); }
 .badge { position: absolute; left: 3px; top: 3px; font-size: 10px; font-weight: 700; padding: 1px 4px; border-radius: 4px; }
 .attack-badge { background: var(--attack); color: #fff; }
 

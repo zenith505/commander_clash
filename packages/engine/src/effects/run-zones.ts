@@ -1,6 +1,6 @@
 import type { CounterKind, Effect } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
-import { auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackedName, attackedPlaneswalker, auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -363,9 +363,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!o || o.zone !== "hand" || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
       moveObject(s, o.id, "battlefield", { tapped: true });
       if ((o.zone as string) !== "battlefield") return;
+      // Attacking the same player or planeswalker (CR 702.49c); a planeswalker that's gone leaves it not attacking (CR 506.3c).
       const defender = ctx.lki?.attacking;
-      if (defender !== undefined && inCombat(s) && livingPlayers(s).includes(defender)) o.attacking = defender;
-      log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${player(s, o.attacking).name}` : ""} (ninjutsu).`);
+      const pw = ctx.lki?.attackingPermanent;
+      if (defender !== undefined && inCombat(s) && livingPlayers(s).includes(defender)) {
+        o.attacking = defender;
+        if (pw) {
+          o.attackingPermanent = pw;
+          if (!attackedPlaneswalker(s, o)) {
+            o.attacking = undefined;
+            o.attackingPermanent = undefined;
+          }
+        }
+      }
+      log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
       return;
     }
     case "warpExile":

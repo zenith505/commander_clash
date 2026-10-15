@@ -251,6 +251,8 @@ export interface TokenSpec {
   abilities?: string;
   /** A double-faced token's back face (CR 111.10i): an Incubator's Phyrexian. */
   back?: TokenSpec;
+  /** A planeswalker token's printed loyalty (CR 306.5b). */
+  loyalty?: number;
 }
 
 /**
@@ -760,6 +762,8 @@ export interface TriggeredAbility {
   group?: TargetSpec;
   /** Dethrone (CR 702.105a): "attacks the player with the most life or tied for most life", as it attacks. */
   attacksMostLife?: boolean;
+  /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
+  attacksPlayer?: boolean;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
@@ -817,6 +821,12 @@ export interface ActivatedAbility {
   costs?: AdditionalCost[];
   /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */
   removeCounters?: { counter: CounterKind; n: number };
+  /**
+   * A loyalty ability (CR 606): its cost puts on (+N) or removes (−N) loyalty counters; `loyaltyX` for −X, where X is
+   * the number announced. Only as a sorcery, and only one loyalty ability of a permanent each turn (CR 606.3).
+   */
+  loyalty?: number;
+  loyaltyX?: boolean;
 }
 
 /**

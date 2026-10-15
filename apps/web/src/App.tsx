@@ -67,6 +67,7 @@ import {
   canEnterUntapped,
   crewPower,
   potentialAttackers,
+  attackedName,
   returnCandidates,
   tapCostCandidates,
   ringBearer,
@@ -276,7 +277,7 @@ function maxX(plan: (x: number) => unknown): number {
 function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) {
   const { state: s, dispatch, error, intent, priorityMode, setPriorityMode, stops, toggleStop, loop, startLoop, cancelLoop, repeatLoop, shortcutNote } = useGame(initial);
   const [hover, setHover] = useState<CardDef | null>(null);
-  const [attacks, setAttacks] = useState<Record<string, PlayerId>>({});
+  const [attacks, setAttacks] = useState<Record<string, AttackTo>>({});
   /** The creature you've clicked to attack with, waiting for you to click the player it attacks. */
   const [aim, setAim] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<Record<string, string[]>>({});
@@ -318,6 +319,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
+  // Opponents' planeswalkers, which can be attacked (CR 506.2).
+  const opponentWalkers = useMemo(
+    () => (s ? s.battlefield.filter((id) => opps.includes(controllerOf(s, s.objects[id]!)) && characteristics(s, s.objects[id]!).types.includes("Planeswalker")) : []),
+    [s, opps],
+  );
+  const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, controllerOf(s, s.objects[id]!));
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
   const picking = !!(xPick || kickPick || costPick || delvePick || dividing);
@@ -397,6 +404,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (x === undefined && parseManaCost(ab.manaCost).hasX) {
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes });
+    }
+    // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
+    if (x === undefined && ab.loyaltyX) {
+      const max = s.objects[objectId]!.counters.loyalty ?? 0;
+      return setXPick({ mode: "activate", objectId, index, label, cost: "−X loyalty", max, value: max, modes });
     }
     const body = withModes(ab.body, modes);
     if (body.targets.length) return setTargeting({ mode: "activate", objectId, index, specs: body.targets, chosen: [], label, modes, x });
@@ -594,13 +606,19 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Attacking: click a creature, then the player it attacks (an arrow follows the mouse).
     // Clicking an attacking creature again takes it out of the attack.
     if (pending?.kind === "declareAttackers") {
+      // An opponent's planeswalker can be attacked instead of the player (CR 506.2, 508.1b).
+      if (aim && attackablePlaneswalker(o.id)) {
+        setAttacks({ ...attacks, [aim]: { defender: controllerOf(s, o), planeswalker: o.id } });
+        setAim(null);
+        return;
+      }
       if (controllerOf(s, o) !== HUMAN || !potentialAttackers(s, HUMAN).some((a) => a.id === o.id)) return;
       if (o.id in attacks) {
         const next = { ...attacks };
         delete next[o.id];
         setAttacks(next);
         setAim(null);
-      } else if (opps.length === 1) setAttacks({ ...attacks, [o.id]: opps[0]! }); // potentialAttackers checked it can attack them
+      } else if (opps.length === 1 && !opponentWalkers.length) setAttacks({ ...attacks, [o.id]: { defender: opps[0]! } }); // potentialAttackers checked it can attack them
       else setAim(aim === o.id ? null : o.id);
       return;
     }
@@ -674,7 +692,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     blocks,
     blocker: blocker ?? aim,
     discards: [...discards, ...(tapPick?.chosen ?? []), ...(costPick?.chosen ?? [])],
-    targetable: (id) => canTarget({ kind: "object", id }) || blockable(id),
+    targetable: (id) => canTarget({ kind: "object", id }) || blockable(id) || attackablePlaneswalker(id),
     ready: (o) =>
       (!!attackers?.has(o.id) && !(o.id in attacks) && aim !== o.id) ||
       (canBlockWith(o) && blocker !== o.id) ||
@@ -711,7 +729,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             onSelect={() => {
               if (targeting) return pickTarget({ kind: "player", id: pid });
               if (aim && opps.includes(pid) && !attackProblem(s, s.objects[aim]!, pid)) {
-                setAttacks({ ...attacks, [aim]: pid });
+                setAttacks({ ...attacks, [aim]: { defender: pid } });
                 setAim(null);
               }
             }}
@@ -1315,7 +1333,7 @@ interface CardProps {
   ready?: (o: GameObject) => boolean;
   onClick: (o: GameObject) => void;
   onHover: (d: CardDef | null) => void;
-  attacks: Record<string, PlayerId>;
+  attacks: Record<string, AttackTo>;
   blocks: Record<string, string[]>;
   blocker: string | null;
   discards: string[];
@@ -1355,7 +1373,7 @@ function SingleCard({ o, s, onClick, onHover, attacks, blocks, blocker, discards
       <div className={classes.join(" ")} data-obj={o.id} onClick={() => onClick(o)} {...hoverProps(seen, onHover)}>
         <CardFace d={d} peek={seen !== d ? seen : undefined} />
         {onField && <Modified s={s} o={o} />}
-        {o.attacking !== undefined && <span className="badge attack-badge">→ {s.players[o.attacking]!.name}</span>}
+        {o.attacking !== undefined && <span className="badge attack-badge">→ {attackedName(s, o)}</span>}
       </div>
     </div>
   );
@@ -1433,7 +1451,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             {signed(m.effectPower)}/{signed(m.effectToughness)}
           </span>
         )}
-        {Object.entries(m.otherCounters).map(([k, n]) => (
+        {Object.entries(m.otherCounters).filter(([k]) => !(k === "loyalty" && c.types.includes("Planeswalker"))).map(([k, n]) => (
           <span key={k} className="chip other" title={`${n} ${k} counter(s)`}>
             {n} {k}
           </span>
@@ -1443,6 +1461,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Regen{o.regenShields! > 1 ? ` ×${o.regenShields}` : ""}
           </span>
         )}
+        {(o.redirectNext ?? []).map((r) => (
+          <span key={r.id} className="chip shield" title={`${r.source}: the next ${r.n} damage that would be dealt to it this turn is dealt to ${"object" in r.to ? (s.objects[r.to.object] ? cardOf(s, r.to.object).name : "a creature that's gone") : s.players[r.to.player]!.name} instead.`}>
+            Redirect {r.n}
+          </span>
+        ))}
         {(o.preventNext ?? 0) > 0 && (
           <span className="chip shield" title={`The next ${o.preventNext} damage that would be dealt to it this turn is prevented.`}>
             Prevent {o.preventNext}
@@ -1462,6 +1485,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
           </span>
         )}
       </span>
+      {c.types.includes("Planeswalker") && (
+        <span className={`pt loyalty ${creature ? "with-pt" : ""}`} title={`Loyalty ${o.counters.loyalty ?? 0} (printed ${cardOf(s, o.id).loyalty ?? "?"})`}>
+          {o.counters.loyalty ?? 0}
+        </span>
+      )}
       {creature && (
         <span className={`pt ${m.setOrSwitched ? "set" : ""}`} title={tip}>
           <b className={tone(c.power, c.printedPower)}>{c.power}</b>/<b className={tone(c.toughness, c.printedToughness)}>{c.toughness}</b>
@@ -2365,7 +2393,7 @@ function Controls({
 }: {
   s: GameState;
   pending: GameState["pending"];
-  attacks: Record<string, PlayerId>;
+  attacks: Record<string, AttackTo>;
   aim: string | null;
   blocks: Record<string, string[]>;
   blocker: string | null;
@@ -2444,8 +2472,8 @@ function Controls({
             : must.length && !aim
             ? `${must.map((o) => cardOf(s, o.id).name).join(" and ")} attack${must.length === 1 ? "s" : ""} each combat if able: click ${must.length === 1 ? "it" : "them"}, then a player.`
             : aim
-            ? `Now click the player ${cardOf(s, aim).name} attacks.`
-            : opponents(s, HUMAN).length === 1
+            ? `Now click the player or planeswalker ${cardOf(s, aim).name} attacks.`
+            : opponents(s, HUMAN).length === 1 && !s.battlefield.some((id) => controllerOf(s, s.objects[id]!) !== HUMAN && characteristics(s, s.objects[id]!).types.includes("Planeswalker"))
               ? "Click your creatures to attack. Click an attacker again to take it back."
               : "Click a creature, then the player it attacks. Click an attacker again to take it back."}
         </span>
@@ -2456,7 +2484,7 @@ function Controls({
               {
                 type: "declareAttackers",
                 player: HUMAN,
-                attacks: Object.entries(attacks).map(([attacker, defender]) => ({ attacker, defender })),
+                attacks: Object.entries(attacks).map(([attacker, a]) => ({ attacker, defender: a.defender, ...(a.planeswalker ? { planeswalker: a.planeswalker } : {}) })),
               },
             ])
           }
@@ -2812,9 +2840,12 @@ function youGrammar(text: string) {
   );
 }
 
+/** Whom a creature you're declaring as an attacker attacks: a player, or a planeswalker they control. */
+type AttackTo = { defender: PlayerId; planeswalker?: string };
+
 /** Attacks and blocks you're lining up, before you confirm them. */
 interface Combat {
-  attacks: Record<string, PlayerId>;
+  attacks: Record<string, AttackTo>;
   aim: string | null;
   blocks: Record<string, string[]>;
   blocker: string | null;
@@ -2834,11 +2865,12 @@ function targetingArrows(s: GameState, targeting: Targeting | null, intent: Retu
   const out: ArrowSpec[] = [];
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
-    if (o.attacking !== undefined) out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [`[data-player="${o.attacking}"]`], color: ATTACK_COLOR });
+    if (o.attacking !== undefined)
+      out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [o.attackingPermanent ? `[data-obj="${o.attackingPermanent.id}"]` : `[data-player="${o.attacking}"]`], color: ATTACK_COLOR });
     for (const a of o.blocking ?? []) out.push({ key: `blk:${id}:${a}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${a}"]`], color: BLOCK_COLOR });
   }
-  for (const [id, pid] of Object.entries(combat.attacks))
-    out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [`[data-player="${pid}"]`], color: ATTACK_COLOR });
+  for (const [id, a] of Object.entries(combat.attacks))
+    out.push({ key: `atk:${id}`, from: [`[data-obj="${id}"]`], to: [a.planeswalker ? `[data-obj="${a.planeswalker}"]` : `[data-player="${a.defender}"]`], color: ATTACK_COLOR });
   for (const [id, atts] of Object.entries(combat.blocks))
     for (const att of atts) out.push({ key: `blk:${id}:${att}`, from: [`[data-obj="${id}"]`], to: [`[data-obj="${att}"]`], color: BLOCK_COLOR });
   if (combat.aim) out.push({ key: "aim", from: [`[data-obj="${combat.aim}"]`], to: "cursor", color: ATTACK_COLOR, aiming: true });

@@ -88,14 +88,25 @@ export function dealDamage(
   if ("object" in to) {
     const o = to.object;
     const c = characteristics(s, o);
-    // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt.
-    if (has(src, "Infect") || has(src, "Wither")) {
-      o.counters["-1/-1"] = (o.counters["-1/-1"] ?? 0) + n;
+    const walker = c.types.includes("Planeswalker");
+    // Damage to a planeswalker removes that many loyalty counters (CR 120.3c, 306.8); one that's also a creature is
+    // dealt damage as a creature too (CR 120.3d-e).
+    if (walker) {
+      const removed = Math.min(n, o.counters.loyalty ?? 0);
+      if (removed) o.counters.loyalty = (o.counters.loyalty ?? 0) - removed;
       invalidateCharacteristics(s);
-      log(s, `${src.name} deals ${n} damage to ${c.name} (as -1/-1 counters).`);
-    } else {
-      o.damage += n;
-      log(s, `${src.name} deals ${n} damage to ${c.name}.`);
+      log(s, `${src.name} deals ${n} damage to ${c.name} (${removed} loyalty removed).`);
+    }
+    if (!walker || c.types.includes("Creature")) {
+      if (has(src, "Infect") || has(src, "Wither")) {
+        // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt.
+        o.counters["-1/-1"] = (o.counters["-1/-1"] ?? 0) + n;
+        invalidateCharacteristics(s);
+        log(s, `${src.name} deals ${n} damage to ${c.name} (as -1/-1 counters).`);
+      } else {
+        o.damage += n;
+        log(s, `${src.name} deals ${n} damage to ${c.name}.`);
+      }
     }
     if (has(src, "Deathtouch")) o.deathtouchDamage = true;
     if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);

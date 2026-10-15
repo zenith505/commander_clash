@@ -83,7 +83,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
 
 export function tokenDef(t: TokenSpec): CardDef {
   return {
-    oracleId: `token:${t.name}:${t.power ?? ""}/${t.toughness ?? ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
+    oracleId: `token:${t.name}:${t.power ?? ""}/${t.toughness ?? ""}${t.loyalty !== undefined ? `:L${t.loyalty}` : ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
     name: `${t.name} Token`,
     manaCost: "",
     cmc: 0,
@@ -97,6 +97,7 @@ export function tokenDef(t: TokenSpec): CardDef {
     colorIdentity: t.colors,
     keywords: t.keywords,
     ...(t.back ? { tokenBack: tokenDef(t.back) } : {}),
+    ...(t.loyalty !== undefined ? { loyalty: String(t.loyalty) } : {}),
   };
 }
 

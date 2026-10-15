@@ -11,7 +11,7 @@ import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
-import { parseActivated, stripAbilityWord } from "./activated";
+import { parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseGroup, parseTargetPhrase } from "./targets";
@@ -121,7 +121,7 @@ const RING_TRIGGERS: TriggeredAbility[] = [
 ];
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
-const UNSUPPORTED_TYPES = ["Planeswalker", "Battle", "Kindred", "Tribal", "Dungeon"];
+const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
 const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege", "Spacecraft"];
 
 /**
@@ -135,6 +135,8 @@ export function isFullySupported(d: CardDef): boolean {
   const cost = parseManaCost(d.manaCost);
   if (!cost.supported) return false;
   if (d.types.some((t) => UNSUPPORTED_TYPES.includes(t)) || d.subtypes.some((t) => UNSUPPORTED_SUBTYPES.includes(t))) return false;
+  // A planeswalker needs a printed loyalty number to enter with (CR 306.5b); "X" loyalty isn't modeled.
+  if (d.types.includes("Planeswalker") && !/^\d+$/.test(d.loyalty ?? "")) return false;
   const c = compileCard(d);
   // Creatures, and Vehicles that can become creatures (CR 301.7a), need numbers for power and toughness,
   // or a characteristic-defining ability that says what a "*" is (CR 604.3).
@@ -237,6 +239,8 @@ export function compile(d: CardDef): CompiledCard {
     if (!line) continue;
     // Deck construction, not play: the deck checker reads it (deckLimit).
     if (/^A deck can have (?:any number of|up to \w+) cards named ~\.$/.test(line)) continue;
+    // Also deck construction: who can be a commander (CR 903.3, deck.ts canBeCommander).
+    if (/^~ can be your commander\.$/.test(line)) continue;
     if (line === "Start your engines!") {
       out.startYourEngines = true; // CR 702.179a
       continue;
@@ -245,6 +249,14 @@ export function compile(d: CardDef): CompiledCard {
     const maxSpeed = /^Max speed — (.+)$/.exec(line);
     if (maxSpeed) {
       if (!maxSpeedAbility(d, maxSpeed[1]!, out)) out.unsupported.push(raw);
+      continue;
+    }
+    // Loyalty abilities (CR 606): "+1: ...", "−2: ...", "0: ...", "−X: ...".
+    const loyal = /^([+−-]?)(\d+|X): (.+)$/.exec(line);
+    if (loyal && d.types.includes("Planeswalker")) {
+      const ab = parseLoyalty(loyal[1]!, loyal[2]!, loyal[3]!, raw);
+      if (ab === "fail") out.unsupported.push(raw);
+      else out.activated.push(bindThisAbility(ab, line));
       continue;
     }
     const manaAb = parseManaAbility(line);

@@ -139,7 +139,7 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
 /** Record every triggered ability that `ev` triggers. They go on the stack the next time a player would get priority. */
 /** Dethrone (CR 702.105a): it attacks the player with the most life or tied for most life. */
 function attacksMostLife(s: GameState, o: GameObject): boolean {
-  if (o.attacking === undefined) return false;
+  if (o.attacking === undefined || o.attackingPermanent) return false; // not when it attacks a planeswalker (rulings)
   const lives = s.turnOrder.map((pid) => s.players[pid]!).filter((p) => !p.lost).map((p) => p.life);
   return s.players[o.attacking]!.life >= Math.max(...lives);
 }
@@ -344,7 +344,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.training || trains(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.training || trains(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);

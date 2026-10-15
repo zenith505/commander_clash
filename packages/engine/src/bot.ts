@@ -215,6 +215,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && /Turn$/.test(obj(s, a.objectId).mayPlay?.until ?? "")));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
+    // A loyalty ability of each planeswalker we control, once spells are cast (CR 606.3).
+    const loyalty = chooseLoyalty(s, pid);
+    if (loyalty) return loyalty;
     // Suspend what we can't cast now (CR 702.62a).
     const sus = chooseSuspend(s, pid);
     if (sus) return sus;
@@ -262,7 +265,8 @@ function chooseUnblocked(s: GameState, pid: PlayerId, ids: ObjectId[]): ObjectId
   return ids.filter((id) => {
     const at = obj(s, id);
     const dmg = power(s, at);
-    const life = player(s, at.attacking!).life;
+    const pw = at.attackingPermanent && s.objects[at.attackingPermanent.id];
+    const life = pw ? (pw.counters.loyalty ?? 0) : player(s, at.attacking!).life;
     const kills = (at.blockedBy ?? []).some((b) => s.objects[b]?.zone === "battlefield" && (objHasKeyword(s, at, "Deathtouch") || toughness(s, obj(s, b)) - obj(s, b).damage <= dmg));
     return controllerOf(s, at) === pid ? !kills || life <= dmg : kills && life > dmg + 5;
   });
@@ -1410,6 +1414,80 @@ function chooseCycling(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
+/**
+ * A loyalty ability for one of our planeswalkers (CR 606): the ultimate when we can afford it, else a minus ability
+ * that leaves the planeswalker at 2 or more and has something good to aim at, else a plus or zero ability. −X uses all
+ * but 1 of its loyalty.
+ */
+function chooseLoyalty(s: GameState, pid: PlayerId): Action[] | null {
+  let best: { score: number; plan: Action[] } | null = null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || !objIsType(s, o, "Planeswalker")) continue;
+    const loyalty = o.counters.loyalty ?? 0;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.loyalty === undefined && !ab.loyaltyX) continue;
+      const x = ab.loyaltyX ? loyalty - 1 : undefined;
+      const cost = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
+      if (ab.loyaltyX && (x ?? 0) < 1) continue;
+      const after = loyalty + cost;
+      const ultimate = cost <= -6;
+      if (after < 0 || (after === 0 && !ultimate)) continue;
+      const problem = abilityProblem(s, pid, id, i, undefined, undefined, undefined, x);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
+      if (ab.body.modal && !modes) continue;
+      const body = withModes(ab.body, modes);
+      if ((groupValue(s, pid, body, defOf(s, o), id) ?? 1) <= 0) continue;
+      const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
+      if (!targets) continue;
+      const score = ultimate ? 100 : cost < 0 ? (after >= 2 ? 50 - cost : -1) : 30 + cost;
+      if (score < 0) continue;
+      if (best && best.score >= score) continue;
+      const plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x);
+      if (plan) best = { score, plan };
+    }
+  }
+  return best?.plan ?? null;
+}
+
+/**
+ * Opponents' planeswalkers worth attacking instead of the player: moves attackers that the planeswalker's controller
+ * can't block (or all of them when they have no untapped creatures) onto it, smallest first, until their power
+ * covers its loyalty. Not when the attack on the player would be lethal, and never a goaded creature (CR 701.15b).
+ */
+function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
+  const atPlayer = (d: PlayerId) => attacks.filter((a) => a.defender === d && a.planeswalker === undefined).reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0);
+  const walkers = s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => objIsType(s, o, "Planeswalker") && opponents(s, pid).includes(controllerOf(s, o)))
+    .sort((a, b) => (b.counters.loyalty ?? 0) - (a.counters.loyalty ?? 0));
+  for (const pw of walkers) {
+    const owner = controllerOf(s, pw);
+    if (atPlayer(owner) >= player(s, owner).life) continue;
+    const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && !b.tapped && objIsType(s, b, "Creature"));
+    const free = attacks
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !attackProblem(s, obj(s, a.attacker), owner))
+      .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
+      .sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)));
+    let need = pw.counters.loyalty ?? 0;
+    const moved: typeof attacks = [];
+    for (const a of free) {
+      if (need <= 0) break;
+      moved.push(a);
+      need -= Math.max(0, power(s, obj(s, a.attacker)));
+    }
+    if (need > 0) continue;
+    for (const a of moved) {
+      a.defender = owner;
+      a.planeswalker = pw.id;
+    }
+  }
+  return attacks;
+}
+
 function chooseAttacks(s: GameState, pid: PlayerId): Action {
   const opps = opponents(s, pid);
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
@@ -1442,7 +1520,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
   });
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
-  return { type: "declareAttackers", player: pid, attacks };
+  return { type: "declareAttackers", player: pid, attacks: attackPlaneswalkers(s, pid, attacks) };
 }
 
 function chooseBlocks(s: GameState, pid: PlayerId): Action {
@@ -1453,7 +1531,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     .filter((o) => controllerOf(s, o) === pid && !o.tapped && objIsType(s, o, "Creature") && !characteristics(s, o).cantBlock);
   const used = new Set<string>();
   const blocks: { blocker: string; attacker: string }[] = [];
-  const totalIncoming = incoming.reduce((n, a) => n + power(s, a), 0);
+  // Only damage to us counts toward our life; attackers of our planeswalkers are blocked when that's a good trade.
+  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + power(s, a), 0);
   const desperate = totalIncoming >= me.life;
   // Requirements first (CR 509.1c): every creature able to block a lure blocks one, and a creature that
   // must be blocked if able gets our sturdiest blocker (two against menace).

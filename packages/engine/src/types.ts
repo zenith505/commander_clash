@@ -348,7 +348,9 @@ export interface StackItem {
  * beginning of your next upkeep". It triggers once, about `subject` (the card as it was then).
  */
 export interface DelayedTrigger {
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat" | "nextCleanup";
+  /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat" | "nextCleanup" | "leaves";
+  to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };

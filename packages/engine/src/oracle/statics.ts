@@ -245,8 +245,8 @@ function parseAffected(subject: string): Affects | null {
     let colorless = false;
     for (const w of words) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
-      // "Artifact creatures you control get +1/+1": both card types.
-      else if (/^(artifact|enchantment)$/i.test(w) && !types.includes(capital(w.toLowerCase()))) types.push(capital(w.toLowerCase()));
+      // "Artifact creatures you control get +1/+1", "Land creatures you control have vigilance": both card types.
+      else if (/^(artifact|enchantment|land)$/i.test(w) && !types.includes(capital(w.toLowerCase()))) types.push(capital(w.toLowerCase()));
       else if (CREATURE_TYPES.has(w)) subtypes.push(w);
       // "Attacking creatures you control get +1/+0": whichever are attacking right now (CR 611.3a).
       else if ((w.toLowerCase() === "attacking" || w.toLowerCase() === "blocking") && !combat) combat = w.toLowerCase() as "attacking" | "blocking";

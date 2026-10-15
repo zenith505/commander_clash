@@ -1,5 +1,5 @@
-import type { Effect, TokenSpec } from "../abilities";
-import { defOf, isType, objIsType, power, toughness } from "../cards";
+import type { Effect, Modification, TokenSpec } from "../abilities";
+import { cardIdOf, defOf, isType, objIsType, power, toughness } from "../cards";
 import { clearCombat, draw, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
@@ -66,6 +66,29 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Only what's on the battlefield: "it" may have left (CR 702.26b).
       phaseOut(s, objects(s, e.what, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id));
       return;
+    case "earthbend": {
+      // CR 701.66a. Its effect lasts as long as the land stays on the battlefield (CR 611.2c, 400.7).
+      const n = amountNow(s, e.n, ctx);
+      for (const o of objects(s, e.what, ctx).filter((x) => x.zone === "battlefield")) {
+        const mods: Modification[] = [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: 0, toughness: 0 }, { kind: "addKeywords", keywords: ["Haste"] }];
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [o.id], mods });
+        invalidateCharacteristics(s);
+        const put = n > 0 ? putCounters(s, o, "+1/+1", n) : 0;
+        invalidateCharacteristics(s);
+        log(s, `${src}: ${defOf(s, o).name} becomes a 0/0 land creature with haste${put ? ` with ${put} +1/+1 counter${put > 1 ? "s" : ""}` : ""} (earthbend ${n}).`);
+        (s.delayed ??= []).push({
+          when: "leaves",
+          to: ["graveyard", "exile"],
+          controller: ctx.controller,
+          sourceCardId: ctx.sourceId && s.objects[ctx.sourceId] ? cardIdOf(s.objects[ctx.sourceId]!) : cardIdOf(o),
+          subject: { id: o.id, zc: o.zoneChanges ?? 0 },
+          body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard" }, tapped: true }], text: "When that land dies or is put into exile, return it to the battlefield tapped under your control." },
+          turn: s.turn,
+          step: s.step,
+        });
+      }
+      return;
+    }
     case "mustBlockSource": {
       // Provoke (CR 702.39a): only the creature that provoked it, as long as it's still that object.
       if (!ctx.sourceId) return;

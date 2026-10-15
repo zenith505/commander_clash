@@ -718,6 +718,12 @@ export type Effect =
   | { type: "surveil"; n: Amount } // CR 701.25
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount }
+  /**
+   * Earthbend N (CR 701.66a): the target land you control becomes a 0/0 land creature with haste in addition to its
+   * other types, gets N +1/+1 counters, and "when that land dies or is put into exile, return it to the battlefield
+   * tapped under your control".
+   */
+  | { type: "earthbend"; what: ObjRef; n: Amount }
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   | { type: "handToTop"; n: Amount }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */

@@ -52,6 +52,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "mustBlock" }], duration: "endOfTurn" }] : null;
   }
+  // Earthbend N (CR 701.66a): "target land you control becomes a 0/0 land creature with haste ...". Each instance has its
+  // own target, which may be the same land (rulings).
+  if ((m = /^(?:you )?earthbend (\d+|X)$/i.exec(s))) {
+    const what = parseObject("target land you control", ctx);
+    return what?.ref === "target" ? [{ type: "earthbend", what, n: amt(m[1]!) }] : null;
+  }
   // Recruit (CR 701.70a): "recruit", "you recruit".
   if (/^(?:you )?recruit$/i.test(s)) return [{ type: "recruit" }];
   // "If that creature would die this turn, exile it instead" (CR 614.1a), for what an earlier sentence targeted

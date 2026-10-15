@@ -13,7 +13,9 @@
     "dev": "npm run dev -w @cc/web",
     "simulate": "tsx tools/simulate.ts",
     "coverage": "tsx tools/coverage.ts",
-    "blockers": "tsx tools/blockers.ts"
+    "blockers": "tsx tools/blockers.ts",
+    "e2e": "npm run e2e -w @cc/web",
+    "e2e:cards": "tsx tools/e2e-cards.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.0",

@@ -11,6 +11,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Infinite or long loops: shortcut them like paper Magic (CR 732): propose a loop and a number of iterations,
   others accept or stop it earlier.
 - A UI polish pass comes at the end. Don't reorder the game log (Ken rejected that).
+- Each round clicks through the prompts and buttons it adds with a browser test (`npm run e2e`, Ken, Oct 15 2026).
 
 ## Next rounds
 

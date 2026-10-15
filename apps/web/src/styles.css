@@ -171,6 +171,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 .control-pane .controls > span { flex: 1 1 100%; }
 .control-pane .controls > button { flex: 1 1 0; }
 .control-pane .targeting > span { flex: 1 1 100%; }
+.control-pane .targeting > span.divide, .targeting > span.divide { flex: 0 0 auto; display: inline-flex; gap: 4px; align-items: center; }
 .control-pane .prio-toggle { align-self: flex-start; }
 .phase-track { display: flex; gap: 3px; flex-wrap: wrap; }
 .phase-track .step {

@@ -2,12 +2,12 @@
 
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
-import type { DamageRecipient, Effect, ObjRef, PlayerRef } from "../../abilities";
-import { NUMX, amt, plainMana, sacrificeSelf } from "../words";
+import type { DamageRecipient, Effect, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
+import { NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseSearch } from "../search";
-import { parseDamageRecipient, parsePlayer, parseObject, pickFilter } from "../targets";
+import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
 
@@ -89,6 +89,24 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const a = parseDamageRecipient(m[2]!, ctx);
     const b = a && parseDamageRecipient(m[4]!, ctx);
     return a && b ? [{ type: "damage", amount: amt(m[1]!), to: a }, { type: "damage", amount: amt(m[3]!), to: b }] : null;
+  }
+  // "~ deals 3 damage divided as you choose among one, two, or three targets": how many targets and how much each
+  // gets are chosen with the targets, at least 1 each (CR 601.2d); "any number of targets" is one to that many.
+  if ((m = /^~ deals (\d+|one|two|three|four|five|six|seven|eight|nine|ten) damage divided as you choose among (one or two|one, two, or three|any number of) (targets|target .+)$/i.exec(s))) {
+    const total = num(m[1]!);
+    const n = m[2] === "one or two" ? 2 : m[2] === "one, two, or three" ? 3 : total;
+    let spec: TargetSpec | null = { kind: "any", text: "any target" };
+    if (m[3] !== "targets") {
+      const words = m[3]!.replace(/^target /, "").replace(/ your opponents control$/, " an opponent controls").replace(/ and\/or /g, " or ");
+      const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bplaneswalkers\b/g, "planeswalker");
+      spec = one === words ? null : parseTargetPhrase(one);
+      if (spec?.kind !== "object") return null;
+      spec = { ...spec, text: `target ${one}` };
+    }
+    const first = ctx.targets.length;
+    for (let k = 0; k < n; k++)
+      addTarget(ctx, { ...spec, divided: { first, n, total }, ...(k ? { optional: true, distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    return [{ type: "damage", amount: total, to: { ref: "anyTarget", index: first, n }, divided: true }];
   }
   // Damage: "~ deals 3 damage to any target"
   if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+)$`, "i").exec(s))) {

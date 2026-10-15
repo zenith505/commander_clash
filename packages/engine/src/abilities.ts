@@ -134,6 +134,11 @@ export interface TargetSpec {
   opponent?: boolean;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
   optional?: boolean;
+  /**
+   * "N damage divided as you choose among one, two, or three targets": this is one of the targets `first` to
+   * `first + n - 1`, which share `total` as their controller chose with the targets, at least 1 each (CR 601.2d).
+   */
+  divided?: { first: number; n: number; total: number };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
   /**
@@ -178,8 +183,9 @@ export interface Range {
  * since, it's a new object and no longer the target (CR 400.7, 608.2b).
  */
 export type TargetChoice =
-  | { kind: "object"; id: ObjectId; zc?: number }
-  | { kind: "player"; id: PlayerId }
+  /** `amount`: what it gets of an amount "divided as you choose" (CR 601.2d). */
+  | { kind: "object"; id: ObjectId; zc?: number; amount?: number }
+  | { kind: "player"; id: PlayerId; amount?: number }
   | { kind: "stack"; id: string }
   /** An "up to N" target left unchosen (CR 115.6, 601.2c). */
   | { kind: "none" };
@@ -381,7 +387,8 @@ export type StaticCondition =
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[] }
+  /** `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). */
+  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */

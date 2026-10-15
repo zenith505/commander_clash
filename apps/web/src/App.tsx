@@ -20,6 +20,7 @@ import {
   describeTargets,
   describeCount,
   canChooseTarget,
+  divisionProblem,
   legalModes,
   spellModes,
   withModes,
@@ -171,6 +172,23 @@ type Targeting =
   /** New targets for a copy of a spell (CR 707.10c), or keep the old ones. */
   | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string };
 
+/** Targets chosen for damage "divided as you choose" (CR 601.2d): how much each gets, at least 1 each. */
+type Dividing = { targeting: Targeting; chosen: TargetChoice[] };
+
+/** Each chosen target of a divided amount gets an even part to start with, the first ones any remainder. */
+function evenDivision(specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice[] {
+  const out = [...chosen];
+  for (let i = 0; i < specs.length; i++) {
+    const d = specs[i]!.divided;
+    if (d?.first !== i) continue;
+    const slots = Array.from({ length: d.n }, (_, k) => d.first + k).filter((k) => out[k]?.kind === "object" || out[k]?.kind === "player");
+    slots.forEach((k, j) => {
+      out[k] = { ...(out[k] as Extract<TargetChoice, { kind: "object" | "player" }>), amount: Math.floor(d.total / slots.length) + (j < d.total % slots.length ? 1 : 0) };
+    });
+  }
+  return out;
+}
+
 /** The human is choosing modes for a modal spell or activated ability they're casting (CR 700.2a). */
 type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
 
@@ -266,6 +284,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [discards, setDiscards] = useState<string[]>([]);
   const [viewing, setViewing] = useState<ZoneView | null>(null);
   const [targeting, setTargeting] = useState<Targeting | null>(null);
+  const [dividing, setDividing] = useState<Dividing | null>(null);
   const [modePick, setModePick] = useState<ModePick | null>(null);
   const [menu, setMenu] = useState<string | null>(null); // permanent (or card in hand) whose abilities are shown
   const [tapPick, setTapPick] = useState<TapPick | null>(null);
@@ -301,7 +320,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || delvePick);
+  const picking = !!(xPick || kickPick || costPick || delvePick || dividing);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -318,6 +337,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setAim(null);
         setBlocker(null);
         setTargeting((t) => (t?.mode === "trigger" || t?.mode === "copy" ? t : null));
+        setDividing((d) => (d?.targeting.mode === "trigger" ? d : null));
       } else if (e.key === " " && k.s && !k.targeting && !k.modePick && !k.tapPick && !k.picking && !k.pending && waitingOn(k.s) === HUMAN) {
         e.preventDefault();
         k.dispatch([{ type: "passPriority", player: HUMAN }]);
@@ -351,14 +371,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     finishTargets(chosen);
   }
 
-  function finishTargets(chosen: TargetChoice[]) {
-    if (!targeting) return;
-    if (chosen.length < targeting.specs.length) return setTargeting({ ...targeting, chosen });
+  function finishTargets(chosen: TargetChoice[], divided?: Targeting) {
+    const tg = divided ?? targeting;
+    if (!tg) return;
+    if (chosen.length < tg.specs.length) return setTargeting({ ...tg, chosen });
     setTargeting(null);
-    if (targeting.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
-    if (targeting.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
-    if (targeting.mode === "cast") return continueCast({ ...targeting.draft, targets: chosen });
-    continueActivate({ objectId: targeting.objectId, index: targeting.index, modes: targeting.modes, x: targeting.x, targets: chosen });
+    setDividing(null);
+    // Then how a divided amount is split among them (CR 601.2d); a copy keeps the division it has.
+    if (!divided && tg.mode !== "copy" && tg.specs.some((x) => x.divided)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
+    if (tg.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
+    if (tg.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
+    if (tg.mode === "cast") return continueCast({ ...tg.draft, targets: chosen });
+    continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, targets: chosen });
   }
 
   function useAbility(objectId: string, index: number, modes?: number[], x?: number) {
@@ -738,6 +762,33 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 </button>
               )}
               {targeting.mode !== "trigger" && targeting.mode !== "copy" && <button onClick={() => setTargeting(null)}>Cancel</button>}
+            </div>
+          )}
+          {dividing && (
+            <div className="targeting">
+              <span>
+                <strong>{dividing.targeting.label}</strong>: divide the damage
+              </span>
+              {dividing.chosen.map((c, i) => {
+                if ((c.kind !== "object" && c.kind !== "player") || c.amount === undefined) return null;
+                const set = (n: number) => setDividing({ ...dividing, chosen: dividing.chosen.map((x, j) => (j === i ? { ...c, amount: n } : x)) });
+                return (
+                  <span key={i} className="divide">
+                    {c.kind === "player" ? s.players[c.id]!.name : cardOf(s, c.id).name}{" "}
+                    <button className="ghost" disabled={c.amount <= 1} onClick={() => set(c.amount! - 1)}>
+                      −
+                    </button>
+                    <strong>{c.amount}</strong>
+                    <button className="ghost" onClick={() => set(c.amount! + 1)}>
+                      +
+                    </button>
+                  </span>
+                );
+              })}
+              <button disabled={divisionProblem(dividing.targeting.specs, dividing.chosen) !== null} onClick={() => finishTargets(dividing.chosen, dividing.targeting)}>
+                {divisionProblem(dividing.targeting.specs, dividing.chosen) ?? "Done"}
+              </button>
+              {dividing.targeting.mode !== "trigger" && <button onClick={() => setDividing(null)}>Cancel</button>}
             </div>
           )}
           {targeting && nextSpec?.kind === "card" && (

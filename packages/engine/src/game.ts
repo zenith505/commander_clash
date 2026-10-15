@@ -1991,7 +1991,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
 export function describeTargets(s: GameState, targets?: TargetChoice[]): string {
   if (!targets?.length) return "";
   const names = targets.flatMap((t) =>
-    t.kind === "none" ? [] : t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell"),
+    t.kind === "none"
+      ? []
+      : (t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell")) +
+        (t.kind !== "stack" && t.amount !== undefined ? ` (${t.amount})` : ""),
   );
   return names.length ? ` targeting ${names.join(", ")}` : "";
 }
@@ -2148,7 +2151,10 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     if (targets.length !== pend.specs.length) throw new RulesError(`choose ${pend.specs.length} target${pend.specs.length === 1 ? "" : "s"}`);
     const key = (t: TargetChoice | undefined) => (t ? (t.kind === "none" ? "none" : `${t.kind}:${t.id}`) : "");
     const changed = targets.map((t, i) => key(t) !== key(pend.current[i]));
-    const kept = targets.map((t, i) => (changed[i] ? t : pend.current[i]!));
+    // A divided amount stays as it was: the number of targets and the division can't change (rulings on Pyrotechnics).
+    const part = (t: TargetChoice | undefined) => (t && (t.kind === "object" || t.kind === "player") ? t.amount : undefined);
+    if (targets.some((t, i) => changed[i] && pend.specs[i]?.divided && (t.kind === "none" || pend.current[i]?.kind === "none"))) throw new RulesError("the number of targets of a divided amount can't change");
+    const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
     for (let i = 0; i < targets.length; i++)
       if (changed[i] && !canChooseTarget(s, pend.specs, kept, i, targets[i]!, p.id)) throw new RulesError("that isn't a legal new target");
     targets = kept;

@@ -240,7 +240,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const options = [...exilePlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -598,6 +598,13 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   return null;
 }
 
+/** Freerunning is cheaper than the mana cost: pay it whenever it's allowed (CR 702.173a). */
+function freerunPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "hand" || !altCost(defOf(s, o), "freerunning") || !(s.freerunningThisTurn ?? []).includes(pid)) return null;
+  return castPlan(s, pid, id, false, undefined, "freerunning");
+}
+
 /** Bestow it on one of our creatures when we can afford to (CR 702.103a): the bonus now, and a creature later. */
 function bestowPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   const o = obj(s, id);
@@ -779,8 +786,9 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const pool = s.battlefield
         .map((x) => obj(s, x))
         .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false))
-        .filter((o) => value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7))
-        .sort((a, b) => value(a) - value(b));
+        .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
+        // Emerge: the creature's mana value comes off the cost (CR 702.119a), so a small creature that cost a lot.
+        .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
       if (pool.length < c.n) return null;
       out.sacrifice = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "discard" && c.filter) {

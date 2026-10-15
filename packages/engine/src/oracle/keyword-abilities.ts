@@ -160,6 +160,16 @@ export function parseCostKeyword(
       trigger: { event: "selfEnters", ifEvoked: true, body: { targets: [], effects: [sacrificeSelf], text: "When ~ enters, if its evoke cost was paid, its controller sacrifices it." } },
     };
   }
+  // Emerge [cost] (CR 702.119a), "Emerge from artifact [cost]" (702.119b): sacrifice a creature (an artifact) as part of
+  // this alternative cost; the total cost is reduced by its mana value (see spellCost).
+  if ((m = /^Emerge(?: from (artifact))? ((?:\{[^}]+\})+)$/.exec(line))) {
+    const sac = parseAdditionalCost(m[1] ? "sacrifice an artifact" : "sacrifice a creature");
+    return plainMana(m[2]!) && sac ? { alt: { kind: "emerge", mana: m[2]!, costs: [sac] } } : "fail";
+  }
+  if (/^Emerge\b/.test(line)) return "fail";
+  // Freerunning [cost] (CR 702.173a); "Freerunning—Return a blue creature ..." and {X} costs aren't modeled.
+  if ((m = /^Freerunning ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) ? { alt: { kind: "freerunning", mana: m[1]! } } : "fail";
+  if (/^Freerunning\b/.test(line)) return "fail";
   if (line === "Delve") return { delve: true };
   if (line === "Assist") return { assist: true }; // CR 702.132a
   if (line === "Living weapon") {

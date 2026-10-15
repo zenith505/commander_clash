@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   abilityProblem,
+  altCost,
   altCostsFor,
   canCast,
   castProblem,
@@ -1094,7 +1095,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for" };
+const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", emerge: "Emerge", freerunning: "Freerunning" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1105,6 +1106,8 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   alternative: "an alternative cost: it's still the same spell, with the same mana value",
   prototype: "the smaller version: the prototype's mana cost, color, power and toughness",
   wubrg: "instead of its mana cost (Fist of Suns); X is 0",
+  emerge: "sacrifice a creature as you cast it: the cost is reduced by its mana value",
+  freerunning: "only if a player was dealt combat damage this turn by an Assassin or a commander you controlled",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
@@ -1155,7 +1158,12 @@ function canCastNowIgnoringMana(s: GameState, id: string) {
 /** Could you cast this card from your hand for its evoke or dash cost now, tapping mana as needed? */
 function canCastAlt(s: GameState, id: string, alt: AltCostKind) {
   const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt });
-  return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt }) !== null);
+  if (!problem) return true;
+  if (!/not enough mana/.test(problem)) return false;
+  if (planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt }) !== null) return true;
+  // Emerge: what's sacrificed lowers the cost (CR 702.119a), so try each permanent that could be.
+  const sac = alt === "emerge" ? altCost(cardOf(s, id), alt)?.costs?.find((c) => c.kind === "sacrifice") : undefined;
+  return !!sac && s.battlefield.some((x) => controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, sac.filter, s.objects[x]!, HUMAN, false) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, sacrifice: [x] }) !== null);
 }
 
 /** Indices of a card's abilities that work from your hand (cycling, CR 702.29a). */

@@ -592,6 +592,8 @@ export interface GameState {
   lostLifeThisTurn?: PlayerId[];
   /** Revolt: the players a permanent left the battlefield under the control of this turn, tokens too (rulings). */
   permanentLeftThisTurn?: PlayerId[];
+  /** Players whose Assassin creature or commander dealt combat damage to a player this turn: they may pay freerunning costs (CR 702.173a). */
+  freerunningThisTurn?: PlayerId[];
   /** Void: a nonland permanent left the battlefield this turn, or a spell was warped this turn (CR 702.185c). */
   voidThisTurn?: boolean;
   /** Descend: the players a permanent card was put into the graveyard of this turn, from anywhere (CR 700.11). */

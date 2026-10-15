@@ -28,6 +28,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ deals combat damage, (.+)$/, "selfDealsCombatDamage"],
   [/^Whenever ~ deals damage to a player, (.+)$/, "selfDealsDamageToPlayer"],
   [/^Whenever ~ deals damage, (.+)$/, "selfDealsDamage"],
+  // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
+  [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
   [/^Whenever another creature you control enters, (.+)$/, "anotherCreatureYouControlEnters"],
   [/^Whenever another creature enters the battlefield under your control, (.+)$/, "anotherCreatureYouControlEnters"],
   // Landfall
@@ -56,7 +58,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage",
 ];
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
@@ -79,6 +81,7 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^deals damage, (.+)$/, "selfDealsDamage", { thatMuch: true }],
   [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
   [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
+  [/^is dealt damage, (.+)$/, "selfIsDealtDamage", { thatMuch: true }],
 ];
 
 /**
@@ -379,6 +382,18 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // The Enduring cycle: "When ~ dies, if it was a creature, return it to the battlefield under its owner's control.
+  // It's an enchantment. (It's not a creature.)" Only a creature dies here (CR 700.4), so the intervening if (CR 603.4)
+  // holds whenever it triggers. It enters as an enchantment only, without its creature types (rulings, CR 205.1b).
+  if (/^When ~ dies, if it was a creature, return it to the battlefield under its owner's control\. It's an enchantment\.(?: \(It's not a creature\.\))?$/.test(line))
+    return {
+      event: "selfDies",
+      body: {
+        targets: [],
+        effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, owner: true, becomes: { types: ["Enchantment"], subtypes: [] } }],
+        text: "If it was a creature, return it to the battlefield under its owner's control. It's an enchantment.",
+      },
+    };
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
@@ -484,7 +499,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       let text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const amount = event === "selfDealsDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
       const thatMuch = amount && /\bthat (?:much|many)\b/.test(text);
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;

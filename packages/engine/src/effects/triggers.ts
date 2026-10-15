@@ -76,6 +76,8 @@ export type TriggerSourceEvent =
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
+  | { type: "wasDealtDamage"; id: ObjectId; amount: number }
   /** A permanent dealt damage to a player, in combat or not. */
   | { type: "damagedPlayer"; source: ObjectId; player: PlayerId; amount: number; combat: boolean }
   /** A permanent dealt damage to a creature (`id`). */
@@ -467,6 +469,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield" && hit) {
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, { amount: ev.amount });
+    }
+  } else if (ev.type === "wasDealtDamage") {
+    // "Whenever ~ is dealt damage", "When enchanted creature is dealt damage": it's still on the battlefield as the
+    // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") {
+      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
     }
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);

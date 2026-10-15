@@ -386,7 +386,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!isPermanentCard(d) || d.subtypes.includes("Aura")) continue;
         const under = e.owner ? o.owner : ctx.controller;
         log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under).name}'s control${e.tapped ? ", tapped" : ""}.`);
-        moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped }); // CR 110.2a
+        moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}) }); // CR 110.2a
       }
       return;
     case "putInLibrary":

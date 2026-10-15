@@ -489,6 +489,8 @@ export function moveObject(
     x?: number;
     /** Its controller is sacrificing it (CR 701.21a), for "whenever you sacrifice" triggers. */
     sacrificed?: boolean;
+    /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
+    becomes?: { types: string[]; subtypes: string[] };
   } = {},
 ) {
   const o = obj(s, id);
@@ -619,6 +621,8 @@ export function moveObject(
       }
   }
   if (to === "battlefield") o.controlledSinceTurn = s.turn;
+  if (to === "battlefield" && opts.becomes)
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
   invalidateCharacteristics(s);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;

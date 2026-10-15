@@ -448,7 +448,17 @@ export type Effect =
   | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; may: boolean; any?: boolean }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
-  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean; /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */ attachToSubject?: boolean }
+  | {
+      type: "putOntoBattlefield";
+      what: ObjRef;
+      tapped?: boolean;
+      /** "Under its owner's control" rather than yours. */
+      owner?: boolean;
+      /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
+      attachToSubject?: boolean;
+      /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
+      becomes?: { types: string[]; subtypes: string[] };
+    }
   /**
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
@@ -713,6 +723,7 @@ export type TriggerEvent =
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
+  | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
   | "permanentEnters"

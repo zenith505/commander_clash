@@ -446,7 +446,9 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       continue;
     }
     if (spec.divided?.first === i) {
-      const picks = spec.divided.counter === "+1/+1" ? distributeCounters(s, pid, body, i, out, forced, sourceId) : divideDamage(s, pid, body, i, out, forced, sourceId);
+      // Shields divided as you choose (Remedy) help, like +1/+1 counters.
+      const shields = allEffects(body.effects).some((e) => e.type === "preventNext" && e.divided && e.to.ref === "anyTarget" && e.to.index === i);
+      const picks = spec.divided.counter === "+1/+1" || shields ? distributeCounters(s, pid, body, i, out, forced, sourceId) : divideDamage(s, pid, body, i, out, forced, sourceId);
       if (!picks) return null;
       out.push(...picks);
       i += spec.divided.n - 1;
@@ -489,6 +491,12 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
   }
   // Only "up to" targets, none of them worth choosing: not worth doing.
   if (!forced && body.targets.some((t) => !t.skip) && out.every((t) => t.kind === "none")) return null;
+  // "Divided evenly among any number of targets" (Fireball), each one more to pay for: all of it at the best one.
+  if (many >= 0 && allEffects(body.effects).some((e) => e.type === "damage" && e.evenly)) {
+    const end = many + body.targets.length - printed.targets.length + 1; // the targets it was offered as
+    const keep = out.findIndex((t, i) => i >= many && i < end && t.kind !== "none");
+    return out.map((t, i) => (i >= many && i < end && i !== keep ? { kind: "none" as const } : t));
+  }
   return out;
 }
 
@@ -530,7 +538,10 @@ function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: num
   return Array.from({ length: n }, (_, k): TargetChoice => (picks[k] ? { ...picks[k]!.t, amount: picks[k]!.n } as TargetChoice : { kind: "none" }));
 }
 
-/** "Distribute +1/+1 counters among" targets (CR 601.2d): all of them on our best creature among the legal targets. */
+/**
+ * "Distribute +1/+1 counters among" targets, prevention shields divided among them (CR 601.2d): all of it on our best
+ * creature (or ourselves) among the legal targets.
+ */
 function distributeCounters(s: GameState, pid: PlayerId, body: AbilityBody, first: number, before: TargetChoice[], forced: boolean, sourceId?: string): TargetChoice[] | null {
   const spec = body.targets[first]!;
   const { n, total, upTo } = spec.divided!;

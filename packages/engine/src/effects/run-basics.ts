@@ -44,8 +44,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const amount = amountNow(s, e.amount, ctx);
       // "Divided as you choose": each target is dealt its part; a part for an illegal target isn't dealt (CR 608.2b,
       // rulings on Arc Lightning).
+      // "Divided evenly, rounded down": among the targets still legal (rulings on Fireball).
+      const evenly = e.evenly && e.to.ref === "anyTarget" ? damageRecipients(s, e.to, ctx) : undefined;
+      const shares = evenly ? evenly.objs.length + evenly.pids.length : 0;
       const parts = (to: DamageRecipient) =>
-        e.divided && to.ref === "anyTarget"
+        evenly
+          ? [{ ...evenly, n: shares ? Math.floor(amount / shares) : 0 }]
+          : e.divided && to.ref === "anyTarget"
           ? Array.from({ length: to.n ?? 1 }, (_, k) => {
               const t = ctx.targets[to.index + k];
               return { ...damageRecipients(s, { ref: "anyTarget", index: to.index + k }, ctx), n: t && t.kind !== "none" && t.kind !== "stack" ? (t.amount ?? 0) : 0 };
@@ -70,11 +75,21 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "preventNext": {
       // A shield for the next N damage this turn (CR 615.7), used up by damage from any source.
-      const n = amountNow(s, e.n, ctx);
-      const { objs, pids } = damageRecipients(s, e.to, ctx);
-      for (const x of [...objs, ...pids.map((pid) => player(s, pid))]) {
-        x.preventNext = (x.preventNext ?? 0) + n;
-        log(s, `${src} will prevent the next ${n} damage to ${"cardId" in x ? defOf(s, x).name : x.name} this turn.`);
+      // Divided as you choose: each target's part, none for a target that has become illegal (rulings on Remedy).
+      const to = e.to;
+      const parts =
+        e.divided && to.ref === "anyTarget"
+          ? Array.from({ length: to.n ?? 1 }, (_, k) => {
+              const t = ctx.targets[to.index + k];
+              return { ...damageRecipients(s, { ref: "anyTarget", index: to.index + k }, ctx), n: t && t.kind !== "none" && t.kind !== "stack" ? (t.amount ?? 0) : 0 };
+            })
+          : [{ ...damageRecipients(s, to, ctx), n: amountNow(s, e.n, ctx) }];
+      for (const { objs, pids, n } of parts) {
+        if (n <= 0) continue;
+        for (const x of [...objs, ...pids.map((pid) => player(s, pid))]) {
+          x.preventNext = (x.preventNext ?? 0) + n;
+          log(s, `${src} will prevent the next ${n} damage to ${"cardId" in x ? defOf(s, x).name : x.name} this turn.`);
+        }
       }
       return;
     }

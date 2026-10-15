@@ -135,7 +135,9 @@ export function expandMany(body: AbilityBody, k: number, optional = false): Abil
     ...(t.sharesCreatureTypeWith ? { sharesCreatureTypeWith: t.sharesCreatureTypeWith.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
-  const { many: _many, ...spec } = fix(body.targets[i]!);
+  const { many: _many, ...spec0 } = fix(body.targets[i]!);
+  // "X damage divided as you choose among any number of targets": divided among the ones announced.
+  const spec: TargetSpec = spec0.divided ? { ...spec0, divided: { ...spec0.divided, first: i, n } } : spec0;
   const copies: TargetSpec[] =
     k === 0
       ? [{ ...spec, skip: true }]
@@ -160,6 +162,13 @@ export function fitMany(body: AbilityBody, targets: TargetChoice[], x = 0): { bo
   const group = targets.slice(i, end).filter((t) => t.kind !== "none");
   if (spec.skip && group.length) return `${spec.text} isn't a target this spell has, cast this way`;
   if (spec.many === "x" && group.length > x) return `choose at most X (${x}) targets for ${spec.text}`;
+  // Divided as you choose (CR 601.2d): at least 1 each, so no more targets than the amount, and at least one if there's
+  // anything to divide (none if it's 0, rulings on Rolling Thunder).
+  const d = spec.divided;
+  if (d?.amount && !spec.skip) {
+    if (group.length > d.total) return `choose at most ${d.total} target(s) to divide ${d.total} among`;
+    if (d.total > 0 && !group.length) return `choose at least one target to divide ${d.total} among`;
+  }
   return { body: expandMany(body, group.length), targets: [...targets.slice(0, i), ...(group.length ? group : [{ kind: "none" as const }]), ...targets.slice(end)] };
 }
 

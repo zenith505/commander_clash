@@ -266,11 +266,22 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (where) s = where[1]!;
     ctx.whereX = !!where;
     const before = effects.length;
+    const targetsBefore = ctx.targets.length;
     const defineX = () => {
       if (!where) return true;
-      const def = parseCount(where[2]!, ctx);
+      // "X damage divided as you choose ..., where X is the number of Mountains you control as you cast this spell": the
+      // amount is worked out as the targets are chosen, while it's being cast, anyway (TargetSpec.divided.amount).
+      const asCast = / as you (?:cast ~|cast this spell|activate this ability)$/.exec(where[2]!);
+      const added = effects.slice(before);
+      const dividedOnly = added.length === 1 && added[0]!.type === "damage" && !!added[0]!.divided && ctx.targets.slice(targetsBefore).some((t) => t.divided?.amount);
+      if (asCast && !dividedOnly) return false;
+      const def = parseCount(asCast ? where[2]!.slice(0, asCast.index) : where[2]!, ctx);
       if (!def) return false;
-      effects.splice(before, effects.length - before, ...replaceX(effects.slice(before), def));
+      effects.splice(before, effects.length - before, ...replaceX(added, def));
+      for (let k = targetsBefore; k < ctx.targets.length; k++) {
+        const t = ctx.targets[k]!;
+        if (t.divided?.amount) ctx.targets[k] = { ...t, divided: { ...t.divided, amount: replaceX(t.divided.amount, def) } };
+      }
       return true;
     };
     // "You may discard a card. If you do, draw a card." (CR 608.2c): what follows depends on whether it was

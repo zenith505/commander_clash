@@ -3,7 +3,7 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -298,7 +298,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "activateMana":
       if (!paysManaNow(s)) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -1803,7 +1803,7 @@ export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = []) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
@@ -1812,8 +1812,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
   if (problem) throw new RulesError(problem);
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
+  // "Add {W}{W}, {W}{U}, or {U}{U}": one of the combinations, chosen as it resolves (CR 605.3b).
+  if (ab.produces.kind === "combos" ? combo === undefined || !ab.produces.options[combo] : combo !== undefined) throw new RulesError(ab.produces.kind === "combos" ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
-  const adds = manaProduced(s, o, ab, mana);
+  const adds = manaProduced(s, o, ab, mana, combo);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
   const triggered = manaTriggerResults(s, p.id, o, ab, adds);
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
@@ -1953,7 +1955,8 @@ export function castProblem(
       if (mp) return mp;
     }
   }
-  let specs = spellTargetSpecs(d, modes, castHow(choices));
+  // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
+  let specs = settleDivided(s, { targets: spellTargetSpecs(d, modes, castHow(choices)), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }).targets;
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
     const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, x);
@@ -2253,7 +2256,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
   if (problem) throw new RulesError(problem);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
-  let body = spell ? gateBody(withModes(spell, modes), castHow(choices)) : undefined;
+  let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHow(choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   if (body && manySlot(body.targets) >= 0) {
     // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
     const fit = fitMany(body, targets ?? [], x) as Exclude<ReturnType<typeof fitMany>, string>;
@@ -2773,7 +2776,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
     if (mp) return mp;
   }
-  let body = withModes(ab.body, modes);
+  let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 });
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
     const fit = fitMany(body, targets, x);
@@ -2868,7 +2871,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   if (ab?.costs?.some((c) => c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
-  let body = ab ? withModes(ab.body, modes) : undefined;
+  let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   if (manySlot(body.targets) >= 0) {
@@ -4684,7 +4687,7 @@ export function availableMana(s: GameState, pid: PlayerId): number {
     let best = 0;
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i, true)) return;
-      const most = Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
+      const most = ab.produces.kind === "combos" ? Math.max(0, ...ab.produces.options.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
       best = Math.max(best, most - manaValue(parseManaCost(ab.manaCost)));
     });
     for (const { ab, options } of payableActivatedMana(s, pid, o)) best = Math.max(best, Math.max(0, ...options.map((x) => x.adds.length)) - manaValue(parseManaCost(ab.manaCost)));

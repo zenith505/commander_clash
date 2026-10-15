@@ -2,7 +2,7 @@
 
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
-import type { DamageRecipient, Effect, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
+import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
 import { NUM, NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget } from "../body";
 import { parseCount } from "../counts";
@@ -176,21 +176,29 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "~ deals 3 damage divided as you choose among one, two, or three targets": how many targets and how much each
   // gets are chosen with the targets, at least 1 each (CR 601.2d); "any number of targets" is one to that many.
-  if ((m = /^~ deals (\d+|one|two|three|four|five|six|seven|eight|nine|ten) damage divided as you choose among (one or two|one, two, or three|any number of) (targets|target .+)$/i.exec(s))) {
-    const total = num(m[1]!);
-    const n = m[2] === "one or two" ? 2 : m[2] === "one, two, or three" ? 3 : total;
-    let spec: TargetSpec | null = { kind: "any", text: "any target" };
-    if (m[3] !== "targets") {
-      const words = m[3]!.replace(/^target /, "").replace(/ your opponents control$/, " an opponent controls").replace(/ and\/or /g, " or ");
-      const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bplaneswalkers\b/g, "planeswalker");
-      spec = one === words ? null : parseTargetPhrase(one);
-      if (spec?.kind !== "object") return null;
-      spec = { ...spec, text: `target ${one}` };
-    }
-    const first = ctx.targets.length;
-    for (let k = 0; k < n; k++)
-      addTarget(ctx, { ...spec, divided: { first, n, total }, ...(k ? { optional: true, distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
-    return [{ type: "damage", amount: total, to: { ref: "anyTarget", index: first, n }, divided: true }];
+  // "X damage" ("X plus 1"): the spell's X, announced before the targets (CR 601.2b), so one to X targets.
+  // "Damage equal to its power" (Orca, Siege Demon): worked out the same way, with what the ability knows then.
+  if ((m = /^~ deals (\d+|one|two|three|four|five|six|seven|eight|nine|ten|X|X plus 1|damage equal to .+?) (?:damage )?divided as you choose among (one or two|one, two, or three|any number of) (targets|target .+)$/i.exec(s))) {
+    const equal = /^damage equal to (.+)$/.exec(m[1]!);
+    const counted = equal ? parseCount(equal[1]!, ctx) : null;
+    if (equal && !counted) return null;
+    const to = addDivided(ctx, counted ?? m[1]!, m[2]!, m[3]!);
+    return to && [{ type: "damage", amount: to.amount, to: { ref: "anyTarget", index: to.index, n: to.n }, divided: true }];
+  }
+  // "~ deals X damage divided evenly, rounded down, among any number of targets" (Fireball): no division is chosen; it's
+  // worked out among the targets still legal as it resolves (rulings), so any number of targets, X or not (CR 115.6).
+  if ((m = /^~ deals (X|\d+) damage divided evenly, rounded down, among any number of targets$/i.exec(s))) {
+    if (ctx.targets.some((t) => t.many) || (m[1] === "X" && !ctx.spell)) return null;
+    const index = addTarget(ctx, { kind: "any", text: "any target", many: "any" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index, n: 2 };
+    return [{ type: "damage", amount: amt(m[1]!), to: { ref: "anyTarget", index, n: 2 }, evenly: true }];
+  }
+  // "Prevent the next 5 damage that would be dealt this turn to any number of targets, divided as you choose" (Remedy):
+  // a shield of its part on each target, divided as for damage (CR 601.2d, 615.7).
+  if ((m = /^Prevent the next (\d+|one|two|three|four|five|six|seven|eight|nine|ten|X) damage that would be dealt this turn to (any number of|one or two|one, two, or three) (targets|target .+), divided as you choose$/i.exec(s))) {
+    const to = addDivided(ctx, m[1]!, m[2]!, m[3]!);
+    return to && [{ type: "preventNext", n: to.amount, to: { ref: "anyTarget", index: to.index, n: to.n }, divided: true }];
   }
   // Damage: "~ deals 3 damage to any target"
   if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+)$`, "i").exec(s))) {
@@ -217,4 +225,40 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: amt(m[3]!) }];
   }
   return undefined;
+}
+
+/**
+ * The targets something "divided as you choose" is divided among (CR 601.2d): `amount` ("3", "X", "X plus 1", or an
+ * amount counted otherwise), `among` ("one or two", "one, two, or three", "any number of"), `what` ("targets", "target
+ * creatures and/or planeswalkers your opponents control"). A fixed amount gets a target for each part there could be; an
+ * amount worked out as they're chosen gets one `many` target (TargetSpec.divided.amount). Null if it isn't one we can.
+ */
+function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: string): { index: number; n: number; amount: Amount } | null {
+  const counted = typeof amount !== "string";
+  const isX = counted || amount.startsWith("X");
+  // X is the spell's own, or defined by the text ("where X is ...", body.ts defineX).
+  if (isX && (among !== "any number of" || (!counted && !ctx.spell && !ctx.whereX) || (ctx.whereX && amount !== "X"))) return null;
+  const total = isX ? 0 : num(amount as string);
+  const n = among === "one or two" ? 2 : among === "one, two, or three" ? 3 : total;
+  let spec: TargetSpec | null = { kind: "any", text: "any target" };
+  if (what !== "targets") {
+    const words = what.replace(/^target /, "").replace(/ your opponents control$/, " an opponent controls").replace(/ and\/or /g, " or ");
+    const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bplaneswalkers\b/g, "planeswalker");
+    spec = one === words ? null : parseTargetPhrase(one);
+    if (spec?.kind !== "object") return null;
+    spec = { ...spec, text: `target ${one}` };
+  }
+  const first = ctx.targets.length;
+  if (isX) {
+    if (ctx.targets.some((t) => t.many)) return null;
+    const x: AmountExpr = counted ? amount : { count: { kind: "x" }, ...(amount === "X plus 1" ? { plus: 1 } : {}) };
+    addTarget(ctx, { ...spec, divided: { first, n: 1, total: 0, amount: x }, many: "any" });
+    // "Those creatures" are all of them, however many (see TargetSpec.many).
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return { index: first, n: 2, amount: x };
+  }
+  for (let k = 0; k < n; k++)
+    addTarget(ctx, { ...spec, divided: { first, n, total }, ...(k ? { optional: true, distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+  return { index: first, n, amount: total };
 }

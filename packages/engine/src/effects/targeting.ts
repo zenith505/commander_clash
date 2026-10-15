@@ -8,6 +8,7 @@ import { CREATURE_TYPES, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { COLOR_NAMES } from "./describe";
+import { evalAmount, type AmountCtx } from "../amounts";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
 const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : n === 0);
@@ -215,12 +216,25 @@ export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerI
  * The body to choose targets for (CR 601.2c): "any number of target creatures" offered as one "up to" target for each
  * creature that could be chosen, "up to X target ..." no more than X; `fitMany` then keeps the ones chosen. Else as is.
  */
-export function offerMany(s: GameState, body: AbilityBody, controller: PlayerId, x = 0, src?: SourceQuality, sourceId?: ObjectId): AbilityBody {
+export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId, x = 0, src?: SourceQuality, sourceId?: ObjectId): AbilityBody {
+  const body = settleDivided(s, body0, { controller, ...(sourceId ? { sourceId } : {}), x });
   const i = manySlot(body.targets);
   if (i < 0) return body;
   const spec = body.targets[i]!;
   const room = spec.skip ? 0 : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => !(spec.notSource && t.kind === "object" && t.id === sourceId)).length;
-  return expandMany(body, spec.many === "x" ? Math.min(x, room) : room, true);
+  // Divided as you choose: no more targets than there is to divide (at least 1 each, CR 601.2d).
+  const most = spec.divided?.amount ? Math.min(room, spec.divided.total) : room;
+  return expandMany(body, spec.many === "x" ? Math.min(x, most) : most, true);
+}
+
+/**
+ * The body with each amount to be "divided as you choose" worked out (TargetSpec.divided.amount), as its targets are
+ * chosen (CR 601.2d): the spell's X as it's cast, a trigger's as it's put on the stack. Already worked out, as is.
+ */
+export function settleDivided(s: GameState, body: AbilityBody, ctx: AmountCtx): AbilityBody {
+  if (!body.targets.some((t) => t.divided?.amount && !t.divided.settled)) return body;
+  const targets = body.targets.map((t) => (t.divided?.amount && !t.divided.settled ? { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } } : t));
+  return { ...body, targets };
 }
 
 /** The targets to choose from, as offerMany offers them. */

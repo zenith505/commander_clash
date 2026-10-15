@@ -813,7 +813,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
       if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0)) return setMenu(o.id);
-      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra);
+      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra, mana[0].combo);
       if (plan) dispatch(plan);
     }
   }
@@ -1024,7 +1024,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   const candidates = tapCostCandidates(s, HUMAN, s.objects[menu]!, tapCost);
                   return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
                 }
-                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra);
+                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra, x.combo);
                 if (plan) dispatch(plan);
               }}
               onPlay={(untapped) => {
@@ -2591,7 +2591,7 @@ function ModeMenu({
 
 /** Ways to make mana with this permanent right now (paying any mana they cost with other sources). */
 function usableManaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaOptions(s, o).filter((x) => x.adds.length > 0 && planManaAbility(s, HUMAN, o.id, x.ability, x.mana) !== null);
+  return manaOptions(s, o).filter((x) => x.adds.length > 0 && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo) !== null);
 }
 
 function AbilityMenu({
@@ -2736,7 +2736,7 @@ function AbilityMenu({
           const ab = manaAbilitiesOn(s, o)[x.ability]!;
           const cost = ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it");
           return (
-            <button key={`${x.ability}-${x.mana}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
+            <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>

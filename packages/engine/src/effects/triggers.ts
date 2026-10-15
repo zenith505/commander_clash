@@ -6,7 +6,7 @@ import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
 import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneName } from "../types";
 import { RulesError } from "../types";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, offerTargets } from "./targeting";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, offerTargets, settleDivided } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -847,7 +847,8 @@ export function checkStateTriggers(s: GameState) {
 
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
-  const body = t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body;
+  // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
   if (!body.targets.some((x) => x.controller === "eventPlayer")) return body;

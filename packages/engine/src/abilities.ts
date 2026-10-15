@@ -169,7 +169,23 @@ export interface TargetSpec {
    * "N damage divided as you choose among one, two, or three targets": this is one of the targets `first` to
    * `first + n - 1`, which share `total` as their controller chose with the targets, at least 1 each (CR 601.2d).
    */
-  divided?: { first: number; n: number; total: number; /** Counters distributed, not damage divided. */ counter?: CounterKind; /** "Among up to two target creatures": none at all is fine too. */ upTo?: true };
+  divided?: {
+    first: number;
+    n: number;
+    total: number;
+    /** Counters distributed, not damage divided. */
+    counter?: CounterKind;
+    /** "Among up to two target creatures": none at all is fine too. */
+    upTo?: true;
+    /**
+     * "X damage divided as you choose among any number of targets": the amount, worked out as the targets are chosen
+     * (CR 601.2d: as it's cast or put on the stack) and kept in `total` from then on (`settleDivided`). With it the
+     * target is a `many` one: one to that many targets, as each gets at least 1, or none if it's 0.
+     */
+    amount?: AmountExpr;
+    /** `total` holds the amount, worked out. */
+    settled?: true;
+  };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
   /**
@@ -569,8 +585,11 @@ export type StaticCondition =
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
-  /** `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true }
+  /**
+   * `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). `evenly`: "divided evenly,
+   * rounded down, among any number of targets" (Fireball): among the targets still legal as it resolves, nothing chosen.
+   */
+  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
@@ -912,8 +931,11 @@ export type Effect =
    * just put into to the battlefield under its owner's control, with a counter on it.
    */
   | { type: "returnToBattlefield"; counter?: "+1/+1" | "-1/-1" }
-  /** "Prevent the next 2 damage that would be dealt to any target this turn" (a prevention shield, CR 615.7). */
-  | { type: "preventNext"; n: Amount; to: DamageRecipient }
+  /**
+   * "Prevent the next 2 damage that would be dealt to any target this turn" (a prevention shield, CR 615.7). `divided`:
+   * "to any number of targets, divided as you choose", each target's shield its part (CR 601.2d).
+   */
+  | { type: "preventNext"; n: Amount; to: DamageRecipient; divided?: true }
   /** "The next N damage that would be dealt to ~ this turn is dealt to target creature you control instead" (CR 614.9). */
   | { type: "redirectNext"; n: Amount; from: DamageRecipient; to: DamageRecipient }
   /** "Prevent all combat damage that would be dealt this turn" (CR 615.1). */
@@ -1323,7 +1345,9 @@ export type ManaProduce =
    * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
    * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
    */
-  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean };
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean }
+  /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
+  | { kind: "combos"; options: ManaType[][] };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).

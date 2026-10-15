@@ -232,6 +232,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       continue;
     }
+    // "Create four Bear tokens instead if there are seven or more cards in your graveyard" (threshold) is
+    // "If there are seven or more cards in your graveyard, create four Bear tokens instead."
+    const insteadIf = /^(.+) instead if ([^,]+)$/.exec(s);
+    if (insteadIf) s = `If ${insteadIf[2]}, ${insteadIf[1]!.charAt(0).toLowerCase()}${insteadIf[1]!.slice(1)} instead`;
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;

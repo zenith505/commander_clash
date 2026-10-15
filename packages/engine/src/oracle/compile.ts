@@ -11,7 +11,7 @@ import { parseManaAbility } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic } from "./statics";
 import { parseTrigger } from "./triggers";
-import { parseActivated } from "./activated";
+import { parseActivated, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseGroup, parseTargetPhrase } from "./targets";
@@ -628,7 +628,8 @@ export function compile(d: CardDef): CompiledCard {
       else out.activated.push(bindThisAbility(act, line));
       continue;
     }
-    if (isSpell) spellLines.push(line);
+    // A spell's paragraphs are read as one text, so an ability word inside it goes (CR 207.2c).
+    if (isSpell) spellLines.push(stripAbilityWord(line));
     else out.unsupported.push(raw);
   }
   if (isSpell) {

@@ -1,6 +1,6 @@
 # Roadmap
 
-11,952 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+12,062 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,10 +14,9 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. **"Becomes a copy"** (CR 707.4, layer 1), and copying double-faced or face-down permanents.
-2. **Madness, suspend, bestow, dredge, casualty.**
-3. **CR 732 loop shortcuts.**
-4. Then by `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
+1. **Madness, suspend, bestow, dredge, casualty.**
+2. **CR 732 loop shortcuts.**
+3. Then by `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
    "assign combat damage as though it weren't blocked", flash with a cleanup sacrifice, Start your engines!.
 
 ## Known gaps (from earlier rounds)
@@ -50,6 +49,14 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   creature"; devour on tokens (Dragon Broodmother), "the number of Goblins it devoured".
 - City's blessing text: "those creatures get +2/+2 instead", "half the creatures they control", "has hexproof and
   can't be blocked", "exile those tokens unless you have the city's blessing".
+- Becoming a copy: double-faced cards (CR 707.8, they're unsupported entirely); copies chosen without targeting
+  (Cytoshape, Deepfathom Echo, Sakashima's Will, Polymorphous Rush); "for as long as" durations (Assimilation Aegis,
+  Blade of Shared Souls, Zygon Infiltrator, Secret Invasion); copying an exiled card (Dimir Doppelganger, The
+  Mimeoplasm, Dermotaxi, Lazav, Wearer of Faces, Niko); targets "with mana value X" (Lazav, the Multifarious,
+  Likeness Looter, The Mycosynth Gardens), "with a counter on it" (Volrath), "of the chosen type" (Mirror of the
+  Forebears), "a second target" (Shuri); Permeating Mass, Crystalline Resonance, Hall of Echoes, Absorbing Man,
+  Taskmaster, Gogo, Court of Vantress, Vesuvan Shapeshifter, Brudiclad, Infinite Reflection; planeswalkers (Saheeli,
+  Oko, Kaya).
 
 ## Later
 

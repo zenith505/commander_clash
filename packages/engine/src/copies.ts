@@ -3,7 +3,8 @@
 // power and toughness, abilities compiled from its rules text) sees the copied values (layer 1, CR 613.2).
 
 import { defOf } from "./cards";
-import type { CardDef, Color, GameObject, GameState } from "./types";
+import { invalidateCharacteristics } from "./layers";
+import type { CardDef, Color, CopyEffect, GameObject, GameState } from "./types";
 
 /**
  * Exceptions to a copy (CR 707.9): "except it isn't legendary", "except it's a 1/1 Spirit in addition to its
@@ -25,6 +26,10 @@ export interface CopyExcept {
   /** Keywords it has ("haste"), and other rules text ("At the beginning of the end step, sacrifice ~."). */
   keywords?: string[];
   text?: string[];
+  /** "It doesn't copy that creature's color": it keeps the colors it had (CR 707.9c); set to them as the copy begins. */
+  keepColors?: boolean;
+  /** "It has this ability": the ability's own text, added to `text` when the card is compiled (CR 707.9a). */
+  thisAbility?: boolean;
 }
 
 /** The copiable values of `o` now (CR 707.2): its definition as modified by copy effects, or face-down values. */
@@ -67,7 +72,35 @@ export function copyKey(s: GameState, base: CardDef, except?: CopyExcept): strin
   return key;
 }
 
-/** Make `o` a copy of these values (CR 707.2): as it enters (707.5), or "becomes a copy" (707.4). */
-export function becomeCopy(s: GameState, o: GameObject, key: string) {
-  o.copyOf = key;
+/**
+ * The exceptions as they apply to `o` becoming a copy now: "its name is ~" is its own name, "it doesn't copy that
+ * creature's color" keeps the colors it has before this copy effect (CR 707.9c).
+ */
+export function exceptFor(s: GameState, o: GameObject, except: CopyExcept | undefined, ownName: string): CopyExcept | undefined {
+  if (!except) return undefined;
+  const { keepColors, thisAbility: _, ...rest } = except;
+  return { ...rest, ...(rest.name === "~" ? { name: ownName } : {}), ...(keepColors ? { colors: [...defOf(s, o).colors] } : {}) };
+}
+
+/**
+ * `o` becomes a copy of these values while it stays on the battlefield (CR 707.4): a copy effect with a new
+ * timestamp, which overwrites the copiable values earlier ones gave it (CR 613.2a, 613.7). Nothing enters or
+ * leaves, and other effects on it keep applying.
+ */
+export function addCopyEffect(s: GameState, o: GameObject, key: string, until?: CopyEffect["until"]) {
+  (o.copyEffects ??= []).push({ key, timestamp: s.nextTimestamp++, ...(until ? { until } : {}) });
+  invalidateCharacteristics(s);
+}
+
+/** End the copy effects `ends` says are over (their duration ran out). */
+export function endCopyEffects(s: GameState, ends: (e: CopyEffect) => boolean) {
+  let changed = false;
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (!o.copyEffects?.some(ends)) continue;
+    const kept = o.copyEffects.filter((e) => !ends(e));
+    o.copyEffects = kept.length ? kept : undefined;
+    changed = true;
+  }
+  if (changed) invalidateCharacteristics(s);
 }

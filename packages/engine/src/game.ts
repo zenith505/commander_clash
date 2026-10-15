@@ -1,11 +1,11 @@
 import type { AdditionalCost, AltCostKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaProduced, pickManaAbility } from "./manaabilities";
 import { addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, objectSource, protectedFrom } from "./damage";
 import { putCounters } from "./counters";
-import { copyKey } from "./copies";
+import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
@@ -450,7 +450,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}) };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}) };
   }
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
   const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
@@ -480,6 +480,7 @@ export function moveObject(
   o.zone = to;
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
+  o.copyEffects = undefined;
   o.tapped = false;
   o.damage = 0;
   o.damagedBy = undefined;
@@ -570,10 +571,11 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
   const own = compileCard(defOf(s, o)).entersAsCopy;
   if (choice !== "none" && own) {
     const target = obj(s, choice);
-    const except = own.except?.name === "~" ? { ...own.except, name: realDefOf(s, o).name } : own.except;
-    o.copyOf = copyKey(s, defOf(s, target), except);
+    const key = copyKey(s, defOf(s, target), exceptFor(s, o, own.except, realDefOf(s, o).name));
+    if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
+    else o.copyOf = key;
     invalidateCharacteristics(s);
-    log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}.`);
+    log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
   }
   const printed = compileCard(defOf(s, o));
   const ewc = printed.entersWithCounters;
@@ -826,7 +828,16 @@ function advanceStep(s: GameState) {
 }
 
 function startNextTurn(s: GameState) {
+  const prev = s.activePlayer;
   s.activePlayer = nextLivingAfter(s, s.activePlayer);
+  // "Until your next turn" ends as that turn begins, or when it would have begun for a player who left (CR 800.4m).
+  const order = s.turnOrder;
+  const began = new Set<PlayerId>();
+  for (let i = (order.indexOf(prev) + 1) % order.length; ; i = (i + 1) % order.length) {
+    began.add(order[i]!);
+    if (order[i] === s.activePlayer || began.size >= order.length) break;
+  }
+  endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
   s.turn++;
   for (const p of s.players) p.landsPlayedThisTurn = 0;
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
@@ -914,6 +925,7 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
 
 function finishCleanup(s: GameState) {
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
+  endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -1572,7 +1584,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters } });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard");
       }
@@ -2545,22 +2557,23 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId): st
   if (!o || o.zone !== "battlefield" || !o.faceDown) return "that isn't a face-down permanent";
   if (controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (s.priority !== pid || s.pending) return "you don't have priority";
-  const fd = compileCard(realDefOf(s, o)).faceDownCast;
+  const fd = compileCard(faceUpDefOf(s, o)).faceDownCast;
   if (!fd) return "it has no morph or disguise cost"; // CR 702.37e
   if (!payFromPool(parseManaCost(fd.cost), player(s, pid).manaPool)) return `not enough mana to turn it face up (${fd.cost})`;
   return null;
 }
 
 /** The cost of turning a face-down permanent face up, if it has one. */
-export const faceUpCost = (s: GameState, o: GameObject) => (o.faceDown ? compileCard(realDefOf(s, o)).faceDownCast : undefined);
+export const faceUpCost = (s: GameState, o: GameObject) => (o.faceDown ? compileCard(faceUpDefOf(s, o)).faceDownCast : undefined);
 
 function turnFaceUp(s: GameState, p: Player, id: ObjectId) {
   const problem = turnFaceUpProblem(s, p.id, id);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
-  const fd = compileCard(realDefOf(s, o)).faceDownCast!;
+  const fd = compileCard(faceUpDefOf(s, o)).faceDownCast!;
   p.manaPool = payFromPool(parseManaCost(fd.cost), p.manaPool)!.pool;
-  // Its copiable values go back to the card's (CR 708.8); it's the same permanent, so nothing "enters".
+  // Its copiable values go back to the card's, or what a copy effect made it (CR 708.8, 707.3); it's the same
+  // permanent, so nothing "enters".
   o.faceDown = undefined;
   invalidateCharacteristics(s);
   const d = defOf(s, o);

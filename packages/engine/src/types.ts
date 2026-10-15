@@ -43,6 +43,11 @@ export interface GameObject {
   cardId: string; // key into GameState.cards
   /** A copy effect's values (CR 707.2), a key into GameState.cards: Clone as it entered, until it leaves. */
   copyOf?: string;
+  /**
+   * "Becomes a copy" effects on it (CR 707.4), in timestamp order. Each one overwrites every copiable value, so the
+   * latest decides (CR 613.2a); `until` is when it ends (see CopyEffect). They end with the object (CR 400.7).
+   */
+  copyEffects?: CopyEffect[];
   owner: PlayerId;
   /**
    * The player it came under the control of when it entered its zone (or who cast it).
@@ -122,6 +127,17 @@ export interface GameObject {
   devoured?: number;
   /** Soulbond (CR 702.95b): the creature it's paired with (that object, by its zone changes) and who paired them. */
   paired?: { id: ObjectId; zc: number; by: PlayerId };
+}
+
+/**
+ * A copy effect that began after the permanent entered (CR 707.4): `key` is the copiable values, a key into
+ * GameState.cards. It lasts for the rest of the game, until end of turn (CR 514.2), or until `turnOf`'s next
+ * turn begins (CR 611.2a; if that player has left, until it would have begun, CR 800.4m).
+ */
+export interface CopyEffect {
+  key: string;
+  timestamp: number;
+  until?: "endOfTurn" | { turnOf: PlayerId };
 }
 
 export interface Player {
@@ -258,6 +274,8 @@ export interface LastKnown {
   manaValue?: number;
   /** The player a creature returned for ninjutsu was attacking (CR 702.49c). */
   attacking?: PlayerId;
+  /** Its copiable values as it last existed (CR 707.2, 608.2h), a key into GameState.cards: "becomes a copy of that creature". */
+  copyKey?: string;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
@@ -405,7 +423,7 @@ export interface GameState {
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number } }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string }>;
   nextTimestamp: number;
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */

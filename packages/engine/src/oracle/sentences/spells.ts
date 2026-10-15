@@ -37,6 +37,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
   // Scry and surveil (CR 701.22, 701.25)
   if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
+  // Learn (CR 701.48a): "You may discard a card. If you do, draw a card. If you didn't discard a card, you may reveal a
+  // Lesson card you own from outside the game and put it into your hand." Players here have no sideboard (CR 100.4:
+  // one is optional) and nothing else outside the game, so only the first part can happen.
+  if (/^Learn$/i.test(s))
+    return [
+      { type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1, random: false }], text: "discard a card" },
+      { type: "if", cond: { kind: "youDid" }, effects: [{ type: "draw", who: { ref: "you" }, n: 1 }] },
+    ];
   // Empower Jace (CR 701.71a)
   if ((m = new RegExp(`^Empower Jace ${NUMX}$`, "i").exec(s))) return [{ type: "empowerJace", n: amt(m[1]!) }];
   // Fighting (CR 701.14) and "deals damage equal to its power to"

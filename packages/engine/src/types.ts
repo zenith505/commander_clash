@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
@@ -167,6 +167,13 @@ export interface CopyEffect {
   until?: "endOfTurn" | { turnOf: PlayerId };
 }
 
+/** `n` of the `mana` in a player's pool that can only be spent as `only` says (CR 106.6). */
+export interface RestrictedMana {
+  mana: ManaType;
+  n: number;
+  only: ManaSpend;
+}
+
 export interface Player {
   id: PlayerId;
   name: string;
@@ -177,6 +184,8 @@ export interface Player {
   exile: ObjectId[];
   command: ObjectId[];
   manaPool: Record<ManaType, number>;
+  /** Mana in the pool (counted in manaPool too) that can only be spent some ways (CR 106.6). */
+  restrictedMana?: RestrictedMana[];
   /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
   combatMana?: number;
   landsPlayedThisTurn: number;

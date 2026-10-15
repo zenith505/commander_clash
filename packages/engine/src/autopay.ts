@@ -1,8 +1,9 @@
-import { abilitiesOf, defOf, FACE_DOWN, objIsType, power } from "./cards";
+import { abilitiesOf, bestowedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
+import { poolFor, spendAllows, type ManaUse } from "./spend";
 import type { TargetChoice } from "./abilities";
 import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -20,6 +21,8 @@ interface Option {
   tapCost?: { n: number; candidates: ObjectId[] };
   /** What it taps for that cost, once it's chosen to be used. */
   taps?: ObjectId[];
+  /** Its mana can only be spent some ways (CR 106.6), here on what's being paid for. */
+  restricted?: boolean;
 }
 
 interface Source {
@@ -29,7 +32,7 @@ interface Source {
   colors: number;
 }
 
-function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[]): Source[] {
+function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: ManaUse): Source[] {
   // Current controller, types and mana abilities, after continuous effects (CR 613).
   const isCreature = (id: string) => objIsType(s, obj(s, id), "Creature");
   return s.battlefield
@@ -39,11 +42,12 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[]): Source[]
     .map((o) => {
       const abs = manaAbilitiesOn(s, o);
       const options = manaOptions(s, o)
-        .filter((x) => x.adds.length > 0 && !manaAbilityProblem(s, pid, o, x.ability, true))
+        // Mana that can't be spent on this is no help (CR 106.6).
+        .filter((x) => x.adds.length > 0 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, abs[x.ability]!.spendOnly!, use)))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
-          return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab), ...(tapCost ? { tapCost } : {}) };
+          return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
         });
       return { id: o.id, options, colors: new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds)).size };
     })
@@ -168,6 +172,8 @@ export function planCast(
 ): Action[] | null {
   const o = obj(s, objectId);
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
+  // The spell as it will be on the stack, for mana that can only be spent on some spells (CR 106.6).
+  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : d };
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets });
@@ -186,34 +192,34 @@ export function planCast(
   if (Array.isArray(convoke) && convoke.length) {
     const reduced = convokeReduce(cost, extra, convoke.map((id) => characteristics(s, obj(s, id)).colors));
     if (!reduced) return null;
-    const taps = planMana(s, pid, reduced, 0, undefined, convoke);
+    const taps = planMana(s, pid, reduced, 0, undefined, convoke, use);
     if (taps) return cast(taps, convoke);
-    const imp = improvise ? autoImprovise(s, pid, reduced, 0, convoke) : null;
+    const imp = improvise ? autoImprovise(s, pid, reduced, 0, convoke, use) : null;
     return imp ? cast(imp.taps, convoke, imp.artifacts) : null;
   }
   // "Costs {3} less if it targets a tapped creature" is worked out before mana abilities (CR 601.2f-g):
   // tapping the target for mana first mustn't make it count.
   const targetIds = compileCard(d).costLessIfTargets ? (targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])) : [];
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
-  const pool = player(s, pid).manaPool;
+  const pool = poolFor(s, pid, use).pool;
   const rainbow = compileCard(d).countsColors && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
   let taps: Action[] | null = null;
-  for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]))) break;
-  taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]);
+  for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
+  taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
   // So when the cost depends on the board, don't sacrifice permanents for its mana.
   if (taps && costDependsOnBoard(s, d)) {
     const sacs = taps.flatMap((a) => (a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf ? [a.objectId] : []));
-    if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, [...sacs, ...sacrificedTargets(s, targets)]);
+    if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, [...sacs, ...sacrificedTargets(s, targets)], use);
   }
   if (taps) return cast(taps);
   if (convoke !== "auto") return null;
   // Tap artifacts for improvise, or creatures for convoke, only when mana alone can't pay.
-  const imp = improvise ? autoImprovise(s, pid, cost, extra, []) : null;
+  const imp = improvise ? autoImprovise(s, pid, cost, extra, [], use) : null;
   if (imp) return cast(imp.taps, undefined, imp.artifacts);
   if (!compileCard(d).convoke) return null;
-  const auto = autoConvoke(s, pid, cost, extra);
+  const auto = autoConvoke(s, pid, cost, extra, use);
   return auto ? cast(auto.taps, auto.creatures) : null;
 }
 
@@ -246,7 +252,7 @@ function costDependsOnBoard(s: GameState, d: CardDef): boolean {
  * Artifacts to improvise with (CR 702.126a) when mana sources can't pay alone: ones that don't
  * make mana first, then noncreatures. Each pays for one generic mana.
  */
-export function autoImprovise(s: GameState, pid: PlayerId, cost: ParsedCost, extra: number, exclude: ObjectId[]): { artifacts: ObjectId[]; taps: Action[] } | null {
+export function autoImprovise(s: GameState, pid: PlayerId, cost: ParsedCost, extra: number, exclude: ObjectId[], use: ManaUse = "other"): { artifacts: ObjectId[]; taps: Action[] } | null {
   const candidates = s.battlefield
     .map((id) => obj(s, id))
     .filter((a) => controllerOf(s, a) === pid && !a.tapped && !exclude.includes(a.id) && objIsType(s, a, "Artifact"))
@@ -256,7 +262,7 @@ export function autoImprovise(s: GameState, pid: PlayerId, cost: ParsedCost, ext
     chosen.push(a.id);
     const reduced = payGenericWith(cost, extra, chosen.length);
     if (!reduced) return null;
-    const taps = planMana(s, pid, reduced.cost, reduced.extra, undefined, [...exclude, ...chosen]);
+    const taps = planMana(s, pid, reduced.cost, reduced.extra, undefined, [...exclude, ...chosen], use);
     if (taps) return { artifacts: chosen, taps };
   }
   return null;
@@ -266,7 +272,7 @@ export function autoImprovise(s: GameState, pid: PlayerId, cost: ParsedCost, ext
  * Pick creatures to convoke with when mana sources can't pay alone: ones that can't attack
  * this turn first (summoning sick), then the smallest. Each must pay for some mana.
  */
-export function autoConvoke(s: GameState, pid: PlayerId, cost: ParsedCost, tax: number): { creatures: ObjectId[]; taps: Action[] } | null {
+export function autoConvoke(s: GameState, pid: PlayerId, cost: ParsedCost, tax: number, use: ManaUse = "other"): { creatures: ObjectId[]; taps: Action[] } | null {
   const candidates = s.battlefield
     .map((id) => obj(s, id))
     .filter((c) => controllerOf(s, c) === pid && !c.tapped && objIsType(s, c, "Creature"))
@@ -275,7 +281,7 @@ export function autoConvoke(s: GameState, pid: PlayerId, cost: ParsedCost, tax: 
   for (;;) {
     const reduced = convokeReduce(cost, tax, chosen.map((id) => characteristics(s, obj(s, id)).colors));
     if (!reduced) return null;
-    const taps = planMana(s, pid, reduced, 0, undefined, chosen);
+    const taps = planMana(s, pid, reduced, 0, undefined, chosen, use);
     if (taps) return chosen.length ? { creatures: chosen, taps } : null;
     // The next creature that can pay for something: one matching a colored symbol if possible.
     const left = candidates.filter((c) => !chosen.includes(c.id));
@@ -331,7 +337,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const cost = parseManaCost(ab.manaCost);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
-  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)]);
+  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], { ability: obj(s, objectId) });
   if (!taps) return null;
   return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}) }];
 }
@@ -341,12 +347,17 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
  * that cost nothing come first; when they aren't enough, abilities that cost mana and make
  * more of it or a color we lack (a Signet: "{1}, {T}: Add {W}{U}") are paid for and added.
  */
-export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = []): Action[] | null {
+export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = [], use: ManaUse = "other"): Action[] | null {
   const p = player(s, pid);
-  if (payFromPool(cost, p.manaPool, extraGeneric, p.life)) return [];
-  const sources = manaSources(s, pid, [...(exclude ? [exclude] : []), ...alsoExclude]);
+  // Only the mana that can be spent on this counts (CR 106.6); `restricted` is how much of the pool can't be spent
+  // on anything else, such as a Signet's cost.
+  const start = poolFor(s, pid, use);
+  if (payFromPool(cost, start.pool, extraGeneric, p.life)) return [];
+  const sources = manaSources(s, pid, [...(exclude ? [exclude] : []), ...alsoExclude], use);
+  const unrestricted = sources.map((src) => ({ ...src, options: src.options.filter((x) => !x.restricted) }));
   const needColors = namedColors(cost);
-  let pool: ManaPool = { ...p.manaPool };
+  let pool: ManaPool = start.pool;
+  const restricted: ManaPool = start.prefer;
   let used = new Set<ObjectId>();
   const taps: Action[] = [];
   for (let round = 0; round < 8; round++) {
@@ -361,12 +372,18 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
       .sort((a, b) => Number(b.color) - Number(a.color) || b.net - a.net || a.x.penalty - b.x.penalty);
     let added = false;
     for (const { x } of costed) {
-      const others = sources.filter((src) => src.id !== x.id);
-      const pay = planFree(x.cost!, 0, p.life, pool, others, used, needColors);
+      const others = unrestricted.filter((src) => src.id !== x.id);
+      const free = { ...pool };
+      for (const m of Object.keys(free) as ManaType[]) free[m] -= restricted[m];
+      const pay = planFree(x.cost!, 0, p.life, free, others, used, needColors);
       if (!pay) continue;
       taps.push(...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x));
       pool = payFromPool(x.cost!, pay.pool)!.pool;
-      for (const m of x.adds) pool[m]++;
+      for (const m of Object.keys(pool) as ManaType[]) pool[m] += restricted[m];
+      for (const m of x.adds) {
+        pool[m]++;
+        if (x.restricted) restricted[m]++;
+      }
       used = new Set([...pay.used, x.id]);
       added = true;
       break;
@@ -383,7 +400,7 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
   const ab = manaAbilitiesOn(s, o)[ability]!;
   // "Tap an untapped creature you control": what's given, or the best to tap.
   const tapped = ab.tapCost ? (tap ?? tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost)).slice(0, ab.tapCost.n)) : undefined;
-  const taps = ab.manaCost ? planMana(s, pid, parseManaCost(ab.manaCost), 0, objectId, tapped) : [];
+  const taps = ab.manaCost ? planMana(s, pid, parseManaCost(ab.manaCost), 0, objectId, tapped, { ability: o }) : [];
   return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(tapped ? { tap: tapped } : {}) }] : null;
 }
 

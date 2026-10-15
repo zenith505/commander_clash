@@ -1,5 +1,6 @@
 import type { Effect, PayCost } from "../abilities";
-import { parseManaCost, payFromPool } from "../mana";
+import { parseManaCost } from "../mana";
+import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { draw, log, player } from "../game";
 import { staticConditionNow } from "../layers";
@@ -81,7 +82,7 @@ export function canPayNow(s: GameState, pid: PlayerId, pay: PayCost): boolean {
   const p = player(s, pid);
   if (pay.life && p.life < pay.life) return false;
   if (pay.energy && (p.energy ?? 0) < pay.energy) return false;
-  return !pay.mana || !!payFromPool(parseManaCost(pay.mana), p.manaPool) || !!planMana(s, pid, parseManaCost(pay.mana));
+  return !pay.mana || canPayFromPool(s, pid, parseManaCost(pay.mana), "other") || !!planMana(s, pid, parseManaCost(pay.mana));
 }
 
 /** A cost paid `n` times over, as one cost (cumulative upkeep, CR 702.24a). */

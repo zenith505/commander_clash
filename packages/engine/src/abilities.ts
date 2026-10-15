@@ -824,6 +824,20 @@ export interface ManaAbility {
   oncePerTurn?: boolean;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
+  /** "Spend this mana only to cast a creature spell." (CR 106.6) */
+  spendOnly?: ManaSpend;
+}
+
+/**
+ * What restricted mana can be spent on (CR 106.6): the total cost of casting matching spells, additional and
+ * alternative costs included, and/or the costs of activating abilities ("any", or of permanents matching).
+ */
+export interface ManaSpend {
+  spells?: TargetSpec;
+  abilities?: TargetSpec | "any";
+  /** "Abilities of artifact sources": in any zone, not only permanents. */
+  anyZone?: boolean;
+  text: string;
 }
 
 /**

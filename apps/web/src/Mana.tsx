@@ -48,29 +48,36 @@ export function ManaCost({ cost, size }: { cost: string; size?: "sm" | "lg" }) {
   );
 }
 
-/**
- * A mana pool as pips: up to 4 of a color are drawn as repeated pips,
- * more than 4 shows the count in front of a single pip.
- */
-export function ManaPoolView({ pool }: { pool: Record<ManaType, number> }) {
-  const entries = COLOR_ORDER.filter((c) => pool[c] > 0);
-  if (!entries.length) return <span className="muted small">Mana pool empty</span>;
+/** Up to 4 of a color drawn as repeated pips; more than 4 shows the count in front of a single pip. */
+function PoolGroup({ c, n, title, restricted }: { c: ManaType; n: number; title?: string; restricted?: boolean }) {
+  return (
+    <span className={restricted ? "pool-group pool-restricted" : "pool-group"} title={title}>
+      {n > 4 ? (
+        <>
+          <span className="pool-count">{n}</span>
+          <Pip sym={c} size="lg" />
+        </>
+      ) : (
+        Array.from({ length: n }, (_, i) => <Pip key={i} sym={c} size="lg" />)
+      )}
+    </span>
+  );
+}
+
+/** A mana pool as pips. Mana that can only be spent some ways (CR 106.6) is ringed, and says how on hover. */
+export function ManaPoolView({ pool, restricted = [] }: { pool: Record<ManaType, number>; restricted?: { mana: ManaType; n: number; only: { text: string } }[] }) {
+  const free = { ...pool };
+  for (const r of restricted) free[r.mana] -= r.n;
+  const entries = COLOR_ORDER.filter((c) => free[c] > 0);
+  if (!entries.length && !restricted.length) return <span className="muted small">Mana pool empty</span>;
   return (
     <span className="mana-pool">
-      {entries.map((c) =>
-        pool[c] > 4 ? (
-          <span key={c} className="pool-group">
-            <span className="pool-count">{pool[c]}</span>
-            <Pip sym={c} size="lg" />
-          </span>
-        ) : (
-          <span key={c} className="pool-group">
-            {Array.from({ length: pool[c] }, (_, i) => (
-              <Pip key={i} sym={c} size="lg" />
-            ))}
-          </span>
-        ),
-      )}
+      {entries.map((c) => (
+        <PoolGroup key={c} c={c} n={free[c]} />
+      ))}
+      {restricted.map((r, i) => (
+        <PoolGroup key={`r${i}`} c={r.mana} n={r.n} title={r.only.text} restricted />
+      ))}
     </span>
   );
 }

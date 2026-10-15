@@ -1612,7 +1612,7 @@ function Seat({
           </span>
         )}
         {p.lost && <span className="error">Out: {p.lossReason}</span>}
-        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} />}</span>
+        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} restricted={p.restrictedMana} />}</span>
       </header>
       <div className="seat-body">
         <div className="zones" onClick={(e) => e.stopPropagation()}>

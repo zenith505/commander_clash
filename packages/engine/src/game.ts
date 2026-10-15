@@ -10,8 +10,9 @@ import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
-import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
+import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
+import { addMana, canPayFromPool, spendFromPool } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { CREATURE_TYPES } from "./keywords";
@@ -943,8 +944,10 @@ function advanceStep(s: GameState): void {
   for (const p of s.players) {
     // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a). Red mana
     // spent is spent from the rest first, so what's kept is the red left, up to firebending's.
-    const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R) : 0;
+    const restrictedRed = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === "R" ? r.n : 0), 0);
+    const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R - restrictedRed) : 0;
     p.manaPool = emptyPool();
+    p.restrictedMana = undefined;
     p.manaPool.R = keep;
     p.combatMana = keep || undefined;
   }
@@ -1337,7 +1340,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const adds = manaProduced(s, o, ab, mana);
   const src = objectSource(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
-  if (ab.manaCost) p.manaPool = payFromPool(parseManaCost(ab.manaCost), p.manaPool)!.pool;
+  if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
   if (ab.tap) o.tapped = true;
   for (const t of tap ?? []) obj(s, t).tapped = true;
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
@@ -1349,7 +1352,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard");
   }
-  for (const m of adds) p.manaPool[m]++;
+  addMana(s, p.id, adds, ab.spendOnly);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
 }
@@ -1463,9 +1466,10 @@ export function castProblem(
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets });
   if (typeof cost === "string") return cost;
-  if (choices?.assisted && (choices.assist === undefined || !payFromPool(parseManaCost(`{${choices.assisted}}`), player(s, choices.assist).manaPool)))
+  // The helper isn't casting the spell, so mana only for casting spells can't help (CR 106.6, 702.132a).
+  if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), "other")))
     return "the assisting player can't pay that much";
-  if (!payFromPool(cost.cost, p.manaPool, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
+  if (!canPayFromPool(s, pid, cost.cost, { spell: d }, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
 }
 
@@ -1665,14 +1669,14 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
   const flashSacrifice = !!compileCard(d).flashSacrifice && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
-  const paid = payFromPool(cost.cost, p.manaPool, cost.extra, p.life, { spreadColors: sunburst })!;
+  // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
+  const paid = spendFromPool(s, p.id, cost.cost, { spell: d }, cost.extra, p.life, { spreadColors: sunburst })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
-  const colorsSpent = COLORS.filter((c) => paid.pool[c] < p.manaPool[c]);
-  p.manaPool = paid.pool;
+  const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
   if (choices.assisted && choices.assist !== undefined) {
     const helper = player(s, choices.assist);
-    helper.manaPool = payFromPool(parseManaCost(`{${choices.assisted}}`), helper.manaPool)!.pool;
+    spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), "other");
     log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
   }
   for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
@@ -1983,7 +1987,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const cost = parseManaCost(ab.manaCost);
   const xp = xProblem(cost, x);
   if (xp) return xp;
-  if (!payFromPool(cost, p.manaPool, (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
+  if (!canPayFromPool(s, pid, cost, { ability: o }, (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
 }
 
@@ -2023,10 +2027,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = parseManaCost(ab.manaCost);
-  const paid = payFromPool(abCost, p.manaPool, (x ?? 0) * xCount(abCost), p.life)!;
+  const paid = spendFromPool(s, p.id, abCost, { ability: o }, (x ?? 0) * xCount(abCost), p.life)!;
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
-  p.manaPool = paid.pool;
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -2359,9 +2362,8 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     const { mana, life = 0, energy = 0 } = pend.pay;
     if (p.life < life) throw new RulesError(`you don't have ${life} life to pay`); // CR 119.4
     if ((p.energy ?? 0) < energy) throw new RulesError(`you don't have ${energy} energy`);
-    const paid = mana ? payFromPool(parseManaCost(mana), p.manaPool, 0, p.life - life) : null;
+    const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), "other", 0, p.life - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
-    if (paid) p.manaPool = paid.pool;
     loseLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     p.energy = (p.energy ?? 0) - energy;
     log(s, `${p.name} pays ${describePay(pend.pay)} for ${pend.source}.`);
@@ -2381,9 +2383,8 @@ function payUnless(s: GameState, p: Player, pay: boolean) {
     const life = pend.life ?? 0;
     // You can pay life only if your life total is at least that much (CR 119.4).
     if (life && p.life < life) throw new RulesError(`you don't have ${life} life to pay`);
-    const paid = payFromPool(parseManaCost(pend.cost), p.manaPool, 0, p.life - life);
+    const paid = spendFromPool(s, p.id, parseManaCost(pend.cost), "other", 0, p.life - life);
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
-    p.manaPool = paid.pool;
     loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
   }
@@ -3192,7 +3193,7 @@ export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): strin
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash");
   if (!instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be suspended when you could cast it (sorcery speed)`;
-  if (!payFromPool(parseManaCost(sus.cost), player(s, pid).manaPool)) return `not enough mana to suspend ${d.name} (${sus.cost})`;
+  if (!canPayFromPool(s, pid, parseManaCost(sus.cost), "other")) return `not enough mana to suspend ${d.name} (${sus.cost})`;
   return null;
 }
 
@@ -3203,7 +3204,7 @@ function suspendCard(s: GameState, p: Player, id: ObjectId) {
   const o = obj(s, id);
   const d = defOf(s, o);
   const sus = compileCard(d).suspend!;
-  p.manaPool = payFromPool(parseManaCost(sus.cost), p.manaPool)!.pool;
+  spendFromPool(s, p.id, parseManaCost(sus.cost), "other");
   moveObject(s, id, "exile");
   o.counters.time = sus.n;
   log(s, `${p.name} suspends ${d.name} with ${sus.n} time counter${sus.n === 1 ? "" : "s"} (${sus.cost}).`);
@@ -3234,7 +3235,7 @@ function assistPays(s: GameState, p: Player, n: number) {
   const pend = s.pending;
   if (pend?.kind !== "assist" || pend.player !== p.id) throw new RulesError("no spell to assist");
   if (!Number.isInteger(n) || n < 0 || n > pend.max) throw new RulesError(`pay from 0 to ${pend.max}`);
-  if (n && !payFromPool(parseManaCost(`{${n}}`), p.manaPool)) throw new RulesError(`not enough mana in your pool to pay {${n}}`);
+  if (n && !canPayFromPool(s, p.id, parseManaCost(`{${n}}`), "other")) throw new RulesError(`not enough mana in your pool to pay {${n}}`);
   log(s, n ? `${p.name} will pay {${n}} of ${pend.source}'s cost.` : `${p.name} doesn't help pay for ${pend.source}.`);
   s.pending = { kind: "assistCast", player: pend.caster, helper: p.id, source: pend.source, n, cast: { ...pend.cast, ...(n ? { assisted: n } : { assist: undefined }) } };
 }
@@ -3274,7 +3275,7 @@ export function plotProblem(s: GameState, pid: PlayerId, id: ObjectId): string |
   if (!cost) return `${d.name} doesn't have plot`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (!canActAtSorcerySpeed(s, pid)) return "you can only plot during your main phase while the stack is empty";
-  if (!payFromPool(parseManaCost(cost), player(s, pid).manaPool)) return `not enough mana to plot ${d.name} (${cost})`;
+  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to plot ${d.name} (${cost})`;
   return null;
 }
 
@@ -3285,7 +3286,7 @@ function plotCard(s: GameState, p: Player, id: ObjectId) {
   const o = obj(s, id);
   const d = defOf(s, o);
   const cost = compileCard(d).plot!;
-  p.manaPool = payFromPool(parseManaCost(cost), p.manaPool)!.pool;
+  spendFromPool(s, p.id, parseManaCost(cost), "other");
   moveObject(s, id, "exile");
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
   log(s, `${p.name} plots ${d.name} (${cost}). They may cast it without paying its mana cost on a later turn.`);
@@ -3304,7 +3305,7 @@ export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId): st
   if (s.priority !== pid || s.pending) return "you don't have priority";
   const fd = compileCard(faceUpDefOf(s, o)).faceDownCast;
   if (!fd) return "it has no morph or disguise cost"; // CR 702.37e
-  if (!payFromPool(parseManaCost(fd.cost), player(s, pid).manaPool)) return `not enough mana to turn it face up (${fd.cost})`;
+  if (!canPayFromPool(s, pid, parseManaCost(fd.cost), "other")) return `not enough mana to turn it face up (${fd.cost})`;
   return null;
 }
 
@@ -3316,7 +3317,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId) {
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const fd = compileCard(faceUpDefOf(s, o)).faceDownCast!;
-  p.manaPool = payFromPool(parseManaCost(fd.cost), p.manaPool)!.pool;
+  spendFromPool(s, p.id, parseManaCost(fd.cost), "other");
   // Its copiable values go back to the card's, or what a copy effect made it (CR 708.8, 707.3); it's the same
   // permanent, so nothing "enters".
   o.faceDown = undefined;

@@ -1,6 +1,6 @@
-import type { CounterKind, ManaAbility, ManaProduce } from "../abilities";
+import type { CounterKind, ManaAbility, ManaProduce, ManaSpend, TargetSpec } from "../abilities";
 import type { ManaType } from "../types";
-import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf } from "./words";
+import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } from "./words";
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
 
@@ -46,7 +46,11 @@ export function parseManaAbility(line: string): ManaAbility | null {
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
     else if (extra === "Activate only once each turn.") out.oncePerTurn = true;
-    else return null;
+    else if (/^Spend this mana only /.test(extra) && !out.spendOnly) {
+      const only = parseManaSpend(extra);
+      if (!only) return null;
+      out.spendOnly = only;
+    } else return null;
   }
   return out;
 }
@@ -76,4 +80,41 @@ function parseManaProduced(text: string): ManaProduce | null {
     return { kind: "fixed", mana: [sym(each[1]!)!], count: { ...spec, controller: "you", text: `${each[2]} you control` } };
   }
   return null;
+}
+
+/**
+ * "Spend this mana only to cast a creature spell.", "... to cast instant and sorcery spells.", "... to activate
+ * abilities.", "... to cast artifact spells or activate abilities of artifacts." (CR 106.6). Null for anything else
+ * ("of the chosen type", "on costs that contain {X}", "and that spell can't be countered", "... source").
+ */
+export function parseManaSpend(sentence: string): ManaSpend | null {
+  const m = /^Spend this mana only to (.+)\.$/.exec(sentence);
+  if (!m) return null;
+  const only: ManaSpend = { text: sentence };
+  for (const part of m[1]!.split(/,? or (?=activate |cast )/)) {
+    let x: RegExpExecArray | null;
+    if ((x = /^cast (?:an? )?(.+?) spells?$/.exec(part)) && !only.spells) {
+      const spec = spellFilter(x[1]!);
+      if (!spec) return null;
+      only.spells = spec;
+    } else if (part === "cast spells" && !only.spells) only.spells = { kind: "spell", text: "spells" };
+    else if ((part === "activate abilities" || part === "activate an ability") && !only.abilities) only.abilities = "any";
+    else if ((x = /^activate (?:abilities of|an ability of an?) (.+?)( sources?)?$/.exec(part)) && !only.abilities) {
+      const words = x[1]!.split(" ");
+      const spec = parseTargetPhrase([...words.slice(0, -1), singular(words[words.length - 1]!)].join(" "));
+      if (spec?.kind !== "object" || spec.controller || spec.chosen || spec.counter || spec.tapped || spec.combat || spec.token) return null;
+      only.abilities = { ...spec, text: `${x[1]!}${x[2] ?? ""}` };
+      // "Abilities of artifacts" are of artifact permanents (CR 109.2); an "artifact source" can be anywhere.
+      if (x[2]) only.anyZone = true;
+    } else return null;
+  }
+  return only;
+}
+
+/** "creature", "instant and sorcery", "noncreature", "Dragon": a filter on the spell's characteristics. */
+function spellFilter(words: string): TargetSpec | null {
+  if (words === "legendary") return { kind: "spell", supertypes: ["Legendary"], text: "legendary spells" };
+  const spec = parseTargetPhrase(`${words.replace(/ and(?:\/or)? /g, " or ")} spell`);
+  if (spec?.kind !== "spell" || spec.chosen || spec.counter || spec.controller) return null;
+  return { ...spec, text: `${words} spells` };
 }

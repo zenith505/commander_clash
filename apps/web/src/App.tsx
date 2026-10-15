@@ -749,6 +749,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               key={pending.cards.join(",")}
               s={s}
               how={pending.how}
+              owner={pending.owner ? s.players[pending.owner]?.name : undefined}
               source={pending.source}
               cards={pending.cards}
               onHover={setHover}
@@ -1722,13 +1723,16 @@ function GraveyardPicker({
 function ArrangeTop({
   s,
   how,
+  owner,
   source,
   cards,
   onHover,
   onDone,
 }: {
   s: GameState;
-  how: "scry" | "surveil";
+  how: "scry" | "surveil" | "order";
+  /** Whose library, when it isn't yours. */
+  owner?: string;
   source: string;
   cards: string[];
   onHover: (d: CardDef | null) => void;
@@ -1738,6 +1742,7 @@ function ArrangeTop({
   const [away, setAway] = useState<string[]>([]);
   const awayName = how === "scry" ? "Bottom of library" : "Graveyard";
   const toggle = (id: string) => {
+    if (how === "order") return; // they all go back on top
     if (top.includes(id)) {
       setTop(top.filter((x) => x !== id));
       setAway([...away, id]);
@@ -1759,7 +1764,7 @@ function ArrangeTop({
         const d = cardOf(s, id);
         return (
           <div key={id} className="arrange-card">
-            <div className="card big" data-arrange={id} onClick={() => toggle(id)} {...hoverProps(d, onHover)} title="Click to move to the other row">
+            <div className="card big" data-arrange={id} onClick={() => toggle(id)} {...hoverProps(d, onHover)} title={how === "order" ? undefined : "Click to move to the other row"}>
               <CardFace d={d} />
             </div>
             {ordered && ids.length > 1 && (
@@ -1783,16 +1788,20 @@ function ArrangeTop({
       <div className="modal arrange">
         <header>
           <strong>
-            {source}: {how} {cards.length}
+            {source}: {how === "order" ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order` : `${how} ${cards.length}`}
           </strong>
-          <span className="muted"> Click a card to move it between rows.</span>
+          <span className="muted">{how === "order" ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>
           <button onClick={() => onDone(top, away)}>Done</button>
         </header>
         <div className="modal-body">
           <h4>Top of library (leftmost on top)</h4>
           {row(top, true)}
-          <h4>{awayName}</h4>
-          {row(away, false)}
+          {how !== "order" && (
+            <>
+              <h4>{awayName}</h4>
+              {row(away, false)}
+            </>
+          )}
         </div>
       </div>
     </div>

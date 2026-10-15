@@ -174,7 +174,8 @@ export function compile(d: CardDef): CompiledCard {
   let ascendSpell = false;
   const lines = joinModes(normalizeSelf(d).split("\n"));
   for (const [li, raw] of lines.entries()) {
-    const line = raw.trim();
+    // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own.
+    const line = raw.trim().replace(/^Converge — /, "");
     if (!line) continue;
     if (line === "Start your engines!") {
       out.startYourEngines = true; // CR 702.179a
@@ -521,7 +522,9 @@ export function compile(d: CardDef): CompiledCard {
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
   linkExile(out);
-  if (JSON.stringify(out).includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
+  const json = JSON.stringify(out);
+  if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
+  if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;
   return out;
 }
 

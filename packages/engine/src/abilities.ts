@@ -81,6 +81,8 @@ export type Count =
   | { kind: "wasKicked"; which?: number }
   /** "That much", "that many" in a triggered ability: the damage its event dealt. */
   | { kind: "eventAmount" }
+  /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
+  | { kind: "colorsSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
@@ -490,6 +492,10 @@ export type Effect =
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   | { type: "surveil"; n: Amount } // CR 701.25
+  /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
+  | { type: "orderTop"; who: PlayerRef; n: Amount }
+  /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
+  | { type: "shuffle"; who: PlayerRef }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   | { type: "bite"; a: ObjRef; b: ObjRef } // a deals damage equal to its power to b
   /** Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead". */
@@ -876,6 +882,8 @@ export interface CompiledCard {
    * always that kind ("Modular—Sunburst", 702.44c).
    */
   sunburst?: { counter?: "+1/+1" };
+  /** Something on it counts the colors of mana spent to cast it (sunburst, converge): paying wants many colors. */
+  countsColors?: boolean;
   /**
    * "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller
    * of the permanent it becomes sacrifices it at the beginning of the next cleanup step."

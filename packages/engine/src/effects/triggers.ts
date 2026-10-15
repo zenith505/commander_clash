@@ -155,6 +155,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     x?: number,
     kicked?: number[],
     event?: TriggerEventInfo,
+    colorsSpent?: number,
   ) => {
     const printed = compileCard(defOf(s, o)).triggers;
     triggers.forEach((t, index) => {
@@ -176,6 +177,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ...(lki ? { lki } : {}),
           ...(x ? { x } : {}),
           ...(kicked ? { kicked } : {}),
+          ...(colorsSpent ? { colorsSpent } : {}),
           ...(event ? { event } : {}),
         });
     });
@@ -201,6 +203,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       undefined,
       ev.x,
       entering.kicked,
+      undefined,
+      entering.colorsSpent?.length,
     );
     if (objIsType(s, entering, "Creature")) {
       const lki = { power: power(s, entering), toughness: toughness(s, entering) };
@@ -569,6 +573,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoi
     ...(t.lki ? { lki: t.lki } : {}),
     ...(t.x ? { x: t.x } : {}),
     ...(t.kicked ? { kicked: t.kicked } : {}),
+    ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}),
     ...(t.event ? { event: t.event } : {}),
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
     ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),

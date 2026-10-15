@@ -230,6 +230,8 @@ export interface StackItem {
   x?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
+  /** For its permanent's enters trigger: how many colors of mana were spent to cast it (converge, CR 207.2c). */
+  colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
   event?: TriggerEventInfo;
   /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
@@ -275,6 +277,7 @@ export interface PendingTrigger {
   /** For an enters trigger of a permanent that was a spell with X: that X (CR 107.3m). */
   x?: number;
   kicked?: number[];
+  colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
   event?: TriggerEventInfo;
   /** A delayed trigger's own ability (its source card has no such printed ability). */
@@ -344,7 +347,8 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
-  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil"; cards: ObjectId[]; source: string }
+  /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
+  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
   | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean }
   /**

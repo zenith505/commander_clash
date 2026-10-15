@@ -167,9 +167,9 @@ export function planCast(
   // "Costs {3} less if it targets a tapped creature" is worked out before mana abilities (CR 601.2f-g):
   // tapping the target for mana first mustn't make it count.
   const targetIds = compileCard(d).costLessIfTargets ? (targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])) : [];
-  // Sunburst counts the colors of mana spent (CR 702.44a): pay its generic mana with as many other colors as we can.
+  // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
   const pool = player(s, pid).manaPool;
-  const rainbow = compileCard(d).sunburst && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
+  const rainbow = compileCard(d).countsColors && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
   let taps: Action[] | null = null;
   for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]))) break;
   taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds]);

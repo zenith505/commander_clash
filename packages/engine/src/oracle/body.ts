@@ -5,6 +5,7 @@ import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
 import { compileQuoted } from "./grants";
+import { parsePlayer } from "./targets";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -43,7 +44,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "may", "explore", "search", "choose", "connive", "pick"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick"]);
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
@@ -108,6 +109,22 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const when = (playIt[1] ?? playIt[2])!.toLowerCase();
       effects.push({ type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: /next turn/.test(when) ? "nextTurn" : "thisTurn" });
       si++;
+      continue;
+    }
+    // "Look at the top three cards of target player's library, then put them back in any order." The player
+    // looking orders them (CR 401.4 lets nobody else see them). "You may shuffle." after it is a choice to shuffle.
+    const order = new RegExp(`^(You may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
+    if (order && /^[Pp]ut them back in any order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const who = parsePlayer(order[3] === "your" ? "you" : order[3]!.replace(/'s$/, ""), ctx);
+      if (!who) return null;
+      const e: Effect = { type: "orderTop", who, n: amt(order[2]!) };
+      effects.push(order[1] ? { type: "may", effects: [e], text: `look at the top ${order[2]} cards of ${order[3]} library, then put them back in any order` } : e);
+      si++;
+      const shuffle = /^You may (shuffle|have that player shuffle)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      if (shuffle && (shuffle[1] === "shuffle") === (who.ref === "you")) {
+        effects.push({ type: "may", effects: [{ type: "shuffle", who }], text: shuffle[1]! });
+        si++;
+      }
       continue;
     }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
@@ -328,6 +345,10 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx): { effects: Eff
 
 /** One sentence: a plain instruction, two joined by "and", or one with "for each" / "equal to" in it. */
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
+  // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.
+  // Support X would need a variable number of targets: not supported.
+  const support = /^[Ss]upport (\d+)$/.exec(s);
+  if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
   const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
   if (fx) {

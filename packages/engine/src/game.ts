@@ -553,7 +553,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   const withCounters = printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller) ? undefined : printedCounters;
-  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked })) : 0;
+  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
@@ -1562,7 +1562,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets }) as { cost: ParsedCost; extra: number };
-  const sunburst = !!compileCard(d).sunburst;
+  const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
   const flashSacrifice = !!compileCard(d).flashSacrifice && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
@@ -2041,6 +2041,7 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   const r = s.resolving;
   if (pend?.kind !== "arrangeTop" || pend.player !== p.id || !r) throw new RulesError("nothing to arrange");
   const all = [...top, ...away];
+  if (pend.how === "order" && away.length) throw new RulesError("put them all back on top");
   if (all.length !== pend.cards.length || new Set(all).size !== all.length || all.some((id) => !pend.cards.includes(id)))
     throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : "into your graveyard"));
   r.scratch = { ...r.scratch, arranged: { top, away } };

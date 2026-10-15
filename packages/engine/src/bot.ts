@@ -119,6 +119,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
     }
+    if (pend.kind === "arrangeTop" && pend.how === "order") {
+      // Its own library: wanted cards first. Someone else's: the cards its owner wants least on top.
+      const owner = pend.owner ?? pid;
+      const rank = (id: ObjectId) => (wantOnTop(s, owner, id) ? 1 : 0) * (owner === pid ? -1 : 1);
+      return [{ type: "arrangeTop", player: pid, top: [...pend.cards].sort((a, b) => rank(a) - rank(b)), away: [] }];
+    }
     if (pend.kind === "arrangeTop") {
       const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
       return [{ type: "arrangeTop", player: pid, top: keep, away: pend.cards.filter((id) => !keep.includes(id)) }];

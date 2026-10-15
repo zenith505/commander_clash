@@ -526,6 +526,40 @@ export function compile(d: CardDef): CompiledCard {
       });
       continue;
     }
+    // A double-faced token's "{2}: Transform this token." (CR 701.27a, 701.53b). A double-faced card's back face isn't in
+    // the card data, so its transform abilities stay unsupported.
+    const transform = /^((?:\{[^}]+\})+): Transform ~\.$/.exec(line);
+    if (transform && d.tokenBack) {
+      out.activated.push({ manaCost: transform[1]!, tap: false, sacrificeSelf: false, sorcerySpeed: false, body: { targets: [], effects: [{ type: "transformSelf" }], text: "Transform ~." }, text: line });
+      continue;
+    }
+    // CR 702.151a: "[Cost]: Attach this permanent to another target creature you control. Activate only as a sorcery"
+    // and "[Cost]: Unattach this permanent. Activate only if this permanent is attached to a creature and only as a sorcery."
+    const reconfigure = /^Reconfigure ((?:\{[^}]+\})+)$/.exec(line);
+    if (reconfigure && d.subtypes.includes("Equipment") && !out.reconfigure) {
+      const mana = reconfigure[1]!;
+      out.reconfigure = true;
+      out.activated.push(
+        {
+          manaCost: mana,
+          tap: false,
+          sacrificeSelf: false,
+          sorcerySpeed: true,
+          body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", notSource: true, text: "another target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach ~ to another target creature you control." },
+          text: `Reconfigure ${mana}: attach ~ to another target creature you control.`,
+        },
+        {
+          manaCost: mana,
+          tap: false,
+          sacrificeSelf: false,
+          sorcerySpeed: true,
+          activateIf: { kind: "self", is: "attachedToCreature" },
+          body: { targets: [], effects: [{ type: "unattachSelf" }], text: "Unattach ~." },
+          text: `Reconfigure ${mana}: unattach ~.`,
+        },
+      );
+      continue;
+    }
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passAll, passUntil, setup } from "./helpers";
-import { botActions, castProblem, characteristics, isFullySupported, legalActions, planCast, planPlot, plotProblem, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, characteristics, isFullySupported, legalActions, planCast, planPlot, plotProblem, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const zone = (s: GameState, id: string) => s.objects[id]?.zone;
@@ -15,7 +15,7 @@ const run = (s: GameState, plan: Action[] | null) => {
   for (const a of plan!) s = act(s, a);
   return settle(passAll(s));
 };
-const untappedLands = (s: GameState, pid: string) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && !s.objects[id]!.tapped && s.cards[s.objects[id]!.cardId]!.types.includes("Land")).length;
+const untappedLands = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && !s.objects[id]!.tapped && s.cards[s.objects[id]!.cardId]!.types.includes("Land")).length;
 
 // Real oracle text (Scryfall).
 const mayhemPatrol = card("Mayhem Patrol", "Creature — Devil Warrior", "{1}{R}", {

@@ -257,7 +257,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const host = objects(s, e.what, ctx)[0];
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!host || !me || me.zone !== "battlefield" || me.attachedTo === host.id || host.id === me.id) return; // CR 701.3b-c
-      if (objIsType(s, me, "Creature")) return; // an Equipment that's also a creature can't equip (CR 301.5c)
+      // An Equipment that's also a creature can't equip, unless it has reconfigure (CR 301.5c).
+      if (objIsType(s, me, "Creature") && !compileCard(defOf(s, me)).reconfigure) return;
       // Only to something it could be attached to: an Equipment to a creature (CR 301.5c), an Aura to
       // what it can enchant (CR 303.4d), neither to something with protection from it (CR 702.16c-d).
       const enchant = compileCard(defOf(s, me)).enchant;
@@ -265,7 +266,30 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (meChars.subtypes.includes("Aura") ? !enchant || !objectMatches(s, enchant, host, ctx.controller, false, meChars) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, ctx.controller, false, meChars)) return;
       me.attachedTo = host.id;
       me.timestamp = s.nextTimestamp++;
+      invalidateCharacteristics(s); // reconfigure: it stops being a creature (CR 702.151b)
       log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+      return;
+    }
+    case "transformSelf": {
+      // Only a double-faced token (CR 701.27a, c): not a card copying one (CR 707.8a covers token copies). It turns its
+      // back face up; a Phyrexian has no other face to go back to, so a second activation does nothing (CR 701.27f).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !me.isToken || me.copyOf || me.copyEffects?.length) return;
+      const front = defOf(s, me);
+      const back = front.tokenBack;
+      if (!back) return;
+      s.cards[back.oracleId] ??= back;
+      me.cardId = back.oracleId;
+      invalidateCharacteristics(s);
+      log(s, `${front.name} transforms into ${back.name}.`);
+      return;
+    }
+    case "unattachSelf": {
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !me.attachedTo) return;
+      log(s, `${defOf(s, me).name} is unattached from ${defOf(s, obj(s, me.attachedTo)).name}.`);
+      me.attachedTo = undefined;
+      invalidateCharacteristics(s);
       return;
     }
   }

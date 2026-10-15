@@ -28,6 +28,8 @@ export interface CardDef {
   colorIdentity: Color[];
   keywords: string[];
   producedMana?: ManaType[];
+  /** A double-faced token's back face (CR 111.10i, 712): what it becomes as it transforms (CR 701.27a). */
+  tokenBack?: CardDef;
   imageUrl?: string;
   artUrl?: string;
 }

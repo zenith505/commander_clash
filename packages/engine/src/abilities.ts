@@ -241,6 +241,8 @@ export interface TokenSpec {
   keywords: string[];
   /** Rules text of other abilities, e.g. a Treasure's "{T}, Sacrifice this token: Add one mana of any color." */
   abilities?: string;
+  /** A double-faced token's back face (CR 111.10i): an Incubator's Phyrexian. */
+  back?: TokenSpec;
 }
 
 /**
@@ -252,6 +254,7 @@ export type Modification =
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
   | { kind: "setTypes"; types: string[]; subtypes: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
+  | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   | { kind: "setColors"; colors: Color[] } // layer 5
   | { kind: "addKeywords"; keywords: string[] } // layer 6
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
@@ -344,7 +347,7 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
@@ -493,6 +496,10 @@ export type Effect =
   /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game"; notSource?: boolean }
   | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
+  /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
+  | { type: "transformSelf" }
+  /** Reconfigure's "Unattach this permanent" (CR 702.151a, 701.3d). */
+  | { type: "unattachSelf" }
   /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
   /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
   | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean }
@@ -997,6 +1004,8 @@ export interface CompiledCard {
   madness?: string;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */
   suspend?: { n: number; cost: string };
+  /** Reconfigure (CR 702.151): attached to a creature, this Equipment isn't a creature (702.151b). */
+  reconfigure?: true;
   /** Plot [cost] (CR 702.170a): exile it from your hand as a special action, and cast it free on a later turn (702.170d). */
   plot?: string;
   /** Dredge N (CR 702.52a): in your graveyard, a draw may be replaced by milling N and returning it to your hand. */

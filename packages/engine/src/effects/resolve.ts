@@ -353,6 +353,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "explore":
     case "continuous":
     case "attach":
+    case "unattachSelf":
+    case "transformSelf":
       return runPermanentsEffect(s, e, ctx, src);
     case "becomeCopy":
       return runCopiesEffect(s, e, ctx);

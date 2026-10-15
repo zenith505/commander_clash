@@ -34,6 +34,7 @@ export function layerOf(m: Modification): Layer {
     case "addTypes":
     case "setTypes":
     case "setSubtypes":
+    case "loseTypes":
       return "4";
     case "setColors":
       return "5";
@@ -238,6 +239,10 @@ function gather(s: GameState): Inst[] {
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
+    // An Equipment with reconfigure attached to a creature stops being a creature and loses its creature types until
+    // it's unattached (CR 702.151b, rulings), even if it loses its abilities meanwhile. Its timestamp is the attaching's.
+    if (o.attachedTo && compileCard(d).reconfigure)
+      out.push({ key: `reconfigure:${id}`, timestamp: o.timestamp, order: order++, sourceName: d.name, untilEndOfTurn: false, mods: [{ kind: "loseTypes", types: ["Creature"] }], controller: o.controller, fixed: [id] });
     compileCard(d).statics.forEach((st, i) =>
       out.push({
         key: `${id}#${i}`,
@@ -321,6 +326,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "self": {
       if (cond.is === "attacking") return src.attacking !== undefined;
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
+      if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");
       if (cond.is === "enchanted") return attached.some(aura);
@@ -425,6 +431,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     }
     case "setSubtypes":
       setSubtypes(c, m.subtypes);
+      return;
+    case "loseTypes":
+      c.types = c.types.filter((t) => !m.types.includes(t));
+      c.subtypes = c.subtypes.filter((st) => !m.types.includes(subtypeSet(st) ?? ""));
+      if (m.types.includes("Creature")) c.allCreatureTypes = false;
       return;
     case "setColors":
       c.colors = [...m.colors];
@@ -536,7 +547,7 @@ function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock:
  * controller, types, colors, and whether a source still has its abilities, so only these
  * can create a dependency (CR 613.8a).
  */
-const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setColors", "loseAllAbilities"]);
+const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "loseTypes", "setColors", "loseAllAbilities"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";

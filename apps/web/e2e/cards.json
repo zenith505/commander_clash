@@ -338,6 +338,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "df2738fe-9cd1-4347-8808-105fcfde1190",
+  "name": "Circle of Protection: Red",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}: The next time a red source of your choice would deal damage to you this turn, prevent that damage.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5e15ff93-99a0-4000-918e-4bd2c257188d",
   "name": "Combat Celebrant",
   "manaCost": "{2}{R}",
@@ -959,6 +985,36 @@
   "commanderLegal": "legal",
   "set": "p02",
   "releasedAt": "1998-06-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "83c8a3a6-2e1a-4e26-8847-6d066f42d906",
+  "name": "Gray Ogre",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Ogre",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ogre"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -1808,6 +1864,32 @@
   "set": "aer",
   "releasedAt": "2017-01-20",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "71da5acb-78bc-453a-ae28-d22faa5a4e43",
+  "name": "Pay No Heed",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Prevent all damage a source of your choice would deal this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tor",
+  "releasedAt": "2002-02-04",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

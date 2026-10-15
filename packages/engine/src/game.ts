@@ -1502,6 +1502,7 @@ function finishCleanup(s: GameState) {
     p.redirectNext = undefined;
   }
   s.preventCombatDamage = undefined;
+  s.damageRules = undefined;
   // "You may play that card this turn" / "until the end of your next turn" ends now.
   for (const q of s.players)
     for (const id of q.exile) {
@@ -3318,6 +3319,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "venture") {
     (r.scratch ??= {}).venture = choice; // which dungeon, or which room the arrows lead to (CR 701.49a-b)
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "damageSource") {
+    // The source of damage a prevention or redirection effect is about, chosen as it resolves (CR 609.7a).
+    (r.scratch ??= {}).damageSource = choice;
     continueResolution(s);
     return;
   }

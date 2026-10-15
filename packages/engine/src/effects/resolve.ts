@@ -10,6 +10,7 @@ import { RulesError, type CardDef, type Chosen, type Color, type GameObject, typ
 import { manaTriggerResults } from "../manaabilities";
 import { addMana } from "../spend";
 import { objectMatches, bindChosen, sourceQuality, isLegalTarget, lesserPowerOk } from "./targeting";
+import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
@@ -411,6 +412,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "loseGame":
     case "winGame":
       return runBasicsEffect(s, e, ctx, src);
+    case "damageRule":
+      return runPreventionEffect(s, e, ctx, src);
     case "returnToBattlefield":
     case "unearth":
     case "castFromExileFree":
@@ -574,5 +577,10 @@ const isObjectTarget = (ctx: ResolveCtx, i: number) => ctx.targets[i]?.kind === 
  */
 export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-  return o && o.zone === "battlefield" ? { ...objectSource(s, o), controller: ctx.controller } : cardSource(ctx.sourceDef, ctx.controller);
+  if (o && o.zone === "battlefield") return { ...objectSource(s, o), controller: ctx.controller };
+  // A spell is its own card on the stack; a gone permanent's ability, that permanent as it last existed (CR 609.7a).
+  const item = s.resolving?.item;
+  const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;
+  return cardSource(ctx.sourceDef, ctx.controller, ref);
 }

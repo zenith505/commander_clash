@@ -4,6 +4,7 @@ import { num, NUMX, X, amt, isGroup, WHEEL } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
+import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
 import { parsePlayer } from "./targets";
 import { parseSearchFilter } from "./search";
@@ -164,6 +165,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       effects.push({ type: "revealTopToHand", ...(life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
       if (life) si++;
+      continue;
+    }
+    // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
+    const rider = parsePreventionRider(s);
+    if (rider) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "damageRule" || prev.rule.redirect) return null;
+      effects[effects.length - 1] = { ...prev, rule: { ...prev.rule, ...rider } };
       continue;
     }
     // Hand disruption: "Target opponent reveals their hand. You choose a nonland card from it. That player discards

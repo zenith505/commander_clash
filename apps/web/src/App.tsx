@@ -3083,6 +3083,29 @@ function Controls({
         ))}
       </div>
     );
+  if (pending?.kind === "chooseOption" && pending.what === "damageSource" && pending.player === HUMAN)
+    // A source of damage for a prevention or redirection effect (CR 609.7a): a permanent, a spell, or an ability's source.
+    return (
+      <div className="controls source-pick">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o, i) => {
+          const id = o.split("@")[0]!;
+          return (
+            <button
+              key={o}
+              className="ghost"
+              onMouseEnter={() => s.objects[id] && onHover(cardOf(s, id))}
+              onMouseLeave={() => onHover(null)}
+              onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}
+            >
+              {pending.labels?.[i] ?? o}
+            </button>
+          );
+        })}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "basicLandType" && pending.player === HUMAN)
     return (
       <div className="controls color-pick">

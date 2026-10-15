@@ -37,7 +37,8 @@ export function parseManaAbility(line: string): ManaAbility | null {
     else if (c === "Sacrifice ~") sacrificeSelf = true;
     else if (/^Pay \d+ life$/.test(c)) lifeCost = Number(/\d+/.exec(c)![0]);
     else if (/^Pay (\{E\})+$/.test(c)) energyCost = energyIn(c);
-    else if (/^(\{(\d+|[WUBRGC])\})+$/.test(c)) manaCost += c;
+    // "{W/U}, {T}: Add ..." (filter lands): hybrid symbols are paid with either color (CR 107.4e).
+    else if (/^(\{(\d+|[WUBRGC]|[WUBRG]\/[WUBRG])\})+$/.test(c)) manaCost += c;
     else return null;
   }
   const produces = parseManaProduced(m[2]!);
@@ -115,6 +116,8 @@ function parseManaProduced(text: string): ManaProduce | null {
   // "{W} or {U}", "{R}, {G}, or {W}"
   const parts = text.split(/, or |, | or /);
   if (parts.length > 1 && parts.every((x) => sym(x))) return { kind: "oneOf", options: parts.map((x) => sym(x)!), amount: 1 };
+  // "{W}{W}, {W}{U}, or {U}{U}": one of these combinations (filter lands).
+  if (parts.length > 1 && parts.every((x) => /^(\{[WUBRGC]\})+$/.test(x))) return { kind: "combos", options: parts.map((x) => [...x.matchAll(/\{([WUBRGC])\}/g)].map((y) => y[1] as ManaType)) };
   const any = new RegExp(`^${NUM} mana of any (?:one )?color$`).exec(text);
   if (any) return { kind: "oneOf", options: ALL_COLORS, amount: num(any[1]!) };
   if (text === "one mana of any color in your commander's color identity") return { kind: "commanderIdentity" };

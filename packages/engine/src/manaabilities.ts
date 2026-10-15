@@ -68,12 +68,15 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
     const c = o.chosen?.color;
     return [...(p.also ? [p.also] : []), ...(c && c !== p.also ? [c] : [])];
   }
+  // A combination is picked by its number (`combo`); these are the types it could make (CR 106.7).
+  if (p.kind === "combos") return [...new Set(p.options.flat())];
   return commanderIdentity(s, controllerOf(s, o));
 }
 
-/** Exactly what activating it with `choice` adds to the pool. */
-export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType): ManaType[] {
+/** Exactly what activating it with `choice` (or the combination numbered `combo`, for "combos") adds to the pool. */
+export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
   const p = ab.produces;
+  if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
   if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {
     // CR 106.1: worked out as the ability resolves, with the permanent as "~" and its controller as "you".
     const n = evalAmount(s, p.n, { controller: controllerOf(s, o), sourceId: o.id });
@@ -94,6 +97,8 @@ export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choic
 export interface ManaOption {
   ability: number;
   mana: ManaType;
+  /** "Add {W}{W}, {W}{U}, or {U}{U}": which combination (ManaProduce "combos"); `mana` is its first. */
+  combo?: number;
   adds: ManaType[];
   extra?: ManaType[];
 }
@@ -145,12 +150,14 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
 export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
   const pid = controllerOf(s, o);
   const sources = manaTriggerSources(s);
-  return manaAbilitiesOn(s, o).flatMap((ab, ability) =>
-    manaChoices(s, o, ab).flatMap((mana) => {
-      const adds = manaProduced(s, o, ab, mana);
-      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}) }));
-    }),
-  );
+  return manaAbilitiesOn(s, o).flatMap((ab, ability) => {
+    const p = ab.produces;
+    const picks: { mana: ManaType; combo?: number }[] = p.kind === "combos" ? p.options.map((c, combo) => ({ mana: c[0]!, combo })) : manaChoices(s, o, ab).map((mana) => ({ mana }));
+    return picks.flatMap(({ mana, combo }) => {
+      const adds = manaProduced(s, o, ab, mana, combo);
+      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}) }));
+    });
+  });
 }
 
 /**
@@ -195,7 +202,7 @@ export function pickManaAbility(s: GameState, pid: PlayerId, o: GameObject, mana
   const abs = manaAbilitiesOn(s, o);
   return abs
     .map((ab, i) => ({ ab, i }))
-    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost)
+    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost && ab.produces.kind !== "combos")
     .sort((a, b) => manaPenalty(a.ab) - manaPenalty(b.ab))[0]?.i;
 }
 

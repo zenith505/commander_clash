@@ -3,7 +3,7 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -298,7 +298,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "activateMana":
       if (!paysManaNow(s)) requireNoPending(s);
-      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra);
+      activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra, action.combo);
       break;
     case "castSpell":
       if (action.assisted !== undefined) throw new RulesError("the assisting player chooses how much they pay");
@@ -1803,7 +1803,7 @@ export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
 
-function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = []) {
+function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
   const i = index ?? pickManaAbility(s, p.id, o, mana);
@@ -1812,8 +1812,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
   if (problem) throw new RulesError(problem);
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
+  // "Add {W}{W}, {W}{U}, or {U}{U}": one of the combinations, chosen as it resolves (CR 605.3b).
+  if (ab.produces.kind === "combos" ? combo === undefined || !ab.produces.options[combo] : combo !== undefined) throw new RulesError(ab.produces.kind === "combos" ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
-  const adds = manaProduced(s, o, ab, mana);
+  const adds = manaProduced(s, o, ab, mana, combo);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
   const triggered = manaTriggerResults(s, p.id, o, ab, adds);
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
@@ -1953,7 +1955,8 @@ export function castProblem(
       if (mp) return mp;
     }
   }
-  let specs = spellTargetSpecs(d, modes, castHow(choices));
+  // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
+  let specs = settleDivided(s, { targets: spellTargetSpecs(d, modes, castHow(choices)), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }).targets;
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
     const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, x);
@@ -1968,11 +1971,15 @@ export function castProblem(
     if (tp) return tp;
   }
   const tax = fromCommand ? commanderTax(p, o) : 0;
-  const xp = xProblem(parseManaCost(d.manaCost), x);
+  // "Pay X life", "discard X cards": X can be in an additional cost, or the flashback cost paid, too (CR 107.3a).
+  const manaX = parseManaCost(d.manaCost).hasX;
+  const costX = costsHaveX(d, choices);
+  const xp = xProblem(costX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
   if (xp) return xp;
-  // Cast without paying its mana cost, the only choice for X is 0 (CR 107.3b).
-  if ((free || plotted) && !madness && x) return "X is 0 when a spell is cast without paying its mana cost";
-  if (madness && x && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
+  // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
+  // additional cost (Toxic Deluge's rulings).
+  if ((free || plotted) && !madness && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
+  if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
   const or = compileCard(d).costOr;
@@ -1980,8 +1987,8 @@ export function castProblem(
   // Not chosen yet: one of the ways has to be possible (a mana one is, as far as the mana check below goes).
   if (or && choices?.costOr === undefined && or.every((c) => c.cost && extraCostProblem(s, pid, o, [c.cost], undefined, `cast ${d.name}`)))
     return `you can't pay ${d.name}'s additional cost (${or.map((c) => c.text).join(" or ")})`;
-  if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
-  const ap = additionalCostProblem(s, pid, o, choices);
+  if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
+  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0);
   if (ap) return ap;
   const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
@@ -2253,7 +2260,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
   if (problem) throw new RulesError(problem);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
-  let body = spell ? gateBody(withModes(spell, modes), castHow(choices)) : undefined;
+  let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHow(choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   if (body && manySlot(body.targets) >= 0) {
     // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
     const fit = fitMany(body, targets ?? [], x) as Exclude<ReturnType<typeof fitMany>, string>;
@@ -2307,7 +2314,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const chosen = spell?.modal ? modes : undefined;
   const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
-  const hasX = parseManaCost(d.manaCost).hasX;
+  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices);
   s.stack.push({
     id: `s${s.nextId++}`,
     kind: "spell",
@@ -2350,7 +2357,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices), choices, returned);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices, x ?? 0), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
@@ -2561,15 +2568,24 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 }
 
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
-function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices): string | null {
+function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, choices), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, choices, x), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
-  return [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
+  // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a).
+  return costs.map((c) => (xCost(c) ? { ...c, n: x } : c));
+}
+
+const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
+
+/** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
+export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {
+  return castExtraCosts(d, choices).some(xCost);
 }
 
 /** "Sacrifice a creature or pay {3}{B}": the extra mana of the way chosen to pay it, if that's mana (CR 601.2f). */
@@ -2674,6 +2690,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of ids) tapPermanent(s, obj(s, id));
       log(s, `${p.name} taps ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
+      if (!c.n) continue; // "pay X life" with X = 0
       loseLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "sacrifice") {
@@ -2694,6 +2711,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else {
       const ids = choices.exileCards ?? [];
+      if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
     }
@@ -2773,7 +2791,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
     if (mp) return mp;
   }
-  let body = withModes(ab.body, modes);
+  let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 });
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
     const fit = fitMany(body, targets, x);
@@ -2868,7 +2886,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   if (ab?.costs?.some((c) => c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
-  let body = ab ? withModes(ab.body, modes) : undefined;
+  let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   if (manySlot(body.targets) >= 0) {
@@ -4684,7 +4702,7 @@ export function availableMana(s: GameState, pid: PlayerId): number {
     let best = 0;
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i, true)) return;
-      const most = Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
+      const most = ab.produces.kind === "combos" ? Math.max(0, ...ab.produces.options.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
       best = Math.max(best, most - manaValue(parseManaCost(ab.manaCost)));
     });
     for (const { ab, options } of payableActivatedMana(s, pid, o)) best = Math.max(best, Math.max(0, ...options.map((x) => x.adds.length)) - manaValue(parseManaCost(ab.manaCost)));

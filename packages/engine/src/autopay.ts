@@ -13,6 +13,7 @@ interface Option {
   id: ObjectId;
   ability: number;
   mana: ManaType;
+  combo?: number;
   adds: ManaType[];
   /** The mana picked for the triggered mana abilities it triggers. */
   extra?: ManaType[];
@@ -72,7 +73,7 @@ function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): Option[] 
 const toAction = (pid: PlayerId, x: Option): Action =>
   x.activated
     ? { type: "activateAbility", player: pid, objectId: x.id, index: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }
-    : { type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}) };
+    : { type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}) };
 
 /**
  * What to tap for "Tap an untapped creature you control", best first: what makes no mana itself, then what's
@@ -394,38 +395,45 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
       .map((x) => ({ x, net: x.adds.length - manaValue(x.cost!), color: x.adds.some((m) => needColors.has(m) && pool[m] === 0) }))
       .filter((c) => c.color || c.net > 0)
       .sort((a, b) => Number(b.color) - Number(a.color) || b.net - a.net || a.x.penalty - b.x.penalty);
-    let added = false;
+    // The first that can be paid for, unless a later one finishes the payment right away (a filter land's {W}{U}
+    // rather than its {W}{W}).
+    let pick: { actions: Action[]; pool: ManaPool; restricted: ManaPool; used: Set<ObjectId> } | undefined;
     for (const { x } of costed) {
       const others = unrestricted.filter((src) => src.id !== x.id);
       const free = { ...pool };
       for (const m of Object.keys(free) as ManaType[]) free[m] -= restricted[m];
       const pay = planFree(x.cost!, 0, p.life, free, others, used, needColors);
       if (!pay) continue;
-      taps.push(...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x));
-      pool = payFromPool(x.cost!, pay.pool)!.pool;
-      for (const m of Object.keys(pool) as ManaType[]) pool[m] += restricted[m];
+      const next = payFromPool(x.cost!, pay.pool)!.pool;
+      const nextRestricted = { ...restricted };
+      for (const m of Object.keys(next) as ManaType[]) next[m] += restricted[m];
       for (const m of x.adds) {
-        pool[m]++;
-        if (x.restricted) restricted[m]++;
+        next[m]++;
+        if (x.restricted) nextRestricted[m]++;
       }
-      used = new Set([...pay.used, x.id]);
-      added = true;
-      break;
+      const option = { actions: [...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x)], pool: next, restricted: nextRestricted, used: new Set([...pay.used, x.id]) };
+      const done = !!planFree(cost, extraGeneric, p.life, next, sources, option.used);
+      if (!pick || done) pick = option;
+      if (done) break;
     }
-    if (!added) return null;
+    if (!pick) return null;
+    taps.push(...pick.actions);
+    pool = pick.pool;
+    for (const m of Object.keys(restricted) as ManaType[]) restricted[m] = pick.restricted[m];
+    used = pick.used;
   }
   return null;
 }
 
 /** The actions to activate one mana ability, paying any mana it costs first. */
-export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[], extra?: ManaType[]): Action[] | null {
+export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId, ability: number, mana: ManaType, tap?: ObjectId[], extra?: ManaType[], combo?: number): Action[] | null {
   const o = obj(s, objectId);
   if (manaAbilityProblem(s, pid, o, ability, true, tap)) return null;
   const ab = manaAbilitiesOn(s, o)[ability]!;
   // "Tap an untapped creature you control": what's given, or the best to tap.
   const tapped = ab.tapCost ? (tap ?? tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost)).slice(0, ab.tapCost.n)) : undefined;
   const taps = ab.manaCost ? planMana(s, pid, parseManaCost(ab.manaCost), 0, objectId, tapped, { ability: o }) : [];
-  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}) }] : null;
+  return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}) }] : null;
 }
 
 /** Tap what's needed and turn a face-down permanent face up (CR 702.37e), or null if that can't be done now. */

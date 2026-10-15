@@ -2,7 +2,7 @@
 
 import type { Effect } from "../../abilities";
 import { allEffects } from "../../abilities";
-import { NUMX, amt, singularWord, isGroup } from "../words";
+import { NUMX, X, amt, singularWord, isGroup } from "../words";
 import { parsePlayer, parseObject } from "../targets";
 import { INCUBATOR, PREDEFINED_TOKENS, parseToken, parseCopyExcept } from "../tokens";
 import { parseSentence } from "../sentence";
@@ -67,7 +67,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return what && !isGroup(what) ? [{ type: "flicker", what, under: m[2] === "your" ? "you" : "owner" }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
-  if ((m = /^Investigate( twice)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
+  if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
   // Explore (CR 701.44)
   if (/^~ explores$/.test(s)) return [{ type: "explore" }];
   // "Target creature you control explores" (a Map token, CR 111.10s): its controller is you.

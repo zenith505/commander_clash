@@ -13,6 +13,7 @@ import {
   graveyardCast,
   graveyardWays,
   castExtraCosts,
+  costsHaveX,
   mayPlayFromExile,
   mayPlayLandFromGraveyard,
   mayPlayFromTop,
@@ -313,7 +314,8 @@ type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
-  | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number }
+  /** `extra`: an additional cost with X in it, "pay X life" (CR 107.3a). */
+  | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string }
   | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[] };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
@@ -570,10 +572,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.costOr === undefined && compiled.costOr) return setCostOrPick({ draft: d, label: card.name, options: compiled.costOr.map((c) => c.text) });
     // Gift: you may promise an opponent a gift as you cast it (CR 702.174a), announced with the other costs (601.2b).
     if (d.gift === undefined && compiled.gift && opps.length) return setGiftPick({ draft: d, label: card.name, what: compiled.gift.what, options: opps });
-    // Cast without paying its mana cost, X is 0 (CR 107.3b).
-    if (d.x === undefined && parseManaCost(card.manaCost).hasX && !free && !d.via && !d.alt) {
+    // Cast without paying its mana cost, X is 0 (CR 107.3b); not so for "pay X life" and the like, an X in an
+    // additional cost (Toxic Deluge's rulings).
+    const costX = costsHaveX(card, d);
+    if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && !free && !d.via && !d.alt) || costX)) {
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
-      return setXPick({ mode: "cast", draft: d, label: card.name, cost: card.manaCost, max, value: max });
+      const extra = costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      return setXPick({ mode: "cast", draft: d, label: card.name, cost: card.manaCost, max, value: max, ...(extra ? { extra } : {}) });
     }
     // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is
     // asked before them when a target depends on it.
@@ -587,8 +592,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Every target skipped: it's cast as if it had none.
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
-    for (const c of castExtraCosts(card, d)) {
+    for (const c of castExtraCosts(card, d, d.x ?? 0)) {
       if (c.kind === "payLife" || c.kind === "tap" || (c.kind === "discard" && c.random)) continue; // no spell asks to tap a permanent yet
+      if (!c.n) continue; // "sacrifice X creatures" with X = 0
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       if (c.kind === "returnToHand")
@@ -813,7 +819,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
       if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0)) return setMenu(o.id);
-      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra);
+      const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra, mana[0].combo);
       if (plan) dispatch(plan);
     }
   }
@@ -1024,7 +1030,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   const candidates = tapCostCandidates(s, HUMAN, s.objects[menu]!, tapCost);
                   return setCostPick({ mana: { objectId: menu, ability: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }, kind: "tap", label: cardOf(s, menu).name, what: `tap ${tapCost.n === 1 ? (/^[aeiou]/i.test(tapCost.filter.text) ? "an" : "a") : tapCost.n} ${tapCost.filter.text}`, n: tapCost.n, candidates, chosen: [] });
                 }
-                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra);
+                const plan = planManaAbility(s, HUMAN, menu, x.ability, x.mana, undefined, x.extra, x.combo);
                 if (plan) dispatch(plan);
               }}
               onPlay={(untapped) => {
@@ -1368,7 +1374,8 @@ function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange:
   return (
     <div className="targeting x-pick">
       <span>
-        <strong>{pick.label}</strong> <ManaCost cost={pick.cost} size="sm" />: choose X (up to {pick.max} with your mana)
+        <strong>{pick.label}</strong> <ManaCost cost={pick.cost} size="sm" />
+        {pick.mode === "cast" && pick.extra ? ` and ${pick.extra}: choose X (up to ${pick.max})` : `: choose X (up to ${pick.max} with your mana)`}
       </span>
       <button className="ghost" disabled={pick.value <= 0} onClick={() => set(pick.value - 1)} aria-label="X minus one">
         −
@@ -2591,7 +2598,7 @@ function ModeMenu({
 
 /** Ways to make mana with this permanent right now (paying any mana they cost with other sources). */
 function usableManaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaOptions(s, o).filter((x) => x.adds.length > 0 && planManaAbility(s, HUMAN, o.id, x.ability, x.mana) !== null);
+  return manaOptions(s, o).filter((x) => x.adds.length > 0 && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo) !== null);
 }
 
 function AbilityMenu({
@@ -2736,7 +2743,7 @@ function AbilityMenu({
           const ab = manaAbilitiesOn(s, o)[x.ability]!;
           const cost = ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it");
           return (
-            <button key={`${x.ability}-${x.mana}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
+            <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
               <RulesText text={cost} />: add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>

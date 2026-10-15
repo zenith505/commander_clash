@@ -1,6 +1,6 @@
 # Roadmap
 
-16,146 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,223 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -16,24 +16,33 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Haunt, Read ahead.
+   Left from the filter lands/divided damage/X costs round:
+   - Divided damage still out: "each of those creatures deals damage equal to its power to ~" (Polukranos, Living
+     Inferno, Ravenous Gigantotherium), "age counters on it" (Magmatic Core), Impact Resonance, Ghired's Belligerence's
+     populate, Aurelia's Fury's riders, Arrow Volley Trap, Pollen Remedy, Meteor Swarm's "among X target"; "deals X
+     damage to each of X targets" (Firestorm, Meteor Blast). The divide panel says "divide the damage" for prevention
+     too (Remedy).
+   - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
+     Rupture, Curse of Surveillance, The Death of Gwen Stacy; Will of the Abzan (below).
+   - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
+     lands" (Devastating Dreams), "with mana value X" (Fix What's Broken, Vicious Rivalry), Devastating Summons' X/X
+     tokens, Insidious Dreams, Recall, Nahiri's Wrath, Abandon Hope; X in an activated ability's non-mana cost (Gix,
+     Champion of Stray Souls, Martyr of Bones); "X target cards from a single graveyard" (Rats' Feast); waterbend {X}.
+   - Bots don't sacrifice nontoken permanents for mana abilities on their own (Ashnod's Altar, Phyrexian Tower): only
+     the human player does, from the ability menu.
    Left from the mana abilities/any number of targets round:
-   - "Any number of target" players or opponents (Will of the Abzan, Court of Cunning, Call the Coppercoats, Stonespeaker
-     Crystal); "X damage divided as you choose among any number of targets" (Rolling Thunder, Fireball's "divided
-     evenly", Fire Covenant, about 25 cards); "up to X target" where X isn't the spell's own X ("where X is ...",
+   - "Up to X target" where X isn't the spell's own X ("where X is ...",
      verse counters, monstrosity, kicker count); target counts with a group condition ("with total mana value 8 or
      less", "with different controllers", "that each have a different mana value", "with equal toughness"); "for each
      creature destroyed/exiled this way, its controller creates" (Descent of the Dragons, Hour of Need); "Shuffle any
      number of target cards from your graveyard into your library"; "Return those cards ... at the beginning of the
      next end step" after exiling several (Eerie Interlude, Brago); "Choose target creature you don't control. Each
      creature you control deals damage equal to its power to that creature" (Kamahl's Will).
-   - Filter lands ("{W/U}, {T}: Add {W}{W}, {W}{U}, or {U}{U}", 10 cards): a choice between mana combinations and a
-     hybrid cost in a mana ability. Other "Activate only if" mana abilities still out: "~ is a creature" (Flywheel
-     Racer), "three or more lands with the same name", counters on ~ (Pyramid of the Pantheon, Tablet of Compleation).
+   - "Activate only if" mana abilities still out: "~ is a creature" (Flywheel Racer), "three or more lands with the
+     same name", counters on ~ (Pyramid of the Pantheon, Tablet of Compleation).
    - An activated mana ability whose body isn't a plain "Add ..." (Leafkin Druid's "add {G}{G} instead") can't be
      activated while a "whenever ~ is tapped for mana, add one mana of any color" trigger would need a color choice
      (Fertile Ground on it): it's refused rather than asked. No supported card hits this yet.
-   - Bots don't sacrifice nontoken permanents for mana abilities on their own (Ashnod's Altar, Phyrexian Tower): only
-     the human player does, from the ability menu.
    Left from the conditional targets/Will cycle/hideaway conditions round:
    - "Choose target X ... If the gift was promised, instead choose target Y ... the chosen" (Too Evil to Stay Dead,
      Expel the Unworthy, The Eagles Are Coming!); "each creature target player controls" (Galadriel's Dismissal);

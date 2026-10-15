@@ -1461,6 +1461,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e9f5feb2-2c1a-46ce-885a-4f378d7d10af",
+  "name": "Mystic Gate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{W/U}, {T}: Add {W}{W}, {W}{U}, or {U}{U}.",
+  "colors": [],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "exp",
+  "releasedAt": "2016-01-22",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "713332c1-5bd8-400f-bfff-c1ca0697a043",
   "name": "Opt",
   "manaCost": "{U}",
@@ -1695,6 +1725,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9c47888b-28a5-4c43-9ee4-a9059e3c367d",
+  "name": "Rolling Thunder",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Rolling Thunder deals X damage divided as you choose among any number of targets.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f748b2fb-6c2a-400a-8e96-fa4e4a1dfe80",
   "name": "Shelldock Isle",
   "manaCost": "",
@@ -1746,6 +1802,32 @@
   "set": "spm",
   "releasedAt": "2025-09-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "728d2e30-2f36-4054-81db-29b01e376a82",
+  "name": "Sickening Dreams",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, discard X cards.\nSickening Dreams deals X damage to each creature and each player.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tor",
+  "releasedAt": "2002-02-04",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -1825,6 +1907,31 @@
   "set": "war",
   "releasedAt": "2019-05-03",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a494fcee-6885-434c-aad5-6f83640c4472",
+  "name": "Stonespeaker Crystal",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}{C}.\n{2}, {T}, Sacrifice this artifact: Exile any number of target players' graveyards. Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -1930,6 +2037,32 @@
   "set": "otp",
   "releasedAt": "2024-04-19",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "afaef788-34d1-460b-b884-9d7ae6ddeb18",
+  "name": "Toxic Deluge",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, pay X life.\nAll creatures get -X/-X until end of turn.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

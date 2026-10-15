@@ -54,8 +54,21 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   if (x === "defending player" && ctx.defending) return { ref: "eventPlayer" };
   if (x === "enchanted player" || x === "enchanted opponent") return { ref: "enchantedPlayer" };
+  // "Any number of target players each mill two cards" (CR 601.2c, 115.6): one entry for them all until it's cast
+  // (TargetSpec.many); "those players", "each of those players" are all of them.
+  const many = /^any number of target (players|opponents)(?: each)?$/.exec(x);
+  if (many) {
+    if (ctx.targets.some((t) => t.many)) return null;
+    const one = many[1] === "players" ? "target player" : "target opponent";
+    const index = addTarget(ctx, { kind: "player", opponent: many[1] === "opponents", text: one, many: "any" });
+    ctx.lastPlayerTarget = index;
+    ctx.manyPlayers = index;
+    return { ref: "target", index, n: 2 };
+  }
+  const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
+  if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
   // "Target player discards two cards. ... that player discards a card": the player targeted before.
-  if (x === "that player" && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
+  if (x === "that player" && ctx.lastPlayerTarget !== undefined && !manyNow) return { ref: "target", index: ctx.lastPlayerTarget };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -147,14 +160,15 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const other = other0 ?? other1;
   // "Any number of target creatures" (CR 601.2c, 115.6), "up to X target artifacts" with the spell's X (107.3a): how
   // many is announced as it's cast, so one entry stands for them all until then (TargetSpec.many).
-  const many = range === "any number of" ? ("any" as const) : count === "X" ? ("x" as const) : undefined;
-  if (count === "X" && (!upTo || !ctx.spell || ctx.whereX)) return null;
+  // "Destroy X target creatures": exactly X of them (Eliminate the Competition).
+  const many = range === "any number of" ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
+  if (count === "X" && (!ctx.spell || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
   const [mine0, theirs] = thatPlayerControls(phrase!, ctx);
   // "Cards from a single graveyard" (all in one), "creature cards that share a creature type" (each with each other).
-  const single = n > 1 && / from a single graveyard$/.test(mine0);
-  const share = n > 1 && / that share a creature type(?= from |$)/.test(mine0);
+  const single = (n > 1 || !!many) && / from a single graveyard$/.test(mine0);
+  const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
   const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "");
   const parsed = parseTargetPhrase(n > 1 || many ? singularPhrase(mine) : mine);
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;

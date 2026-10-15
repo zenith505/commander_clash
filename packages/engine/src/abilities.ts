@@ -169,7 +169,23 @@ export interface TargetSpec {
    * "N damage divided as you choose among one, two, or three targets": this is one of the targets `first` to
    * `first + n - 1`, which share `total` as their controller chose with the targets, at least 1 each (CR 601.2d).
    */
-  divided?: { first: number; n: number; total: number; /** Counters distributed, not damage divided. */ counter?: CounterKind; /** "Among up to two target creatures": none at all is fine too. */ upTo?: true };
+  divided?: {
+    first: number;
+    n: number;
+    total: number;
+    /** Counters distributed, not damage divided. */
+    counter?: CounterKind;
+    /** "Among up to two target creatures": none at all is fine too. */
+    upTo?: true;
+    /**
+     * "X damage divided as you choose among any number of targets": the amount, worked out as the targets are chosen
+     * (CR 601.2d: as it's cast or put on the stack) and kept in `total` from then on (`settleDivided`). With it the
+     * target is a `many` one: one to that many targets, as each gets at least 1, or none if it's 0.
+     */
+    amount?: AmountExpr;
+    /** `total` holds the amount, worked out. */
+    settled?: true;
+  };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
   /**
@@ -225,11 +241,11 @@ export interface TargetSpec {
   /** Set by `gateTargets` for a target the spell is cast as if it didn't have: nothing ({ kind: "none" }) is chosen. */
   skip?: true;
   /**
-   * "Any number of target creatures" ("any"), "up to X target artifacts" ("x"): a variable number of targets, announced
-   * as it's cast (CR 601.2c), any number from 0 (115.6), or up to X. This one entry stands for all of them until then;
+   * "Any number of target creatures" ("any"), "up to X target artifacts" ("x"), "X target creatures" ("exactX"): a
+   * variable number of targets, announced as it's cast (CR 601.2c), any number from 0 (115.6), up to X, or exactly X. This one entry stands for all of them until then;
    * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
    */
-  many?: "any" | "x";
+  many?: "any" | "x" | "exactX";
   /** Original text, for display. */
   text: string;
 }
@@ -289,7 +305,8 @@ export type ObjRef =
 export type PlayerRef =
   | { ref: "you" }
   | { ref: "subjectController" } // the controller of the object the trigger was about, or as it last existed
-  | { ref: "target"; index: number }
+  /** `n`: "any number of target players" covers the targets from `index` on (TargetSpec.many). */
+  | { ref: "target"; index: number; n?: number }
   | { ref: "eachOpponent" }
   | { ref: "eachPlayer" }
   | { ref: "targetController"; index: number } // "its controller"
@@ -569,8 +586,11 @@ export type StaticCondition =
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
-  /** `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true }
+  /**
+   * `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). `evenly`: "divided evenly,
+   * rounded down, among any number of targets" (Fireball): among the targets still legal as it resolves, nothing chosen.
+   */
+  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
@@ -912,8 +932,11 @@ export type Effect =
    * just put into to the battlefield under its owner's control, with a counter on it.
    */
   | { type: "returnToBattlefield"; counter?: "+1/+1" | "-1/-1" }
-  /** "Prevent the next 2 damage that would be dealt to any target this turn" (a prevention shield, CR 615.7). */
-  | { type: "preventNext"; n: Amount; to: DamageRecipient }
+  /**
+   * "Prevent the next 2 damage that would be dealt to any target this turn" (a prevention shield, CR 615.7). `divided`:
+   * "to any number of targets, divided as you choose", each target's shield its part (CR 601.2d).
+   */
+  | { type: "preventNext"; n: Amount; to: DamageRecipient; divided?: true }
   /** "The next N damage that would be dealt to ~ this turn is dealt to target creature you control instead" (CR 614.9). */
   | { type: "redirectNext"; n: Amount; from: DamageRecipient; to: DamageRecipient }
   /** "Prevent all combat damage that would be dealt this turn" (CR 615.1). */
@@ -1323,7 +1346,9 @@ export type ManaProduce =
    * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
    * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
    */
-  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean };
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean }
+  /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
+  | { kind: "combos"; options: ManaType[][] };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).
@@ -1431,15 +1456,19 @@ export interface CostMod {
 
 /** Everything the engine knows how to do with one card. */
 /** A cost paid along with a spell's mana cost (CR 118.8). */
+/**
+ * `x` (on a spell's costs): "pay X life", "discard X cards", "sacrifice X lands": as many as the X announced as it's
+ * cast (CR 107.3a, 601.2b); `n` is that X once `castExtraCosts` has it.
+ */
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
-  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true }
-  | { kind: "payLife"; n: number }
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number }
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true }
+  | { kind: "payLife"; n: number; x?: true }
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
-  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean }
+  | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**
    * "Tap an untapped creature you control", "tap two untapped Wizards you control" (CR 602.2b). Any of them, summoning
    * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.

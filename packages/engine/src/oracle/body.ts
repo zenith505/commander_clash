@@ -31,6 +31,8 @@ export interface Ctx {
   lastGroup?: ObjRef;
   /** Index of the most recent player target, for "that player's hand". */
   lastPlayerTarget?: number;
+  /** "Any number of target players": that target (see TargetSpec.many); "those players" are all of them. */
+  manyPlayers?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */
   activated?: boolean;
   /** The last sentence created one token: "put a +1/+1 counter on it" means that token. */
@@ -266,11 +268,22 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (where) s = where[1]!;
     ctx.whereX = !!where;
     const before = effects.length;
+    const targetsBefore = ctx.targets.length;
     const defineX = () => {
       if (!where) return true;
-      const def = parseCount(where[2]!, ctx);
+      // "X damage divided as you choose ..., where X is the number of Mountains you control as you cast this spell": the
+      // amount is worked out as the targets are chosen, while it's being cast, anyway (TargetSpec.divided.amount).
+      const asCast = / as you (?:cast ~|cast this spell|activate this ability)$/.exec(where[2]!);
+      const added = effects.slice(before);
+      const dividedOnly = added.length === 1 && added[0]!.type === "damage" && !!added[0]!.divided && ctx.targets.slice(targetsBefore).some((t) => t.divided?.amount);
+      if (asCast && !dividedOnly) return false;
+      const def = parseCount(asCast ? where[2]!.slice(0, asCast.index) : where[2]!, ctx);
       if (!def) return false;
-      effects.splice(before, effects.length - before, ...replaceX(effects.slice(before), def));
+      effects.splice(before, effects.length - before, ...replaceX(added, def));
+      for (let k = targetsBefore; k < ctx.targets.length; k++) {
+        const t = ctx.targets[k]!;
+        if (t.divided?.amount) ctx.targets[k] = { ...t, divided: { ...t.divided, amount: replaceX(t.divided.amount, def) } };
+      }
       return true;
     };
     // "You may discard a card. If you do, draw a card." (CR 608.2c): what follows depends on whether it was
@@ -587,12 +600,13 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
 
 /** Run a parse that may fail halfway, undoing any targets it added. */
 function attempt<T>(ctx: Ctx, f: () => T | null): T | null {
-  const saved = { n: ctx.targets.length, o: ctx.lastObjectTarget, p: ctx.lastPlayerTarget, a: ctx.lastAttached };
+  const saved = { n: ctx.targets.length, o: ctx.lastObjectTarget, p: ctx.lastPlayerTarget, a: ctx.lastAttached, mp: ctx.manyPlayers };
   const r = f();
   if (r === null) {
     ctx.targets.length = saved.n;
     ctx.lastObjectTarget = saved.o;
     ctx.lastPlayerTarget = saved.p;
+    ctx.manyPlayers = saved.mp;
     ctx.lastAttached = saved.a;
   }
   return r;
@@ -771,7 +785,8 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
     const second = first && parseSentence(`${m[3]!.charAt(0).toUpperCase()}${m[3]!.slice(1)}`, ctx);
     return first && second ? [...first, ...second] : null;
   }
-  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
+  // "Any number of target players each mill a card and lose 1 life" (Tinybones Joins Up): all of them both times.
+  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^any number of target (players|opponents) each$/i.test(subject) ? "Each of those players" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
   if (!again) return null;
   const first = parseSentence(`${subject} ${m[2]}`, ctx);
   const second = first && parseSentence(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`, ctx);

@@ -3,7 +3,7 @@
 
 import type { Effect, ObjRef } from "../../abilities";
 import { isGroup } from "../words";
-import { parseObject } from "../targets";
+import { parseObject, parsePlayer } from "../targets";
 import { parseCopyExcept } from "../tokens";
 import type { Ctx } from "../body";
 
@@ -19,6 +19,8 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // only chooses the target the second refers to.
   // "Choose any number of target creatures. Each of those creatures gains persist until end of turn." too.
   if ((m = /^Choose ((?:any number of )?target .+)$/.exec(s))) {
+    // "Choose any number of target opponents" (Call the Coppercoats): players, likewise.
+    if (/^any number of target (?:players|opponents)$/.test(m[1]!)) return parsePlayer(m[1]!, ctx) ? [] : null;
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [] : null;
   }

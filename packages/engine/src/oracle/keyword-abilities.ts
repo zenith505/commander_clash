@@ -29,7 +29,8 @@ export function parseGraveyardKeyword(
     const costs: AdditionalCost[] = [];
     for (const part of parts) {
       // Escape's "Exile two other cards from your graveyard": other than this card, which is on the stack by then.
-      const c = parseAdditionalCost(part.replace(/^Exile (\w+) other /, "exile $1 "));
+      // "Flashback—{R}{R}, Discard X cards" (Conflagrate): the spell's X (CR 107.3a).
+      const c = parseAdditionalCost(part.replace(/^Exile (\w+) other /, "exile $1 "), true);
       if (!c) return "fail";
       costs.push(c);
     }
@@ -325,17 +326,36 @@ function describePayText(pay: PayCost): string {
   return [pay.mana, pay.life ? `${pay.life} life` : "", pay.energy ? "{E}".repeat(pay.energy) : ""].filter(Boolean).join(" and ");
 }
 
-export function parseAdditionalCost(text: string): AdditionalCost | null {
+/**
+ * A cost beyond mana: "sacrifice a creature", "discard two cards", "pay 3 life", ... With `allowX` (a spell's costs),
+ * "pay X life", "discard X cards", "sacrifice X lands" too, X being announced as it's cast (CR 107.3a).
+ */
+export function parseAdditionalCost(text: string, allowX = false): AdditionalCost | null {
   let m: RegExpExecArray | null;
-  if ((m = new RegExp(`^sacrifice ${NUM} (.+)$`, "i").exec(text))) {
-    const n = num(m[1]!);
-    const phrase = n === 1 ? m[2]! : m[2]!.split(" ").map(singularWord).join(" ");
+  const isX = (w: string) => allowX && w === "X";
+  const many = (w: string) => (isX(w) ? { n: 0, x: true as const } : { n: num(w) });
+  if ((m = new RegExp(`^sacrifice (${NUM.slice(1, -1)}|X) (.+)$`, "i").exec(text)) && (m[1] !== "X" || allowX)) {
+    const n = many(m[1]!);
+    const phrase = n.n === 1 && !n.x ? m[2]! : m[2]!.split(" ").map(singularWord).join(" ");
     const spec = parseTargetPhrase(phrase);
     if (spec?.kind !== "object" || spec.controller || spec.combat) return null;
-    return { kind: "sacrifice", filter: { ...spec, text: m[2]! }, n };
+    return { kind: "sacrifice", filter: { ...spec, text: m[2]! }, ...n };
   }
   if ((m = new RegExp(`^discard ${NUM} cards?( at random)?$`, "i").exec(text))) return { kind: "discard", n: num(m[1]!), ...(m[2] ? { random: true as const } : {}) };
+  // "Discard X cards", "discard X land cards", "discard X cards at random".
+  if (allowX && (m = /^discard X (?:(.+?) )?cards( at random)?$/i.exec(text))) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (filter && m[2])) return null;
+    return { kind: "discard", n: 0, x: true, ...(filter ? { filter } : {}), ...(m[2] ? { random: true as const } : {}) };
+  }
   if ((m = /^pay (\d+) life$/i.exec(text))) return { kind: "payLife", n: Number(m[1]) };
+  if (allowX && /^pay X life$/i.test(text)) return { kind: "payLife", n: 0, x: true };
+  // "Return X Swamps you control to their owner's hand" (Infernal Harvest).
+  if (allowX && (m = /^return X (.+?) you control to their owner's hand$/i.exec(text))) {
+    const spec = parseTargetPhrase(m[1]!.split(" ").map(singularWord).join(" "));
+    if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped !== undefined) return null;
+    return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[1]} you control` }, n: 0, x: true };
+  }
   // "Return a land you control to its owner's hand" (Deprive).
   if ((m = /^return an? (.+?) you control to its owner's hand$/i.exec(text))) {
     const spec = parseTargetPhrase(m[1]!);
@@ -346,10 +366,10 @@ export function parseAdditionalCost(text: string): AdditionalCost | null {
     const filter = parseSearchFilter(m[1]!);
     return filter ? { kind: "reveal", filter, n: 1 } : null;
   }
-  if ((m = new RegExp(`^exile ${NUM} (.+?) from your graveyard$`, "i").exec(text))) {
-    const filter = parseSearchFilter(m[2]!);
+  if ((m = new RegExp(`^exile (${NUM.slice(1, -1)}|X) (.+?) from your graveyard$`, "i").exec(text)) && (m[1] !== "X" || allowX)) {
+    const filter = parseSearchFilter(m[1] === "X" ? m[2]!.replace(/cards$/, "card") : m[2]!);
     if (filter === null) return null;
-    return { kind: "exileFromGraveyard", n: num(m[1]!), ...(filter ? { filter } : {}) };
+    return { kind: "exileFromGraveyard", ...many(m[1]!), ...(filter ? { filter } : {}) };
   }
   return null;
 }

@@ -27,7 +27,8 @@ import {
   player,
   potentialAttackers,
   spellCost,
-  graveyardCast,
+  graveyardWay,
+  graveyardWays,
   altCost,
   delveRoom,
   spellTargets,
@@ -222,7 +223,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       if (plan) return plan;
     }
     const p = player(s, pid);
-    const fromYard = p.graveyard.filter((id) => compileCard(defOf(s, obj(s, id))).fromGraveyard?.length);
+    const fromYard = p.graveyard.filter((id) => graveyardWays(s, obj(s, id)).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
@@ -536,7 +537,7 @@ function targetIndexOf(e: Effect): number | undefined {
  */
 function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const d = defOf(s, obj(s, id));
-  const cost = parseManaCost(graveyardCast(d, via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
+  const cost = parseManaCost(graveyardWay(s, obj(s, id), via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free) return null;
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
@@ -635,7 +636,7 @@ function chooseDredge(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectI
 
 /** Casting a card from our graveyard (flashback, escape, ...): the first way that works. */
 function graveyardCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
-  for (const g of compileCard(defOf(s, obj(s, id))).fromGraveyard ?? []) {
+  for (const g of graveyardWays(s, obj(s, id))) {
     const plan = castPlan(s, pid, id, false, g.kind);
     if (plan) return plan;
   }
@@ -1017,6 +1018,7 @@ function guessChosen(s: GameState, pid: PlayerId, card: CardDef): Chosen | undef
  * mana, the colors our commander needs).
  */
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
+  if (what === "basicLandType") return chooseLandType(s, pid, options);
   const c = card ? compileCard(card) : undefined;
   // Protection from the chosen color is against what opponents have, above all the spell or ability
   // that's about to resolve against us.
@@ -1705,4 +1707,21 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
   if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks.length = 0;
   return { type: "declareBlockers", player: pid, blocks };
+}
+
+const LAND_COLOR: Record<string, Color> = { Plains: "W", Island: "U", Swamp: "B", Mountain: "R", Forest: "G" };
+
+/**
+ * "Target land becomes the basic land type of your choice" (Reef Shaman): our own land makes the color our hand and
+ * commander need most; an opponent's makes a color their commander can't use.
+ */
+function chooseLandType(s: GameState, pid: PlayerId, options: string[]): string {
+  const t = s.resolving?.item.targets?.find((x) => x.kind === "object");
+  const owner = t?.kind === "object" && s.objects[t.id] ? controllerOf(s, obj(s, t.id)) : pid;
+  const identity = new Set<Color>();
+  for (const o of Object.values(s.objects)) if (o.isCommander && o.owner === owner) defOf(s, o).colorIdentity.forEach((c) => identity.add(c));
+  if (owner !== pid) return options.find((o) => !identity.has(LAND_COLOR[o]!)) ?? options[0]!;
+  const want = new Map<string, number>();
+  for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) want.set(c, (want.get(c) ?? 0) + 1);
+  return [...options].sort((a, b) => (want.get(LAND_COLOR[b]!) ?? 0) + (identity.has(LAND_COLOR[b]!) ? 1 : 0) - (want.get(LAND_COLOR[a]!) ?? 0) - (identity.has(LAND_COLOR[a]!) ? 1 : 0))[0]!;
 }

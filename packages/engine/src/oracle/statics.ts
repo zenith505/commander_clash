@@ -60,6 +60,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [m[2]!], text: `${m[2]} creature` } } };
   }
+  // Aerial Modification: "As long as enchanted permanent is a Vehicle, it's a creature in addition to its other types."
+  // A type-changing effect (layer 4) whose condition looks at the permanent as the earlier effects in that layer left it.
+  if ((m = /^As long as (?:enchanted|equipped) permanent is an? (Vehicle), it's a creature in addition to its other types$/.exec(text)))
+    return { affects: { kind: "attached" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }], text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [m[1]!], text: m[1]! } } };
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as ([^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
@@ -158,8 +162,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, max: 0 } : null;
   }
   // "It" is the source only when the ability is about the source itself.
-  const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified)$/.exec(text);
-  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" };
+  const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped)$/.exec(text);
+  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" };
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
@@ -360,6 +364,8 @@ function parseStaticMods(rest: string): Modification[] | null {
 
 export function parseStatic(line: string): StaticAbility | null {
   let text = line.replace(/\.$/, "");
+  const lands = parseLandTypeStatic(text, line);
+  if (lands) return lands;
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);
   if (silenced) {
@@ -481,3 +487,29 @@ function parseDefinedPT(text: string): Modification | null {
 
 // ---------------------------------------------------------------------------
 // Effect bodies
+
+const BASIC_PLURAL: Record<string, string> = { Plains: "Plains", Islands: "Island", Swamps: "Swamp", Mountains: "Mountain", Forests: "Forest" };
+const LAND: TargetSpec = { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" };
+
+/**
+ * Basic land types (CR 305.7): "Nonbasic lands are Mountains" (Blood Moon), "All Mountains are Plains" (Conversion),
+ * "Enchanted land is an Island" (Spreading Seas) set a land's land types, so it loses its other land types and the
+ * abilities from its rules text. "Each land is a Swamp in addition to its other land types" (Urborg), "Lands you control
+ * are every basic land type in addition to their other types" (Prismatic Omen) only add types. "Islands don't untap
+ * during their controllers' untap steps" (Choke).
+ */
+function parseLandTypeStatic(text: string, line: string): StaticAbility | null {
+  let m: RegExpExecArray | null;
+  if ((m = /^Nonbasic lands are (Plains|Islands|Swamps|Mountains|Forests)$/.exec(text)))
+    return { affects: { kind: "filter", types: ["Land"], spec: { ...LAND, notSupertypes: ["Basic"], text: "nonbasic land" } }, mods: [{ kind: "setLandTypes", subtypes: [BASIC_PLURAL[m[1]!]!] }], text: line };
+  if ((m = /^All (Plains|Islands|Swamps|Mountains|Forests) are (Plains|Islands|Swamps|Mountains|Forests)$/.exec(text)) && m[1] !== m[2])
+    return { affects: { kind: "filter", types: ["Land"], subtypes: [BASIC_PLURAL[m[1]!]!] }, mods: [{ kind: "setLandTypes", subtypes: [BASIC_PLURAL[m[2]!]!] }], text: line };
+  if ((m = /^Enchanted land is an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(text))) return { affects: { kind: "attached" }, mods: [{ kind: "setLandTypes", subtypes: [m[1]!] }], text: line };
+  if ((m = /^Each land is an? (Plains|Island|Swamp|Mountain|Forest) in addition to its other land types$/.exec(text)))
+    return { affects: { kind: "filter", types: ["Land"] }, mods: [{ kind: "addTypes", types: [], subtypes: [m[1]!] }], text: line };
+  if (/^Lands you control are every basic land type in addition to their other types$/.test(text))
+    return { affects: { kind: "filter", types: ["Land"], controller: "you" }, mods: [{ kind: "addTypes", types: [], subtypes: [...BASIC_TYPES] }], text: line };
+  if ((m = /^(Plains|Islands|Swamps|Mountains|Forests) don't untap during their controllers' untap steps$/.exec(text)))
+    return { affects: { kind: "filter", types: ["Land"], subtypes: [BASIC_PLURAL[m[1]!]!] }, mods: [{ kind: "doesntUntap" }], text: line };
+  return null;
+}

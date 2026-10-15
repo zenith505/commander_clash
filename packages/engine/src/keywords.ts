@@ -102,6 +102,8 @@ export function canonicalKeyword(text: string): string | undefined {
 }
 /** "Becomes the creature type of your choice": a subtype filled in with the type chosen as it resolved. */
 export const CHOSEN_TYPE = "(the chosen creature type)";
+/** "Becomes the basic land type of your choice": filled in with the basic land type chosen as it resolved. */
+export const CHOSEN_LAND_TYPE = "(the chosen basic land type)";
 /** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };

@@ -19,6 +19,7 @@ import {
   takeShortcut,
   isType,
   obj,
+  graveyardWays,
   waitingOn,
   RulesError,
   type Action,
@@ -134,7 +135,7 @@ function hasInstantPlay(s: GameState): boolean {
   for (const id of me.graveyard) {
     const d = cardOf(s, id);
     if (!isType(d, "Instant")) continue;
-    for (const g of compileCard(d).fromGraveyard ?? []) if (planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { via: g.kind })) return true;
+    for (const g of graveyardWays(s, obj(s, id))) if (planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { via: g.kind })) return true;
   }
   for (const id of s.battlefield) {
     const o = obj(s, id);

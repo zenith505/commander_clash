@@ -77,13 +77,14 @@ export const ENTERS_COUNTER = "+1/+1 counter";
 export function choiceOptions(what: ChoiceKind | EntersOption, except?: string): string[] {
   if (what === "riot") return [ENTERS_COUNTER, "Haste"];
   if (what === "unleash") return [ENTERS_COUNTER, "No counter"];
-  const all = what === "color" ? Object.values(COLOR_NAMES) : [...CREATURE_TYPES].sort();
+  const all = what === "color" ? Object.values(COLOR_NAMES) : what === "basicLandType" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES].sort();
   return all.filter((x) => x.toLowerCase() !== except?.toLowerCase());
 }
 
 /** Record a choice by name: a creature type, or a color ("Blue" is U). */
 export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice: string): Chosen {
   if (what === "creatureType") return { ...chosen, type: choice };
+  if (what === "basicLandType") return { ...chosen, landType: choice };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };
 }

@@ -15,6 +15,18 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
   if (/^Exile ~$/i.test(s) && ctx.spell) return [{ type: "exileSpell" }];
 
+  // Snapcaster Mage, Past in Flames: "... gains flashback until end of turn. The flashback cost is equal to its mana cost"
+  // (parseBody joins the two sentences).
+  if ((m = /^(target .+? card in your graveyard|each instant and sorcery card in your graveyard) gains flashback with its mana cost until end of turn$/i.exec(s))) {
+    if (/^each/i.test(m[1]!)) return [{ type: "grantFlashback", each: { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant and sorcery card in your graveyard" } }];
+    const i = ctx.targets.length;
+    const what = parseCardTarget(m[1]!, ctx, "you");
+    const spec = ctx.targets[i];
+    // Only instants and sorceries can be cast with flashback (CR 702.34a): other cards would gain it for nothing.
+    if (!what || !spec?.types?.length || spec.types.some((t) => t !== "Instant" && t !== "Sorcery")) return null;
+    return [{ type: "grantFlashback", what }];
+  }
+
   // Graveyards. Cards in a graveyard (CR 109.2a): returning them, reanimating them, exiling them.
   // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j) or "Whenever you
   // cast a multicolored spell, you may return ~ from your graveyard to your hand" (CR 113.6m): the card itself,

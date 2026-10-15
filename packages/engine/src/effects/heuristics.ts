@@ -47,7 +47,7 @@ export function modsAreHarmful(mods: Modification[]): boolean {
   for (const m of mods) {
     if (m.kind === "modifyPT") pt += estimate(m.power) + estimate(m.toughness);
     if (m.kind === "addAbility") pt -= grantCost(m.text);
-    if (["control", "loseAllAbilities", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes", "goad", "cantActivate"].includes(m.kind)) return true;
+    if (["control", "loseAllAbilities", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes", "setLandTypes", "goad", "cantActivate"].includes(m.kind)) return true;
     if (m.kind === "setPT" && estimate(m.power) + estimate(m.toughness) <= 2) return true;
   }
   return pt < 0;

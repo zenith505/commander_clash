@@ -6,6 +6,7 @@
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
 import { abilitiesOf } from "./cards";
+import { putCounters } from "./counters";
 import { fireEvent } from "./effects";
 import { canPreventDamage, gainLife, log, loseLife, obj, player, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
@@ -59,7 +60,7 @@ export function dealDamage(
   src: DamageSource,
   to: { object: GameObject } | { player: PlayerId },
   n: number,
-  opts: { combat?: boolean; lifelink?: { n: number }; shielded?: boolean } = {},
+  opts: { combat?: boolean; lifelink?: { n: number }; shielded?: boolean; witherCounters?: Map<ObjectId, number> } = {},
 ): number {
   if (n <= 0) return 0;
   if (opts.combat && s.preventCombatDamage && canPreventDamage(s)) return 0;
@@ -99,8 +100,10 @@ export function dealDamage(
     }
     if (!walker || c.types.includes("Creature")) {
       if (has(src, "Infect") || has(src, "Wither")) {
-        // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt.
-        o.counters["-1/-1"] = (o.counters["-1/-1"] ?? 0) + n;
+        // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt. They're put on with
+        // the rest of the damage dealt at the same time, as one event for replacement effects (Vizier of Remedies rulings).
+        if (opts.witherCounters) opts.witherCounters.set(o.id, (opts.witherCounters.get(o.id) ?? 0) + n);
+        else putCounters(s, o, "-1/-1", n);
         invalidateCharacteristics(s);
         log(s, `${src.name} deals ${n} damage to ${c.name} (as -1/-1 counters).`);
       } else {
@@ -437,13 +440,19 @@ export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lif
 /** Commit a finished plan and deal its damage. `lifelink`: add the life up for the caller instead of gaining it per event. */
 export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }) } = {}): (DamageEvent & { dealt: number })[] {
   commitShields(s, plan);
+  const witherCounters = new Map<ObjectId, number>();
   const out = plan.final.map((e) => {
     const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
     const o = "object" in e.to ? obj(s, e.to.object) : undefined;
     const to = o ? { object: o } : { player: (e.to as { player: PlayerId }).player };
-    const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true });
+    const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true, witherCounters });
     return { ...e, dealt };
   });
+  for (const [id, n] of witherCounters) {
+    const o = obj(s, id);
+    if (o.zone === "battlefield") putCounters(s, o, "-1/-1", n);
+  }
+  if (witherCounters.size) invalidateCharacteristics(s);
   // "Whenever ~ is dealt damage": the damage dealt to a permanent at the same time is one event (rulings).
   const dealtTo = new Map<ObjectId, number>();
   for (const e of out) if ("object" in e.to && e.dealt > 0) dealtTo.set(e.to.object, (dealtTo.get(e.to.object) ?? 0) + e.dealt);

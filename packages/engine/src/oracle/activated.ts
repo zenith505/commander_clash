@@ -1,5 +1,5 @@
 import type { ActivatedAbility, AdditionalCost } from "../abilities";
-import { NUM, num, X, sacrificeSelf } from "./words";
+import { NUM, num, X, sacrificeSelf, counterKind } from "./words";
 import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
@@ -19,16 +19,18 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
   // Sacrificing other permanents or discarding cards as part of the cost (CR 602.2b, 601.2h).
   const extra: AdditionalCost[] = [];
   let removeCounters: ActivatedAbility["removeCounters"];
+  let putCounters: ActivatedAbility["putCounters"];
   for (const part of costs.split(", ")) {
     let c: RegExpExecArray | null;
-    if (/^Remove /.test(part)) {
+    if ((c = new RegExp(`^Put ${NUM} ([+-]1/[+-]1|[a-z]+) counters? on ~$`).exec(part))) putCounters = { counter: counterKind(c[2]!), n: num(c[1]!) };
+    else if (/^Remove /.test(part)) {
       const rc = removeCounterCost(part);
       if (!rc || !Number.isFinite(rc.n)) return "fail"; // "Remove X counters" isn't modeled
       removeCounters = rc;
@@ -116,6 +118,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(energy ? { energyCost: energy } : {}),
     ...(extra.length ? { costs: extra } : {}),
     ...(removeCounters ? { removeCounters } : {}),
+    ...(putCounters ? { putCounters } : {}),
   };
 }
 

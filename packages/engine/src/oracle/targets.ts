@@ -287,6 +287,12 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
     else extra.notKeywords = kws;
     p = p.slice(0, m.index);
   }
+  // "Target 1/1 creature" (Pendelhaven, The Seedcore): power and toughness exactly those.
+  if ((m = /^(\d+)\/(\d+) (?=creature\b)/.exec(p)) && !extra.power && !extra.toughness) {
+    extra.power = { min: Number(m[1]), max: Number(m[1]) };
+    extra.toughness = { min: Number(m[2]), max: Number(m[2]) };
+    p = p.slice(m[0].length);
+  }
   let controller: TargetSpec["controller"];
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";
@@ -363,7 +369,9 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   // per-alternative filters too (the fields of a filter must all match).
   if (colors.length && alts.length > 1 && alts.some((a) => !a.trim().split(/\s+/).some((w) => COLOR_WORDS[w]))) return null;
   // Supertypes are "and" requirements ("basic land"); with alternatives they'd need per-alternative filters.
-  if ((supertypes.length || notSupertypes.length) && alts.length > 1) return null;
+  // "Nonlegendary, nonland card" is one card that's neither: only "non" words, so every one is required.
+  const onlyNon = alts.every((a) => a.trim().split(/\s+/).every((w) => w.startsWith("non") || w === "permanent"));
+  if ((supertypes.length || (notSupertypes.length && !onlyNon)) && alts.length > 1) return null;
   // Subtypes mixed with card types in alternatives ("Wall or artifact") would need per-alternative filters too.
   if (subtypes.length && (types.length || notTypes.length) && alts.length > 1) return null;
   const filters = {

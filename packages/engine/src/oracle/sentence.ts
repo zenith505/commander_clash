@@ -1,5 +1,5 @@
 import type { Modification, Effect } from "../abilities";
-import { CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
+import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL } from "./words";
 import { Ctx } from "./body";
@@ -94,6 +94,11 @@ export function parseBecomes(text: string): Modification[] | null {
   const out: Modification[] = [];
   let m: RegExpExecArray | null;
   if ((m = /^(?:the color of your choice)$/i.exec(rest))) return null;
+  // The color or basic land type chosen as it resolves (see parseBody). A land's basic land type replaces its land
+  // types and the abilities from its rules text (CR 305.7): "becomes an Island" too.
+  if (/^the chosen color$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
+  if (/^the chosen basic land type$/i.test(rest)) return [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }];
+  if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];
   // The creature type chosen as it resolves (see parseBody): it replaces the other creature types (CR 205.1b), unless
   // "in addition to its other types".
   if ((m = /^the chosen creature type( in addition to its other types)?$/i.exec(rest)))

@@ -94,6 +94,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
   };
   const effects: Effect[] = [];
+  // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
+  text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   const sentences = splitSentences(text.trim())
     .map((x) => x.replace(/\.$/, "").trim())
     // "Draw two cards, then discard a card": two instructions, in order.
@@ -151,11 +153,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (choose) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
-      const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "")?.[0];
+      const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       if (!then) return null;
+      // "Exile that card until ~ leaves the battlefield" (Kitesail Freebooter, CR 610.3): only an ability of a permanent.
+      const until = typeof then !== "string" && !!then[1];
+      if (until && opts.spell) return null;
       const filter = parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`);
       if (filter === null) return null;
-      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: /discards/.test(then) ? "discard" : "exile" });
+      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}) });
       if (!choose[3]) si++;
       continue;
     }
@@ -323,6 +328,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "~ becomes the creature type of your choice until end of turn", "Creatures of the creature type of your choice
     // get +X/+X until end of turn": the type is chosen as it resolves (CR 608.2d). Not "target creatures of the
     // creature type of your choice", which would need the choice as the targets are chosen.
+    // "Target land becomes the basic land type of your choice until end of turn" (Reef Shaman), "~ becomes the color of
+    // your choice until end of turn" (Kavu Chameleon): chosen as it resolves too.
+    if (/\bbecomes? the basic land type of your choice\b/.test(s)) {
+      effects.push({ type: "choose", choice: "basicLandType" });
+      s = s.replace(/\b(becomes?) the basic land type of your choice\b/, "$1 the chosen basic land type");
+    }
+    if (/\bbecomes? the color of your choice\b/.test(s)) {
+      effects.push({ type: "choose", choice: "color" });
+      s = s.replace(/\b(becomes?) the color of your choice\b/, "$1 the chosen color");
+    }
     if (/\bbecomes? the creature type of your choice\b/.test(s) || (/\bof the creature type of your choice\b/.test(s) && !/\btarget\b/i.test(s))) {
       effects.push({ type: "choose", choice: "creatureType" });
       s = s.replace(/\b(becomes?) the creature type of your choice\b/, "$1 the chosen creature type").replace(/\bof the creature type of your choice\b/, "of the chosen type");

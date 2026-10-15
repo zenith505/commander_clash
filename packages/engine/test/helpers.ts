@@ -44,6 +44,7 @@ export function passUntil(s: GameState, step: Step, active?: PlayerId, max = 200
     const pend = s.pending;
     if (pend?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: pid, attacks: [] });
     else if (pend?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: pid, blocks: [] });
+    else if (pend?.kind === "pickPermanents" && pend.action === "keepTapped") s = act(s, { type: "pickPermanents", player: pid, ids: [] });
     else if (pend?.kind === "discardToHandSize")
       s = act(s, { type: "discard", player: pid, objectIds: s.players[pid]!.hand.slice(0, pend.count) });
     else s = act(s, { type: "passPriority", player: pid });

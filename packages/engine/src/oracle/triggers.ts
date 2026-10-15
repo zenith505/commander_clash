@@ -656,6 +656,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifKicked = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}) };
         body0 = kicked[2]!;
       }
+      // "When ~ enters, if it was bargained, ..." (CR 702.166b).
+      let ifBargained = false;
+      const bargained = /^if it was bargained, (.+)$/i.exec(body0);
+      if (bargained) {
+        if (event !== "selfEnters") return "fail" as const;
+        ifBargained = true;
+        body0 = bargained[1]!;
+      }
       // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a).
       let ifSneaked = false;
       const sneaked = /^if (?:its|his|her|their) sneak cost was paid, (.+)$/i.exec(body0);
@@ -681,7 +689,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(ifBargained ? { ifBargained } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
         : ("fail" as const);
     }
   }

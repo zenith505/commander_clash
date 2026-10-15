@@ -43,6 +43,7 @@ export interface ResolveCtx {
   sacrificed?: LastKnown[];
   /** A station ability's tapped creature (CR 702.184a). */
   stationed?: StackItem["stationed"];
+  sourceUntaps?: number;
   /** The creature type or color chosen as it resolves, or else as its source entered. */
   chosen?: Chosen;
 }
@@ -104,6 +105,7 @@ export function continueResolution(s: GameState): Resolution {
     colorsSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.colorsSpent?.length ?? 0) : item.colorsSpent,
     sacrificed: item.sacrificed,
     stationed: item.stationed,
+    sourceUntaps: item.sourceUntaps,
   };
   Object.defineProperty(ctx, "chosen", { get: () => r.chosen ?? sourceChosen(s, ctx), enumerable: true });
   while (r.next < r.body.effects.length) {

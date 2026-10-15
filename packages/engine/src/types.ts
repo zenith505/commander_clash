@@ -166,6 +166,8 @@ export interface GameObject {
    * applying when it changes.
    */
   zoneChanges?: number;
+  /** How many times it has untapped as this object: "for as long as ~ remains tapped" ends at the next (CR 611.2b). */
+  untaps?: number;
   /** As a spell, and as the permanent it became: the kicker costs paid for it, by index (CR 702.33d). */
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
@@ -190,6 +192,8 @@ export interface GameObject {
   castAlt?: AltCostKind;
   /** A spell cast for its sneak cost: whom the creature returned to pay it was attacking (CR 702.190b). */
   sneak?: LastKnown;
+  /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
+  bargained?: true;
   /**
    * Face down (CR 708): a 2/2 creature with no name, text, subtypes or mana cost (with ward {2} for
    * disguise). Only its controller may look at it (CR 708.5).
@@ -335,6 +339,8 @@ export interface StackItem {
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
+  /** Its source's untap count as it was activated: if the source untaps before it resolves, "for as long as ~ remains tapped" never starts (rulings). */
+  sourceUntaps?: number;
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
@@ -448,6 +454,8 @@ export interface CostChoices {
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
   casualty?: ObjectId;
+  /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
+  bargain?: ObjectId;
   /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
   assist?: PlayerId;
   /** How much of that generic mana they pay, from their mana pool: set by the game once they've chosen. */
@@ -470,8 +478,13 @@ export interface ContinuousEffect {
    * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
    * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m).
    */
-  duration: "endOfTurn" | "game" | "yourNextTurn";
+  duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped";
   turnOf?: PlayerId;
+  /**
+   * "For as long as ~ remains tapped" (CR 611.2b): it ends when that object (`zc` as it was) untaps, leaves the
+   * battlefield or phases out (CR 702.26f); `controller`: "for as long as you control ~" too.
+   */
+  whileTapped?: { id: ObjectId; zc: number; untaps: number; controller?: PlayerId };
   affected: ObjectId[];
   mods: Modification[];
 }

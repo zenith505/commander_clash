@@ -85,6 +85,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9588a7fd-bbe5-4a81-9a7e-d8e8f6c0537d",
+  "name": "Candy Grapple",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)\nTarget creature gets -3/-3 until end of turn. If this spell was bargained, that creature gets -5/-5 until end of turn instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Bargain"
+  ],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5e15ff93-99a0-4000-918e-4bd2c257188d",
   "name": "Combat Celebrant",
   "manaCost": "{2}{R}",
@@ -297,6 +325,32 @@
   "set": "ltr",
   "releasedAt": "2023-06-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "755dbf29-7484-444f-b5df-29ec4b4bbc82",
+  "name": "Elven Rite",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Distribute two +1/+1 counters among one or two target creatures.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sth",
+  "releasedAt": "1998-03-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -822,6 +876,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "1b524149-340e-4f94-9520-6a5258fabb00",
+  "name": "Monk's Fist",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Job select (When this Equipment enters, create a 1/1 colorless Hero creature token, then attach this to it.)\nEquipped creature gets +1/+0 and is a Monk in addition to its other types.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Job select",
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a3fb7228-e76b-4e96-a40e-20b5fed75685",
   "name": "Mountain",
   "manaCost": "",
@@ -881,6 +962,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a3a98bc9-caa0-49b7-951c-fe4e4f54e4ba",
+  "name": "Ornithopter",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Artifact Creature — Thopter",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Thopter"
+  ],
+  "oracleText": "Flying",
+  "power": "0",
+  "toughness": "2",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
   "name": "Plains",
   "manaCost": "",
@@ -907,6 +1017,34 @@
   "commanderLegal": "legal",
   "set": "trk",
   "releasedAt": "2026-11-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "074e467e-f574-4b44-b5a3-798b592a5a87",
+  "name": "Rain of Rust",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Destroy target artifact.\n• Destroy target land.\nEntwine {3}{R} (Choose both if you pay the entwine cost.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Entwine"
+  ],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -1054,6 +1192,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f07f98bb-4190-4643-aeb9-c5eaf358c97c",
+  "name": "Tawnos's Weaponry",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may choose not to untap this artifact during your untap step.\n{2}, {T}: Target creature gets +1/+1 for as long as this artifact remains tapped.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "atq",
+  "releasedAt": "1994-03-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d2e647ac-717f-46e6-baa8-6a793e7bdc32",
   "name": "Telepathy",
   "manaCost": "{U}",
@@ -1135,6 +1295,66 @@
   "commanderLegal": "legal",
   "set": "dft",
   "releasedAt": "2025-02-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3765e8bb-e70d-4503-b8dc-1e684e434c18",
+  "name": "Verdurous Gearhulk",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Construct"
+  ],
+  "oracleText": "Trample\nWhen this creature enters, distribute four +1/+1 counters among any number of target creatures you control.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "05d24b0c-904a-46b6-b42a-96a4d91a0dd4",
+  "name": "Wastes",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Basic Land",
+  "supertypes": [
+   "Basic"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "ogw",
+  "releasedAt": "2016-01-22",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

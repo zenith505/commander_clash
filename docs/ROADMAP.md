@@ -1,6 +1,6 @@
 # Roadmap
 
-15,770 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,850 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,9 +15,24 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): "You may choose
-   not to untap ~ during your untap step" (44 cards), Bargain (20), Job select (19), Teamwork, Cipher, Hideaway,
-   Entwine, Gift, Conspire, Tribute, Haunt, Read ahead.
+1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Teamwork, Cipher,
+   Hideaway, Gift, Conspire, Tribute, Haunt, Read ahead.
+   Left from the untap/entwine/distribute/job select/bargain round:
+   - "For as long as ~ remains tapped" (23 of 45 supported): storage lands' "remove any number of storage counters"
+     (Bottomless Vault, Dwarven Hold, Sand Silos and others), dynamic target filters (Vedalken Shackles' "power less
+     than or equal to the number of Islands", Old Man of the Sea, Entrancing Lyre's X, Seasinger), "a creature of an
+     opponent's choice" (Preacher), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
+     attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "becomes untapped"
+     triggers (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
+     Whisperer and The Blackstaff of Waterdeep's animation.
+   - Entwine with a non-mana cost (Betrayal of Flesh, Solar Tide); the other unsupported entwine cards fail on a mode.
+   - Job select (11 of 19): granted quoted abilities that don't compile (Ninja's Blades, Blue Mage's Cane, Summoner's
+     Grimoire, Astrologian's Planisphere, Dancer's Chakrams' "other commanders you control"), "for each artifact you
+     control" (Machinist's Arsenal), "Equip—Pay 3 life" (Dark Knight's Greatsword), Reaper's Scythe's soul counters.
+   - Bargain (10 of 20): targets only in the bargained part (Brave the Wilds, Diminisher Witch, CR 702.166d), "twice
+     X" and "instead it deals 3 ... and you scry" (Stonesplitter Bolt, Torch the Tower), "look at the top eight
+     instead" (Farsight Ritual), Beseech the Mirror's free cast, Back for Seconds, Rowan's Grim Search, Thunderous
+     Debut, Realm-Scorcher Hellkite's mana.
    Left from the Spree/Saddle/Station/Curse round:
    - Curses (14 of 47 supported): "whenever a player attacks enchanted player with one or more creatures" (Chaos,
      Inertia, Shallow Graves), "Curses attached to that player" counts (Thirst, Surveillance, Misfortunes), damage to
@@ -68,8 +83,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Known gaps (from earlier rounds)
 
 - Layer 3 (text-changing effects).
-- "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing counters
-  ("distribute three +1/+1 counters among one, two, or three target creatures"), divided prevention (Remedy), on a
+- "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing X counters
+  and "then" riders (Biogenic Upgrade), divided prevention (Remedy), on a
   planeswalker (Chandra, Flameshaper); "up to X target" (Rats' Feast, Martyr of Bones' "up to X target cards from a
   single graveyard").
 - "Costs {1} less for each target", reductions of colored mana, "the first face-down / kicked spell you cast each

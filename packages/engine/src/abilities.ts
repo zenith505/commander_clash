@@ -23,7 +23,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -160,7 +160,7 @@ export interface TargetSpec {
    * "N damage divided as you choose among one, two, or three targets": this is one of the targets `first` to
    * `first + n - 1`, which share `total` as their controller chose with the targets, at least 1 each (CR 601.2d).
    */
-  divided?: { first: number; n: number; total: number };
+  divided?: { first: number; n: number; total: number; /** Counters distributed, not damage divided. */ counter?: CounterKind; /** "Among up to two target creatures": none at all is fine too. */ upTo?: true };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
   /**
@@ -620,7 +620,8 @@ export type Effect =
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1" }
+  /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
   | { type: "sacrifice"; what: ObjRef; byController?: true }
@@ -701,8 +702,11 @@ export type Effect =
   | { type: "ripple"; n: number; of?: "cause" }
   /** Evolve's effect (CR 702.100a): a +1/+1 counter on the source if the entering creature (the subject) is still bigger. */
   | { type: "evolve" }
-  /** `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). */
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn"; notSource?: boolean }
+  /**
+   * `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). "whileTapped": "for as long as ~
+   * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped".
+   */
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped"; notSource?: boolean; whileControlled?: true }
   | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
   | { type: "transformSelf" }
@@ -896,6 +900,8 @@ export type SpellCondition =
   | { kind: "wonClash" }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
+  /** "If ~ was bargained" (CR 702.166b). */
+  | { kind: "bargained" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition };
 
@@ -913,7 +919,8 @@ export interface AbilityBody {
    * has no targets or effects of its own; see `withModes` in modes.ts. `costs`: spree's additional cost for each
    * mode (CR 702.172a), paid for the chosen ones.
    */
-  modal?: { min: number; max: number; modes: AbilityBody[]; costs?: string[] };
+  /** `entwine`: all modes may be chosen for this additional cost (CR 702.42a). */
+  modal?: { min: number; max: number; modes: AbilityBody[]; costs?: string[]; entwine?: string };
 }
 
 export type TriggerEvent =
@@ -1121,6 +1128,8 @@ export interface TriggeredAbility {
   ifX?: number;
   /** Casualty's "if a casualty cost was paid for it" (CR 702.153a). */
   ifCasualty?: boolean;
+  /** "When ~ enters, if it was bargained, ..." (CR 702.166b). */
+  ifBargained?: boolean;
   /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
   ifEcho?: boolean;
   /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
@@ -1532,6 +1541,8 @@ export interface CompiledCard {
   discardedToBattlefield?: boolean;
   /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
   skipDrawStep?: boolean;
+  /** "You may choose not to untap ~ during your untap step." (CR 502.3): its controller decides as the step untaps. */
+  mayNotUntap?: boolean;
   /**
    * "You may cast spells as though they had flash", "... sorcery spells ...", "... creature spells ..." (CR 702.8a): its
    * controller may cast spells like these any time they could cast an instant.
@@ -1619,6 +1630,10 @@ export interface CompiledCard {
   dredge?: number;
   /** Casualty N (CR 702.153a): you may sacrifice a creature with power N or greater as you cast it, to copy it. */
   casualty?: number;
+  /** Bargain (CR 702.166a): you may sacrifice an artifact, enchantment, or token as you cast it. */
+  bargain?: true;
+  /** "~ costs {2} less to cast if it's bargained." */
+  bargainReduction?: number;
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
   /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */

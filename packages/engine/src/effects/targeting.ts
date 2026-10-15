@@ -270,7 +270,7 @@ export function divisionProblem(specs: TargetSpec[], t: TargetChoice[]): string 
     if (i === d.first) {
       let sum = 0;
       for (let k = d.first; k < d.first + d.n; k++) sum += part(t[k]) ?? 0;
-      if (sum !== d.total) return `divide ${d.total} among the targets`;
+      if (sum !== d.total && !(d.upTo && sum === 0)) return d.counter ? `distribute the ${d.total} counters among the targets` : `divide ${d.total} among the targets`;
     }
   }
   return null;

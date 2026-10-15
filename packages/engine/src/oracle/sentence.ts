@@ -4,7 +4,7 @@ import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL } from "./words";
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
-import { parseKeywordList } from "./targets";
+import { parseKeywordList, parseObject } from "./targets";
 import { parseGrants } from "./grants";
 import { parseBasicsSentence } from "./sentences/basics";
 import { parseZonesSentence } from "./sentences/zones";
@@ -47,6 +47,8 @@ const SENTENCE_PARSERS = [parseCopiesSentence, parseBasicsSentence, parseZonesSe
 /** One sentence of an ability's text to effects, or null if it can't be compiled. */
 export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
+  if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;
@@ -143,4 +145,31 @@ export function parseBecomes(text: string): Modification[] | null {
   if (colors.length || /colorless/i.test(rest)) out.push({ kind: "setColors", colors });
   if (pt) out.push({ kind: "setPT", power: pt[0], toughness: pt[1] });
   return out.length ? out : null;
+}
+
+/**
+ * "Target creature gets +1/+1 for as long as ~ remains tapped", "gain control of target creature for as long as you
+ * control ~ and ~ remains tapped", "it doesn't untap during its controller's untap step for as long as ~ remains
+ * tapped" (CR 611.2b): one continuous effect lasting while its source stays tapped. Only a permanent's ability.
+ */
+function parseWhileTapped(inner: string, controlled: boolean, ctx: Ctx): Effect[] | null {
+  if (ctx.spell) return null;
+  inner = inner.charAt(0).toUpperCase() + inner.slice(1);
+  const lasting = (fx: Effect[] | null): Effect[] | null => {
+    const e = fx?.length === 1 ? fx[0]! : undefined;
+    return e?.type === "continuous" ? [{ ...e, duration: "whileTapped", ...(controlled ? { whileControlled: true as const } : {}) }] : null;
+  };
+  const m = /^(.+?) (?:doesn't|don't) untap during (?:its|their) controllers?'s? untap steps?$/i.exec(inner);
+  if (m) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? lasting([{ type: "continuous", what, mods: [{ kind: "doesntUntap" }], duration: "game" }]) : null;
+  }
+  if (/^Gain control of /i.test(inner)) {
+    const fx = parseSentence(inner, ctx);
+    return fx?.[0]?.type === "continuous" && fx[0].duration === "game" ? lasting(fx) : null;
+  }
+  if (!/ (?:gets?|has|have|loses?) /.test(inner)) return null;
+  // "Gets +2/+2 and has trample" for as long as it lasts is "gains trample" from when it starts.
+  const fx = parseSentence(`${inner.replace(/ (has|have) /, (_, w: string) => (w === "has" ? " gains " : " gain "))} until end of turn`, ctx);
+  return fx?.[0]?.type === "continuous" && fx[0].duration === "endOfTurn" ? lasting(fx) : null;
 }

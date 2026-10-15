@@ -65,6 +65,7 @@ import {
   autoConvoke,
   autoCrew,
   casualtyCandidates,
+  bargainCandidates,
   dredgeOptions,
   madnessCastOf,
   planSuspend,
@@ -254,6 +255,8 @@ type CastDraft = {
   delve?: string[];
   /** The creature sacrificed for casualty, or none (CR 702.153a). */
   casualty?: string[];
+  /** The artifact, enchantment, or token sacrificed for bargain, or none (CR 702.166a). */
+  bargain?: string[];
   /** Assist (CR 702.132a): the player asked to help pay its generic mana. */
   assist?: PlayerId;
   /** Cards revealed from your hand for a cost ("reveal a Pirate card from your hand"). */
@@ -276,7 +279,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "tap" | "reveal";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal";
   label: string;
   what: string;
   n: number;
@@ -560,9 +563,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (candidates.length)
         return setCostPick({ draft: d, kind: "casualty", label: card.name, what: `casualty ${compiled.casualty}: you may sacrifice a creature with power ${compiled.casualty} or greater to copy it`, n: 1, candidates, chosen: [] });
     }
+    // Bargain: you may sacrifice an artifact, enchantment, or token as you cast it (CR 702.166a).
+    if (d.bargain === undefined && compiled.bargain) {
+      const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.sacrifice?.includes(id) && !d.casualty?.includes(id));
+      if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
+    }
     const choices = {
       ...kicks,
       ...(d.casualty?.length ? { casualty: d.casualty[0]! } : {}),
+      ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -862,7 +871,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {dividing && (
             <div className="targeting">
               <span>
-                <strong>{dividing.targeting.label}</strong>: divide the damage
+                <strong>{dividing.targeting.label}</strong>: {dividing.targeting.specs.find((x) => x.divided)?.divided?.counter ? `distribute the ${dividing.targeting.specs.find((x) => x.divided)!.divided!.counter} counters` : "divide the damage"}
               </span>
               {dividing.chosen.map((c, i) => {
                 if ((c.kind !== "object" && c.kind !== "player") || c.amount === undefined) return null;
@@ -903,7 +912,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               key={modePick ? `${modePick.mode}:${modePick.objectId}` : `trigger:${pending?.kind === "chooseModes" ? pending.description : ""}`}
               {...(pending?.kind === "chooseModes"
                 ? { label: pending.description.split(":")[0]!, min: pending.min, max: pending.max, modes: pending.modes, legal: pending.legal }
-                : { label: modePick!.label, min: modePick!.body.modal!.min, max: modePick!.body.modal!.max, modes: modePick!.body.modal!.modes.map((m, i) => (modePick!.body.modal!.costs ? `+ ${modePick!.body.modal!.costs[i]} — ${m.text}` : m.text)), legal: legalModes(s, modePick!.body, HUMAN) })}
+                : { label: modePick!.label, min: modePick!.body.modal!.min, max: modePick!.body.modal!.max, modes: modePick!.body.modal!.modes.map((m, i) => (modePick!.body.modal!.costs ? `+ ${modePick!.body.modal!.costs[i]} — ${m.text}` : m.text)), legal: legalModes(s, modePick!.body, HUMAN), entwine: modePick!.body.modal!.entwine })}
               sourceName={(pending?.kind === "chooseModes" ? cardOf(s, pending.sourceId) : cardOf(s, modePick!.objectId)).name}
               onDone={pickModes}
               onCancel={pending?.kind === "chooseModes" ? undefined : () => setModePick(null)}
@@ -1052,11 +1061,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "tap") && (
+          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "tap") && (
             <CostPickBar
               pick={costPick}
               onDone={() => finishCostPick(costPick)}
-              onSkip={costPick.kind === "casualty" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
+              onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -1079,7 +1088,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && (
+          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -2371,6 +2380,7 @@ function ModeMenu({
   max,
   modes,
   legal,
+  entwine,
   onDone,
   onCancel,
 }: {
@@ -2380,6 +2390,8 @@ function ModeMenu({
   max: number;
   modes: string[];
   legal: boolean[];
+  /** Entwine's cost: all the modes, for that much more (CR 702.42a). */
+  entwine?: string;
   onDone: (modes: number[]) => void;
   onCancel?: () => void;
 }) {
@@ -2405,6 +2417,11 @@ function ModeMenu({
           {m.replace(/~/g, sourceName)}
         </button>
       ))}
+      {entwine && (
+        <button className="entwine" disabled={!legal.every(Boolean)} title={legal.every(Boolean) ? "" : "Every mode needs a legal target"} onClick={() => onDone(modes.map((_, i) => i))}>
+          Entwine <ManaCost cost={entwine} />: all of them
+        </button>
+      )}
       {!single && (
         <button disabled={!ok} onClick={() => onDone([...chosen].sort((a, b) => a - b))}>
           {chosen.length === 0 && min === 0 ? "Choose none" : "Done"}
@@ -2797,6 +2814,8 @@ function Controls({
               ? `reveal any number of cards in your hand that share a creature type with it (amplify): click them, then reveal.`
               : pending.action === "band"
                 ? `put attacking creatures in a band if you want: click creatures with banding and up to one without, all attacking the same player. Blocking one blocks them all, and you divide blockers' damage among them.`
+                : pending.action === "keepTapped"
+                ? `click the permanents you want to keep tapped (anything "for as long as it remains tapped" keeps going); the rest untap.`
                 : pending.action === "exert"
                 ? `exert attacking creatures if you want: click them. An exerted creature doesn't untap during your next untap step, and its "when you do" ability triggers.`
                 : pending.action === "enlist"
@@ -2808,7 +2827,7 @@ function Controls({
                 : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

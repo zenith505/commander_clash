@@ -1,6 +1,6 @@
 import type { DamageRecipient, Effect } from "../abilities";
 import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
-import { draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
+import { addPhases, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
@@ -27,6 +27,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         log(s, `${player(s, pid).name} will take ${e.n === 1 ? "an extra turn" : `${e.n} extra turns`} after this one.`);
       }
+      return;
+    case "addPhases":
+      addPhases(s, e.phases, e.after);
       return;
     case "loseGame":
       for (const pid of players(s, e.who, ctx)) playerLoses(s, pid, `${src}`);

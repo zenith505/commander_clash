@@ -130,6 +130,7 @@ export interface Characteristics {
   cantBeBlockedByGreaterPower: boolean;
   cantAttackAlone: boolean;
   cantBlockAlone: boolean;
+  cantAttackSamePlayer: boolean;
   mustBeBlocked: boolean;
   allMustBlock: boolean;
   mustBlock: boolean;
@@ -192,6 +193,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeBlockedByGreaterPower: false,
     cantAttackAlone: false,
     cantBlockAlone: false,
+    cantAttackSamePlayer: false,
     mustBeBlocked: false,
     allMustBlock: false,
     mustBlock: false,
@@ -364,6 +366,33 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
+    case "coven": {
+      const powers = new Set<number>();
+      for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) powers.add(c.power);
+      return powers.size >= 3;
+    }
+    case "opponentMore": {
+      const measure = (p: PlayerId) => {
+        if (cond.what === "life") return s.players[p]!.life;
+        if (cond.what === "hand") return s.players[p]!.hand.length;
+        let n = 0;
+        for (const c of chars.values()) if (c.controller === p && c.types.includes(cond.what === "lands" ? "Land" : "Creature")) n++;
+        return n;
+      };
+      const mine = measure(you);
+      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) > mine);
+    }
+    case "attackingMostLife": {
+      // Not when it attacks a planeswalker (dethrone rulings).
+      if (src.attacking === undefined || src.attackingPermanent) return false;
+      const lives = s.turnOrder.filter((p) => !s.players[p]!.lost).map((p) => s.players[p]!.life);
+      return s.players[src.attacking]!.life >= Math.max(...lives);
+    }
+    case "phase": {
+      const combat = ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
+      const now = cond.phase === "combat" ? combat : s.step === "main1" || s.step === "main2";
+      return now && (!cond.yours || s.activePlayer === you) && (!cond.first || s.combatsThisTurn === 1);
+    }
     case "castAnother": // checked before the spell counts itself (CR 601.2f, 601.2i)
       return (s.castThisTurn ?? []).some((c) => c.player === you);
     case "creatureDied":
@@ -410,6 +439,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "monstrous") return !!src.monstrous; // CR 701.37b
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
+      if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");
       if (cond.is === "enchanted") return attached.some(aura);
@@ -647,6 +677,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantBeBlockedByGreaterPower":
     case "cantAttackAlone":
     case "cantBlockAlone":
+    case "cantAttackSamePlayer":
     case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":

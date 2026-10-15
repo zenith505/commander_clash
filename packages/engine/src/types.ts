@@ -130,6 +130,12 @@ export interface GameObject {
    * spell it's cast as, for "if this spell was foretold".
    */
   foretold?: true;
+  /** The turn its "once each turn, you may cast ... from the top of your library" was used (Johann). */
+  topUsedTurn?: number;
+  /** The turn it was last exerted (CR 701.43), for "if ~ hasn't been exerted this turn". */
+  exertedTurn?: number;
+  /** How many times it has attacked in turn `turn` ("creatures that attacked this turn", Moraug), as this object (CR 400.7). */
+  attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[] };
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
   /**
@@ -594,6 +600,15 @@ export interface GameState {
   diedThisTurn?: PlayerId[];
   /** Creatures declared as attackers this turn ("for each creature that attacked this turn"). */
   attackersThisTurn?: number;
+  /** Combat phases begun this turn: "if it's the first combat phase of the turn" (CR 506.1, 500.8). */
+  combatsThisTurn?: number;
+  /**
+   * Phases added to this turn that come directly after the current phase, in order: the most recently created first
+   * (CR 500.8). An additional main phase is a postcombat main phase (CR 505.1a), so it's run as "main2".
+   */
+  addedPhases?: ("combat" | "main")[];
+  /** While added phases run: the step the turn's own order goes on with once they're done (CR 500.8). */
+  resumeStep?: Step;
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */

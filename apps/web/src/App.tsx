@@ -16,7 +16,7 @@ import {
   mayPlayFromExile,
   mayPlayLandFromGraveyard,
   mayPlayFromTop,
-  topRevealed,
+  topVisible,
   topPlayable,
   handRevealed,
   assistedRemaining,
@@ -352,7 +352,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     () => (s ? s.battlefield.filter((id) => opps.includes(controllerOf(s, s.objects[id]!)) && characteristics(s, s.objects[id]!).types.includes("Planeswalker")) : []),
     [s, opps],
   );
-  const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, controllerOf(s, s.objects[id]!));
+  const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, controllerOf(s, s.objects[id]!), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
   const picking = !!(xPick || kickPick || costPick || costOrPick || delvePick || dividing);
@@ -1702,9 +1702,10 @@ function Seat({
   const p = s.players[pid]!;
   const yardPlayable = pid === HUMAN && !s.pending && p.graveyard.some((id) => graveyardOptions(s, id));
   const exilePlayableHere = !s.pending && p.exile.some((id) => exileOptions(s, id));
-  // The top of a library is shown when it's revealed (CR 401.5), or to you when you may play it.
+  // The top of a library is shown when it's revealed (CR 401.5), to you when you may look at it any time (Vizier of
+  // the Menagerie), or when you may play it.
   const topCanPlay = pid === HUMAN && !s.pending && topPlayable(s, HUMAN).some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)));
-  const topShown = topRevealed(s, pid) || (pid === HUMAN && topPlayable(s, HUMAN).length > 0);
+  const topShown = topVisible(s, pid, HUMAN) || (pid === HUMAN && topPlayable(s, HUMAN).length > 0);
   // Auras and Equipment sit with whatever they're attached to, even in another player's area.
   const onField = new Set(s.battlefield);
   const mine = s.battlefield

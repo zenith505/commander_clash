@@ -17,6 +17,18 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // Additional phases (CR 500.8): "After this main phase, there is an additional combat phase followed by an additional
+  // main phase", "after this phase, there are two additional combat phases", and, after "If it's your main phase,",
+  // "there is an additional combat phase after this phase".
+  if (
+    (m = /^After this (main |combat )?phase, there(?: is|'s| are) (an|two) additional combat phases?(,? followed by an additional main phase)?$/i.exec(s)) ??
+    (m = /^There(?: is|'s| are) (an|two) additional combat phases? after this phase(,? followed by an additional main phase)?$/i.exec(s))
+  ) {
+    const [after, n, main] = m.length === 4 ? [m[1]?.trim(), m[2]!, m[3]] : [undefined, m[1]!, m[2]];
+    if (n.toLowerCase() === "two" && main) return null;
+    const phases: ("combat" | "main")[] = n.toLowerCase() === "two" ? ["combat", "combat"] : main ? ["combat", "main"] : ["combat"];
+    return [{ type: "addPhases", phases, ...(after ? { after: after as "main" | "combat" } : {}) }];
+  }
   // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:
   // "Target player shuffles their graveyard into their library."
   if ((m = /^(?:(Target player|Each player|Target opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {

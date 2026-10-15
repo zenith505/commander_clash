@@ -172,6 +172,15 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
+  if (/^you control three or more creatures with different powers$/.test(text)) return { kind: "coven" };
+  if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
+    return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
+  if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
+  if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
+  if (/^(?:it's|~ is) attacking the player with the most life or tied for most life$/.test(text) && st.affects.kind === "self") return { kind: "attackingMostLife" };
+  // "If it's your main phase", "if it's the first combat phase of the turn" (CR 505.1, 506.1).
+  if ((m = /^it's your (main|combat) phase$/.exec(text))) return { kind: "phase", phase: m[1] as "main" | "combat", yours: true };
+  if ((m = /^it's the first combat phase of (the|your) turn$/.exec(text))) return { kind: "phase", phase: "combat", first: true, ...(m[1] === "your" ? { yours: true as const } : {}) };
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
@@ -355,6 +364,7 @@ function parseStaticMods(rest: string): Modification[] | null {
   // CR 506.5: alone means the only creature declared as an attacker (or blocker) that combat.
   if (/^can't attack or block alone$/.test(rest)) return [{ kind: "cantAttackAlone" }, { kind: "cantBlockAlone" }];
   if (/^can't attack alone$/.test(rest)) return [{ kind: "cantAttackAlone" }];
+  if (/^can't attack a player it has already attacked this turn$/.test(rest)) return [{ kind: "cantAttackSamePlayer" }];
   if (/^can't block alone$/.test(rest)) return [{ kind: "cantBlockAlone" }];
   if (/^must be blocked if able$/.test(rest)) return [{ kind: "mustBeBlocked" }];
   // "Can't attack unless defending player controls an Island" (Sea Serpent), "... a Swamp", "... a blue permanent".

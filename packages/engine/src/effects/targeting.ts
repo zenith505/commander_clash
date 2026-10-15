@@ -44,6 +44,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
+  if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
   if (spec.controller === "eventPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;

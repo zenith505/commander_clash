@@ -115,6 +115,8 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   s.activePlayer = first;
   s.priority = first;
   for (const p of s.players) draw(s, p.id, 7);
+  // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
+  for (const p of s.players) delete p.draws;
   log(s, `Game start. ${s.players[first]!.name} goes first.`);
   if (opts.mulligans) {
     s.mulligans = { taken: {}, kept: [], toDeclare: turnOrderFrom(s, first), going: [] };
@@ -177,6 +179,7 @@ function nextMulliganDecision(s: GameState) {
       p.hand = [];
       shuffle(s, p.library);
       draw(s, g, OPENING_HAND);
+      delete p.draws; // CR 103.5, as above
       m.taken[g] = (m.taken[g] ?? 0) + 1;
     }
     m.going = [];
@@ -1927,6 +1930,9 @@ export function castProblem(
     if (choices.alt === "sneak" && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
     // Only one alternative cost can be applied to a spell (CR 118.9a).
     if (via || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
+    // "If you control a Swamp, you may pay 4 life rather than pay ~'s mana cost": only while that's true (CR 601.2b).
+    const cond = altCost(d, choices.alt)?.if;
+    if (cond && !staticConditionNow(s, cond, id, pid)) return `${d.name}'s alternative cost can't be paid now`;
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
@@ -2151,7 +2157,7 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 }
 
 /** A card's own alternative cost of that kind; with `s` and the caster, Fist of Suns' {W}{U}{B}{R}{G} too (CR 118.9). */
-export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): { kind: AltCostKind; mana: string; costs?: AdditionalCost[] } | undefined {
+export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
   if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
@@ -2166,7 +2172,7 @@ const controlsPayWUBRG = (s: GameState, pid: PlayerId) =>
   });
 
 /** The alternative costs `pid` could cast this card for: its own, and Fist of Suns' (CR 118.9). */
-export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): { kind: AltCostKind; mana: string }[] {
+export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   return controlsPayWUBRG(s, pid) && !isType(defOf(s, o), "Land") ? [...own, { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" }] : own;
 }
@@ -2598,9 +2604,9 @@ const costOrMana = (d: CardDef, i?: number) => (i === undefined ? "" : (compileC
 function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string): string | null {
   const d = defOf(s, o);
   const p = player(s, pid);
-  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal") => choices?.[k];
-  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap", "reveal"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k}`;
+  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal" | "exileFromHand") => choices?.[k];
+  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap", "reveal", "exileFromHand"] as const)
+    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
   const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
   for (const c of costs) {
@@ -2615,7 +2621,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"
           ? returnCandidates(s, pid, c)
-          : c.kind === "discard" || c.kind === "reveal"
+          : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
@@ -2623,12 +2629,12 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
         ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
         : c.kind === "tap"
         ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
-        : c.kind === "discard" || c.kind === "reveal"
+        : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
           ? c.filter
             ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : "exile";
+    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? "exile from your hand" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -2709,7 +2715,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       discardCards(s, p.id, picked, " at random");
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
-    else {
+    else if (c.kind === "exileFromHand") {
+      const ids = choices.exileFromHand ?? [];
+      log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);
+      for (const id of ids) moveObject(s, id, "exile");
+    } else {
       const ids = choices.exileCards ?? [];
       if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);

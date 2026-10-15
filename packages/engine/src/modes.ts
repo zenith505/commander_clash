@@ -165,10 +165,11 @@ export function fitMany(body: AbilityBody, targets: TargetChoice[], x = 0): { bo
   if (spec.many === "exactX" && group.length !== x) return `choose X (${x}) targets for ${spec.text}`;
   // Divided as you choose (CR 601.2d): at least 1 each, so no more targets than the amount, and at least one if there's
   // anything to divide (none if it's 0, rulings on Rolling Thunder).
+  // "Divided among X target creatures" (Meteor Swarm): X of them, so X is no more than the amount.
   const d = spec.divided;
-  if (d?.amount && !spec.skip) {
+  if (d && (d.amount || spec.many === "exactX") && !spec.skip) {
     if (group.length > d.total) return `choose at most ${d.total} target(s) to divide ${d.total} among`;
-    if (d.total > 0 && !group.length) return `choose at least one target to divide ${d.total} among`;
+    if (d.total > 0 && !group.length && spec.many !== "exactX") return `choose at least one target to divide ${d.total} among`;
   }
   return { body: expandMany(body, group.length), targets: [...targets.slice(0, i), ...(group.length ? group : [{ kind: "none" as const }]), ...targets.slice(end)] };
 }

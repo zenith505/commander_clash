@@ -1,5 +1,5 @@
 import type { CopyExcept } from "../copies";
-import type { AbilityBody, Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, AltCostKind, EntersOption } from "../abilities";
+import type { AbilityBody, Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, CompiledCard, EntersOption } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { CardDef, FaceDownKind } from "../types";
@@ -7,6 +7,7 @@ import { NUM, num, keywordOf, plainMana, sacrificeSelf, pumpSelf, BASIC_TYPES, c
 import { parsePayCost } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseTargetPhrase } from "./targets";
+import { parseStaticCondition } from "./statics";
 
 /** "sacrifice a creature", "discard a card", "pay 3 life", "exile a creature card from your graveyard". */
 /**
@@ -73,7 +74,7 @@ export function parseCostKeyword(
   line: string,
   d: CardDef,
 ): {
-  alt?: { kind: AltCostKind; mana: string; costs?: AdditionalCost[] };
+  alt?: NonNullable<CompiledCard["altCosts"]>[number];
   trigger?: TriggeredAbility;
   activated?: ActivatedAbility;
   delve?: true;
@@ -90,10 +91,29 @@ export function parseCostKeyword(
   // "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (Bringers), "You may pay {1} and return a basic land you
   // control to its owner's hand rather than pay ~'s mana cost" (Borderposts): an alternative cost (CR 118.9). The returned
   // land may be one just tapped for mana (rulings: mana abilities come before costs are paid, CR 601.2g-h).
-  if ((m = /^You may pay ((?:\{[^}]+\})+)( and return a basic land you control to its owner's hand)? rather than pay ~'s mana cost\.?$/.exec(line)))
-    return plainMana(m[1]!)
-      ? { alt: { kind: "alternative", mana: m[1]!, ...(m[2] ? { costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Land"], supertypes: ["Basic"], controller: "you", text: "basic land you control" }, n: 1 }] } : {}) } }
-      : "fail";
+  // "You may sacrifice two Mountains rather than pay ~'s mana cost" (Fireblast), "You may pay 1 life and exile a blue card
+  // from your hand ..." (Force of Will), "If you control a Swamp, you may pay 4 life ..." (Snuff Out), "If four or more
+  // creatures are attacking, you may pay {1}{W} ..." (Arrow Volley Trap): only while that's true, as it's cast (CR 601.2b).
+  if ((m = /^(?:(?:Raid — )?If ([^,]+), )?[Yy]ou may (.+?) rather than pay ~'s mana cost(?: if ([^,]+?))?\.?$/.exec(line))) {
+    const when = m[1] ?? m[3];
+    const cond = when ? parseStaticCondition(when, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    if (cond === null) return "fail";
+    let mana = "";
+    const costs: AdditionalCost[] = [];
+    for (const part of m[2]!.split(" and ")) {
+      const pay = /^pay ((?:\{[^}]+\})+)$/.exec(part);
+      if (pay && !mana && !costs.length) {
+        if (!plainMana(pay[1]!)) return "fail";
+        mana = pay[1]!;
+        continue;
+      }
+      const c = parseAdditionalCost(part);
+      if (!c) return "fail";
+      costs.push(c);
+    }
+    const text = m[2]!.replace(/^pay (?:\{[^}]+\})+(?: and )?/, "");
+    return { alt: { kind: "alternative", mana, ...(costs.length ? { costs } : {}), ...(cond ? { if: cond } : {}), ...(text ? { text } : {}) } };
+  }
   // Bestow (CR 702.103a); "Bestow—{R}, Collect evidence 6" isn't modeled. (Cast bestowed, the card is an Aura: see bestowedDef.)
   if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
   // Madness (CR 702.35a): "Madness—{1}{B}, Pay 1 life" and X madness costs aren't modeled.
@@ -348,6 +368,21 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     if (filter === null || (filter && m[2])) return null;
     return { kind: "discard", n: 0, x: true, ...(filter ? { filter } : {}), ...(m[2] ? { random: true as const } : {}) };
   }
+  // "Discard a Mountain card" (Flameshot).
+  if ((m = new RegExp(`^discard ${NUM} (.+?) cards?$`, "i").exec(text))) {
+    const filter = parseSearchFilter(`${m[2]} card`);
+    return filter ? { kind: "discard", n: num(m[1]!), filter } : null;
+  }
+  // "Exile a blue card from your hand", "exile two red cards from your hand" (Force of Will, Fury of the Horde).
+  if ((m = new RegExp(`^exile ${NUM} (?:(.+?) )?cards? from your hand$`, "i").exec(text))) {
+    const filter = m[2] ? parseSearchFilter(`${m[2]} card`) : undefined;
+    return filter === null ? null : { kind: "exileFromHand", n: num(m[1]!), ...(filter ? { filter } : {}) };
+  }
+  // "Tap an untapped creature you control" (Lashknife), "tap four untapped creatures you control with flying" (Sephara).
+  if ((m = new RegExp(`^tap ${NUM} untapped (.+?) you control( with .+)?$`, "i").exec(text))) {
+    const filter = parseTargetPhrase(`${num(m[1]!) > 1 ? m[2]!.split(" ").map(singularWord).join(" ") : m[2]}${m[3] ?? ""}`);
+    return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}` }, n: num(m[1]!) } : null;
+  }
   if ((m = /^pay (\d+) life$/i.exec(text))) return { kind: "payLife", n: Number(m[1]) };
   if (allowX && /^pay X life$/i.test(text)) return { kind: "payLife", n: 0, x: true };
   // "Return X Swamps you control to their owner's hand" (Infernal Harvest).
@@ -355,6 +390,12 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const spec = parseTargetPhrase(m[1]!.split(" ").map(singularWord).join(" "));
     if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped !== undefined) return null;
     return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[1]} you control` }, n: 0, x: true };
+  }
+  // "Return two Islands you control to their owner's hand" (Gush).
+  if ((m = new RegExp(`^return ${NUM} (.+?) you control to their owner's hand$`, "i").exec(text)) && num(m[1]!) > 1) {
+    const spec = parseTargetPhrase(m[2]!.split(" ").map(singularWord).join(" "));
+    if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped !== undefined) return null;
+    return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[2]} you control` }, n: num(m[1]!) };
   }
   // "Return a land you control to its owner's hand" (Deprive).
   if ((m = /^return an? (.+?) you control to its owner's hand$/i.exec(text))) {

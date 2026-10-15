@@ -475,6 +475,8 @@ export interface CostChoices {
   tap?: ObjectId[];
   /** Cards in hand revealed for "reveal a Pirate card from your hand". */
   reveal?: ObjectId[];
+  /** Cards exiled from your hand for "exile a blue card from your hand" (Force of Will). */
+  exileFromHand?: ObjectId[];
   /** Which way to pay "sacrifice a creature or pay {3}{B}" (an index into CompiledCard.costOr, CR 601.2b). */
   costOr?: number;
   /** Permanents to return to their owner's hand: ninjutsu's unblocked attacker (CR 702.49a). */

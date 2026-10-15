@@ -223,7 +223,7 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
   const spec = body.targets[i]!;
   const room = spec.skip ? 0 : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => !(spec.notSource && t.kind === "object" && t.id === sourceId)).length;
   // Divided as you choose: no more targets than there is to divide (at least 1 each, CR 601.2d).
-  const most = spec.divided?.amount ? Math.min(room, spec.divided.total) : room;
+  const most = spec.divided?.amount || (spec.divided && spec.many === "exactX") ? Math.min(room, spec.divided.total) : room;
   // "X target creatures": exactly X, each one required (as many as there are, if fewer: it can't be cast so).
   if (spec.many === "exactX") return expandMany(body, Math.min(x, most));
   return expandMany(body, spec.many === "x" ? Math.min(x, most) : most, true);

@@ -277,7 +277,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const added = effects.slice(before);
       const dividedOnly = added.length === 1 && added[0]!.type === "damage" && !!added[0]!.divided && ctx.targets.slice(targetsBefore).some((t) => t.divided?.amount);
       if (asCast && !dividedOnly) return false;
-      const def = parseCount(asCast ? where[2]!.slice(0, asCast.index) : where[2]!, ctx);
+      // "~ deals X damage ..., where X is the number of age counters on it" (Magmatic Core): "it" is ~.
+      const what = /^~ /.test(s) ? where[2]!.replace(/ counters on it$/, " counters on ~") : where[2]!;
+      const def = parseCount(asCast ? what.slice(0, asCast.index) : what, ctx);
       if (!def) return false;
       effects.splice(before, effects.length - before, ...replaceX(added, def));
       for (let k = targetsBefore; k < ctx.targets.length; k++) {

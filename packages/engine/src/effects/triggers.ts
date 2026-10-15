@@ -74,8 +74,8 @@ export type TriggerSourceEvent =
   | { type: "tapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number }
-  /** A permanent became monstrous (CR 701.37b). */
-  | { type: "becameMonstrous"; id: ObjectId }
+  /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
+  | { type: "becameMonstrous"; id: ObjectId; x: number }
   /** An attacker was exerted as it attacked (CR 701.43d). */
   | { type: "exerted"; id: ObjectId; /** By its "you may exert ~ as it attacks" (its "when you do" is linked to that, CR 607.2h). */ attacking?: true }
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
@@ -483,7 +483,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
-    add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous");
+    add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");

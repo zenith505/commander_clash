@@ -224,25 +224,33 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "fight":
     case "bite": {
       // CR 701.14b: if either creature is gone, isn't a creature, or is an illegal target, no damage is dealt.
-      const a = objects(s, e.a, ctx)[0];
+      // "Each of those creatures deals damage equal to its power to ~": each target still legal and still a creature.
+      const as = objects(s, e.a, ctx).filter((a) => objIsType(s, a, "Creature"));
+      const a = as[0];
       // "Deals damage equal to its power to each of two other target creatures": each one still a legal target, a
       // planeswalker too where it could be targeted (Bite Down). Only fighting needs both to be creatures (CR 701.14b).
       const bs = e.type === "bite" ? objects(s, e.b, ctx).filter((b) => ["Creature", "Planeswalker", "Battle"].some((t) => objIsType(s, b, t))) : objects(s, e.b, ctx).slice(0, 1).filter((b) => objIsType(s, b, "Creature"));
-      if (!a || !bs.length || !objIsType(s, a, "Creature")) {
+      if (!a || !bs.length) {
         log(s, `${src}: no damage is dealt.`);
         return;
       }
-      // Noncombat damage from the creatures themselves: their own deathtouch, lifelink, infect apply.
-      const pa = power(s, a);
-      const pbs = bs.map((b) => power(s, b));
+      if (e.type === "bite") {
+        // Noncombat damage from the creatures themselves, all dealt at once: their own deathtouch, lifelink, infect
+        // apply. Their power as it resolves (rulings on Living Inferno).
+        const events: DamageEvent[] = as.flatMap((x) => bs.map((b): DamageEvent => ({ src: objectSource(s, x), to: { object: b.id }, n: power(s, x) })));
+        const by = new Map<string, number>();
+        for (const d of dealDamageBatch(s, events)) if (d.dealt && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
+        for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
+        return;
+      }
       // Fighting: each creature deals damage at the same time, so each is one event per source.
-      const fromA = objectSource(s, a);
-      const fromB = e.type === "fight" ? objectSource(s, bs[0]!) : undefined;
-      let byA = 0;
-      for (const b of bs) byA += dealDamage(s, fromA, { object: b }, pa);
-      const byB = fromB ? dealDamage(s, fromB, { object: a }, pbs[0]!) : 0; // a creature fighting itself takes twice its power (CR 701.14c)
+      const b = bs[0]!;
+      const pa = power(s, a);
+      const pb = power(s, b);
+      const byA = dealDamage(s, objectSource(s, a), { object: b }, pa);
+      const byB = dealDamage(s, objectSource(s, b), { object: a }, pb); // a creature fighting itself takes twice its power (CR 701.14c)
       if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
-      if (byB) fireEvent(s, { type: "dealtDamage", id: bs[0]!.id, amount: byB, combat: false });
+      if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false });
       return;
     }
   }

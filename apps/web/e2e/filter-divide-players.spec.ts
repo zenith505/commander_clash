@@ -64,3 +64,30 @@ test("Stonespeaker Crystal: pick two players, Done, and only their graveyards ar
   expect([bears, giant, elves].map((id) => after.objects[id]!.zone)).toEqual(["exile", "graveyard", "exile"]);
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Meteor Swarm: choose X, exactly X targets, then divide 8 between them", async ({ page }) => {
+  const s = scene({ hand: ["Meteor Swarm"], board: LANDS }, [{ board: ["Grizzly Bears", "Hill Giant"] }]);
+  const [bears, giant] = [one(s, "Grizzly Bears"), one(s, "Hill Giant")];
+  await open(page, s);
+  await card(page, "Meteor Swarm", s).click();
+  const x = page.locator(".x-pick");
+  await x.getByLabel("X", { exact: true }).fill("2");
+  await x.getByRole("button", { name: "X = 2" }).click();
+  const bar = page.locator(".targeting");
+  await page.locator(`[data-obj="${bears}"]`).click();
+  // Exactly X targets: no Done with one picked.
+  await expect(bar.getByRole("button", { name: "Done" })).toHaveCount(0);
+  await page.locator(`[data-obj="${giant}"]`).click();
+  const panel = page.locator(".targeting", { hasText: "divide the damage" });
+  const bearsRow = panel.locator(".divide", { hasText: "Grizzly Bears" });
+  await expect(bearsRow.locator("strong")).toHaveText("4");
+  const giantRow = panel.locator(".divide", { hasText: "Hill Giant" });
+  for (let i = 0; i < 2; i++) await bearsRow.getByRole("button", { name: "−" }).click();
+  // All 8 must be divided.
+  await expect(panel.getByRole("button", { name: "divide 8 among the targets" })).toBeDisabled();
+  for (let i = 0; i < 2; i++) await giantRow.getByRole("button", { name: "+" }).click();
+  await panel.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[one(s, "Meteor Swarm")]!.zone === "graveyard");
+  expect([bears, giant].map((id) => after.objects[id]!.zone)).toEqual(["graveyard", "graveyard"]);
+  expect(pageErrors(page)).toEqual([]);
+});

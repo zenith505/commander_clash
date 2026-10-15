@@ -177,6 +177,20 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
+  // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"
+  // (the traps): attacking creatures, anyone's.
+  if ((m = new RegExp(`^(?:${NUM} or more|(exactly one)|an?) (.+?) (?:is|are) attacking$`).exec(text))) {
+    const spec = parseTargetPhrase(`attacking ${m[3]!.replace(/\bcreatures\b/, "creature")}`);
+    if (spec?.kind !== "object" || spec.controller) return null;
+    const n = m[2] ? 1 : m[1] ? num(m[1]) : 1;
+    return { kind: "onBattlefield", filter: { ...spec, text: `attacking ${m[3]}` }, min: n, ...(m[2] ? { max: 1 } : {}) };
+  }
+  // "If there are thirteen or more creatures on the battlefield" (Blasphemous Edict).
+  if ((m = new RegExp(`^there are ${NUM} or more (.+) on the battlefield$`).exec(text))) {
+    const g = parseGroup(`all ${m[2]}`);
+    return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!) } : null;
+  }
   if ((m = new RegExp(`^you have ${NUM} or more cards in hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
   if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
@@ -206,6 +220,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
+  if ((m = new RegExp(`^an opponent drew ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!), opponent: true };
   if (/^you descended this turn$/.test(text)) return { kind: "descended" };
   if (/^a permanent left the battlefield under your control this turn$/.test(text)) return { kind: "revolt" };
   if (/^a nonland permanent left the battlefield this turn or a spell was warped this turn$/.test(text)) return { kind: "void" };

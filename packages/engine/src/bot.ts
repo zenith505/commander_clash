@@ -226,8 +226,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const cost = parseManaCost(d.manaCost);
       const x = cost.hasX ? Math.max(0, availableMana(s, pid) - manaValue(cost)) : undefined;
       if (!body || !worthIt(body, id, x)) continue;
-      const plan = planCast(s, pid, id, chooseTargets(s, pid, body, false, id, x) ?? undefined, undefined, "auto", x);
+      const targets = chooseTargets(s, pid, body, false, id, x) ?? undefined;
+      const plan = planCast(s, pid, id, targets, undefined, "auto", x);
       if (plan && plan[plan.length - 1]!.type === "castSpell" && (plan[plan.length - 1] as { targets?: unknown }).targets) return plan;
+      // Its alternative cost when the mana isn't there: Force of Will's blue card, Daze's Island (CR 118.9).
+      if (targets && altCost(d, "alternative") && !cost.hasX) {
+        const extra = chooseExtraCosts(s, pid, id, targets, undefined, "alternative");
+        const alt = extra && planCast(s, pid, id, targets, undefined, "auto", undefined, { ...extra, alt: "alternative" });
+        if (alt && alt[alt.length - 1]!.type === "castSpell") return alt;
+      }
     }
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -1019,8 +1026,21 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
         .sort((a, b) => Number(b.tapped) - Number(a.tapped));
       if (pool.length < c.n || lands(s, pid) < 4) return null;
       out.returnToHand = pool.slice(0, c.n).map((o) => o.id);
-    } else if (c.kind === "tap") return null; // no spell asks for that
-    else if (c.kind === "reveal") {
+    } else if (c.kind === "tap") {
+      // "Tap an untapped creature you control" (Lashknife): the least valuable ones, not something it targets.
+      const pool = tapCostCandidates(s, pid, obj(s, id), c)
+        .map((x) => obj(s, x))
+        .filter((o) => !targeted.has(o.id) && o.attacking === undefined)
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+      if (pool.length < c.n) return null;
+      out.tap = pool.slice(0, c.n).map((o) => o.id);
+    } else if (c.kind === "exileFromHand") {
+      // Pitching cards (Force of Will): the cheapest that fit, and only with another card left in hand after.
+      const others = player(s, pid).hand.filter((x) => x !== id);
+      const fits = others.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))).sort((a, b) => mv(s, a) - mv(s, b));
+      if (fits.length < c.n || others.length < c.n + 1) return null;
+      out.exileFromHand = fits.slice(0, c.n);
+    } else if (c.kind === "reveal") {
       const fits = player(s, pid).hand.filter((x) => x !== id && printedMatches(c.filter, defOf(s, obj(s, x))));
       if (fits.length < c.n) return null;
       out.reveal = fits.slice(0, c.n);

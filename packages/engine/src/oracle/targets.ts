@@ -29,6 +29,14 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
       addTarget(ctx, { kind: "any", text: "any target", ...(k >= required ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
     return { ref: "anyTarget", index: first, n };
   }
+  // "Each of X targets" (Firestorm, Meteor Blast): exactly the spell's X targets, all different (CR 115.3, 601.2c).
+  if (/^each of X targets$/i.test(p)) {
+    if (!ctx.spell || ctx.targets.some((t) => t.many)) return null;
+    const index = addTarget(ctx, { kind: "any", text: "any target", many: "exactX" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index, n: 2 };
+    return { ref: "anyTarget", index, n: 2 };
+  }
   const player = parsePlayer(p, ctx);
   if (player) return player;
   return parseObject(p, ctx);

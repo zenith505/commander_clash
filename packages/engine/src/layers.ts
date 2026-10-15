@@ -344,7 +344,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return n >= cond.min && (cond.max === undefined || n <= cond.max);
     }
     case "yourTurn":
-      return s.activePlayer === you;
+      return (s.activePlayer === you) !== !!cond.not;
     case "anyOf":
       return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount));
     case "beforeAttackers":
@@ -412,7 +412,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "onBattlefield": {
       let n = 0;
       for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
-      return n <= cond.max;
+      return (cond.max === undefined || n <= cond.max) && (cond.min === undefined || n >= cond.min);
     }
     case "life": {
       const life = s.players[you]?.life ?? 0;
@@ -439,8 +439,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "libraryAtMost":
       return s.players.some((p) => !p.lost && p.library.length <= cond.n);
     case "drawn": {
-      const d = s.players[you]?.draws;
-      return d?.turn === s.turn && d.n >= cond.n;
+      const drew = (p: number) => {
+        const d = s.players[p]?.draws;
+        return d?.turn === s.turn && d.n >= cond.n;
+      };
+      return cond.opponent ? s.turnOrder.some((p) => p !== you && drew(p)) : drew(you);
     }
     case "descended":
       return (s.descendedThisTurn ?? []).includes(you);

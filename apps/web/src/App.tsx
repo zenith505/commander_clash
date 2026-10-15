@@ -255,8 +255,12 @@ type CastDraft = {
   sacrifice?: string[];
   discard?: string[];
   exileCards?: string[];
-  /** A Borderpost's basic land returned to hand. */
+  /** A Borderpost's basic land returned to hand, Daze's Island. */
   returnToHand?: string[];
+  /** Cards exiled from your hand for Force of Will's alternative cost. */
+  exileFromHand?: string[];
+  /** Untapped creatures tapped for Lashknife's alternative cost. */
+  tap?: string[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
@@ -299,7 +303,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire" | "exileFromHand";
   label: string;
   what: string;
   n: number;
@@ -552,7 +556,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (pick.activate) continueActivate({ ...pick.activate, [pick.kind]: pick.chosen });
-    else if (pick.kind !== "tap") continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
+    else continueCast({ ...pick.draft, [pick.kind]: pick.chosen });
   }
 
   /**
@@ -593,21 +597,24 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0)) {
-      if (c.kind === "payLife" || c.kind === "tap" || (c.kind === "discard" && c.random)) continue; // no spell asks to tap a permanent yet
+      if (c.kind === "payLife" || (c.kind === "discard" && c.random)) continue;
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       if (c.kind === "returnToHand")
-        return setCostPick({ draft: d, kind: "returnToHand", label: card.name, what: `return ${c.n === 1 ? "a" : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
+        return setCostPick({ draft: d, kind: "returnToHand", label: card.name, what: `return ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text} to hand`, n: c.n, candidates: returnCandidates(s, HUMAN, c), chosen: [] });
+      // "Tap an untapped creature you control" (Lashknife's alternative cost): clicked on the battlefield.
+      if (c.kind === "tap")
+        return setCostPick({ draft: d, kind: "tap", label: card.name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.convoke?.includes(id)), chosen: [] });
       const me = s.players[HUMAN]!;
       const candidates =
         c.kind === "sacrifice"
           ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !d.bargain?.includes(id) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
-          : c.kind === "discard" || c.kind === "reveal"
+          : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
             ? me.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))))
             : me.graveyard.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
-      const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
-      const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : "exile from your graveyard";
+      const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
+      const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? "exile from your hand" : "exile from your graveyard";
       return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
     // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
@@ -638,6 +645,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
       ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}),
       ...(d.reveal?.length ? { reveal: d.reveal } : {}),
+      ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}),
+      ...(d.tap?.length ? { tap: d.tap } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -1207,7 +1216,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "conspire" && (
+          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "conspire" && costPick.kind !== "tap" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}
@@ -1483,7 +1492,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
@@ -2683,7 +2692,14 @@ function AbilityMenu({
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { alt: a.kind }) ?? "");
           return (
             <button key={a.kind} disabled={!ok} title={problem || ALT_NOTES[a.kind]} onClick={() => onCastAlt(a.kind)}>
-              {ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" />
+              {a.text && !a.mana ? (
+                <>Cast it: {a.text}</>
+              ) : (
+                <>
+                  {ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" />
+                  {a.text ? ` and ${a.text}` : ""}
+                </>
+              )}
             </button>
           );
         })}

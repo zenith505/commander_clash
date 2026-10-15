@@ -140,7 +140,8 @@ export interface TargetSpec {
   power?: Range; // "with power 4 or greater"
   toughness?: Range;
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
-  combat?: "attacking" | "blocking" | "attackingOrBlocking";
+  /** `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1). */
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
   /**
@@ -378,6 +379,8 @@ export type Modification =
   /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */
   | { kind: "cantAttackAlone" }
   | { kind: "cantBlockAlone" }
+  /** "Can't attack a player it has already attacked this turn" (Port Razer): attacking a planeswalker still can (rulings). */
+  | { kind: "cantAttackSamePlayer" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked" }
   | { kind: "allMustBlock" }
@@ -438,7 +441,14 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" }
+  /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
+  | { kind: "coven" }
+  /**
+   * "If an opponent controls more lands than you", "... more creatures than you", "an opponent has more life than you",
+   * "... more cards in hand than you": any one opponent.
+   */
+  | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
@@ -487,6 +497,13 @@ export type StaticCondition =
   | { kind: "opponentPoison"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
+  /**
+   * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
+   * turn" (`first`; "of your turn": `yours` too).
+   */
+  | { kind: "phase"; phase: "main" | "combat"; yours?: true; first?: true }
+  /** "If it's attacking the player with the most life or tied for most life" (Scourge of the Throne; dethrone's test, CR 702.105a). */
+  | { kind: "attackingMostLife" }
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   | { kind: "castAnother" }
   /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
@@ -834,6 +851,11 @@ export type Effect =
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
   /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
   | { type: "extraTurn"; who: PlayerRef; n: number; loseAtEnd?: true }
+  /**
+   * "After this phase, there is an additional combat phase [followed by an additional main phase]" (CR 500.8): `after`
+   * "main" or "combat" for "after this main/combat phase", which adds nothing in another phase.
+   */
+  | { type: "addPhases"; phases: ("combat" | "main")[]; after?: "main" | "combat" }
   /** "You lose the game" (CR 104.3e). */
   | { type: "loseGame"; who: PlayerRef }
   /** "You win the game" (CR 104.2b): the game ends. */
@@ -957,6 +979,8 @@ export type TriggerEvent =
   | "selfBecomesBlocked"
   /** "Whenever ~ attacks and isn't blocked": after blockers are declared, if no creature blocks it (rulings). */
   | "selfAttacksUnblocked"
+  /** "Whenever ~ attacks alone" (CR 506.5): it's the only creature declared as an attacker. */
+  | "selfAttacksAlone"
   | "selfBlocksOrBecomesBlocked" // bushido (CR 702.45a)
   | "selfBlocksCreature"
   | "selfBlockedByCreature" // flanking (CR 702.25a)
@@ -1062,6 +1086,8 @@ export interface TriggeredAbility {
   attacksMostLife?: boolean;
   /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
   attacksPlayer?: boolean;
+  /** "Whenever ~ attacks for the first time each turn": only on its first attack this turn, as this object (Aurelia). */
+  firstAttack?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
   withOthers?: number;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
@@ -1391,7 +1417,8 @@ export interface CompiledCard {
    * "You may exert ~ as it attacks" (CR 701.43d): an optional cost to attack (508.1g); its "When you do, ..." is a
    * linked trigger (event "selfExerted", CR 607.2h). An exerted permanent doesn't untap during your next untap step.
    */
-  exert?: boolean;
+  /** "notThisTurn": "If ~ hasn't been exerted this turn, you may exert it as it attacks" (Combat Celebrant). */
+  exert?: boolean | "notThisTurn";
   /** Start your engines! (CR 702.179a): a player with no speed who controls it gets speed 1 (a state-based action). */
   startYourEngines?: boolean;
   /** Amplify N (CR 702.38a): as it enters, reveal cards from your hand that share a creature type with it; N +1/+1 counters for each. */
@@ -1487,7 +1514,13 @@ export interface CompiledCard {
    * "You may play lands from the top of your library" (Courser of Kruphix), "you may cast creature spells from the top
    * of your library" (Garruk's Horde): its controller may play the top card of their library (CR 401.5).
    */
-  fromTop?: { lands: boolean; spells?: TargetSpec | "any" };
+  /**
+   * `spells`: any of these ("Angel spells and Human spells"); `once`: "Once each turn, you may cast an instant or sorcery
+   * spell from the top of your library" (Johann), a permission each such permanent gives once a turn.
+   */
+  fromTop?: FromTop[];
+  /** "You may look at the top card of your library any time" (Vizier of the Menagerie): only its controller sees it. */
+  lookTop?: true;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
   /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */
@@ -1562,4 +1595,15 @@ export interface CompiledCard {
   textKeywords: string[];
   /** Lines the compiler couldn't turn into rules. Empty means the card is fully supported. */
   unsupported: string[];
+}
+
+/**
+ * A permission to play the top card of your library: lands, and spells that match `spells` (any of them); `once`: once
+ * each turn for each permanent with it (Johann); `if`: "as long as ..." (Verge Rangers, coven).
+ */
+export interface FromTop {
+  lands: boolean;
+  spells?: TargetSpec[] | "any";
+  once?: true;
+  if?: StaticCondition;
 }

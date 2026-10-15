@@ -1,6 +1,6 @@
 # Roadmap
 
-15,576 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,679 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,15 +14,28 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers` (a long tail of 2- and 3-card lines): Rageform-style "it becomes an Aura ... manifest the
-   top card", "untap all creatures that attacked this turn ... additional combat phase" (Relentless Assault; the
-   engine has one combat per turn), "for each other attacking ~" naming the card itself (Aurochs Herd) and Shared
-   Animosity's "that share a creature type with it". Left from the ripple/sneak round: Karai's "if a sneak cost was
-   paid this turn", sneak conditions on Last Ronin's Technique and Turncoat Kunoichi, "you may look at the top card
-   of your library any time" (Vizier of the Menagerie, Experimental Frenzy), "once each turn, you may cast ... from
-   the top" and conditional play-from-top (Bolas's Citadel's life payment, Melek, Mistbreath Elder, Precognition
-   Field), putting cards from a hand on the bottom in any order (Arjun, Mindmoil), granting cascade, and the owner's
-   order when several target spells or permanents go to the bottom at once (CR 401.4). Left from the
+1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): "You may choose
+   not to untap ~ during your untap step" (44 cards), "Enchant player" (42), Station (31), Saddle (30), level up
+   (25), Spree (21), Bargain (20), Job select (19), Teamwork, Cipher, Hideaway, Entwine, Gift, Conspire, Tribute,
+   Haunt, Read ahead.
+2. By `npm run blockers` (a long tail of 2- and 3-card lines): Rageform-style "it becomes an Aura ... manifest the
+   top card", "for each other attacking ~" naming the card itself (Aurochs Herd) and Shared Animosity's "that share a
+   creature type with it". Left from the additional-combat round: "at the beginning of that combat" and "each combat
+   this turn" delayed triggers (Moraug, World at War, Full Throttle), "only the chosen creatures / land creatures can
+   attack during that combat phase" (Last Night Together, Bumi), "skips their next combat phase" (Stonehorn Dignitary,
+   False Peace, Moment of Silence), "cast only during combat" (Savage Beating, Take the Bait), "attacks for the first
+   time each turn" on creatures other than the source and group attack triggers (Desert Were-Worm, Akki Battle Squad,
+   Éomer), Raphael's "deals combat damage to a player for the first time each turn", "untap it and all Samurai you
+   control" (Godo), Moraug's "for each time it has attacked this turn"; "it can't be blocked this combat" (Ma Chao),
+   "whenever ~ or a commander you control attacks alone"; play-from-top riders: Bolas's Citadel's life payment,
+   Elsha's flash, Thundermane Dragon's haste, Mikey & Don's counter, Galea's attach, Falco Spara's and Into the Pit's
+   extra costs, historic and snow filters (Crystal Skull, The Fourth Doctor, Isu), "spells with flash or flying"
+   (Errant and Giada), Vizier of the Menagerie's "spend mana of any type", Experimental Frenzy's "can't play cards from
+   your hand", granted look-at-top (Glowcap Lantern), "until end of turn, you may look at the top card" (Gwenom, The
+   Belligerent). Left from the ripple/sneak round: Karai's "if a sneak cost was paid this turn", sneak conditions on
+   Last Ronin's Technique and Turncoat Kunoichi, Melek and Mistbreath Elder, putting cards from a hand on the bottom
+   in any order (Arjun, Mindmoil), granting cascade, and the owner's order when several target spells or permanents
+   go to the bottom at once (CR 401.4). Left from the
    earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed, Monastery Raid),
    "if this spell was cast from exile" conditions on foretell cards (Haunting Voyage, Cosmos Charger), Earth
    Rumble's reflexive earthbend trigger and Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
@@ -64,10 +77,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   of combat on each opponent's turn".
 - "Copy target activated or triggered ability" (Strionic Resonator). Changing the target of a spell with more than one
   target; Misdirection's pitch cost; Mirrorshell Crab's channel ability.
-- "Activate only during your turn, before attackers are declared" assumes one combat per turn (the engine has no
-  extra combats). Random discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with
-  something else ("create a 2/2 black Zombie", Kalitas). "Prevent all damage that would be dealt by target instant or
-  sorcery spell" (Hidden Retreat).
+- "Activate only during your turn, before attackers are declared" with additional combats: it's allowed in each
+  combat's beginning of combat step but not in an added main phase; check the rulings before relying on it. Random
+  discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with something else ("create a
+  2/2 black Zombie", Kalitas). "Prevent all damage that would be dealt by target instant or sorcery spell" (Hidden
+  Retreat).
 - "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat; Pain Seer's "becomes
   untapped"; Ivory Gargoyle.
 - Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed"); reinforce X;

@@ -3,7 +3,7 @@ import type { ActivatedAbility, AdditionalCost, AltCostKind, ChoiceKind, CastFro
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem, enterAttacking } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -522,6 +522,8 @@ export function moveObject(
   }
   o.exileIfDiesTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
+  o.attacked = undefined;
+  o.exertedTurn = undefined;
   // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
   // battlefield or leaving it at the same time (rulings).
   if (fromZone === "battlefield" && to === "graveyard" && o.damagedBy?.length && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
@@ -1193,10 +1195,45 @@ function advanceStep(s: GameState): void {
   if (s.step === "endCombat") {
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
+    s.unblockedChoice = undefined; // made for this combat's damage steps
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
+  // Added phases come directly after the phase they were added after (CR 500.8); then the turn goes on as it would
+  // have from there.
+  if (PHASE_ENDS.has(s.step)) {
+    const added = s.addedPhases?.shift();
+    if (!s.addedPhases?.length) s.addedPhases = undefined;
+    if (added) {
+      s.resumeStep ??= next;
+      log(s, added === "combat" ? "An additional combat phase begins." : "An additional main phase begins.");
+      return beginStep(s, added === "combat" ? "beginCombat" : "main2");
+    }
+    if (s.resumeStep) {
+      const resume = s.resumeStep;
+      s.resumeStep = undefined;
+      return beginStep(s, resume);
+    }
+  }
   beginStep(s, next);
 }
+
+/** The last step of each phase that can have phases added after it (CR 500.8): beginning, main, combat. */
+const PHASE_ENDS = new Set<Step>(["draw", "main1", "endCombat", "main2"]);
+
+/**
+ * "After this phase, there is an additional combat phase [followed by an additional main phase]" (CR 500.8): added
+ * directly after the current phase, before any added after it earlier. "After this main phase" and "after this combat
+ * phase" add nothing when it isn't one (rulings on Relentless Assault and Full Throttle).
+ */
+export function addPhases(s: GameState, phases: ("combat" | "main")[], after?: "main" | "combat") {
+  if (after === "main" && !isMainPhase(s)) return;
+  if (after === "combat" && !inCombatPhase(s)) return;
+  if (s.step === "end" || s.step === "cleanup") return; // nothing comes after the ending phase but the next turn
+  s.addedPhases = [...phases, ...(s.addedPhases ?? [])];
+}
+
+/** The combat phase's steps (CR 506.1). */
+export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
 
 function startNextTurn(s: GameState) {
   const prev = s.activePlayer;
@@ -1236,6 +1273,9 @@ function startNextTurn(s: GameState) {
   s.damagedThisTurn = undefined;
   s.diedThisTurn = undefined;
   s.attackersThisTurn = undefined;
+  s.combatsThisTurn = undefined;
+  s.addedPhases = undefined;
+  s.resumeStep = undefined;
   s.lostLifeThisTurn = undefined;
   s.permanentLeftThisTurn = undefined;
   s.freerunningThisTurn = undefined;
@@ -1318,6 +1358,7 @@ function beginStep(s: GameState, step: Step): void {
       if (askUnblocked(s) || dealCombatDamage(s, false)) return;
       break;
     case "beginCombat":
+      s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
       break;
     case "endCombat":
@@ -1583,13 +1624,33 @@ export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: Playe
  * lets them play (Courser of Kruphix, Future Sight), at its usual timing (CR 401.5, rulings).
  */
 export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return false;
+  return !!topPermission(s, o, pid);
+}
+
+/**
+ * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
+ * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
+ */
+function topPermission(s: GameState, o: GameObject, pid: PlayerId): { by: GameObject; once?: true } | undefined {
+  if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
-  return s.battlefield.some((id) => {
-    const top = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).fromTop : undefined;
-    return !!top && (land ? top.lands : top.spells === "any" || (!!top.spells && printedMatches(top.spells, d)));
-  });
+  let once: GameObject | undefined;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    if (controllerOf(s, src) !== pid) continue;
+    for (const top of abilitiesOf(s, src).fromTop ?? []) {
+      if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
+      if (!top.once) return { by: src };
+      if (src.topUsedTurn !== s.turn) once ??= src;
+    }
+  }
+  return once && { by: once, once: true };
+}
+
+/** "You may look at the top card of your library any time" (Vizier of the Menagerie): whether `viewer` may see `pid`'s top card. */
+export function topVisible(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
+  return topRevealed(s, pid) || (pid === viewer && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).lookTop));
 }
 
 /** Cards `pid` may play from the top of their library right now (see mayPlayFromTop). */
@@ -2105,6 +2166,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
+  // A once-a-turn permission to cast from the top is used up (Johann).
+  if (castFrom === "library") {
+    const how = topPermission(s, o, p.id);
+    if (how?.once) how.by.topUsedTurn = s.turn;
+  }
   const via = graveyardWay(s, o, choices.via);
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
@@ -2567,6 +2633,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.tap) tapPermanent(s, o);
   if (ab.exertCost && o.zone === "battlefield") {
     o.skipNextUntap = true; // CR 701.43a
+    o.exertedTurn = s.turn;
     log(s, `${p.name} exerts ${d.name}.`);
     fireEvent(s, { type: "exerted", id: o.id });
   }
@@ -3067,8 +3134,9 @@ export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswal
   return attacks.reduce((n, a) => n + (a.planeswalker === undefined ? attackTaxPer(s, a.defender) : 0), 0);
 }
 
-export function attackProblem(s: GameState, o: GameObject, defender: PlayerId): string | null {
+export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false): string | null {
   const c = characteristics(s, o);
+  if (c.cantAttackSamePlayer && !planeswalker && o.attacked?.turn === s.turn && o.attacked.players?.includes(defender)) return `${c.name} can't attack a player it has already attacked this turn`;
   for (const f of c.attackUnless)
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack unless defending player controls ${f.text}`;
@@ -3128,7 +3196,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
       const pw = s.objects[a.planeswalker];
       if (!pw || pw.zone !== "battlefield" || !objIsType(s, pw, "Planeswalker") || controllerOf(s, pw) !== a.defender) throw new RulesError("must attack a planeswalker that player controls");
     }
-    const why = attackProblem(s, obj(s, a.attacker), a.defender);
+    const why = attackProblem(s, obj(s, a.attacker), a.defender, a.planeswalker !== undefined);
     if (why) throw new RulesError(why);
     seen.add(a.attacker);
   }
@@ -3172,6 +3240,9 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     o.attacking = a.defender;
     if (a.planeswalker !== undefined) o.attackingPermanent = { id: a.planeswalker, zc: obj(s, a.planeswalker).zoneChanges ?? 0 };
     if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o); // CR 508.1f
+    const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
+    const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
+    o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}) };
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
@@ -3186,7 +3257,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   // Optional costs to attack, like enlist's, are chosen as the attackers are tapped (CR 508.1g; enlist rulings).
   const ids = attacks.map((a) => a.attacker);
-  const exert = ids.filter((id) => abilitiesOf(s, obj(s, id)).exert);
+  const exert = ids.filter((id) => {
+    const e = abilitiesOf(s, obj(s, id)).exert;
+    return e === true || (e === "notThisTurn" && obj(s, id).exertedTurn !== s.turn);
+  });
   s.declaring = { ids, bands: canBand(s, ids), enlist: ids.filter((id) => objHasKeyword(s, obj(s, id), "Enlist") && abilitiesOf(s, obj(s, id)).enlist), enlisted: [], ...(exert.length ? { exert, exerted: [] } : {}) };
   finishAttacks(s);
 }
@@ -3277,6 +3351,7 @@ function exertChosen(s: GameState, ids: ObjectId[]) {
   const d = s.declaring!;
   for (const id of ids) {
     obj(s, id).skipNextUntap = true;
+    obj(s, id).exertedTurn = s.turn;
     (d.exerted ??= []).push(id);
     log(s, `${player(s, s.activePlayer).name} exerts ${nameOf(s, id)}.`);
   }

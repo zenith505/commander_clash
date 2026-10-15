@@ -1,4 +1,4 @@
-import type { AbilityBody, Amount, AmountExpr, Count, Effect, SpellCondition, TargetSpec, UnlessPays, PayCost } from "../abilities";
+import type { AbilityBody, Amount, AmountExpr, Count, Effect, ObjRef, SpellCondition, TargetSpec, UnlessPays, PayCost } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, isGroup, WHEEL } from "./words";
 import { parseStaticCondition } from "./statics";
@@ -22,6 +22,11 @@ export interface Ctx {
   lastObjectTarget?: number;
   /** The most recent "up to two target creatures", for "they" / "those creatures". */
   lastTargets?: { index: number; n?: number };
+  /**
+   * "Untap all attacking creatures. They gain first strike until end of turn" (Karlach): the permanents an untap or tap
+   * of a group just touched, which are still on the battlefield, so "they" is the same group.
+   */
+  lastGroup?: ObjRef;
   /** Index of the most recent player target, for "that player's hand". */
   lastPlayerTarget?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */
@@ -98,6 +103,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
+  // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
+  text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   const sentences = splitSentences(text.trim())
     .map((x) => x.replace(/\.$/, "").trim())
     // "Draw two cards, then discard a card": two instructions, in order.
@@ -302,10 +309,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (insteadIf) s = `If ${insteadIf[2]}, ${insteadIf[1]!.charAt(0).toLowerCase()}${insteadIf[1]!.slice(1)} instead`;
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
-    const stateCond = ifState && !/^(it|~)\b/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
-    const insteadOf = ifState && !/^(it|~)\b/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (ifState && insteadOf) {
       const previous = effects.slice(prevStart);
       const t = ifState[2]!.replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "");
@@ -640,7 +647,7 @@ function parseModal(count: string, bullets: string, text: string, spell?: boolea
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|after this phase)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

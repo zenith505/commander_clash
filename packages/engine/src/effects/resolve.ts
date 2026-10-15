@@ -327,6 +327,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "fight":
     case "bite":
     case "extraTurn":
+    case "addPhases":
     case "loseGame":
     case "winGame":
       return runBasicsEffect(s, e, ctx, src);

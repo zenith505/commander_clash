@@ -15,6 +15,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ attacks, (.+)$/, "selfAttacks"],
   // Attacking a planeswalker isn't attacking a player (rulings): see TriggeredAbility.attacksPlayer.
   [/^Whenever ~ attacks a player, (.+)$/, "selfAttacks"],
+  [/^Whenever ~ attacks for the first time each turn, (.+)$/, "selfAttacks"],
   [/^Whenever ~ enlists a creature, (.+)$/, "selfEnlists"], // CR 702.154c
   [/^When(?:ever)? ~ attacks or blocks, (.+)$/, "selfAttacksOrBlocks"],
   // The beginning of combat step (CR 507) and end of combat step (CR 511).
@@ -38,6 +39,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked"],
   [/^Whenever ~ becomes blocked, (.+)$/, "selfBecomesBlocked"],
   [/^Whenever ~ attacks and isn't blocked, (.+)$/, "selfAttacksUnblocked"],
+  [/^Whenever ~ attacks alone, (.+)$/, "selfAttacksAlone"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
@@ -59,7 +61,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
-  "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
+  "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous",
 ];
 
@@ -70,6 +72,7 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked", {}],
   [/^becomes blocked, (.+)$/, "selfBecomesBlocked", { defending: true }],
   [/^attacks and isn't blocked, (.+)$/, "selfAttacksUnblocked", { defending: true }],
+  [/^attacks alone, (.+)$/, "selfAttacksAlone", { defending: true }],
   [/^blocks, (.+)$/, "selfBlocks", {}],
   // An attacking creature's combat damage to a player is dealt to the player it attacks (CR 510.1a); a blocking
   // creature deals none to players. So "defending player" is that player.
@@ -432,6 +435,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ~ attacks, ${battalion[2]}`);
     return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!) } : "fail";
   }
+  // "Whenever a creature you control attacks alone" (exalted's event, CR 702.83a, 506.5): that creature is the subject.
+  const alone = /^Whenever an? (.+?) you control attacks alone, (?!if )(.+)$/.exec(line);
+  if (alone) {
+    const filter = alone[1] === "creature" ? undefined : parseTargetPhrase(alone[1]!);
+    if (filter === null || (filter && filter.kind !== "object")) return "fail";
+    const body = parseBody(alone[2]!, { subjectIt: true, defending: true });
+    return body ? { event: "creatureYouControlAttacksAlone", body, ...(filter ? { subjectFilter: { ...filter, text: alone[1]! } } : {}) } : "fail";
+  }
   // The Enduring cycle: "When ~ dies, if it was a creature, return it to the battlefield under its owner's control.
   // It's an enchantment. (It's not a creature.)" Only a creature dies here (CR 700.4), so the intervening if (CR 603.4)
   // holds whenever it triggers. It enters as an enchantment only, without its creature types (rulings, CR 205.1b).
@@ -469,7 +480,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
   // "If it's attacking" is about the source only in an ability about the source itself.
-  const aboutIt = intervening && /^(it|~)\b/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!);
+  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) )/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   const thatHand = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
@@ -602,7 +613,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifSneaked = true;
         body0 = sneaked[1]!;
       }
-      let text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
+      let text = self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
       const thatMuch = amount && /\bthat (?:much|many)\b/.test(text);
@@ -613,10 +624,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked", selfCastSpell: event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
-      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}) } : ("fail" as const);
+      const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
+      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}) } : ("fail" as const);
     }
   }
   return "fail" as const;

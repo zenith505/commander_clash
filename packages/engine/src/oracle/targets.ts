@@ -83,7 +83,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
-  if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : null;
+  if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(they|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   const several = SEVERAL_TARGETS.exec(x);
   if (several) return parseSeveralTargets(several, ctx, cards);
   // After it left the battlefield, its name means the card where it went (CR 400.7 makes the permanent gone).
@@ -225,7 +225,7 @@ export function parseGroup(phrase: string, bare = false): { filter: TargetSpec; 
   const ofChosen = /^creatures of the chosen type$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
@@ -266,6 +266,12 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
     if (!opts.chosen) return null;
     extra.chosen = chosen[2] === "color" ? (chosen[1] ? "notColor" : "color") : chosen[1] ? "notType" : "type";
     p = (p.slice(0, chosen.index) + p.slice(chosen.index + chosen[0].length)).trim();
+  }
+  // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
+  const attacked = / that attacked this turn$/.exec(p);
+  if (attacked) {
+    extra.combat = "attackedThisTurn";
+    p = p.slice(0, attacked.index);
   }
   // "creature an opponent controls that was dealt damage this turn"
   const hurt = / that was dealt damage this turn$/.exec(p);

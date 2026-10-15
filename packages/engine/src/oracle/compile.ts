@@ -1,5 +1,5 @@
 import { allEffects } from "../abilities";
-import type { AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec } from "../abilities";
+import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
@@ -326,12 +326,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Exert (CR 701.43d): "You may exert ~ as it attacks. When you do, it gets +2/+2 until end of turn." The "when you
     // do" ability triggers when it's exerted (linked, CR 607.2h); "it" is the exerted creature itself.
-    const exert = /^You may exert ~ as (?:it|he|she|they) attacks?\.(?: When you do, (.+))?$/.exec(line);
+    // Combat Celebrant: "If ~ hasn't been exerted this turn, you may exert it as it attacks" (with additional combats).
+    const exert = /^(?:You may exert ~|(If ~ hasn't been exerted this turn), you may exert it) as (?:it|he|she|they) attacks?\.(?: When you do, (.+))?$/.exec(line);
     if (exert) {
-      const body = exert[1] ? parseBody(exert[1].replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|can't)\b)/, "~ ").replace(/^(?:he|she) /, "it "), { selfIt: true }) : undefined;
+      const body = exert[2] ? parseBody(exert[2].replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|can't)\b)/, "~ ").replace(/^(?:he|she) /, "it "), { selfIt: true }) : undefined;
       if (out.exert || body === null) out.unsupported.push(raw);
       else {
-        out.exert = true;
+        out.exert = exert[1] ? "notThisTurn" : true;
         if (body) out.triggers.push({ event: "selfExerted", body });
       }
       continue;
@@ -561,16 +562,31 @@ export function compile(d: CardDef): CompiledCard {
       out.revealHands = /^Players/.test(line) ? "players" : "opponents";
       continue;
     }
-    // "You may play lands from the top of your library", "you may play lands and cast spells from the top of your
-    // library", "you may cast creature spells from the top of your library": at their usual timing, a land still using
-    // the turn's land play (rulings on Courser of Kruphix and Future Sight).
-    const top = /^You may (play lands|play lands and cast spells|cast (.+?) spells) from the top of your library\.$/.exec(line);
-    if (top) {
-      const lands = /^play lands/.test(top[1]!);
-      const kinds = top[2]?.replace(/ and /g, " or ");
-      const spells = /cast spells$/.test(top[1]!) ? ("any" as const) : kinds ? parseSearchFilter(`${kinds} card`) : undefined;
-      if (spells === null || (kinds && !spells)) out.unsupported.push(raw);
-      else out.fromTop = { lands, ...(spells ? { spells } : {}) };
+    // "You may look at the top card of your library any time" (rulings on Vizier of the Menagerie): information for its
+    // controller only, any time; Radha adds "and you may play lands from the top of your library".
+    const look = /^You may look at the top card of your library any time(?:, and (you may .+))?\.$/.exec(line);
+    if (look) {
+      const top = look[1] ? parseFromTop(look[1]) : undefined;
+      if (out.lookTop || top === null) out.unsupported.push(raw);
+      else {
+        out.lookTop = true;
+        if (top) (out.fromTop ??= []).push(top);
+      }
+      continue;
+    }
+    // "As long as ~ is attached to a creature, you may cast creature spells from the top of your library", coven.
+    const condTop = /^(?:[A-Z][A-Za-z' -]+ — )?As long as (.+?), (you may .+)\.$/.exec(line);
+    const ifTop = condTop ? parseFromTop(condTop[2]!) : undefined;
+    if (condTop && ifTop !== undefined) {
+      const cond = parseStaticCondition(condTop[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || !ifTop) out.unsupported.push(raw);
+      else (out.fromTop ??= []).push({ ...ifTop, if: cond });
+      continue;
+    }
+    const top = parseFromTop(line.replace(/\.$/, ""));
+    if (top !== undefined) {
+      if (top === null) out.unsupported.push(raw);
+      else (out.fromTop ??= []).push(top);
       continue;
     }
     const extraLand = new RegExp(`^You may play ${NUM} additional lands? on each of your turns\\.$`).exec(line);
@@ -1025,4 +1041,37 @@ function parseCostOr(text: string): CostOption[] | null {
     else return null;
   }
   return out;
+}
+
+/**
+ * "You may play lands from the top of your library", "you may play lands and cast spells from the top of your library",
+ * "you may cast creature spells from the top of your library", "you may cast Angel spells and Human spells ...", "once
+ * each turn, you may cast an instant or sorcery spell from the top of your library": at their usual timing, a land still
+ * using the turn's land play (rulings on Courser of Kruphix, Future Sight and Johann). Undefined if it isn't one.
+ */
+export function parseFromTop(text: string): FromTop | null | undefined {
+  // "You may play the top card of your library", "you may play cards from the top of your library": lands and spells.
+  text = text.replace(/^(you may) play (?:the top card of your library|cards from the top of your library)$/i, "$1 play lands and cast spells from the top of your library");
+  const m = /^(Once each turn, )?[Yy]ou may (play lands|play lands and cast (.+)|cast (.+)) from the top of your library$/.exec(text);
+  if (!m) return undefined;
+  const lands = !!m[2]!.startsWith("play lands");
+  const what = m[3] ?? m[4];
+  if (m[1] && (lands || !what)) return null; // only "once each turn, you may cast ..." is modeled
+  if (!what) return { lands };
+  if (what === "spells") return m[1] ? null : { lands, spells: "any" };
+  // "Creature spells", "an instant or sorcery spell", "a creature spell with power 2 or less", "Angel spells and Human
+  // spells", "spells with mana value 4 or greater": each kind as a card filter.
+  const parts = what.split(/ spells and (?=\S+ spells$)/).map((x) => x.replace(/^an? /, ""));
+  const spells: TargetSpec[] = [];
+  for (const part of parts) {
+    if (!/\bspells?\b/.test(part) && parts.length === 1) return null;
+    // Realmwalker: "creature spells of the chosen type", the permanent's choice (see topPermission).
+    const chosen = / of the chosen type$/.test(part);
+    const kinds = part.replace(/ of the chosen type$/, "");
+    const phrase = (/\bspells?\b/.test(kinds) ? kinds.replace(/\bspells?\b/, "card") : `${kinds} card`).replace(/ and /g, " or ").trim();
+    const f = parseSearchFilter(phrase);
+    if (!f) return null;
+    spells.push(chosen ? { ...f, chosen: "type", text: `${f.text} of the chosen type` } : f);
+  }
+  return { lands, spells, ...(m[1] ? { once: true as const } : {}) };
 }

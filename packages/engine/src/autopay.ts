@@ -1,5 +1,5 @@
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
+import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, activationCost, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
@@ -25,6 +25,8 @@ interface Option {
   taps?: ObjectId[];
   /** Its mana can only be spent some ways (CR 106.6), here on what's being paid for. */
   restricted?: boolean;
+  /** `ability` indexes the source's activated abilities: an activated mana ability (CR 605.1a), not a `ManaAbility`. */
+  activated?: true;
 }
 
 interface Source {
@@ -51,6 +53,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
           return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
         });
+      options.push(...activatedOptions(s, pid, o));
       return { id: o.id, options, colors: new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds)).size };
     })
     .filter((src) => src.options.length > 0)
@@ -58,7 +61,18 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
     .sort((a, b) => Number(isCreature(a.id)) - Number(isCreature(b.id)) || a.colors - b.colors);
 }
 
-const toAction = (pid: PlayerId, x: Option): Action => ({ type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}) });
+/** The activated mana abilities (CR 605.1a) a payment can use, as options. */
+function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): Option[] {
+  return payableActivatedMana(s, pid, o).flatMap(({ ab, options, penalty }) => {
+    const cost = ab.manaCost ? parseManaCost(ab.manaCost) : null;
+    return options.filter((x) => x.adds.length > 0).map((x) => ({ id: o.id, ...x, cost, penalty, activated: true as const }));
+  });
+}
+
+const toAction = (pid: PlayerId, x: Option): Action =>
+  x.activated
+    ? { type: "activateAbility", player: pid, objectId: x.id, index: x.ability, mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) }
+    : { type: "activateMana", player: pid, objectId: x.id, mana: x.mana, ability: x.ability, ...(x.taps ? { tap: x.taps } : {}), ...(x.extra ? { extra: x.extra } : {}) };
 
 /**
  * What to tap for "Tap an untapped creature you control", best first: what makes no mana itself, then what's
@@ -215,7 +229,7 @@ export function planCast(
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
   // So when the cost depends on the board, don't sacrifice permanents for its mana.
   if (taps && costDependsOnBoard(s, d)) {
-    const sacs = taps.flatMap((a) => (a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf ? [a.objectId] : []));
+    const sacs = taps.flatMap((a) => ((a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf) || (a.type === "activateAbility" && abilitiesOf(s, obj(s, a.objectId)).activated[a.index]?.sacrificeSelf) ? [a.objectId] : []));
     if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, [...sacs, ...sacrificedTargets(s, targets)], use);
   }
   if (taps) return cast(taps);
@@ -332,11 +346,15 @@ export function autoCrew(s: GameState, pid: PlayerId, vehicleId: ObjectId, n: nu
  * spell or ability would lose its target while being paid for (equipping the Eldrazi Spawn you sacrificed).
  */
 function sacrificedTargets(s: GameState, targets: TargetChoice[] | undefined): ObjectId[] {
-  return (targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && manaAbilitiesOn(s, obj(s, t.id)).some((ab) => ab.sacrificeSelf) ? [t.id] : []));
+  const sacrificesSelf = (o: GameObject) => manaAbilitiesOn(s, o).some((ab) => ab.sacrificeSelf) || abilitiesOf(s, o).activated.some((ab) => ab.mana && ab.sacrificeSelf);
+  return (targets ?? []).flatMap((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && sacrificesSelf(obj(s, t.id)) ? [t.id] : []));
 }
 
-/** Like planCast, for an activated ability. A crew ability needs the creatures to tap (`tapCreatures`). */
-export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): Action[] | null {
+/**
+ * Like planCast, for an activated ability. A crew ability needs the creatures to tap (`tapCreatures`). `pick`: for a
+ * mana ability, the color and the triggered abilities' mana, as for activateMana.
+ */
+export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices, pick?: { mana?: ManaType; extra?: ManaType[] }): Action[] | null {
   const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
   const ab = abilitiesOf(s, obj(s, objectId)).activated[index]!;
@@ -345,7 +363,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   // Don't tap for mana what's about to be sacrificed either.
   const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], { ability: obj(s, objectId) });
   if (!taps) return null;
-  return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}) }];
+  return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}), ...(pick?.mana ? { mana: pick.mana } : {}), ...(pick?.extra?.length ? { extra: pick.extra } : {}) }];
 }
 
 /**

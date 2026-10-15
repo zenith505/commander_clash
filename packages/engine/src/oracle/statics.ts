@@ -156,6 +156,21 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
 const CONTROL_COUNT = new RegExp(`^(?:(no|another|an?)|${NUM} or more(?: other)?|${NUM} or fewer) (.+)$`);
 
 /** The condition of an "as long as" static ability (see parseConditionalStatic). */
+/**
+ * What an "Activate only if ..." needs (CR 602.5b): a static condition, "~ entered this turn", or either of two ("if ~
+ * entered this turn or if you control a basic land").
+ */
+export function parseActivateCondition(text: string): StaticCondition | null {
+  const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: "" };
+  const either = / or if /.exec(text);
+  if (either) {
+    const conds = [text.slice(0, either.index), text.slice(either.index + either[0].length)].map(parseActivateCondition);
+    return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
+  }
+  if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  return parseStaticCondition(text, self);
+}
+
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
@@ -216,7 +231,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const who = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "defending";
     // Each attacking creature has its own defending player (CR 506.2), so only the source's own is modeled.
     if (who === "defending" && st.affects.kind !== "self") return null;
-    const q = CONTROL_COUNT.exec(m[2]!);
+    // "You control a Swamp or a Mountain" (the Verges): either one.
+    const q = CONTROL_COUNT.exec(m[2]!.replace(/^(an? \S+) or an? (?=\S+$)/, "$1 or "));
     if (!q) return null;
     // NUM is a group of its own: q[1] the word, q[2] "N or more", q[3] "N or fewer", q[4] what.
     const filter = pickFilter(q[4]!);

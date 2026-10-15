@@ -25,7 +25,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [...(m[1] ? [{ type: "untap" as const, what }] : []), { type: "removeFromCombat", what }];
   }
   // Removal and tapping
-  if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
+  if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     if (!what) return null;
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy" | "exile" | "tap" | "untap"];
@@ -99,7 +99,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?|~|it|that card|that creature|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands)$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+?|~|it|that card|that creature|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands|their owner's hand)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;
   }
@@ -114,6 +114,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Bolster (\d+|X)$/i.exec(s))) {
     const filter = pickFilter("creature")!;
     return [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1]!) }, least: "toughness" }];
+  }
+  // "Remove all counters from target permanent" (every kind), "Remove all counters from that creature".
+  if ((m = /^Remove all counters from (~|it|that creature|target .+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
+  }
+  // "Move all counters from target creature onto another target creature" (CR 122.5).
+  if ((m = /^Move all counters from (target .+?) onto (another target .+)$/i.exec(s))) {
+    const from = parseObject(m[1]!, ctx);
+    const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
+    return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
   }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
@@ -147,7 +158,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what ? [{ type: "counters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
   }
   // Gaining control (layer 2). "Gain control of target creature until end of turn."
-  if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+?)( until end of turn)?$/i.exec(s))) {
+  if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+?)( until end of turn)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }

@@ -157,6 +157,7 @@ function hasInstantPlay(s: GameState): boolean {
     if (controllerOf(s, o) !== HUMAN) continue;
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
+      if (abilities[i]!.mana) continue; // making mana alone isn't a play (CR 605.1a)
       if (doesNothingNow(s, id, abilities[i]!.body)) continue; // e.g. "{1}: Untap ~" while it's untapped
       const problem = abilityProblem(s, HUMAN, id, i);
       if (!problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, id, i))) return true;

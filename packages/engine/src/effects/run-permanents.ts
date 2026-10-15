@@ -263,6 +263,33 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (had === n && e.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       }
       return;
+    case "removeAllCounters":
+      for (const o of objects(s, e.what, ctx)) {
+        const kinds = Object.entries(o.counters).filter(([, n]) => n > 0);
+        if (!kinds.length) continue;
+        const total = kinds.reduce((a, [, n]) => a + n, 0);
+        for (const [kind] of kinds) o.counters[kind] = 0;
+        if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + total;
+        invalidateCharacteristics(s);
+        log(s, `${characteristics(s, o).name} loses all its counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}).`);
+        if (kinds.some(([k]) => k === "time")) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
+      }
+      return;
+    case "moveAllCounters": {
+      // Both have to still be there and legal targets, or no counters move (CR 122.5; rulings on Fate Transfer).
+      const from = objects(s, e.from, ctx)[0];
+      const to = objects(s, e.to, ctx)[0];
+      if (!from || !to || from.id === to.id) return;
+      const kinds = Object.entries(from.counters).filter(([, n]) => n > 0);
+      for (const [kind, n] of kinds) {
+        from.counters[kind] = 0;
+        // Put onto the other one, so replacement effects and "whenever counters are put" apply (Nexus Mentality rulings).
+        putCounters(s, to, kind, n);
+      }
+      invalidateCharacteristics(s);
+      if (kinds.length) log(s, `${characteristics(s, from).name}'s counters (${kinds.map(([k, n]) => `${n} ${k}`).join(", ")}) move onto ${characteristics(s, to).name}.`);
+      return;
+    }
     case "removeSelfCounter": {
       // Fading (CR 702.32a): "remove a fade counter from this permanent. If you can't, sacrifice the permanent."
       // Vanishing (CR 702.63a): removing the last time counter triggers its sacrifice ability.

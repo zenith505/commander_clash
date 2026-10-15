@@ -49,6 +49,8 @@ export interface Ctx {
   defending?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
   subjectLeft?: boolean;
+  /** This sentence defines its own X ("..., where X is ..."): "up to X target ..." isn't the spell's X then. */
+  whereX?: boolean;
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
@@ -262,6 +264,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     const where = /^(.+), where X is (.+)$/.exec(s);
     if (where) s = where[1]!;
+    ctx.whereX = !!where;
     const before = effects.length;
     const defineX = () => {
       if (!where) return true;

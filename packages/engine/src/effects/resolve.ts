@@ -1,4 +1,4 @@
-import type { AbilityBody, Amount, DamageRecipient, Effect, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
+import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { controllerOf, invalidateCharacteristics } from "../layers";
@@ -6,7 +6,9 @@ import { compileCard } from "../oracle";
 import { bindChosenKeywords, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
-import type { CardDef, Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, StackItem, TriggerEventInfo } from "../types";
+import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
+import { manaTriggerResults } from "../manaabilities";
+import { addMana } from "../spend";
 import { objectMatches, bindChosen, sourceQuality, isLegalTarget, lesserPowerOk } from "./targeting";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runDungeonsEffect } from "./run-dungeons";
@@ -127,7 +129,40 @@ export function continueResolution(s: GameState): Resolution {
   s.leftTogether = undefined;
   s.resolving = null;
   if (item.kind === "spell" && item.objectId && s.objects[item.objectId]?.zone === "stack") finishSpell(s, item.objectId);
+  if (item.manaAbility) manaAbilityResolved(s, item, r.made ?? []);
   return "done";
+}
+
+/**
+ * An activated mana ability resolves as soon as it's activated, without the stack (CR 605.3b), even while another
+ * spell or ability is partway through resolving and waiting on a payment (605.3a). That one carries on afterwards.
+ * Inside another decision, it can't stop for a choice of its own: the activation is refused instead.
+ */
+export function resolveManaAbility(s: GameState, item: StackItem, body: AbilityBody, color?: Color): void {
+  const outer = s.resolving;
+  const inside = !!outer || !!s.pending;
+  const left = s.leftTogether;
+  s.resolving = { item, body, legal: [], next: 0, ...(color ? { chosen: { color } } : {}) };
+  if (continueResolution(s) === "paused" && inside) throw new RulesError(`${s.cards[item.sourceCardId!]?.name ?? "That"}'s mana ability needs a choice that can't be made now`);
+  if (!inside) return;
+  s.resolving = outer;
+  s.leftTogether = left;
+}
+
+/**
+ * After an activated mana ability with {T} in its cost resolves, its source was tapped for mana (CR 106.12): the
+ * triggered mana abilities that triggers add their mana right away (CR 605.4a), as for `ManaAbility`s.
+ */
+function manaAbilityResolved(s: GameState, item: StackItem, made: ManaType[]): void {
+  const m = item.manaAbility!;
+  const o = item.sourceId ? s.objects[item.sourceId] : undefined;
+  if (!m.tapped || !o) return;
+  const results = manaTriggerResults(s, item.controller, o, { tap: true } as ManaAbility, made);
+  const extra = m.extra ?? [];
+  const picked = results.length === 1 ? results[0]! : results.find((r) => r.extra.length === extra.length && r.extra.every((x, i) => x === extra[i]));
+  if (!picked) throw new RulesError(`choose the mana that tapping ${defOf(s, o).name} also adds`);
+  addMana(s, item.controller, picked.adds);
+  if (picked.adds.length) log(s, `${player(s, item.controller).name} adds ${picked.adds.map((x) => `{${x}}`).join("")}.`);
 }
 
 /** What was chosen as the ability's source entered ("the chosen type"), while it's still that object. */
@@ -421,6 +456,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "endure":
     case "moveCounter":
     case "removeCounters":
+    case "removeAllCounters":
+    case "moveAllCounters":
     case "removeSelfCounter":
     case "renown":
     case "adapt":

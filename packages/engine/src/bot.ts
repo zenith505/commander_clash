@@ -1,9 +1,9 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, refCovers, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
-import { withModes, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
+import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   abilityProblem,
   faceUpWays,
@@ -419,7 +419,11 @@ const isCounterOnly = (b: AbilityBody) => b.effects.some((e) => e.type === "coun
  * they'd kill or the biggest threat), helpful ones at our own stuff. Returns null when
  * there's no sensible choice. With `forced`, always returns some legal choice.
  */
-export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
+export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
+  // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
+  const body = offerMany(s, printed, pid, x, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId);
+  const many = manySlot(printed.targets);
+  if (!forced && many >= 0 && !printed.targets[many]!.skip && body.targets[many]!.skip) return null;
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.
@@ -450,8 +454,10 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
     }
     // The source's colors matter for protection (CR 702.16b): a spell's card, or the ability's source.
     // Bots never pick the same thing twice, which also keeps "another target" apart.
+    // "Remove all counters from", "move all counters from": only something with counters on it.
+    const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
     const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimate = allEffects(body.effects).some((e) => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
@@ -855,6 +861,11 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const specs = body?.targets ?? spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
   if (specs.length && !targets) return null;
+  // Strive: each target beyond the first costs more (rulings), so only as many of the best ones as we can pay for.
+  if (targets && compileCard(defOf(s, obj(s, id))).strive) {
+    const way = { ...(via ? { via } : {}), ...(alt ? { alt } : {}) };
+    for (let i = targets.length - 1; i > 0 && !planCast(s, pid, id, targets, modes, "auto", x, way); i--) if (targets[i]!.kind !== "none") targets[i] = { kind: "none" };
+  }
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
@@ -1421,6 +1432,8 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
+      // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
+      if (ab.mana) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
       const cashIn = ab.sacrificeSelf && o.isToken && !objIsType(s, o, "Creature");
       // A cost of nothing, "{0}" included, could be paid over and over.

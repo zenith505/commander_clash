@@ -5,7 +5,7 @@
 // whose text is just the chosen modes, in printed order (CR 608.2c), which is what
 // `withModes` builds.
 
-import type { AbilityBody, SpellCondition, TargetSpec } from "./abilities";
+import type { AbilityBody, SpellCondition, TargetChoice, TargetSpec } from "./abilities";
 
 /** Why `modes` isn't a valid choice for this modal body (ignoring targets), or null. `both`: see modeRange. */
 export function modeCountProblem(body: AbilityBody, modes: number[], both = false): string | null {
@@ -113,3 +113,69 @@ export function gateTargets(specs: TargetSpec[], how: CastHow = {}): TargetSpec[
 
 /** Whether some of these targets depend on how the spell is cast (see gateTargets). */
 export const hasGatedTargets = (specs: TargetSpec[]) => specs.some((t) => t.onlyIf);
+
+/** The target entry that stands for "any number of target ..." or "up to X target ..." (TargetSpec.many), or -1. */
+export const manySlot = (specs: TargetSpec[]): number => specs.findIndex((t) => t.many);
+
+/**
+ * The body with its "any number of target ..." entry made into the `k` targets announced for it (CR 601.2c): each a
+ * target of its own, none the same as another (115.3), and the effects' references to it covering them all; the
+ * targets after it move up. With none announced it stays one target, cast as if it didn't have it (115.6), so nothing
+ * is chosen for it. `optional`: each may still be left unchosen (offering the most there could be, to choose from).
+ */
+export function expandMany(body: AbilityBody, k: number, optional = false): AbilityBody {
+  const i = manySlot(body.targets);
+  if (i < 0) return body;
+  const n = Math.max(1, k);
+  const shift = (j: number) => (j > i ? j + n - 1 : j);
+  const fix = (t: TargetSpec): TargetSpec => ({
+    ...t,
+    ...(t.distinctFrom ? { distinctFrom: t.distinctFrom.map(shift) } : {}),
+    ...(t.sameGraveyardAs ? { sameGraveyardAs: t.sameGraveyardAs.map(shift) } : {}),
+    ...(t.sharesCreatureTypeWith ? { sharesCreatureTypeWith: t.sharesCreatureTypeWith.map(shift) } : {}),
+    ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
+  });
+  const { many: _many, ...spec } = fix(body.targets[i]!);
+  const copies: TargetSpec[] =
+    k === 0
+      ? [{ ...spec, skip: true }]
+      : Array.from({ length: k }, (_, c) => {
+          const distinct = [...(spec.distinctFrom ?? []), ...Array.from({ length: c }, (_, j) => i + j)];
+          return { ...spec, ...(optional ? { optional: true as const } : {}), ...(distinct.length ? { distinctFrom: distinct } : {}) };
+        });
+  return { ...body, targets: [...body.targets.slice(0, i).map(fix), ...copies, ...body.targets.slice(i + 1).map(fix)], effects: body.effects.map((e) => spreadRefs(e, i, n)) };
+}
+
+/**
+ * The body as cast with these targets, and the targets (CR 601.2c): its "any number of target ..." entry becomes as many
+ * targets as were chosen for it, the ones left unchosen dropped. A reason it can't be, or with nothing of the kind, as is.
+ * `x`: the X announced, which "up to X target ..." can't choose more than.
+ */
+export function fitMany(body: AbilityBody, targets: TargetChoice[], x = 0): { body: AbilityBody; targets: TargetChoice[] } | string {
+  const i = manySlot(body.targets);
+  if (i < 0) return { body, targets };
+  const spec = body.targets[i]!;
+  const end = targets.length - (body.targets.length - 1 - i);
+  if (end < i) return `choose ${body.targets.length - 1} target(s) besides ${spec.text}`;
+  const group = targets.slice(i, end).filter((t) => t.kind !== "none");
+  if (spec.skip && group.length) return `${spec.text} isn't a target this spell has, cast this way`;
+  if (spec.many === "x" && group.length > x) return `choose at most X (${x}) targets for ${spec.text}`;
+  return { body: expandMany(body, group.length), targets: [...targets.slice(0, i), ...(group.length ? group : [{ kind: "none" as const }]), ...targets.slice(end)] };
+}
+
+/** Copy of an effect with its references to target `i` covering `n` targets, and the ones after moved up. */
+function spreadRefs<T>(x: T, i: number, n: number): T {
+  if (Array.isArray(x)) return x.map((y) => spreadRefs(y, i, n)) as T;
+  if (!x || typeof x !== "object") return x;
+  const o = x as Record<string, unknown>;
+  const copy: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(o)) copy[key] = spreadRefs(v, i, n);
+  // Every reference to a target by its number: { ref: "target", index }, "its controller", "any target", the spell a
+  // counterspell or redirect targets, Twincast's { target }.
+  if (typeof o.index === "number" && (typeof o.ref === "string" || o.type === "counterSpell" || o.type === "changeTarget")) {
+    if (o.index > i) copy.index = o.index + n - 1;
+    else if (o.index === i && (o.ref === "target" || o.ref === "anyTarget")) copy.n = n;
+  }
+  if (typeof o.target === "number" && Object.keys(o).length === 1 && o.target > i) copy.target = o.target + n - 1;
+  return copy as T;
+}

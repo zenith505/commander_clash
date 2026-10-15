@@ -17,7 +17,8 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
   // "Choose target creature you control. Each other creature becomes a copy of that creature": the first sentence
   // only chooses the target the second refers to.
-  if ((m = /^Choose (target .+)$/.exec(s))) {
+  // "Choose any number of target creatures. Each of those creatures gains persist until end of turn." too.
+  if ((m = /^Choose ((?:any number of )?target .+)$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [] : null;
   }

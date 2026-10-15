@@ -1,10 +1,10 @@
-import type { ActivatedAbility, AdditionalCost } from "../abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type AdditionalCost, type Effect } from "../abilities";
 import { NUM, num, X, sacrificeSelf, counterKind } from "./words";
 import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { pickFilter } from "./targets";
-import { parseStaticCondition } from "./statics";
+import { parseActivateCondition } from "./statics";
 
 /** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
 const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
@@ -79,7 +79,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (activateIf) return "fail";
     if (onlyIf[2] === " and only once each turn") oncePerTurn = true;
     if (onlyIf[2] === " and only as a sorcery") sorcerySpeed = true;
-    activateIf = parseStaticCondition(onlyIf[1]!, { affects: { kind: "self" }, mods: [], text: "" }) ?? undefined;
+    activateIf = parseActivateCondition(onlyIf[1]!) ?? undefined;
     if (!activateIf) return "fail";
     effectText = effectText.slice(0, onlyIf.index);
   }
@@ -102,11 +102,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "Sacrifice ~: It deals damage equal to its power to ...": "it" is the source.
   const body = parseBody(effectText.replace(/^It (?=deals\b)/, "~ "), { activated: true, ...(returnsSelf ? { selfCard: true } : {}) });
   if (!body) return "fail";
-  // An activated ability without a target that could add mana is a mana ability (CR 605.1a): "{T}, Exert ~: Add two
-  // mana", "{2}, {T}: Add {B} for each black creature card in your graveyard". Those don't use the stack, which an
-  // activated ability here does. (Mana abilities with other costs, like Ashnod's Altar's, still go here: see ROADMAP.)
-  const json = JSON.stringify(body);
-  if ((/Exert ~/.test(costs) || (!json.includes('"targets":[{') && json.includes('"times":'))) && json.includes('"type":"addMana"')) return "fail";
+  // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
+  // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
+  // libraries isn't compiled.
+  const mana = manaAbilityKind(body);
+  if (mana === "fail") return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
   return {
@@ -126,7 +126,28 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(extra.length ? { costs: extra } : {}),
     ...(removeCounters ? { removeCounters } : {}),
     ...(putCounters ? { putCounters } : {}),
+    ...(mana === "mana" ? { mana: true as const } : {}),
   };
+}
+
+/** Instructions that move a card to or from a library (CR 605.1a): an ability with one isn't a mana ability. */
+const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "shuffleZones", "search", "dig", "impulse", "cascade", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash"]);
+/** Instructions that don't: what mana abilities do besides adding mana (Pristine Talisman's life, Glittering Stockpile's counter). */
+const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
+
+/**
+ * Whether an activated ability's effect makes it a mana ability (CR 605.1a): no target, it could add mana, and it
+ * moves no card to or from a library ("Draw a card" makes Chromatic Sphere's use the stack, rulings). A delayed
+ * trigger it sets up (Barbed Sextant's draw at the next upkeep) is a separate ability, so that draw doesn't count.
+ * "fail" when it could add mana but does something not known either way.
+ */
+export function manaAbilityKind(body: AbilityBody): "mana" | "stack" | "fail" {
+  const bodies = body.modal ? body.modal.modes : [body];
+  const effects = bodies.flatMap((b) => allEffects(b.effects));
+  if (!effects.some((e) => e.type === "addMana")) return "stack";
+  if (bodies.some((b) => b.targets.length) || body.targets.length || JSON.stringify(effects.filter((e) => e.type !== "delayed")).includes('"targets":[{')) return "stack";
+  if (effects.some((e) => LIBRARY_EFFECTS.has(e.type))) return "stack";
+  return effects.every((e) => MANA_RIDERS.has(e.type)) ? "mana" : "fail";
 }
 
 /**

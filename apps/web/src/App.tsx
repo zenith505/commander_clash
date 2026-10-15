@@ -34,11 +34,14 @@ import {
   withModes,
   planActivate,
   spellTargets,
+  offerTargets,
+  sourceQuality,
   castHow,
   isSummoningSick,
   legalActions,
   manaAbilitiesOn,
   manaOptions,
+  activatedManaOptions,
   spellCost,
   freeCastOf,
   manaPenalty,
@@ -304,7 +307,9 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
 };
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[] };
+/** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; pick?: ManaPick };
+type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
@@ -381,8 +386,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setBlocker(null);
     setDiscards([]);
     setTapPick(null);
-    if (pending?.kind === "chooseTargets") setTargeting({ mode: "trigger", specs: pending.specs, chosen: [], label: pending.description });
-    else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
+    if (pending?.kind === "chooseTargets") {
+      const specs = offerTargets(s!, pending.specs, HUMAN, 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
+      setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: pending.description });
+    } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
     else setTargeting((t) => (answering(t) ? null : t));
   }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" ? pending.stackId : ""]);
@@ -469,7 +476,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, targets: chosen });
   }
 
-  function useAbility(objectId: string, index: number, modes?: number[], x?: number) {
+  function useAbility(objectId: string, index: number, modes?: number[], x?: number, pick?: ManaPick) {
     if (!s) return;
     setMenu(null);
     const ab = abilitiesOf(s, s.objects[objectId]!).activated[index]!;
@@ -493,8 +500,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return setXPick({ mode: "activate", objectId, index, label, cost: "−X loyalty", max, value: max, modes });
     }
     const body = withModes(ab.body, modes);
-    if (body.targets.length) return setTargeting({ mode: "activate", objectId, index, specs: body.targets, chosen: [], label, modes, x });
-    continueActivate({ objectId, index, modes, x });
+    // "Any number of target ...": an "up to" target for each there could be (CR 601.2c).
+    const offered = offerTargets(s, body.targets, HUMAN, x ?? 0, sourceQuality(s, objectId), objectId);
+    if (offered.length) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x });
+    continueActivate({ objectId, index, modes, x, ...(pick ? { pick } : {}) });
   }
 
   /** After targets: pick what to sacrifice or discard for the ability's costs (CR 602.2b, 601.2h), then activate. */
@@ -525,8 +534,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}) };
     dispatch(
-      planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs) ?? [
-        { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs },
+      planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
+        { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
       ],
     );
   }
@@ -573,7 +582,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.casualty?.includes(id));
       if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
     }
-    const specs = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
+    // "Any number of target ...": an "up to" target for each there could be, "up to X" no more than X (CR 601.2c).
+    const specs = offerTargets(s, spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) })), HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId);
     // Every target skipped: it's cast as if it had none.
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
@@ -2602,7 +2612,7 @@ function AbilityMenu({
 }: {
   s: GameState;
   objectId: string;
-  onUse: (id: string, index: number) => void;
+  onUse: (id: string, index: number, modes?: number[], x?: number, pick?: ManaPick) => void;
   onMana: (x: ManaOption) => void;
   /** For a card in hand: cast it, or play it if it's a land (`untapped`: pay life or reveal so it enters untapped). */
   onPlay: (untapped?: boolean) => void;
@@ -2737,6 +2747,16 @@ function AbilityMenu({
         if ((ab.zone ?? "battlefield") !== o.zone) return null;
         const problem = abilityProblem(s, HUMAN, objectId, i);
         const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
+        // A mana ability with a choice of mana (CR 605.1a): a button for each, like a land's.
+        const picks = ab.mana ? (activatedManaOptions(s, o, i) ?? []).filter((x) => x.adds.length) : [];
+        if (picks.length > 1) {
+          const cost = ab.text.slice(0, ab.text.indexOf(": ")).replace(/~/g, "it");
+          return picks.map((x) => (
+            <button key={`${i}-${x.mana}-${x.extra?.join("") ?? ""}`} disabled={!ok} title={problem ?? ""} onClick={() => onUse(objectId, i, undefined, undefined, { mana: x.mana, ...(x.extra ? { extra: x.extra } : {}) })}>
+              <RulesText text={cost} />: add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
+            </button>
+          ));
+        }
         // Legal, but pointless right now (like untapping something that's untapped, CR 602.2).
         const noop = doesNothingNow(s, objectId, ab.body);
         return (

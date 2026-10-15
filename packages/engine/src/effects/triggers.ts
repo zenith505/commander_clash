@@ -2,10 +2,11 @@ import type { AbilityBody, TargetChoice, TargetSpec, TriggeredAbility, TriggerEv
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
-import { withModes } from "../modes";
+import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
 import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneName } from "../types";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes } from "./targeting";
+import { RulesError } from "../types";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, offerTargets } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -809,6 +810,13 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         s.triggerQueue.shift();
         continue;
       }
+      // "Any number of target creatures" with none to choose and nothing else to target: zero targets (CR 115.6).
+      const offered = offerTargets(s, body.targets, t.controller, 0, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
+      if (offered.every((x) => x.skip)) {
+        pushTrigger(s, t, offered.map(() => ({ kind: "none" as const })));
+        added = true;
+        continue;
+      }
       s.pending = { kind: "chooseTargets", player: t.controller, sourceId: t.sourceId, specs: body.targets, description: describeAbility(def, body.text) };
       return added;
     }
@@ -847,9 +855,12 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   return { ...body, targets: body.targets.map(fix), ...(body.modal ? { modal: { ...body.modal, modes: body.modal.modes.map((m) => ({ ...m, targets: m.targets?.map(fix) })) } } : {}) };
 }
 
-export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoice[]) {
+export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoice[]) {
   const def = s.cards[t.sourceCardId]!;
-  const body = withModes(triggerBody(s, t), t.modes);
+  // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
+  const fit = fitMany(withModes(triggerBody(s, t), t.modes), chosen);
+  if (typeof fit === "string") throw new RulesError(fit);
+  const { body, targets } = fit;
   s.triggerQueue = s.triggerQueue.filter((x) => x !== t);
   s.stack.push({
     id: `s${s.nextId++}`,

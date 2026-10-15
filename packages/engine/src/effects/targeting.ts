@@ -3,7 +3,7 @@ import { manaValue, parseManaCost } from "../mana";
 import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
-import { modeCountProblem } from "../modes";
+import { expandMany, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -211,6 +211,22 @@ export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerI
   return out.filter((t) => isLegalTarget(s, spec, t, controller, src) && lesserPowerOk(s, spec, t, sourceId));
 }
 
+/**
+ * The body to choose targets for (CR 601.2c): "any number of target creatures" offered as one "up to" target for each
+ * creature that could be chosen, "up to X target ..." no more than X; `fitMany` then keeps the ones chosen. Else as is.
+ */
+export function offerMany(s: GameState, body: AbilityBody, controller: PlayerId, x = 0, src?: SourceQuality, sourceId?: ObjectId): AbilityBody {
+  const i = manySlot(body.targets);
+  if (i < 0) return body;
+  const spec = body.targets[i]!;
+  const room = spec.skip ? 0 : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => !(spec.notSource && t.kind === "object" && t.id === sourceId)).length;
+  return expandMany(body, spec.many === "x" ? Math.min(x, room) : room, true);
+}
+
+/** The targets to choose from, as offerMany offers them. */
+export const offerTargets = (s: GameState, specs: TargetSpec[], controller: PlayerId, x = 0, src?: SourceQuality, sourceId?: ObjectId): TargetSpec[] =>
+  offerMany(s, { targets: specs, effects: [], text: "" }, controller, x, src, sourceId).targets;
+
 export const sameTarget = (a: TargetChoice | undefined, b: TargetChoice) => !!a && a.kind !== "none" && b.kind !== "none" && a.kind === b.kind && a.id === b.id;
 
 /**
@@ -287,7 +303,8 @@ export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined):
  * out, so only the others need something, each different where they must be.
  */
 export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
-  const free = (spec: TargetSpec) => spec.optional || spec.skip;
+  // "Any number of target creatures" can be none (CR 115.6), and so can "up to X" (see TargetSpec.many).
+  const free = (spec: TargetSpec) => spec.optional || spec.skip || !!spec.many;
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
   if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length)) return true;

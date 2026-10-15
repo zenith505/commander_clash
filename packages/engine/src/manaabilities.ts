@@ -1,10 +1,10 @@
 // Mana abilities (CR 605) as they are on the battlefield: what each one can make right now,
 // whether it can be activated, and which one to use for a given mana.
 
-import type { ManaAbility, ManaTrigger } from "./abilities";
+import { allEffects, type ActivatedAbility, type ManaAbility, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
-import { isSummoningSick, obj, player, tapCostCandidates } from "./game";
+import { abilityProblem, isSummoningSick, obj, player, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -52,6 +52,8 @@ function landsCouldProduce(s: GameState, pid: PlayerId, whose: "you" | "opponent
       const made = p.kind === "fixed" ? p.mana : p.kind === "landsCouldProduce" ? landsCouldProduce(s, ctrl, p.whose, !!p.anyType, new Set([...asking, id])) : manaChoices(s, land, ab);
       made.forEach((m) => out.add(m));
     }
+    // Its activated mana abilities too ("{T}, Sacrifice a creature: Add {B}{B}"): whatever their costs (CR 106.7).
+    for (const ab of abilitiesOf(s, land).activated) if (ab.mana) activatedManaTypes(s, land, ab).forEach((m) => out.add(m));
   }
   return (["W", "U", "B", "R", "G", "C"] as ManaType[]).filter((m) => out.has(m) && (anyType || m !== "C"));
 }
@@ -165,6 +167,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
+  if (ab.activateIf && !staticConditionNow(s, ab.activateIf, o.id, pid)) return `${name}'s ability can't be activated now`; // CR 602.5b
   const p = player(s, pid);
   if (ab.lifeCost && p.life < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
@@ -201,4 +204,80 @@ export function manaActionAbility(s: GameState, a: Extract<Action, { type: "acti
   const o = obj(s, a.objectId);
   const i = a.ability ?? pickManaAbility(s, a.player, o, a.mana);
   return i === undefined ? undefined : manaAbilitiesOn(s, o)[i];
+}
+
+/**
+ * An activated mana ability (CR 605.1a, `ActivatedAbility.mana`) seen as a `ManaAbility`, for planning a payment and
+ * for the choices offered when it's activated: what it adds when that's known before it resolves (a fixed amount, or
+ * one color chosen for it), and its costs. Null when what it adds depends on how it resolves ("If you control four or
+ * more creatures, add {G}{G} instead", "for each ...").
+ */
+export function activatedAsMana(ab: ActivatedAbility): ManaAbility | null {
+  if (!ab.mana || ab.body.modal) return null;
+  const top = ab.body.effects;
+  const adds = allEffects(top).filter((e) => e.type === "addMana");
+  const e = adds.length === 1 && top.includes(adds[0]!) ? adds[0]! : undefined;
+  if (e?.type !== "addMana") return null;
+  let produces: ManaAbility["produces"];
+  if (e.mana && e.times === undefined) produces = { kind: "fixed", mana: [...e.mana.matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1] as ManaType) };
+  else if (!e.mana && e.chosen && top.some((c) => c.type === "choose" && c.choice === "color")) produces = { kind: "oneOf", options: [...COLORS], amount: e.chosen };
+  else return null;
+  return {
+    text: ab.text,
+    manaCost: ab.manaCost,
+    tap: ab.tap,
+    sacrificeSelf: ab.sacrificeSelf,
+    produces,
+    ...(ab.lifeCost ? { lifeCost: ab.lifeCost } : {}),
+    ...(ab.energyCost ? { energyCost: ab.energyCost } : {}),
+    ...(ab.removeCounters ? { removeCounters: ab.removeCounters } : {}),
+    ...(ab.exertCost ? { skipNextUntap: true } : {}),
+  };
+}
+
+/**
+ * The ways to activate this activated mana ability, as for `manaOptions`: the color for "one mana of any color" and
+ * the picks for the triggered mana abilities it triggers. Null when what it adds isn't known before it resolves.
+ */
+export function activatedManaOptions(s: GameState, o: GameObject, index: number): ManaOption[] | null {
+  const ab = abilitiesOf(s, o).activated[index];
+  const m = ab && activatedAsMana(ab);
+  if (!m) return null;
+  const pid = controllerOf(s, o);
+  return manaChoices(s, o, m).flatMap((mana) => {
+    const adds = manaProduced(s, o, m, mana);
+    return manaTriggerResults(s, pid, o, m, adds).map((r) => ({ ability: index, mana, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}) }));
+  });
+}
+
+/** The types of mana an activated mana ability could add if it resolved now (CR 106.7): every one it names. */
+function activatedManaTypes(s: GameState, o: GameObject, ab: ActivatedAbility): ManaType[] {
+  const m = activatedAsMana(ab);
+  if (m) return m.produces.kind === "fixed" ? m.produces.mana : manaChoices(s, o, m);
+  const out = new Set<ManaType>();
+  for (const b of ab.body.modal ? ab.body.modal.modes : [ab.body])
+    for (const e of allEffects(b.effects)) {
+      if (e.type !== "addMana") continue;
+      if (e.mana) for (const x of e.mana.matchAll(/\{([WUBRGC])\}/g)) out.add(x[1] as ManaType);
+      else if (e.chosen) COLORS.forEach((c) => out.add(c));
+    }
+  return [...out];
+}
+
+/**
+ * The activated mana abilities of `o` that paying a cost can use (autopay, and what a bot counts on): no cost that
+ * needs a choice (what to sacrifice or discard is the player's to pick, so those are activated by hand first), mana
+ * known before they resolve, and activatable now apart from mana. `penalty` as for manaPenalty, more for instructions
+ * besides adding mana and gaining life (losing life, damage).
+ */
+export function payableActivatedMana(s: GameState, pid: PlayerId, o: GameObject): { index: number; ab: ActivatedAbility; options: ManaOption[]; penalty: number }[] {
+  return abilitiesOf(s, o).activated.flatMap((ab, index) => {
+    if (!ab.mana || (ab.zone ?? "battlefield") !== "battlefield" || ab.costs?.length || ab.discardSelf || ab.exileSelf || ab.putCounters || ab.crew !== undefined || ab.station) return [];
+    const m = activatedAsMana(ab);
+    if (!m || parseManaCost(ab.manaCost).hasX) return [];
+    const problem = abilityProblem(s, pid, o.id, index);
+    if (problem && !(/not enough mana/.test(problem) && ab.manaCost)) return [];
+    const riders = allEffects(ab.body.effects).some((e) => !["addMana", "choose", "gainLife", "delayed", "counters", "if"].includes(e.type)) ? 2 : 0;
+    return [{ index, ab, options: activatedManaOptions(s, o, index) ?? [], penalty: manaPenalty(m) + riders }];
+  });
 }

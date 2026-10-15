@@ -4,6 +4,7 @@ import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } f
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseCount } from "./counts";
+import { parseActivateCondition } from "./statics";
 
 /**
  * A mana ability (CR 605.1a): "{T}: Add {G}.", "{T}: Add {W} or {U}. ~ deals 1 damage to you.",
@@ -48,6 +49,12 @@ export function parseManaAbility(line: string): ManaAbility | null {
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
     else if (extra === "Activate only once each turn.") out.oncePerTurn = true;
+    else if ((m2 = /^Activate only if ([^.]+)\.$/.exec(extra)) && !out.activateIf) {
+      // "Activate only if you control a Swamp" (CR 602.5b).
+      const cond = parseActivateCondition(m2[1]!);
+      if (!cond) return null;
+      out.activateIf = cond;
+    }
     else if ((m2 = /^This mana can't be spent to cast (?:an? )?non([a-z]+) spells?\.$/.exec(extra)) && !out.spendOnly) {
       // A Powerstone's "can't be spent to cast a nonartifact spell": on anything but those spells (CR 111.10h).
       const spells = spellFilter(m2[1]!);

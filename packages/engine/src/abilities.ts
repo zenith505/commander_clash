@@ -70,6 +70,10 @@ export type Count =
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   | { kind: "discardedThisWay"; greatest?: true }
+  /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
+  | { kind: "greatestPowerExiled" }
+  /** "For each counter removed this way" (Nexus Mentality). */
+  | { kind: "countersRemovedThisWay" }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
@@ -220,6 +224,12 @@ export interface TargetSpec {
   onlyIf?: { cond: SpellCondition; not?: true };
   /** Set by `gateTargets` for a target the spell is cast as if it didn't have: nothing ({ kind: "none" }) is chosen. */
   skip?: true;
+  /**
+   * "Any number of target creatures" ("any"), "up to X target artifacts" ("x"): a variable number of targets, announced
+   * as it's cast (CR 601.2c), any number from 0 (115.6), or up to X. This one entry stands for all of them until then;
+   * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
+   */
+  many?: "any" | "x";
   /** Original text, for display. */
   text: string;
 }
@@ -468,7 +478,9 @@ export type StaticCondition =
   /** A level symbol's "at least N1 and no more than N2 level counters" (CR 711.2), a station symbol's "N or more charge counters" (CR 721.2). */
   | { kind: "selfCounters"; counter: CounterKind; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" }
+  /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
+  | { kind: "anyOf"; conds: StaticCondition[] }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
   | { kind: "coven" }
   /**
@@ -741,6 +753,10 @@ export type Effect =
    */
   | { type: "copySpell"; spell: "cause" | { target: number }; n: Amount | "storm" | "kicked"; newTargets: boolean }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
+  | { type: "removeAllCounters"; what: ObjRef }
+  /** "Move all counters from target creature onto another target creature" (CR 122.5): only if both are still legal targets (rulings on Fate Transfer). */
+  | { type: "moveAllCounters"; from: ObjRef; to: ObjRef }
   /** "Put its counters on target creature": as many of each kind (or of `only`) as the source had as it last existed. */
   | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
@@ -1277,6 +1293,13 @@ export interface ActivatedAbility {
    */
   loyalty?: number;
   loyaltyX?: boolean;
+  /**
+   * A mana ability (CR 605.1a): no target, could add mana, moves no card to or from a library. It doesn't use the
+   * stack: it resolves as soon as it's activated (605.3b), even while paying a cost (605.3a). The ones whose costs
+   * and mana fit `ManaAbility` are compiled as those instead; these have other costs ("Sacrifice a creature") or
+   * other instructions ("You gain 1 life").
+   */
+  mana?: true;
 }
 
 /**
@@ -1326,6 +1349,8 @@ export interface ManaAbility {
   oncePerTurn?: boolean;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
+  /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
+  activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
   spendOnly?: ManaSpend;
 }
@@ -1665,6 +1690,8 @@ export interface CompiledCard {
   costLessIf?: { n: number; cond: StaticCondition }[];
   /** "This spell costs {3} less to cast if it targets a tapped creature" (CR 601.2f). */
   costLessIfTargets?: { n: number; filter: TargetSpec }[];
+  /** Strive: "This spell costs {2}{G} more to cast for each target beyond the first", an additional cost (CR 601.2f, rulings). */
+  strive?: string;
   /** "Spells your opponents cast that target ~ cost {2} more to cast": once per spell however often it targets it (rulings). */
   targetTax?: number;
   /**

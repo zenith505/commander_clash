@@ -52,6 +52,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4d18bcba-a346-445e-a182-6cc30b7e066d",
+  "name": "Ashnod's Altar",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a creature: Add {C}{C}.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ee05fc58-1356-4b2f-b9ce-bda8cc716aee",
   "name": "Augury Raven",
   "manaCost": "{3}{U}",
@@ -314,6 +339,34 @@
   "set": "akh",
   "releasedAt": "2017-04-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8ac493f2-9519-44d7-b6ac-8c020ad2cede",
+  "name": "Consign to Dust",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Strive — This spell costs {2}{G} more to cast for each target beyond the first.\nDestroy any number of target artifacts and/or enchantments.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Strive"
+  ],
+  "commanderLegal": "legal",
+  "set": "jou",
+  "releasedAt": "2014-05-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -835,6 +888,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8e04a5e0-e22c-430b-a39a-c9f38e16ea86",
+  "name": "Guardian of Faith",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Spirit Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Knight"
+  ],
+  "oracleText": "Flash\nVigilance\nWhen this creature enters, any number of other target creatures you control phase out. (Treat them and anything attached to them as though they don't exist until their controller's next turn.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "342199e0-15b6-4824-83da-25caef2592b3",
   "name": "Hill Giant",
   "manaCost": "{3}{R}",
@@ -1229,6 +1316,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c97361b5-af16-4a7b-af85-a429dbaf4ad2",
+  "name": "Mind Stone",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{1}, {T}, Sacrifice this artifact: Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1b524149-340e-4f94-9520-6a5258fabb00",
   "name": "Monk's Fist",
   "manaCost": "{2}",
@@ -1316,6 +1428,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "de2440de-e948-4811-903c-0bbe376ff64d",
+  "name": "Mox Opal",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Metalcraft — {T}: Add one mana of any color. Activate only if you control three or more artifacts.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Metalcraft"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "mps",
+  "releasedAt": "2016-09-30",
+  "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "713332c1-5bd8-400f-bfff-c1ca0697a043",
   "name": "Opt",
   "manaCost": "{U}",
@@ -1373,6 +1518,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8d02b297-97c4-4379-9862-0a462400f66f",
+  "name": "Phyrexian Altar",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice a creature: Add one mana of any color.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "uma",
+  "releasedAt": "2018-12-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bc71ebf6-2056-41f7-be35-b2e5c34afa99",
   "name": "Plains",
   "manaCost": "",
@@ -1400,6 +1574,31 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1b3d7fce-e9fe-4176-9d9a-472415826cdd",
+  "name": "Pristine Talisman",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}. You gain 1 life.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "brr",
+  "releasedAt": "2022-11-18",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -53,6 +53,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature",
 ];
 
 /**
@@ -64,6 +65,25 @@ const BLOCK_TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ becomes blocked by (an? .+?), (.+)$/, "selfBlockedByCreature"],
   [/^Whenever ~ blocks (an? .+?), (.+)$/, "selfBlocksCreature"],
 ];
+
+/**
+ * "Whenever ~ deals combat damage to a creature, tap that creature and it doesn't untap during its controller's next
+ * untap step": once for each creature it dealt damage to (CR 603.2c), which "that creature" and "it" mean.
+ */
+function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever ~ deals (combat )?damage to a creature, (.+)$/.exec(line);
+  if (!m) return null;
+  let text = m[2]!;
+  const thatMuch = /\bthat (?:much|many)\b/.test(text);
+  if (thatMuch) {
+    if (/\bX\b/.test(text)) return "fail";
+    text = text.replace(/\bthat (?:much|many)\b/g, "X");
+  }
+  let body = parseBody(text, { subjectIt: true });
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
+  return { event: m[1] ? "selfDealsCombatDamageToCreature" : "selfDealsDamageToCreature", body };
+}
 
 function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
   for (const [re, event] of BLOCK_TRIGGERS) {
@@ -255,6 +275,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (cast) return cast;
   const block = parseBlockTrigger(line);
   if (block) return block;
+  const damages = parseDamagesCreatureTrigger(line);
+  if (damages) return damages;
   const enters = parseEntersTrigger(line);
   if (enters) return enters;
   const draws = parseDrawTrigger(line);

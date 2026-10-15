@@ -266,7 +266,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c).
-    if (/^(It|They) can't be regenerated$/i.test(s)) {
+    if (/^(It|They|The creature) can't be regenerated$/i.test(s)) {
       const last = effects[effects.length - 1];
       if (!last || last.type !== "destroy") return null;
       last.noRegen = true;

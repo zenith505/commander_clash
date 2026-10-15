@@ -512,6 +512,12 @@ export function compile(d: CardDef): CompiledCard {
       out.entersTappedChoice = choice;
       continue;
     }
+    // Kumano, Master Yamabushi; Kumano's Blessing: a replacement effect (CR 614.1a) on creatures it dealt damage this turn.
+    const kumano = /^If a creature dealt damage by (~|enchanted creature) this turn would die, exile it instead\.$/.exec(line);
+    if (kumano) {
+      out.exileWhatItDamaged = kumano[1] === "~" ? "self" : "attached";
+      continue;
+    }
     // Darksteel Colossus: a replacement effect that works from every zone (CR 614.1a, 113.6c-style "from anywhere").
     if (/^If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead\.$/.test(line)) {
       out.shuffleInsteadOfGraveyard = true;

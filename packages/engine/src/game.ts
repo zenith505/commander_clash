@@ -1,6 +1,6 @@
 import { kickerName } from "./abilities";
 import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
@@ -479,6 +479,12 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
   o.exileIfDiesTurn = undefined;
+  // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
+  // battlefield or leaving it at the same time (rulings).
+  if (fromZone === "battlefield" && to === "graveyard" && o.damagedBy?.length && objIsType(s, o, "Creature") && exiledByWhatDamagedIt(s, o)) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of dying.`);
+  }
   // Darksteel Colossus: "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's
   // library instead" (CR 614.1a). On the battlefield it's the permanent's ability now (it could have lost it);
   // elsewhere the card's. If an "exile it instead" effect also applies, its owner would choose the order (CR 616.1):
@@ -776,6 +782,17 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
   player(s, pid).life -= n;
   fireEvent(s, { type: "lifeLost", player: pid, amount: n });
+}
+
+/** Is a permanent that dealt `o` damage this turn one that exiles it instead of letting it die (Kumano)? */
+function exiledByWhatDamagedIt(s: GameState, o: GameObject): boolean {
+  const by = o.damagedBy ?? [];
+  for (const id of s.battlefield) {
+    const w = obj(s, id);
+    const how = abilitiesOf(s, w).exileWhatItDamaged;
+    if ((how === "self" && by.includes(id)) || (how === "attached" && w.attachedTo && by.includes(w.attachedTo))) return true;
+  }
+  return (s.leftTogether ?? []).some((l) => l.hadAbilities && by.includes(l.id) && withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileWhatItDamaged === "self");
 }
 
 /**

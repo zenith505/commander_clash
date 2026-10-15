@@ -1022,6 +1022,8 @@ export interface CompiledCard {
   /** For Auras: what it can enchant, which is also what the Aura spell targets. CR 303.4a, 702.5 */
   enchant?: TargetSpec;
   entersTapped: boolean;
+  /** "If a creature dealt damage by ~ (by enchanted creature) this turn would die, exile it instead." (Kumano) */
+  exileWhatItDamaged?: "self" | "attached";
   /** "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead." */
   shuffleInsteadOfGraveyard?: boolean;
   /**

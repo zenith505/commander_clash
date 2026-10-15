@@ -415,11 +415,16 @@ export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lif
 /** Commit a finished plan and deal its damage. `lifelink`: add the life up for the caller instead of gaining it per event. */
 export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }) } = {}): (DamageEvent & { dealt: number })[] {
   commitShields(s, plan);
-  return plan.final.map((e) => {
+  const out = plan.final.map((e) => {
     const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
     const o = "object" in e.to ? obj(s, e.to.object) : undefined;
     const to = o ? { object: o } : { player: (e.to as { player: PlayerId }).player };
     const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true });
     return { ...e, dealt };
   });
+  // "Whenever ~ is dealt damage": the damage dealt to a permanent at the same time is one event (rulings).
+  const dealtTo = new Map<ObjectId, number>();
+  for (const e of out) if ("object" in e.to && e.dealt > 0) dealtTo.set(e.to.object, (dealtTo.get(e.to.object) ?? 0) + e.dealt);
+  for (const [id, amount] of dealtTo) fireEvent(s, { type: "wasDealtDamage", id, amount });
+  return out;
 }

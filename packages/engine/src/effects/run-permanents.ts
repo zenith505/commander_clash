@@ -97,18 +97,20 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [army.id], mods: [{ kind: "addTypes", types: [], subtypes: [e.subtype] }] });
       return;
     }
+    case "recruit":
     case "connive": {
       // CR 701.50a: its controller draws, then discards; each nonland card discarded is a +1/+1 counter on it.
       // If it already left the battlefield, its controller as it last existed still draws and discards (CR 701.50c).
+      // Recruit (CR 701.70a) is the same draw and discard, with a Human Soldier token for a nonland card.
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       if (!sc.connive) {
-        const o = objects(s, e.what, ctx)[0];
+        const o = e.type === "connive" ? objects(s, e.what, ctx)[0] : undefined;
         const pid = o ? controllerOf(s, o) : ctx.controller;
-        const n = (sc.n = amountNow(s, e.n, ctx));
+        const n = (sc.n = e.type === "connive" ? amountNow(s, e.n, ctx) : 1);
         sc.connive = { pid, ...(o ? { id: o.id, zc: o.zoneChanges ?? 0 } : {}) };
         if (n <= 0) return;
-        log(s, `${o ? defOf(s, o).name : src} connives${n > 1 ? ` ${n}` : ""}.`);
+        log(s, e.type === "recruit" ? `${player(s, pid).name} recruits.` : `${o ? defOf(s, o).name : src} connives${n > 1 ? ` ${n}` : ""}.`);
         sc.queue = [pid];
         sc.chosen = {};
         if (!draw(s, pid, n)) return "paused"; // dredge's choice finishes the draws (CR 702.52a)
@@ -128,6 +130,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const ids = sc.chosen![pid] ?? [];
       const nonland = ids.filter((x) => !defOf(s, obj(s, x)).types.includes("Land")).length;
       discardCards(s, pid, ids);
+      if (e.type === "recruit") {
+        if (!nonland) return;
+        const soldier: TokenSpec = { name: "Human Soldier", power: 1, toughness: 1, colors: ["W"], types: ["Creature"], subtypes: ["Human", "Soldier"], keywords: [] };
+        const k = tokensToCreate(s, pid, soldier, 1);
+        for (let i = 0; i < k; i++) createToken(s, pid, soldier);
+        if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
+        return;
+      }
       const o = id ? s.objects[id] : undefined;
       if (nonland && o?.zone === "battlefield" && (o.zoneChanges ?? 0) === zc) {
         invalidateCharacteristics(s);
@@ -221,7 +231,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (had === 1 && e.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       } else if (e.orSacrifice && controllerOf(s, o) === ctx.controller) {
         log(s, `${player(s, ctx.controller).name} sacrifices ${name}: it has no ${e.counter} counters left.`);
-        moveObject(s, o.id, "graveyard");
+        moveObject(s, o.id, "graveyard", { sacrificed: true });
       }
       return;
     }

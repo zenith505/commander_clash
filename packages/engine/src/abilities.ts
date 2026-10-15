@@ -296,12 +296,23 @@ export type Modification =
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   | { kind: "doesntUntap" }
+  /**
+   * Ghostly Prison: "Creatures can't attack you unless their controller pays {2} for each creature they control that's
+   * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
+   */
+  | { kind: "attackTax"; n: number }
+  /** "Untap ~ during each other player's untap step" (CR 502.3). */
+  | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
   | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
   /** Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able. */
   | { kind: "goad" }
+  /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
+  | { kind: "mustAttackPlayer"; player: PlayerId }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
+  /** "Can't block creatures with power 2 or greater" (a blocking restriction on the blocker, CR 509.1b). */
+  | { kind: "cantBlockCreatures"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   | { kind: "maxOneBlocker" }
   /** "Its activated abilities can't be activated" (Arrest), mana abilities included (CR 605.1a) unless `exceptMana`. */
@@ -437,9 +448,22 @@ export type Effect =
   | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; may: boolean; any?: boolean }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
-  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean; /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */ attachToSubject?: boolean }
-  /** "Put target card from your graveyard on top of / on the bottom of its owner's library". */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }
+  | {
+      type: "putOntoBattlefield";
+      what: ObjRef;
+      tapped?: boolean;
+      /** "Under its owner's control" rather than yours. */
+      owner?: boolean;
+      /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
+      attachToSubject?: boolean;
+      /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
+      becomes?: { types: string[]; subtypes: string[] };
+    }
+  /**
+   * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
+   * creature's owner puts it on their choice of the top or bottom of their library".
+   */
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
@@ -455,6 +479,11 @@ export type Effect =
   | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
+  /**
+   * Recruit (CR 701.70a): "Draw a card, then discard a card. If you discarded a nonland card this way, create a 1/1
+   * white Human Soldier creature token."
+   */
+  | { type: "recruit" }
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   | { type: "exileIfDies"; what: ObjRef }
   /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
@@ -517,6 +546,11 @@ export type Effect =
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /** CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player). */
   | { type: "myriad" }
+  /**
+   * Encore (CR 702.141a): for each opponent, a token copy of this card that attacks that opponent this turn if able.
+   * The tokens gain haste. (The sacrifice at the next end step is a separate delayed trigger about each token.)
+   */
+  | { type: "encore" }
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string }
   /**
@@ -634,6 +668,13 @@ export type Effect =
   | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop" | "battlefield"; rest: "graveyard" | "bottom" | "shuffle"; reveal: boolean; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
+  /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
+  /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
+  | { type: "extraTurn"; who: PlayerRef; n: number; loseAtEnd?: true }
+  /** "You lose the game" (CR 104.3a). */
+  | { type: "loseGame"; who: PlayerRef }
+  /** "Exile ~" in an instant or sorcery: it goes to exile as it resolves instead of its owner's graveyard (CR 608.2n). */
+  | { type: "exileSpell" }
   /** "You take the initiative" (CR 726). */
   | { type: "takeInitiative"; who: PlayerRef }
   /**
@@ -682,6 +723,7 @@ export type TriggerEvent =
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
+  | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
   | "permanentEnters"
@@ -743,6 +785,8 @@ export type TriggerEvent =
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
+  /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
+  | "youSacrifice"
   /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
   | "playerDiscards"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
@@ -753,6 +797,8 @@ export type TriggerEvent =
   | "selfExploits"
   /** "Whenever a creature you control exploits a nontoken creature": see TriggeredAbility.subjectFilter. */
   | "creatureYouControlExploits"
+  /** "Whenever a creature you control deals combat damage to a player": see TriggeredAbility.dealer; the creature is the subject. */
+  | "creatureYouControlDealsCombatDamageToPlayer"
   /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
@@ -784,6 +830,8 @@ export interface TriggeredAbility {
    * (rulings: cycling a card triggers it once).
    */
   discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
+  /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
+  dealer?: { filter: TargetSpec; other?: boolean };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
   /**
@@ -797,6 +845,11 @@ export interface TriggeredAbility {
    * Equipment is attached to; `damagedBySelf`: "a creature dealt damage by ~ this turn".
    */
   dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean };
+  /**
+   * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
+   * went. The card is the subject ("exile it").
+   */
+  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information. */
   ifNoCounter?: "+1/+1" | "-1/-1";
   /**
@@ -885,9 +938,13 @@ export interface ActivatedAbility {
  * "commanderIdentity": one mana of a color in its controller's commander's color identity
  * (none if that identity is colorless, CR 903.4f).
  */
+/**
+ * `n`: "Add an amount of {G} equal to ~'s power", "Add X mana of any one color, where X is the number of Elves on the
+ * battlefield": the mana (or the one chosen color) that many times, counted as the ability resolves (CR 106.1, 605.3).
+ */
 export type ManaProduce =
-  | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec }
-  | { kind: "oneOf"; options: ManaType[]; amount: number }
+  | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec; n?: AmountExpr }
+  | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
   | { kind: "chosenColor"; also?: ManaType }
@@ -1026,7 +1083,7 @@ export type AdditionalCost =
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
 export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative";
 
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape";
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   mana?: string;

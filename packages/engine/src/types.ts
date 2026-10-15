@@ -154,6 +154,8 @@ export interface GameObject {
   castFrom?: ZoneName;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
+  discardedTurn?: number;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
   castAlt?: AltCostKind;
   /**
@@ -325,6 +327,13 @@ export interface DelayedTrigger {
   step: Step;
 }
 
+/** An extra turn (CR 500.7). */
+export interface ExtraTurn {
+  player: PlayerId;
+  /** "At the beginning of that turn's end step, you lose the game": the spell's controller and card. */
+  loseAtEnd?: { controller: PlayerId; sourceCardId: string; subject: { id: ObjectId; zc: number } };
+}
+
 /** A triggered ability waiting to be put on the stack. CR 603.3 */
 export interface PendingTrigger {
   sourceId: ObjectId;
@@ -467,7 +476,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield" | "topOrBottom"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -542,6 +551,15 @@ export interface GameState {
    */
   /** Delayed triggered abilities waiting for their moment (CR 603.7): unearth's exile, rebound's cast. */
   delayed?: DelayedTrigger[];
+  /**
+   * Extra turns still to be taken (CR 500.7): the most recently created is taken first. `loseAtEnd`: "At the beginning of
+   * that turn's end step, you lose the game", a delayed trigger of that player's.
+   */
+  extraTurns?: ExtraTurn[];
+  /** The extra turn being taken now, if this is one. */
+  extraTurn?: ExtraTurn;
+  /** During extra turns: the player whose turn came before them in the normal order, who the next normal turn follows. */
+  rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
   /** The player who has the initiative (CR 726), once someone has taken it. */
@@ -649,6 +667,7 @@ export interface Resolving {
     copies?: { of: string; left: number; targets?: TargetChoice[] }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
+    topOrBottom?: string; // the owner's choice: "top" or "bottom"
     clash?: { opp?: PlayerId; revealed?: Record<string, ObjectId | null>; queue?: PlayerId[]; bottom?: PlayerId[]; answer?: boolean };
   };
 }

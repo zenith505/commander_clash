@@ -37,6 +37,12 @@ export function parseGraveyardKeyword(
   }
   if (/^Jump-start$/.test(line)) return isSpell ? { fromGraveyard: { kind: "jumpStart", costs: [{ kind: "discard", n: 1 }], exile: true } } : "fail";
   if (/^Retrace$/.test(line)) return { fromGraveyard: { kind: "retrace", costs: [{ kind: "discard", n: 1, filter: { kind: "card", types: ["Land"], text: "land card" } }], exile: false } };
+  // Mayhem (CR 702.187b): "As long as you discarded this card this turn, you may cast it from your graveyard by paying
+  // [cost] rather than paying its mana cost." Mayhem without a cost (a land you may play, 702.187c) isn't supported.
+  if ((m = /^Mayhem ((?:\{[^}]+\})+)$/.exec(line))) {
+    if (!parseManaCost(m[1]!).supported || parseManaCost(m[1]!).hasX) return "fail";
+    return { fromGraveyard: { kind: "mayhem", mana: m[1]!, costs: [], exile: false } };
+  }
   if (/^Rebound$/.test(line)) return isSpell ? { rebound: true } : "fail";
   if ((m = /^Buyback ((?:\{[^}]+\})+)$/.exec(line))) return isSpell && parseManaCost(m[1]!).supported && !parseManaCost(m[1]!).hasX ? { buyback: m[1]! } : "fail";
   if ((m = new RegExp(`^~ escapes with ${NUM} \\+1/\\+1 counters? on it\\.$`).exec(line))) return { escapesWith: num(m[1]!) };
@@ -211,6 +217,28 @@ export function parseCostKeyword(
           text: `Create a token that's a copy of ~, except it's a ${embalm ? "white" : "4/4 black"} Zombie ${d.subtypes.join(" ")} with no mana cost.`,
         },
         text: `${m[1]} ${cost}`,
+      },
+    };
+  }
+  // Encore (CR 702.141a): "[Cost], Exile this card from your graveyard: For each opponent, create a token that's a copy
+  // of this card that attacks that opponent this turn if able. The tokens gain haste. Sacrifice them at the beginning of
+  // the next end step. Activate only as a sorcery."
+  if ((m = /^Encore ((?:\{[^}]+\})+)$/.exec(line))) {
+    if (!plainMana(m[1]!)) return "fail";
+    return {
+      activated: {
+        manaCost: m[1]!,
+        tap: false,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        zone: "graveyard",
+        exileSelf: true,
+        body: {
+          targets: [],
+          effects: [{ type: "encore" }, { type: "delayed", when: "nextEndStep", each: "created", effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "sacrifice ~" }],
+          text: "For each opponent, create a token that's a copy of ~ that attacks that opponent this turn if able. The tokens gain haste. Sacrifice them at the beginning of the next end step.",
+        },
+        text: `Encore ${m[1]}`,
       },
     };
   }

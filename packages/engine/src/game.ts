@@ -22,6 +22,7 @@ import {
   type Action,
   type CardDef,
   type CostChoices,
+  type ExtraTurn,
   type FaceDownKind,
   type GameObject,
   type GameState,
@@ -294,7 +295,8 @@ export function applyInPlace(s: GameState, action: Action): void {
       // Mana abilities can also be activated while paying a cost mid-resolution, like ward's (CR 605.3a).
       // So can they while casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g).
       // And while helping to pay for a spell with assist, or paying the rest of it (CR 702.132a).
-      if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
+      // And while declaring attackers, to pay what attacking costs (CR 508.1i).
+      if (s.pending?.kind !== "payUnless" && s.pending?.kind !== "declareAttackers" && s.pending?.kind !== "assist" && s.pending?.kind !== "assistCast" && !(s.pending?.kind === "chooseMay" && s.pending.pay?.mana) && !(s.pending?.kind === "castFree" && s.pending.how === "madness")) requireNoPending(s);
       activateMana(s, p, action.objectId, action.mana, action.ability, action.tap, action.extra);
       break;
     case "castSpell":
@@ -485,6 +487,10 @@ export function moveObject(
     untapped?: boolean;
     /** The X of the spell it was, for "enters with X counters" and its enters triggers (CR 107.3m). */
     x?: number;
+    /** Its controller is sacrificing it (CR 701.21a), for "whenever you sacrifice" triggers. */
+    sacrificed?: boolean;
+    /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
+    becomes?: { types: string[]; subtypes: string[] };
   } = {},
 ) {
   const o = obj(s, id);
@@ -529,6 +535,7 @@ export function moveObject(
   // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
+  o.discardedTurn = undefined;
   if (fromZone === "stack") {
     o.castFrom = undefined;
     o.castVia = undefined;
@@ -614,6 +621,8 @@ export function moveObject(
       }
   }
   if (to === "battlefield") o.controlledSinceTurn = s.turn;
+  if (to === "battlefield" && opts.becomes)
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
   invalidateCharacteristics(s);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
@@ -634,7 +643,7 @@ export function moveObject(
   // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
   // triggers say "put into a graveyard" or "leaves the battlefield".
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
   if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
@@ -1059,14 +1068,29 @@ function advanceStep(s: GameState): void {
 
 function startNextTurn(s: GameState) {
   const prev = s.activePlayer;
-  s.activePlayer = nextLivingAfter(s, s.activePlayer);
-  // "Until your next turn" ends as that turn begins, or when it would have begun for a player who left (CR 800.4m).
-  const order = s.turnOrder;
+  // An extra turn is taken directly after this one, the most recently created first (CR 500.7); one for a player who
+  // left the game isn't taken (CR 800.4a). After them, the normal order goes on from the last normal turn.
+  let extra: ExtraTurn | undefined;
+  while ((extra = s.extraTurns?.pop()) && player(s, extra.player).lost);
+  if (!s.extraTurns?.length) s.extraTurns = undefined;
   const began = new Set<PlayerId>();
-  for (let i = (order.indexOf(prev) + 1) % order.length; ; i = (i + 1) % order.length) {
-    began.add(order[i]!);
-    if (order[i] === s.activePlayer || began.size >= order.length) break;
+  if (extra) {
+    if (!s.extraTurn) s.rotation = prev;
+    s.activePlayer = extra.player;
+    began.add(extra.player);
+    log(s, `${player(s, extra.player).name} takes an extra turn.`);
+  } else {
+    const from = s.rotation !== undefined && s.extraTurn ? s.rotation : prev;
+    s.rotation = undefined;
+    s.activePlayer = nextLivingAfter(s, from);
+    // "Until your next turn" ends as that turn begins, or when it would have begun for a player who left (CR 800.4m).
+    const order = s.turnOrder;
+    for (let i = (order.indexOf(from) + 1) % order.length; ; i = (i + 1) % order.length) {
+      began.add(order[i]!);
+      if (order[i] === s.activePlayer || began.size >= order.length) break;
+    }
   }
+  s.extraTurn = extra;
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
   const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
   if (ending.length) {
@@ -1098,7 +1122,12 @@ function beginStep(s: GameState, step: Step): void {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
       for (const id of s.battlefield) {
         const o = obj(s, id);
-        if (controllerOf(s, o) !== ap) continue;
+        if (controllerOf(s, o) !== ap) {
+          // "Untap ~ during each other player's untap step": at the same time; what stops it untapping during its
+          // controller's own untap step doesn't apply (Seedborn Muse and Quest for Renewal rulings).
+          if (characteristics(s, o).untapsDuringOthers) untapPermanent(s, o);
+          continue;
+        }
         if (o.skipNextUntap) o.skipNextUntap = undefined;
         else if (!characteristics(s, o).doesntUntap) untapPermanent(s, o); // CR 502.3
       }
@@ -1116,6 +1145,11 @@ function beginStep(s: GameState, step: Step): void {
       break;
     case "end":
       fireEvent(s, { type: "step", step: "end", active: ap });
+      // "At the beginning of that turn's end step, you lose the game" (Final Fortune): a delayed trigger (CR 603.7).
+      if (s.extraTurn?.loseAtEnd) {
+        const l = s.extraTurn.loseAtEnd;
+        s.triggerQueue.push({ sourceId: l.subject.id, sourceCardId: l.sourceCardId, controller: l.controller, index: -1, subject: l.subject, body: { targets: [], effects: [{ type: "loseGame", who: { ref: "you" } }], text: "At the beginning of that turn's end step, you lose the game." } });
+      }
       break;
     case "declareAttackers":
       if (potentialAttackers(s, ap).length === 0 || opponents(s, ap).length === 0) return beginStep(s, "endCombat");
@@ -1457,7 +1491,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
-    moveObject(s, id, "graveyard");
+    moveObject(s, id, "graveyard", { sacrificed: true });
   }
   addMana(s, p.id, adds, ab.spendOnly);
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
@@ -1523,6 +1557,7 @@ export function castProblem(
   const via = graveyardCast(d, choices?.via);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
+  if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
@@ -1865,7 +1900,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
-    moveObject(s, choices.casualty, "graveyard");
+    moveObject(s, choices.casualty, "graveyard", { sacrificed: true });
     item.casualty = true;
   }
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
@@ -2059,7 +2094,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         const ch = characteristics(s, o);
         sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
-        moveObject(s, id, "graveyard");
+        moveObject(s, id, "graveyard", { sacrificed: true });
       }
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
     else {
@@ -2199,7 +2234,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
-  if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard");
+  if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
   if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
   const stackId = `s${s.nextId++}`;
@@ -2406,6 +2441,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   const r = s.resolving;
   if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
+  if (pend.what === "topOrBottom") {
+    if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
+    (r.scratch ??= {}).topOrBottom = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "endure") {
     (r.scratch ??= {}).endure = choice;
     continueResolution(s);
@@ -2441,7 +2482,7 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
     const x = s.objects[id];
     if (x?.zone !== "battlefield") continue;
     log(s, `${player(s, controllerOf(s, x)).name} sacrifices ${defOf(s, x).name} to ${d.name}'s devour.`);
-    moveObject(s, id, "graveyard");
+    moveObject(s, id, "graveyard", { sacrificed: true });
     n++;
   }
   s.leftTogether = undefined;
@@ -2639,6 +2680,25 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  * Why `o` can't attack `defender` in particular, or null: "can't attack unless defending player controls
  * an Island" (CR 508.1c). Each attacking creature has its own defending player (CR 506.2).
  */
+/**
+ * What attacking `defender` costs for each creature (Ghostly Prison, Propaganda): generic mana, paid as attackers are
+ * declared (CR 508.1g-h). Attacking their planeswalkers isn't attacking them.
+ */
+export function attackTaxPer(s: GameState, defender: PlayerId): number {
+  let n = 0;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const c = characteristics(s, o);
+    if (c.attackTax && c.controller === defender) n += c.attackTax;
+  }
+  return n;
+}
+
+/** The total attack tax for a declaration. */
+export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
+  return attacks.reduce((n, a) => n + (a.planeswalker === undefined ? attackTaxPer(s, a.defender) : 0), 0);
+}
+
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId): string | null {
   const c = characteristics(s, o);
   for (const f of c.attackUnless)
@@ -2708,8 +2768,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) throw new RulesError(`${nameOf(s, attacks[0]!.attacker)} can't attack alone`);
   // Requirements (CR 508.1d): every creature that "attacks each combat if able" and can attack has to,
   // unless that would break a restriction: one that can't attack alone needn't attack by itself.
+  // A requirement that would need a cost paid to obey (Ghostly Prison) doesn't oblige anyone to pay it (CR 508.1d).
+  const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d);
   const shirking = potentialAttackers(s, p.id).find(
-    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0),
+    (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && opps.some((d) => free(o, d)),
   );
   if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
@@ -2719,9 +2781,23 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const by = characteristics(s, o).goadedBy;
     if (!by.length) continue;
     const obeyed = (d: PlayerId) => by.filter((g) => g !== d).length;
-    const best = Math.max(0, ...opps.filter((d) => !attackProblem(s, o, d)).map(obeyed));
+    const best = Math.max(0, ...opps.filter((d) => free(o, d) || d === a.defender).map(obeyed));
     if ((a.planeswalker !== undefined ? 0 : obeyed(a.defender)) < best)
       throw new RulesError(`${defOf(s, o).name} is goaded: it must attack a player other than ${by.map((p) => player(s, p).name).join(" or ")} if able`);
+  }
+  // "Attacks that opponent this turn if able" (encore): it attacks one of those players, not a planeswalker, if it can
+  // (CR 508.1d). One that can't attack them, or only by paying a cost, needn't attack at all (encore rulings).
+  for (const o of potentialAttackers(s, p.id)) {
+    const able = characteristics(s, o).mustAttack.filter((d) => opps.includes(d) && free(o, d));
+    if (!able.length) continue;
+    const a = attacks.find((x) => x.attacker === o.id);
+    if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
+  }
+  // Attack costs are totalled and paid, with mana abilities activated first (CR 508.1g-i).
+  const tax = attackTax(s, attacks);
+  if (tax) {
+    if (!spendFromPool(s, p.id, parseManaCost(`{${tax}}`), "other")) throw new RulesError(`attacking these players costs {${tax}}: add the mana first`);
+    log(s, `${p.name} pays {${tax}} to attack.`);
   }
   for (const a of attacks) {
     const o = obj(s, a.attacker);
@@ -2978,6 +3054,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
   if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it (Ring-bearer)`; // CR 701.54c
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
+  for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
       if (has(a, kw) && s.battlefield.some((id) => { const l = obj(s, id); return controllerOf(s, l) === defender && characteristics(s, l).subtypes.includes(land); }))
@@ -3346,7 +3423,7 @@ function syncControl(s: GameState) {
   }
 }
 
-function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
+export function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
   const p = player(s, pid);
   if (p.lost) return false;
   p.lost = true;

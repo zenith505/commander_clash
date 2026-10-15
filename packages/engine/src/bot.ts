@@ -9,6 +9,8 @@ import {
   assistedRemaining,
   returnCandidates,
   attackProblem,
+  attackTax,
+  attackTaxPer,
   blockProblem,
   provokerOf,
   tapCostCandidates,
@@ -48,7 +50,7 @@ import { CHOSEN_PROTECTION } from "./keywords";
 export function botActions(s: GameState, pid: PlayerId): Action[] {
   const pend = s.pending;
   if (pend?.player === pid) {
-    if (pend.kind === "declareAttackers") return [chooseAttacks(s, pid)];
+    if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
     if (pend.kind === "declareBlockers") return [chooseBlocks(s, pid)];
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
@@ -134,6 +136,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return taps ? [...taps, { type: "finishAssistedCast", player: pid }] : [{ type: "finishAssistedCast", player: pid, cancel: true }];
     }
     // Endure (CR 701.63a): every card that endures is a creature, so grow it rather than make a separate Spirit.
+    // Its own card back on top, to draw it again; someone else's card can't be on our library.
+    if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
@@ -1472,7 +1476,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
     if (atPlayer(owner) >= player(s, owner).life) continue;
     const blockers = s.battlefield.map((id) => obj(s, id)).filter((b) => controllerOf(s, b) === owner && !b.tapped && objIsType(s, b, "Creature"));
     const free = attacks
-      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !attackProblem(s, obj(s, a.attacker), owner))
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), owner))
       .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
       .sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)));
     let need = pw.counters.loyalty ?? 0;
@@ -1491,7 +1495,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
   return attacks;
 }
 
-function chooseAttacks(s: GameState, pid: PlayerId): Action {
+function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   const opps = opponents(s, pid);
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
   // (CR 725.2) unless someone else is low enough to finish.
@@ -1521,9 +1525,29 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action {
     const other = opps.find((d) => !by.includes(d) && !attackProblem(s, o, d));
     return other !== undefined ? { ...a, defender: other } : a;
   });
+  // A token that has to attack a particular opponent (encore) attacks them if it can (CR 508.1d).
+  for (const o of potentialAttackers(s, pid)) {
+    const d = characteristics(s, o).mustAttack.find((x) => opps.includes(x) && !attackProblem(s, o, x));
+    if (d === undefined) continue;
+    attacks = [...attacks.filter((a) => a.attacker !== o.id), { attacker: o.id, defender: d }];
+  }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
-  return { type: "declareAttackers", player: pid, attacks: attackPlaneswalkers(s, pid, attacks) };
+  let declared = attackPlaneswalkers(s, pid, attacks);
+  // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
+  // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
+  for (;;) {
+    const tax = attackTax(s, declared);
+    const taps = tax ? planMana(s, pid, parseManaCost(`{${tax}}`)) : [];
+    if (taps) {
+      if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
+      return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];
+    }
+    const taxed = declared.filter((a) => a.planeswalker === undefined && attackTaxPer(s, a.defender)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
+    const o = obj(s, taxed.attacker);
+    const elsewhere = opps.find((d) => !attackTaxPer(s, d) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
+    declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ ...a, defender: elsewhere }] : []));
+  }
 }
 
 function chooseBlocks(s: GameState, pid: PlayerId): Action {

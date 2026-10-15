@@ -44,7 +44,9 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick", "clash", "endure"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
+/** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
+const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
@@ -149,7 +151,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
       const inner = parseOne(then[1]!.charAt(0).toUpperCase() + then[1]!.slice(1), ctx);
-      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` });
       payFirst = null;
       continue;
@@ -215,7 +217,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (ifWin) {
       const clashed = (es: Effect[]): boolean => es.some((e) => e.type === "clash" || (e.type === "may" && clashed(e.effects)));
       const inner = clashed(effects) && parseOne(ifWin[1]!.charAt(0).toUpperCase() + ifWin[1]!.slice(1), ctx);
-      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "wonClash" }, effects: inner });
       continue;
     }
@@ -224,7 +226,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "if" || prev.cond.kind !== "wonClash" || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
-      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
       continue;
     }
@@ -254,14 +256,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const inner = parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => PAUSING.has(e.type))) return null;
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e))) return null;
       effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: inner, otherwise: previous });
       continue;
     }
     if (ifState && stateCond) {
       const inner = parseOne(ifState[2]!.charAt(0).toUpperCase() + ifState[2]!.slice(1), ctx);
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
-      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "state", cond: stateCond }, effects: inner });
       continue;
     }
@@ -273,7 +275,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const inner = parseOne(rest, ctx);
       if (!inner) return null;
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
-      if (inner.length > 1 && inner.some((e) => PAUSING.has(e.type))) return null;
+      if (inner.length > 1 && inner.some((e) => pauses(e))) return null;
       // "You may put a land card from your hand onto the battlefield": choosing none is the "may" (one question).
       const only = inner.length === 1 ? inner[0]! : undefined;
       if (only?.type === "putFromHand" && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
@@ -305,6 +307,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const last = effects[effects.length - 1];
       if (last?.type !== "loseLife") return null;
       last.drain = true;
+      continue;
+    }
+    // "Take an extra turn after this one. At the beginning of that turn's end step, you lose the game." (Final Fortune)
+    if (/^At the beginning of that turn's end step, you lose the game$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1) return null;
+      last.loseAtEnd = true;
       continue;
     }
     // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c).
@@ -380,8 +389,8 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx): { effects: Eff
   const before = ctx.targets.length;
   const fx = parseOne(t, ctx);
   if (!fx || ctx.targets.length !== before) return null;
-  if (fx.length > 1 && fx.some((e) => PAUSING.has(e.type))) return null;
-  if (instead && previous.some((e) => PAUSING.has(e.type))) return null;
+  if (fx.length > 1 && fx.some((e) => pauses(e))) return null;
+  if (instead && previous.some((e) => pauses(e))) return null;
   return { effects: fx, instead };
 }
 
@@ -391,7 +400,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
   if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
-  const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
+  const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
   if (fx) {
     ctx.lastCreated = (last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1;
@@ -566,6 +575,22 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
     out.push(...fx);
   }
   return out;
+}
+
+/**
+ * "Target player draws two cards and loses 2 life", "You draw a card and lose 1 life": one subject doing two things in
+ * order. A target is chosen once; the second verb is about the same player ("that player").
+ */
+function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
+  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?)`;
+  const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+)$`).exec(s);
+  if (!m) return null;
+  const subject = m[1]!;
+  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
+  if (!again) return null;
+  const first = parseSentence(`${subject} ${m[2]}`, ctx);
+  const second = first && parseSentence(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`, ctx);
+  return first && second ? [...first, ...second] : null;
 }
 
 export function addTarget(ctx: Ctx, spec: TargetSpec): number {

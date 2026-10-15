@@ -28,6 +28,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ deals combat damage, (.+)$/, "selfDealsCombatDamage"],
   [/^Whenever ~ deals damage to a player, (.+)$/, "selfDealsDamageToPlayer"],
   [/^Whenever ~ deals damage, (.+)$/, "selfDealsDamage"],
+  // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
+  [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
   [/^Whenever another creature you control enters, (.+)$/, "anotherCreatureYouControlEnters"],
   [/^Whenever another creature enters the battlefield under your control, (.+)$/, "anotherCreatureYouControlEnters"],
   // Landfall
@@ -56,7 +58,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage",
 ];
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
@@ -79,6 +81,7 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^deals damage, (.+)$/, "selfDealsDamage", { thatMuch: true }],
   [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
   [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
+  [/^is dealt damage, (.+)$/, "selfIsDealtDamage", { thatMuch: true }],
 ];
 
 /**
@@ -237,6 +240,56 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 /**
+ * "Whenever a creature you control deals combat damage to a player, draw a card", "Whenever a Vampire you control deals
+ * combat damage to a player, put a +1/+1 counter on it": once for each such creature and player (CR 510.2, 603.2c).
+ * "It" and "that creature" are the creature, "that player" the player, "that much" the damage.
+ */
+function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
+  if (!m) return null;
+  const filter = parseTargetPhrase(m[2]!);
+  if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature"))) return "fail";
+  let text = m[4]!;
+  const thatMuch = /\bthat (?:much|many)\b/.test(text);
+  if (thatMuch) {
+    if (/\bX\b/.test(text)) return "fail";
+    text = text.replace(/\bthat (?:much|many)\b/g, "X");
+  }
+  let body = parseBody(text, { subjectIt: true, eventPlayer: true });
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
+  return {
+    event: "creatureYouControlDealsCombatDamageToPlayer",
+    dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}) },
+    body,
+    ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
+  };
+}
+
+/**
+ * "Whenever you sacrifice another permanent", "Whenever you sacrifice a Food", "Whenever you sacrifice ~ or another
+ * creature", "... a nontoken permanent during your turn": once for each permanent its controller sacrifices (CR 701.21a).
+ * "It" and "that card" are the card where it went. "One or more" (once per batch) isn't modeled.
+ */
+function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
+  if (!m) return null;
+  const phrase = m[2]!.replace(/ or (?=[a-z])/g, " or ");
+  const filter = parseTargetPhrase(phrase);
+  if (!filter || filter.kind !== "object" || filter.controller) return "fail";
+  const body = parseBody(m[4]!, { subjectIt: true, subjectLeft: true });
+  if (!body) return "fail";
+  const kind = m[1]!.toLowerCase();
+  return {
+    event: "youSacrifice",
+    sacrifices: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
+    body,
+    // Only while it's your turn: whether it triggers at all, not an intervening if.
+    ...(m[3] ? { activeIf: { kind: "yourTurn" as const } } : {}),
+  };
+}
+
+/**
  * "Whenever you draw a card", "whenever an opponent draws a card", "whenever a player draws a card",
  * "whenever you draw your second card each turn" (the count includes cards drawn before the source
  * was on the battlefield). "That player" is whoever drew.
@@ -329,6 +382,18 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // The Enduring cycle: "When ~ dies, if it was a creature, return it to the battlefield under its owner's control.
+  // It's an enchantment. (It's not a creature.)" Only a creature dies here (CR 700.4), so the intervening if (CR 603.4)
+  // holds whenever it triggers. It enters as an enchantment only, without its creature types (rulings, CR 205.1b).
+  if (/^When ~ dies, if it was a creature, return it to the battlefield under its owner's control\. It's an enchantment\.(?: \(It's not a creature\.\))?$/.test(line))
+    return {
+      event: "selfDies",
+      body: {
+        targets: [],
+        effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, owner: true, becomes: { types: ["Enchantment"], subtypes: [] } }],
+        text: "If it was a creature, return it to the battlefield under its owner's control. It's an enchantment.",
+      },
+    };
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
@@ -395,6 +460,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (draws) return draws;
   const dies = parseDiesTrigger(line);
   if (dies) return dies;
+  const dealer = parseDealerTrigger(line);
+  if (dealer) return dealer;
+  const sacrifices = parseSacrificeTrigger(line);
+  if (sacrifices) return sacrifices;
   const group = parseGroupTrigger(line);
   if (group) return group;
   const exploits = parseExploitsTrigger(line);
@@ -430,7 +499,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       let text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const amount = event === "selfDealsDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
       const thatMuch = amount && /\bthat (?:much|many)\b/.test(text);
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;

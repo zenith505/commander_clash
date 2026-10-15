@@ -316,6 +316,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "addCombatMana":
     case "fight":
     case "bite":
+    case "extraTurn":
+    case "loseGame":
       return runBasicsEffect(s, e, ctx, src);
     case "returnToBattlefield":
     case "unearth":
@@ -345,6 +347,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "suspendTick":
     case "suspendCast":
     case "exileSelfWithTime":
+    case "exileSpell":
     case "warpExile":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
@@ -355,6 +358,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "proliferate":
     case "amass":
     case "connive":
+    case "recruit":
     case "skipUntap":
     case "counters":
     case "lastKnownCounters":
@@ -373,6 +377,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomeCopy":
       return runCopiesEffect(s, e, ctx);
     case "myriad":
+    case "encore":
     case "createTokenCopy":
     case "createToken":
       return runTokensEffect(s, e, ctx, src);

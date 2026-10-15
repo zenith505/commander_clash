@@ -71,7 +71,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         continue;
       }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
-      moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand");
+      moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
     }
 }
 
@@ -147,7 +147,7 @@ function exploit(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
   const snapshot: GameObject = { ...victim, counters: { ...victim.counters } };
   const chars = characteristics(s, victim);
   log(s, `${player(s, pid).name} sacrifices ${defOf(s, victim).name} (${src}'s exploit).`);
-  moveObject(s, victim.id, "graveyard");
+  moveObject(s, victim.id, "graveyard", { sacrificed: true });
   if (exploiter) fireEvent(s, { type: "exploits", exploiter: exploiter.id, controller: pid, victim: snapshot, chars, watchers });
 }
 
@@ -261,6 +261,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${defOf(s, o).name} can't be cast; it stays in exile.`);
       return;
     }
+    case "exileSpell":
     case "exileSelfWithTime": {
       const item = s.resolving?.item;
       const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
@@ -269,6 +270,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       moveObject(s, o.id, "exile"); // a copy ceases to exist (CR 707.10a)
       const moved = s.objects[o.id];
       if (moved?.zone !== "exile") return;
+      if (e.type === "exileSpell") {
+        log(s, `${name} is exiled.`);
+        return;
+      }
       moved.counters.time = e.n;
       log(s, `${name} is exiled with ${e.n} time counter${e.n === 1 ? "" : "s"} on it.`);
       return;
@@ -381,13 +386,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!isPermanentCard(d) || d.subtypes.includes("Aura")) continue;
         const under = e.owner ? o.owner : ctx.controller;
         log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under).name}'s control${e.tapped ? ", tapped" : ""}.`);
-        moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped }); // CR 110.2a
+        moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}) }); // CR 110.2a
       }
       return;
     case "putInLibrary":
       for (const o of objects(s, e.what, ctx)) {
-        log(s, `${src} puts ${defOf(s, o).name} on the ${e.position} of its owner's library.`);
-        moveObject(s, o.id, "library", { top: e.position === "top" });
+        let position = e.position;
+        if (position === "ownersChoice") {
+          // Its owner chooses as it resolves; a token goes too, then ceases to exist (CR 111.7).
+          const sc = (s.resolving!.scratch ??= {});
+          if (!sc.topOrBottom) {
+            s.pending = { kind: "chooseOption", player: o.owner, source: src, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], prompt: `put ${defOf(s, o).name} on the top or bottom of your library?` };
+            return "paused";
+          }
+          position = sc.topOrBottom as "top" | "bottom";
+          sc.topOrBottom = undefined;
+        }
+        log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
+        moveObject(s, o.id, "library", { top: position === "top" });
       }
       return;
     case "exileGraveyard":
@@ -442,7 +458,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const by = controllerOf(s, o);
         if (by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
         log(s, `${player(s, by).name} sacrifices ${characteristics(s, o).name}.`);
-        moveObject(s, o.id, "graveyard");
+        moveObject(s, o.id, "graveyard", { sacrificed: true });
       }
       return;
     case "ninjutsu": {

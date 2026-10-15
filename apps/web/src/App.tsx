@@ -37,6 +37,8 @@ import {
   type ManaOption,
   doesNothingNow,
   attackProblem,
+  attackTax,
+  attackTaxPer,
   blockProblem,
   blockRequirementProblem,
   maxBlocks,
@@ -1044,7 +1046,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   alternative: "an alternative cost: it's still the same spell, with the same mana value",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
@@ -2464,15 +2466,29 @@ function Controls({
   }
   if (pending?.kind === "declareAttackers") {
     // Creatures that attack each combat if able have to be declared (CR 508.1d).
-    const must = potentialAttackers(s, HUMAN).filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks));
+    // Not when attacking would cost something (Ghostly Prison): nothing obliges paying (CR 508.1d).
+    const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d);
+    const must = potentialAttackers(s, HUMAN).filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks) && opponents(s, HUMAN).some((d) => free(o, d)));
+    // Encore tokens attack their opponent if able (CR 508.1d).
+    const bound = potentialAttackers(s, HUMAN).flatMap((o) => {
+      const able = characteristics(s, o).mustAttack.filter((d) => opponents(s, HUMAN).includes(d) && free(o, d));
+      const a = attacks[o.id];
+      return able.length && (!a || a.planeswalker || !able.includes(a.defender)) ? [`${cardOf(s, o.id).name} must attack ${able.map((d) => s.players[d]!.name).join(" or ")}.`] : [];
+    });
     // "Can't attack alone" (CR 506.5).
     const ids = Object.keys(attacks);
+    // Ghostly Prison and the like: what attacking costs, paid from your lands as you declare (CR 508.1g-i).
+    const declared = Object.entries(attacks).map(([attacker, a]) => ({ attacker, defender: a.defender, ...(a.planeswalker ? { planeswalker: a.planeswalker } : {}) }));
+    const tax = attackTax(s, declared);
+    const taxTaps = tax ? planMana(s, HUMAN, parseManaCost(`{${tax}}`)) : [];
     const alone = ids.length === 1 && characteristics(s, s.objects[ids[0]!]!).cantAttackAlone ? `${cardOf(s, ids[0]!).name} can't attack alone.` : null;
     return (
       <div className="controls">
         <span>
           {alone && !aim
             ? alone
+            : bound.length && !aim
+            ? bound[0]
             : must.length && !aim
             ? `${must.map((o) => cardOf(s, o.id).name).join(" and ")} attack${must.length === 1 ? "s" : ""} each combat if able: click ${must.length === 1 ? "it" : "them"}, then a player.`
             : aim
@@ -2482,18 +2498,11 @@ function Controls({
               : "Click a creature, then the player it attacks. Click an attacker again to take it back."}
         </span>
         <button
-          disabled={must.length > 0 || !!alone}
-          onClick={() =>
-            dispatch([
-              {
-                type: "declareAttackers",
-                player: HUMAN,
-                attacks: Object.entries(attacks).map(([attacker, a]) => ({ attacker, defender: a.defender, ...(a.planeswalker ? { planeswalker: a.planeswalker } : {}) })),
-              },
-            ])
-          }
+          disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps}
+          title={tax && !taxTaps ? `Attacking costs {${tax}} and you can't pay it` : undefined}
+          onClick={() => dispatch([...(taxTaps ?? []), { type: "declareAttackers", player: HUMAN, attacks: declared }])}
         >
-          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}` : "No attacks"}
+          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}${tax ? ` (pay {${tax}})` : ""}` : "No attacks"}
         </button>
       </div>
     );
@@ -2532,7 +2541,7 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "chooseOption" && pending.what === "damageShield" && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

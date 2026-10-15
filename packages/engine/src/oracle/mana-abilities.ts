@@ -3,6 +3,7 @@ import type { ManaType } from "../types";
 import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } from "./words";
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
+import { parseCount } from "./counts";
 
 /**
  * A mana ability (CR 605.1a): "{T}: Add {G}.", "{T}: Add {W} or {U}. ~ deals 1 damage to you.",
@@ -115,6 +116,18 @@ function parseManaProduced(text: string): ManaProduce | null {
   // "one mana of the chosen color", "{B} or one mana of the chosen color" (chosen as it entered).
   const chosen = /^(?:(\{[WUBRGC]\}) or )?one mana of the chosen color$/.exec(text);
   if (chosen) return { kind: "chosenColor", ...(chosen[1] ? { also: sym(chosen[1])! } : {}) };
+  // "an amount of {G} equal to ~'s power", "X mana of any one color, where X is the number of Elves on the battlefield".
+  // A static count: "~" is the permanent, "you" its controller.
+  const amount = /^an amount of (\{[WUBRGC]\}) equal to (.+)$/.exec(text);
+  if (amount) {
+    const n = parseCount(amount[2]!, null);
+    return n && { kind: "fixed", mana: [sym(amount[1]!)!], n };
+  }
+  const xAny = /^X mana of any one color, where X is (.+)$/.exec(text);
+  if (xAny) {
+    const n = parseCount(xAny[1]!, null);
+    return n && { kind: "oneOf", options: ALL_COLORS, amount: 1, n };
+  }
   const each = /^(\{[WUBRGC]\}) for each (.+) you control$/.exec(text);
   if (each) {
     const spec = parseTargetPhrase(each[2]!);

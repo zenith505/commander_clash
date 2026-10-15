@@ -225,6 +225,11 @@ export function parseExtraBlocks(text: string): Modification | null {
 /** "get +1/+1", "have flying and vigilance", "get +2/+0 and have first strike", "can't block". */
 function parseStaticMods(rest: string): Modification[] | null {
   let m: RegExpExecArray | null;
+  // "Gets +4/+4 and has first strike, and all creatures able to block it do so" (a blocking requirement, CR 509.1c).
+  if ((m = /^(.+?),? and all creatures able to block it do so$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    return first && [...first, { kind: "allMustBlock" }];
+  }
   // Arrest: "can't attack or block, and its activated abilities can't be activated" (mana abilities too, CR 605.1a).
   if ((m = /^(.+?),? and its activated abilities can't be activated( unless they're mana abilities)?$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);
@@ -269,6 +274,11 @@ function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
+  // "Can't block creatures with power 2 or greater" (CR 509.1b).
+  if ((m = /^can't block creatures with power (\d+) or (greater|less)$/.exec(rest))) {
+    const filter = parseTargetPhrase(`creature with power ${m[1]} or ${m[2]}`);
+    return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
+  }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
   if (/^can't be blocked$/.test(rest)) return [{ kind: "cantBeBlocked" }];
   if (/^can't be blocked by more than one creature$/.test(rest)) return [{ kind: "maxOneBlocker" }];
@@ -294,6 +304,17 @@ export function parseStatic(line: string): StaticAbility | null {
   if (noAbilities) return { affects: { kind: "attached" }, mods: [{ kind: "cantActivate", ...(noAbilities[2] ? { exceptMana: true as const } : {}) }], text: line };
   // "You control enchanted creature." (Mind Control)
   if (/^You control enchanted (creature|permanent|artifact|land)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
+  // Ghostly Prison, Propaganda (CR 508.1g-h).
+  const tax = /^Creatures can't attack you unless their controller pays \{(\d+)\} for each creature they control that's attacking you$/.exec(text);
+  if (tax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: Number(tax[1]) }], text: line };
+  // "Untap ~ during each other player's untap step", "Untap all permanents you control during ..." (Seedborn Muse):
+  // they untap with the active player's permanents (CR 502.3); "doesn't untap during your untap step" doesn't apply.
+  const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each other player's untap step$/.exec(text);
+  if (untaps) {
+    const affects = untaps[1] === "~" ? { kind: "self" as const } : parseAffected(untaps[2] ? `${untaps[2].charAt(0).toUpperCase()}${untaps[2].slice(1)} you control` : `Each ${untaps[3]}`);
+    if (!affects || (affects.kind === "filter" && affects.controller !== "you" && affects.spec?.controller !== "you")) return null;
+    return { affects, mods: [{ kind: "untapsDuringOthers" }], text: line };
+  }
   const cda = parseDefinedPT(text);
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };
   const where = /^(.+), where X is (.+)$/.exec(text);
@@ -301,6 +322,7 @@ export function parseStatic(line: string): StaticAbility | null {
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
   if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
+  if (/^All creatures able to block (enchanted|equipped) creature do so$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "allMustBlock" }], text: line };
   // "You may have ~ assign its combat damage as though it weren't blocked" (CR 510.1c-d; chosen as it assigns it).
   const unblocked = [{ kind: "unblockedDamage" }] as const;
   if (/^You may have ~ assign its combat damage as though it weren't blocked$/.test(text)) return { affects: { kind: "self" }, mods: [...unblocked], text: line };

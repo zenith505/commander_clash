@@ -7,6 +7,7 @@ import type { CardDef, GameState, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault } from "./triggers";
 import { copiedValues } from "./run-copies";
+import { invalidateCharacteristics } from "../layers";
 
 /** Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). */
 export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
@@ -51,6 +52,24 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!inCombat(s)) return;
       for (const pid of Object.keys(sc.chosen!).map(Number) as PlayerId[])
         if (livingPlayers(s).includes(pid)) tokenCopies(s, ctx.controller, base, 1, ctx, { tapped: true, defender: pid });
+      return;
+    }
+    case "encore": {
+      // CR 702.141a: one token copy of the card for each opponent (left players aren't counted, rulings), each
+      // attacking that opponent this turn if able; they gain haste (an effect, not a copy exception).
+      const base = ctx.sourceDef;
+      const r = s.resolving;
+      if (r) r.created = [];
+      const made: string[] = [];
+      for (const opp of apnap(s, opponents(s, ctx.controller))) {
+        const before = r?.created?.length ?? 0;
+        tokenCopies(s, ctx.controller, base, 1, ctx);
+        const ids = (r?.created ?? []).slice(before);
+        made.push(...ids);
+        if (ids.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "endOfTurn", affected: ids, mods: [{ kind: "mustAttackPlayer", player: opp }] });
+      }
+      if (made.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: made, mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      invalidateCharacteristics(s);
       return;
     }
     case "createTokenCopy": {

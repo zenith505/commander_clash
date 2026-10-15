@@ -52,7 +52,8 @@ export type TriggerSourceEvent =
   | { type: "enters"; id: ObjectId; x?: number }
   /** `counters`: the counters it had on the battlefield (last known information, for persist and undying). */
   /** It left the battlefield for `to` (only a graveyard makes it "die"). */
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
+  /** `sacrificed`: its controller sacrificed it (CR 701.21a). */
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -75,6 +76,8 @@ export type TriggerSourceEvent =
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
+  | { type: "wasDealtDamage"; id: ObjectId; amount: number }
   /** A permanent dealt damage to a player, in combat or not. */
   | { type: "damagedPlayer"; source: ObjectId; player: PlayerId; amount: number; combat: boolean }
   /** A permanent dealt damage to a creature (`id`). */
@@ -314,6 +317,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
     }
+    // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
+    // the same time (CR 603.10a), whatever zone it went to.
+    if (ev.sacrificed && ev.snapshot && ev.chars) {
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const dying = { o: ev.snapshot, c: ev.chars };
+      const consider = (src: GameObject, triggers?: TriggeredAbility[]) =>
+        add(src, ev.controller, (e, t) => e === "youSacrifice" && !!t.sacrifices && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki);
+      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) consider(obj(s, id));
+      for (const left of s.leftTogether ?? []) {
+        const src = s.objects[left.id];
+        if (!src || src.zone === "battlefield" || left.controller !== ev.controller) continue;
+        consider(src, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+      }
+    }
   } else if (ev.type === "blocksDeclared") {
     // "Blocks" and "becomes blocked" trigger once each; "blocks a creature" / "becomes blocked by a creature"
     // once for each such creature, which is the trigger's subject (CR 509.3c-d).
@@ -453,11 +470,26 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, { amount: ev.amount });
     }
+  } else if (ev.type === "wasDealtDamage") {
+    // "Whenever ~ is dealt damage", "When enchanted creature is dealt damage": it's still on the battlefield as the
+    // damage is dealt, before state-based actions (CR 704.3), so it triggers even if the damage destroys it.
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") {
+      add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
+    }
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };
     add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
+    // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
+    const dealerBy = controllerOf(s, o);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) !== dealerBy) continue;
+      add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
+    }
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);
     // "Whenever one or more creatures a player controls deal combat damage to the player who has the initiative, the

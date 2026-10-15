@@ -1,6 +1,6 @@
 # Roadmap
 
-13,854 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+14,166 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,13 +14,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: "{T}: Add an amount of {G} equal to ~'s power", "target player draws two cards and loses N
-   life", "~ can't block creatures with power N or greater", "when enchanted creature is dealt damage, destroy it",
-   "change the target of target spell with a single target", "its owner puts it on their choice of the top or bottom
-   of their library", the Enduring cycle's "return it to the battlefield. It's an enchantment", "whenever a creature
-   you control deals combat damage to a player, draw a card", mayhem, "all creatures able to block target creature
-   this turn do so", encore, "untap ~ during each other player's untap step", "whenever you sacrifice another
-   permanent", extra turns, recruit, Ghostly Prison's attack tax.
+1. By `npm run blockers` (now a long tail of 3-card lines): "skip your draw step", "enchanted creature gets +N/+N
+   and is goaded", "change the target of target spell with a single target", "~ can't block and can't be blocked",
+   "whenever you attack with two or more creatures", "enchanted creature gets -N/-N and loses all abilities", "you may
+   cast sorcery spells as though they had flash", "activated abilities of artifacts can't be activated" (Null Rod),
+   Dark Confidant's reveal, "counter target spell; exile it instead" (Dissipate), battalion, champion, prototype,
+   reinforce, "if a spell or ability an opponent controls causes you to discard ~" (Obstinate Baloth).
 
 ## Known gaps (from earlier rounds)
 
@@ -163,6 +162,20 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   granting quoted triggers, "choose a color" inside a threshold "If" sentence.
 - Assist: bots never ask for or give help (everyone else is an opponent). Gang Up's "power X or less" target.
   Assist kicker (All-Star Kicker) and team-play cards.
+- Attack taxes other than "{N} for each creature they control that's attacking you": domain X (Collective
+  Restraint), "{1} for each of those creatures" (Dáin, Summon: Yojimbo), only nonblack creatures (Elephant Grass),
+  costs to block.
+- Blocking: "can't block creatures with power greater than ~'s power" (Spitfire Handler), "equal to or greater than
+  the enchanted creature's toughness" (Ironclaw Curse), "unless you pay" (Hipparion), affected groups like "creatures
+  your opponents control without flying or reach" (Sidar Kondo); lures with a filter ("All Walls able to block",
+  Talruum Piper) or a condition (Seton's Desire).
+- Untapping during other players' untap steps with color pairs ("green and/or blue", Murkfiend Liege), a condition
+  (Quest for Renewal) or granted to a land (Urban Burgeoning).
+- Top or bottom of a library for spells and graveyard cards (Aether Gust, Endless Detour, Subtlety) and for several
+  objects at once (Aetherspouts).
+- "Whenever a creature is dealt damage" (Death Pits of Rath, Shriveling Rot), "becomes tapped or is dealt damage"
+  (Cryoshatter). Old-Growth Troll and Harold and Bob (they return as Auras). Mayhem without a cost (a land, CR
+  702.187c). "You recruit" after a cast trigger (The Queen of Dale), "if that spell's mana value was 2 or less, recruit".
 
 ## Later
 

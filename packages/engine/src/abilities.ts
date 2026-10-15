@@ -616,7 +616,9 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean };
+  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean }
+  /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
+  | { kind: "allOf"; conds: StaticCondition[] };
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
@@ -1527,7 +1529,12 @@ export type AdditionalCost =
       mvX?: true;
     }
   /** "Reveal your hand" (Land Grant): all of it, whatever is in it (rulings: even if it's revealed already). */
-  | { kind: "revealHand" };
+  | { kind: "revealHand" }
+  /**
+   * "Have an opponent gain 3 life" (Invigorate: the caster picks which, CostChoices.lifeTo), "have each other player gain
+   * 6 life" (`each`; Reverent Silence).
+   */
+  | { kind: "giveLife"; n: number; each?: true };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,

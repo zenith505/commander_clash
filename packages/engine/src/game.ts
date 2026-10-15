@@ -2638,6 +2638,23 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
+    if (c.kind === "giveLife") {
+      // A player who can't gain life can't be had gain life to pay a cost (CR 119.7; Invigorate rulings), though a
+      // replaced life gain (Sulfuric Vortex's) can. Players who left the game aren't players any more (CR 800.4a).
+      const others = opponents(s, pid);
+      if (c.each) {
+        if (others.some((q) => !canGainLife(s, q))) return `every other player must be able to gain life to ${doing} this way`;
+        continue;
+      }
+      const to = choices?.lifeTo;
+      if (to === undefined) {
+        if (!others.some((q) => canGainLife(s, q))) return "no opponent can gain life";
+        continue; // chosen as it's paid
+      }
+      if (!others.includes(to)) return "choose an opponent to gain the life";
+      if (!canGainLife(s, to)) return `${player(s, to).name} can't gain life`;
+      continue;
+    }
     const pool =
       c.kind === "sacrifice"
         ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id) && objectMatches(s, c.filter, obj(s, id), pid, false))
@@ -2744,6 +2761,12 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
+    else if (c.kind === "giveLife") {
+      // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
+      const to = c.each ? opponents(s, p.id) : [choices.lifeTo ?? opponents(s, p.id).find((q) => canGainLife(s, q))!];
+      log(s, `${p.name} has ${to.map((q) => player(s, q).name).join(", ")} gain ${c.n} life.`);
+      for (const q of to) gainLife(s, q, c.n);
+    }
     else if (c.kind === "exileFromHand") {
       const ids = choices.exileFromHand ?? [];
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);

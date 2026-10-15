@@ -1,6 +1,7 @@
 // Alternative costs new this round (CR 118.9): Foil's "discard an Island card and another card", Blazing Shoal's red
 // card whose mana value sets X (CR 107.3a), Land Grant's "reveal your hand", and a Trap whose condition looks back over
-// the turn (Needlebite Trap: "if an opponent gained life this turn").
+// the turn (Needlebite Trap: "if an opponent gained life this turn"), Invigorate's "have an opponent gain 3 life", and Mogg
+// Salvage's "you may cast this spell without paying its mana cost".
 import { expect, test } from "@playwright/test";
 import { LANDS, one, open, pageErrors, scene, state } from "./scene";
 import { card, clickPlayer, menu, modal, resolveUntil } from "./ui";
@@ -76,5 +77,35 @@ test("Needlebite Trap: {B} once an opponent gained life this turn", async ({ pag
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[trap]!.zone === "graveyard");
   expect(after.players[1]!.life).toBe(35);
   expect(after.players[0]!.life).toBe(45);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Invigorate: have an opponent you pick gain 3 life instead of paying {2}{G}", async ({ page }) => {
+  const s = scene({ hand: ["Invigorate"], board: ["Forest", "Grizzly Bears"] });
+  const [invigorate, bears] = [one(s, "Invigorate"), one(s, "Grizzly Bears")];
+  await open(page, s);
+  await card(page, "Invigorate", s).click();
+  await menu(page).getByRole("button", { name: "Cast it: have an opponent gain 3 life" }).click();
+  await page.locator(`[data-obj="${bears}"]`).click();
+  const bar = page.locator(".gift-pick");
+  await expect(bar).toContainText("Invigorate: have an opponent gain 3 life");
+  await expect(bar.getByRole("button", { name: "No gift" })).toHaveCount(0);
+  await bar.getByRole("button", { name: "Ben gains 3 life" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[invigorate]!.zone === "graveyard");
+  expect(after.players.map((p) => p.life)).toEqual([40, 40, 43, 40]);
+  expect(after.log.some((e) => /Grizzly Bears gets \+4\/\+4/.test(e.text))).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Mogg Salvage: cast without paying its mana cost while an opponent controls an Island", async ({ page }) => {
+  const s = scene({ hand: ["Mogg Salvage"], board: ["Mountain"] }, [{ board: ["Island", "Sol Ring"] }]);
+  const [salvage, ring] = [one(s, "Mogg Salvage"), one(s, "Sol Ring")];
+  s.battlefield.forEach((id) => s.objects[id]!.controller === 0 && (s.objects[id]!.tapped = true));
+  await open(page, s);
+  await card(page, "Mogg Salvage", s).click();
+  await menu(page).getByRole("button", { name: "Cast it: without paying its mana cost" }).click();
+  await page.locator(`[data-obj="${ring}"]`).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[salvage]!.zone === "graveyard");
+  expect(after.objects[ring]!.zone).toBe("graveyard");
   expect(pageErrors(page)).toEqual([]);
 });

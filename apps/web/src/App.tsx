@@ -62,6 +62,7 @@ import {
   characteristics,
   modifications,
   opponents,
+  canGainLife,
   planCast,
   planMana,
   objectMatches,
@@ -285,6 +286,8 @@ type CastDraft = {
   conspire?: string[];
   /** The opponent promised the gift (CR 702.174a), or null for no gift. */
   gift?: PlayerId | null;
+  /** Invigorate's "have an opponent gain 3 life": who gains it. */
+  lifeTo?: PlayerId;
 };
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -294,7 +297,8 @@ type CostOrPick = { draft: CastDraft; label: string; options: string[] };
 type DelvePick = { draft: CastDraft; label: string; max: number; candidates: string[]; chosen: string[] };
 
 /** Promising a gift to an opponent, or not (CR 702.174a). */
-type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[] };
+/** Gift's opponent (CR 702.174a), or with `life`, the opponent had gain that much life for an alternative cost (Invigorate). */
+type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[]; life?: number };
 
 /** Paying buyback or not (CR 702.27). */
 type BuybackPick = { draft: CastDraft; label: string; cost: string };
@@ -604,6 +608,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0)) {
       if (c.kind === "payLife" || c.kind === "revealHand" || (c.kind === "discard" && c.random)) continue;
+      // "Have an opponent gain 3 life": pick which (a player who can't gain life can't be picked, CR 119.7).
+      if (c.kind === "giveLife") {
+        if (c.each || d.lifeTo !== undefined) continue;
+        return setGiftPick({ draft: d, label: card.name, what: `have an opponent gain ${c.n} life`, options: opps.filter((p) => canGainLife(s, p)), life: c.n });
+      }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
@@ -655,6 +664,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
       ...(d.conspire?.length ? { conspire: d.conspire } : {}),
       ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}),
+      ...(d.lifeTo !== undefined ? { lifeTo: d.lifeTo } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -1116,27 +1126,29 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {giftPick && (
             <div className="targeting gift-pick">
               <span>
-                <strong>{giftPick.label}</strong>: promise an opponent a gift ({giftPick.what})?
+                <strong>{giftPick.label}</strong>: {giftPick.life !== undefined ? giftPick.what : `promise an opponent a gift (${giftPick.what})?`}
               </span>
               {giftPick.options.map((pid) => (
                 <button
                   key={pid}
                   onClick={() => {
                     setGiftPick(null);
-                    continueCast({ ...giftPick.draft, gift: pid });
+                    continueCast(giftPick.life !== undefined ? { ...giftPick.draft, lifeTo: pid } : { ...giftPick.draft, gift: pid });
                   }}
                 >
-                  Gift {s.players[pid]!.name}
+                  {giftPick.life !== undefined ? `${s.players[pid]!.name} gains ${giftPick.life} life` : `Gift ${s.players[pid]!.name}`}
                 </button>
               ))}
-              <button
-                onClick={() => {
-                  setGiftPick(null);
-                  continueCast({ ...giftPick.draft, gift: null });
-                }}
-              >
-                No gift
-              </button>
+              {giftPick.life === undefined && (
+                <button
+                  onClick={() => {
+                    setGiftPick(null);
+                    continueCast({ ...giftPick.draft, gift: null });
+                  }}
+                >
+                  No gift
+                </button>
+              )}
               <button className="ghost" onClick={() => setGiftPick(null)}>
                 Cancel
               </button>
@@ -1316,6 +1328,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";
+  if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `tap ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "exileFromHand") return `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;

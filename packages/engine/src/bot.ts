@@ -26,6 +26,7 @@ import {
   legalActions,
   obj,
   opponents,
+  canGainLife,
   player,
   potentialAttackers,
   foretoldCast,
@@ -1010,6 +1011,14 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   const d = defOf(s, obj(s, id));
   for (const c of castExtraCosts(d, { via, alt, costOr }, x)) {
     if (c.kind === "revealHand") continue; // nothing to choose
+    if (c.kind === "giveLife") {
+      // Invigorate: the opponent with the least life gets it (the least threat to us); "each other player": nothing to choose.
+      if (c.each) continue;
+      const to = opponents(s, pid).filter((q) => canGainLife(s, q)).sort((a, b) => player(s, a).life - player(s, b).life)[0];
+      if (to === undefined) return null;
+      out.lifeTo = to;
+      continue;
+    }
     if (!c.n && "x" in c && c.x) continue; // "pay X life" with X = 0
     if (c.kind === "returnToHand" && c.unblockedAttacker) {
       // Sneak: the least valuable unblocked attacker that isn't our commander (see chooseSneak).

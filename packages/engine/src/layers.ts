@@ -518,6 +518,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
       });
     }
+    case "allOf":
+      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount));
   }
 }
 

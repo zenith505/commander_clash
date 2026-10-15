@@ -1,5 +1,5 @@
 import type { CopyExcept } from "../copies";
-import type { AbilityBody, Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, CompiledCard, EntersOption } from "../abilities";
+import type { AbilityBody, Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, StaticCondition, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, CompiledCard, EntersOption } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { CardDef, FaceDownKind } from "../types";
@@ -94,9 +94,23 @@ export function parseCostKeyword(
   // "You may sacrifice two Mountains rather than pay ~'s mana cost" (Fireblast), "You may pay 1 life and exile a blue card
   // from your hand ..." (Force of Will), "If you control a Swamp, you may pay 4 life ..." (Snuff Out), "If four or more
   // creatures are attacking, you may pay {1}{W} ..." (Arrow Volley Trap): only while that's true, as it's cast (CR 601.2b).
+  // "If an opponent controls an Island and you control a Mountain, you may cast ~ without paying its mana cost" (Mogg
+  // Salvage): any opponent's Island, checked only as it's cast (rulings); its mana value doesn't change (CR 118.9c).
+  if ((m = /^If (.+), you may cast ~ without paying its mana cost\.?$/.exec(line))) {
+    const cond = altCondition(m[1]!);
+    return cond ? { alt: { kind: "alternative", mana: "", if: cond, text: "without paying its mana cost" } } : "fail";
+  }
+  // "If you control a Forest, rather than pay ~'s mana cost, you may have an opponent gain 3 life" (Invigorate), "...
+  // have each other player gain 6 life" (Reverent Silence). A player who can't gain life can't be had gain it (CR 119.7).
+  if ((m = /^If ([^,]+), rather than pay ~'s mana cost, you may have (an opponent|each other player) gain (\d+) life\.?$/.exec(line))) {
+    const cond = altCondition(m[1]!);
+    if (!cond) return "fail";
+    const each = m[2] === "each other player";
+    return { alt: { kind: "alternative", mana: "", costs: [{ kind: "giveLife", n: Number(m[3]), ...(each ? { each: true as const } : {}) }], if: cond, text: `have ${m[2]} gain ${m[3]} life` } };
+  }
   if ((m = /^(?:(?:Raid — )?If ([^,]+), )?[Yy]ou may (.+?) rather than pay ~'s mana cost(?: if ([^,]+?))?\.?$/.exec(line))) {
     const when = m[1] ?? m[3];
-    const cond = when ? parseStaticCondition(when, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    const cond = when ? altCondition(when) : undefined;
     if (cond === null) return "fail";
     let mana = "";
     const costs: AdditionalCost[] = [];
@@ -355,6 +369,15 @@ function describePayText(pay: PayCost): string {
  * A cost beyond mana: "sacrifice a creature", "discard two cards", "pay 3 life", ... With `allowX` (a spell's costs),
  * "pay X life", "discard X cards", "sacrifice X lands" too, X being announced as it's cast (CR 107.3a).
  */
+/** An alternative cost's "if ...": one condition, or several joined by "and" (Mogg Salvage), all checked as it's cast (CR 601.2b). */
+function altCondition(text: string): StaticCondition | null {
+  const one = (t: string) => parseStaticCondition(t, { affects: { kind: "self" }, mods: [], text: "" });
+  const whole = one(text);
+  if (whole) return whole;
+  const conds = text.split(" and ").map(one);
+  return conds.length > 1 && conds.every((c) => c) ? { kind: "allOf", conds: conds as StaticCondition[] } : null;
+}
+
 export function parseAdditionalCost(text: string, allowX = false): AdditionalCost | null {
   let m: RegExpExecArray | null;
   const isX = (w: string) => allowX && w === "X";

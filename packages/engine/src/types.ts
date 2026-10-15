@@ -491,6 +491,8 @@ export interface CostChoices {
   conspire?: ObjectId[];
   /** Gift (CR 702.174a): the opponent chosen to promise the gift to. */
   gift?: PlayerId;
+  /** "Have an opponent gain 3 life" (Invigorate's alternative cost): the opponent who gains it. */
+  lifeTo?: PlayerId;
   /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
   assist?: PlayerId;
   /** How much of that generic mana they pay, from their mana pool: set by the game once they've chosen. */

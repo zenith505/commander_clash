@@ -1,6 +1,6 @@
 # Roadmap
 
-16,294 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,331 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -17,11 +17,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Haunt, Read ahead.
    Left from the filter lands/divided damage/X costs round:
-   - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate, Aurelia's Fury's riders ("each
-     player dealt damage this way can't cast noncreature spells this turn", with the "can't cast spells this turn"
-     group: Silence, Orim's Chant, Xantid Swarm, Ranger-Captain of Eos, Render Silent, Permission Denied, Calamity's
-     Wake), Pollen Remedy (kicker that isn't mana). The divide panel says "divide the damage" for prevention too
-     (Remedy).
+   - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate, Pollen Remedy (kicker that isn't
+     mana). The divide panel says "divide the damage" for prevention too (Remedy).
    - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
      Rupture, Curse of Surveillance, The Death of Gwen Stacy; Will of the Abzan (below).
    - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
@@ -144,13 +141,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).
-- Alternative costs still out: Traps whose condition needs "this turn" tracking (Archive Trap's search, Baloth Cage
-  Trap's artifact entering, Cobra, Inferno, Lavaball, Needlebite, Permafrost, Ravenous, Ricochet's spell color,
-  Whiplash), the Shoals' X, Foil's "an Island card and another card", "have an opponent / each other player gain
-  life" (Invigorate, Reverent Silence, Skyshroud Cutter), Land Grant's "reveal your hand", Security Rhox, Spinning
-  Darkness's "top three black cards of your graveyard", Mogg Salvage's "without paying its mana cost" condition,
-  Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost". Bots never use Fist of Suns'
-  {W}{U}{B}{R}{G}, and use the other alternative costs only when they can't pay the mana cost.
+- Alternative costs still out: Shining Shoal (its redirect, "the next X damage ... to you or a creature you control
+  this turn is dealt to any target instead"), Security Rhox (mana from a Treasure only), Spinning Darkness's "top
+  three black cards of your graveyard" (the order of cards put into a graveyard at once isn't modeled), Conspiracy
+  Unraveler's "collect evidence 10 rather than pay the mana cost", Sivvi's Ruse (its "prevent all damage ... to
+  creatures you control" line). Bots never use Fist of Suns' {W}{U}{B}{R}{G} or the Shoals (an X spell for an
+  alternative cost), never cast Invigorate (no combat-trick logic for alternative costs), and use the other
+  alternative costs only when they can't pay the mana cost. The game remembers only some of what happened in a turn
+  (`GameState.turnLog`: searches, permanents entering, destructions by an opponent, creatures dealing damage to a
+  player, life gained, cards put into a graveyard); more "this turn" conditions need more of it.
 - Elesh Norn, Mother of Machines' "triggers an additional time" (its other ability, Torpor Orb's for opponents, works).
   With Torpor Orb, "whenever counters are put on" still triggers for counters a creature enters with.
 - "Becomes the target": "deals 2 damage to that spell's controller", "an ability that targets only it" (Agrus Kos),

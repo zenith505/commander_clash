@@ -302,6 +302,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
   switch (e.type) {
     case "damage":
     case "preventNext":
+    case "redirectNext":
     case "preventCombatDamage":
     case "pumpPerBlocker":
     case "draw":

@@ -1,7 +1,21 @@
 import type { AbilityBody, AltCostKind, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { DamageEvent } from "./damage";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
+
+/**
+ * A redirection shield (CR 614.9) for the next `n` damage that would be dealt to the permanent or player it's on this
+ * turn: that damage is dealt to `to` instead, by the same source. It does nothing while `to` is gone or isn't a
+ * creature or planeswalker any more.
+ */
+export interface RedirectShield {
+  id: string;
+  n: number;
+  to: { object: ObjectId; zc: number } | { player: PlayerId };
+  /** The card whose effect made it, for the log. */
+  source: string;
+}
 
 export type Color = "W" | "U" | "B" | "R" | "G";
 export const COLORS: readonly Color[] = ["W", "U", "B", "R", "G"];
@@ -78,6 +92,8 @@ export interface GameObject {
   regenShields?: number;
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
   preventNext?: number;
+  /** "The next N damage that would be dealt to it this turn is dealt to [X] instead" (CR 614.9, 615.7). */
+  redirectNext?: RedirectShield[];
   /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
   /** Renown's designation (CR 702.112b), until it leaves the battlefield. */
@@ -203,6 +219,8 @@ export interface Player {
   lastUpkeepTurn?: number;
   /** What's left of "prevent the next N damage that would be dealt to [this player] this turn" shields (CR 615.7). */
   preventNext?: number;
+  /** "The next N damage that would be dealt to [this player] this turn is dealt to [X] instead" (CR 614.9). */
+  redirectNext?: RedirectShield[];
   /** Combat damage received from each commander, keyed by commander object id. CR 903.10a */
   commanderDamage: Record<ObjectId, number>;
   lost: boolean;
@@ -440,7 +458,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure"; options: string[]; labels?: string[]; objectId?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -499,6 +517,11 @@ export interface GameState {
   effects: ContinuousEffect[];
   /** "Prevent all combat damage that would be dealt this turn" (Fog) is in effect until cleanup. */
   preventCombatDamage?: boolean;
+  /**
+   * Combat damage about to be dealt, waiting on choices about which of it damage shields apply to (CR 615.7, 616.1):
+   * the damage as assigned, and the options picked so far (see damage.ts planShields).
+   */
+  damageBatch?: { events: DamageEvent[]; answers: number[] };
   /** Players dealt damage this turn, for bloodthirst (CR 702.54a). */
   damagedThisTurn?: PlayerId[];
   /**

@@ -5,7 +5,7 @@ import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, 
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
-import { dealDamage, objectSource, protectedFrom } from "./damage";
+import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -543,6 +543,7 @@ export function moveObject(
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
+  o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
   o.skipNextUntap = undefined;
   o.renowned = undefined;
@@ -1056,12 +1057,10 @@ function beginStep(s: GameState, step: Step): void {
     }
     case "firstStrikeDamage":
       if (!attackersAndBlockers(s).some((o) => hasFirstOrDouble(s, o))) return beginStep(s, "combatDamage");
-      if (askUnblocked(s)) return;
-      dealCombatDamage(s, true);
+      if (askUnblocked(s) || dealCombatDamage(s, true)) return;
       break;
     case "combatDamage":
-      if (askUnblocked(s)) return;
-      dealCombatDamage(s, false);
+      if (askUnblocked(s) || dealCombatDamage(s, false)) return;
       break;
     case "beginCombat":
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
@@ -1101,8 +1100,12 @@ function finishCleanup(s: GameState) {
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
     o.preventNext = undefined;
+    o.redirectNext = undefined;
   }
-  for (const p of s.players) p.preventNext = undefined;
+  for (const p of s.players) {
+    p.preventNext = undefined;
+    p.redirectNext = undefined;
+  }
   s.preventCombatDamage = undefined;
   // "You may play that card this turn" / "until the end of your next turn" ends now.
   for (const q of s.players)
@@ -1121,7 +1124,7 @@ function finishCleanup(s: GameState) {
   advanceStep(s);
 }
 
-function turnOrderFrom(s: GameState, pid: PlayerId): PlayerId[] {
+export function turnOrderFrom(s: GameState, pid: PlayerId): PlayerId[] {
   const i = s.turnOrder.indexOf(pid);
   return [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((id) => !player(s, id).lost);
 }
@@ -2264,6 +2267,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "devour" || pend.what === "amplify") throw new RulesError(`${pend.what} is chosen by picking cards`);
   if (!pend.options.includes(choice)) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : "an option"} you can choose`);
   s.pending = null;
+  if (pend.what === "damageShield") {
+    // Which damage a shield takes, or which shield applies first (CR 615.7, 616.1); combat damage waits for it.
+    s.damageBatch!.answers.push(Number(choice));
+    finishCombatDamage(s);
+    return;
+  }
   if (pend.objectId) {
     const o = obj(s, pend.objectId);
     const entry = s.entersChoices?.shift();
@@ -2873,8 +2882,8 @@ function bandSplit(s: GameState, source: GameObject, targets: GameObject[], dmg:
   return [...out];
 }
 
-/** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. */
-function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
+/** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. True if it waits on a choice. */
+function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
   for (const at of attackers(s)) {
@@ -2930,39 +2939,56 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean) {
   }
   if (s.preventCombatDamage && hits.length) {
     log(s, "All combat damage is prevented.");
-    return;
+    return false;
   }
   // Sources as they are now, before any of the damage changes anything (it's all dealt at once).
   const sources = new Map(hits.map((h) => [h.source.id, objectSource(s, h.source)]));
+  const events: DamageEvent[] = hits.map((h) => ({ src: sources.get(h.source.id)!, to: h.toPlayer !== undefined ? { player: h.toPlayer } : { object: h.toObject!.id }, n: h.amount, combat: true }));
+  s.damageBatch = { events, answers: [] };
+  return finishCombatDamage(s);
+}
+
+/**
+ * Deal the combat damage waiting in s.damageBatch, once its players have chosen what their damage shields take
+ * (CR 615.7, 616.1). Returns true while it's waiting on a choice.
+ */
+function finishCombatDamage(s: GameState): boolean {
+  const batch = s.damageBatch!;
+  const plan = planShields(s, batch.events, batch.answers);
+  if (plan.ask) {
+    const q = plan.ask;
+    s.pending = { kind: "chooseOption", player: q.player, source: "Combat damage", what: "damageShield", prompt: q.prompt, options: q.labels.map((_, i) => String(i)), labels: q.labels };
+    return true;
+  }
+  s.damageBatch = undefined;
   // Each source's lifelink is one life-gain event however many things it damaged (CR 119.10).
-  const lifelink = new Map<ObjectId, { n: number }>(hits.map((h) => [h.source.id, { n: 0 }]));
+  const lifelink = new Map<string, { n: number }>();
+  const key = (e: DamageEvent) => e.src.id!;
+  const done = dealPlanned(s, plan, { lifelink: (e) => lifelink.get(key(e)) ?? lifelink.set(key(e), { n: 0 }).get(key(e))! });
   const dealt = new Map<ObjectId, number>();
-  const hitDealt: number[] = [];
-  for (const h of hits) {
-    const src = sources.get(h.source.id)!;
-    const opts = { combat: true, lifelink: lifelink.get(h.source.id)! };
-    let n = 0;
-    if (h.toPlayer !== undefined) {
-      n = dealDamage(s, src, { player: h.toPlayer }, h.amount, opts);
-      if (n) fireEvent(s, { type: "combatDamageToPlayer", id: h.source.id, player: h.toPlayer, amount: n });
-    } else if (h.toObject) n = dealDamage(s, src, { object: h.toObject }, h.amount, opts);
-    dealt.set(h.source.id, (dealt.get(h.source.id) ?? 0) + n);
-    hitDealt.push(n);
+  for (const e of done) {
+    dealt.set(key(e), (dealt.get(key(e)) ?? 0) + e.dealt);
+    if ("player" in e.to && e.dealt) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: e.to.player, amount: e.dealt });
   }
   // "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage.
   const groups = new Map<string, { controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }>();
-  for (const [i, h] of hits.entries()) {
-    if (h.toPlayer === undefined || !hitDealt[i]) continue;
-    const controller = sources.get(h.source.id)!.controller;
-    const g = groups.get(`${controller}|${h.toPlayer}`) ?? { controller, player: h.toPlayer, ids: [], amounts: [] };
-    g.ids.push(h.source.id);
-    g.amounts.push(hitDealt[i]!);
-    groups.set(`${controller}|${h.toPlayer}`, g);
+  for (const e of done) {
+    if (!("player" in e.to) || !e.dealt) continue;
+    const controller = e.src.controller;
+    const g = groups.get(`${controller}|${e.to.player}`) ?? { controller, player: e.to.player, ids: [], amounts: [] };
+    g.ids.push(key(e));
+    g.amounts.push(e.dealt);
+    groups.set(`${controller}|${e.to.player}`, g);
   }
-  for (const [id, gained] of lifelink) gainLife(s, sources.get(id)!.controller, gained.n);
+  for (const e of done) {
+    const gained = lifelink.get(key(e));
+    if (gained?.n) gainLife(s, e.src.controller, gained.n);
+    lifelink.delete(key(e));
+  }
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
   for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
   for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
+  return false;
 }
 
 // ---------------------------------------------------------------------------

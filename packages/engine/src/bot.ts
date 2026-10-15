@@ -134,6 +134,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
+    if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
@@ -187,7 +189,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -1099,6 +1101,7 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
+      if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
@@ -1247,6 +1250,54 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
       const costs = abilityCosts(s, pid, o, ab, [], c.id);
       if (costs === null) continue;
       const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * Redirection shields in a combat (the en-Kor, Daughter of Autumn), once blocks are declared and before damage: when
+ * one of our creatures would be dealt lethal combat damage, send 1 more of it at a time to a creature or player of an
+ * opponent's if the ability allows it, else to a creature of ours that survives it, until the one in danger survives.
+ */
+function chooseRedirect(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.step !== "declareBlockers" || s.stack.length) return null;
+  const foesOf = (c: GameObject) => (c.blocking ? c.blocking : c.attacking !== undefined ? (c.blockedBy ?? []) : []);
+  const incoming = (c: GameObject) => foesOf(c).reduce((n, f) => n + (s.objects[f]?.zone === "battlefield" ? power(s, obj(s, f)) : 0), 0);
+  const shielded = (c: GameObject) => (c.preventNext ?? 0) + (c.redirectNext ?? []).reduce((n, r) => n + r.n, 0);
+  const sentTo = (c: GameObject) =>
+    s.battlefield.reduce((n, id) => n + (obj(s, id).redirectNext ?? []).filter((r) => "object" in r.to && r.to.object === c.id).reduce((a, r) => a + r.n, 0), 0);
+  const inDanger = (c: GameObject) => objIsType(s, c, "Creature") && incoming(c) + sentTo(c) - shielded(c) >= Math.max(1, lethalDamage(s, c));
+  // A creature of ours that can take one more damage and live; theirs is better.
+  const spare = (c: GameObject) => objIsType(s, c, "Creature") && incoming(c) + sentTo(c) - shielded(c) + 1 < lethalDamage(s, c) && !objHasKeyword(s, c, "Indestructible");
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const e = ab.body.effects.length === 1 ? ab.body.effects[0]! : undefined;
+      if (e?.type !== "redirectNext" || ab.body.targets.length !== 1 || ab.tap || ab.sacrificeSelf) continue;
+      if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const options = legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id);
+      let target: TargetChoice | undefined;
+      if (e.from.ref === "self" && inDanger(o)) {
+        // Away from it: to an opponent, an opponent's creature, or one of ours that survives it.
+        target =
+          options.find((t) => t.kind === "player" && t.id !== pid) ??
+          options.find((t) => t.kind === "object" && t.id !== id && controllerOf(s, obj(s, t.id)) !== pid && objIsType(s, obj(s, t.id), "Creature")) ??
+          options.find((t) => t.kind === "object" && t.id !== id && controllerOf(s, obj(s, t.id)) === pid && spare(obj(s, t.id)));
+      } else if (e.to.ref === "self" && spare(o)) {
+        // Onto it (Daughter of Autumn): from one of ours in danger.
+        target = options.find((t) => t.kind === "object" && t.id !== id && controllerOf(s, obj(s, t.id)) === pid && inDanger(obj(s, t.id)));
+      }
+      if (!target) continue;
+      const costs = abilityCosts(s, pid, o, ab, [target]);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, [target], undefined, undefined, undefined, costs);
       if (plan) return plan;
     }
   }

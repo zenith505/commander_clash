@@ -586,6 +586,8 @@ export type Effect =
   | { type: "returnToBattlefield"; counter?: "+1/+1" | "-1/-1" }
   /** "Prevent the next 2 damage that would be dealt to any target this turn" (a prevention shield, CR 615.7). */
   | { type: "preventNext"; n: Amount; to: DamageRecipient }
+  /** "The next N damage that would be dealt to ~ this turn is dealt to target creature you control instead" (CR 614.9). */
+  | { type: "redirectNext"; n: Amount; from: DamageRecipient; to: DamageRecipient }
   /** "Prevent all combat damage that would be dealt this turn" (CR 615.1). */
   | { type: "preventCombatDamage" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */

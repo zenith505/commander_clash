@@ -391,8 +391,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     case "putInLibrary":
       for (const o of objects(s, e.what, ctx)) {
-        log(s, `${src} puts ${defOf(s, o).name} on the ${e.position} of its owner's library.`);
-        moveObject(s, o.id, "library", { top: e.position === "top" });
+        let position = e.position;
+        if (position === "ownersChoice") {
+          // Its owner chooses as it resolves; a token goes too, then ceases to exist (CR 111.7).
+          const sc = (s.resolving!.scratch ??= {});
+          if (!sc.topOrBottom) {
+            s.pending = { kind: "chooseOption", player: o.owner, source: src, what: "topOrBottom", options: ["top", "bottom"], labels: ["Top", "Bottom"], prompt: `put ${defOf(s, o).name} on the top or bottom of your library?` };
+            return "paused";
+          }
+          position = sc.topOrBottom as "top" | "bottom";
+          sc.topOrBottom = undefined;
+        }
+        log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} on the ${position} of their library.`);
+        moveObject(s, o.id, "library", { top: position === "top" });
       }
       return;
     case "exileGraveyard":

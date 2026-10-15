@@ -2540,7 +2540,7 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "chooseOption" && pending.what === "damageShield" && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

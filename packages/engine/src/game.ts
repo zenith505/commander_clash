@@ -1117,7 +1117,12 @@ function beginStep(s: GameState, step: Step): void {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
       for (const id of s.battlefield) {
         const o = obj(s, id);
-        if (controllerOf(s, o) !== ap) continue;
+        if (controllerOf(s, o) !== ap) {
+          // "Untap ~ during each other player's untap step": at the same time; what stops it untapping during its
+          // controller's own untap step doesn't apply (Seedborn Muse and Quest for Renewal rulings).
+          if (characteristics(s, o).untapsDuringOthers) untapPermanent(s, o);
+          continue;
+        }
         if (o.skipNextUntap) o.skipNextUntap = undefined;
         else if (!characteristics(s, o).doesntUntap) untapPermanent(s, o); // CR 502.3
       }
@@ -2431,6 +2436,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   const r = s.resolving;
   if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
+  if (pend.what === "topOrBottom") {
+    if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
+    (r.scratch ??= {}).topOrBottom = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "endure") {
     (r.scratch ??= {}).endure = choice;
     continueResolution(s);
@@ -3011,6 +3022,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
   if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it (Ring-bearer)`; // CR 701.54c
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
+  for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
       if (has(a, kw) && s.battlefield.some((id) => { const l = obj(s, id); return controllerOf(s, l) === defender && characteristics(s, l).subtypes.includes(land); }))

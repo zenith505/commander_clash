@@ -100,10 +100,14 @@ export interface Characteristics {
   blocksOnlyFlyers: boolean;
   /** "Attacks each combat if able" (CR 508.1d). */
   attacksIfAble: boolean;
+  /** Untaps during each other player's untap step too. */
+  untapsDuringOthers: boolean;
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
+  /** Attackers it can't block. */
+  cantBlockCreatures: TargetSpec[];
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   maxOneBlocker: boolean;
   /** "Its activated abilities can't be activated": "all" (mana abilities too, CR 605.1a), "nonMana", or false. */
@@ -162,8 +166,10 @@ function printed(s: GameState, o: GameObject): Characteristics {
     doesntUntap: false,
     blocksOnlyFlyers: false,
     attacksIfAble: false,
+    untapsDuringOthers: false,
     mustAttack: [],
     cantBeBlockedBy: [],
+    cantBlockCreatures: [],
     maxOneBlocker: false,
     minBlockers: 0,
     goadedBy: [],
@@ -191,6 +197,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   grantedAbilities: [...c.grantedAbilities],
   pt: [...c.pt],
   cantBeBlockedBy: [...c.cantBeBlockedBy],
+  cantBlockCreatures: [...c.cantBlockCreatures],
   attackUnless: [...c.attackUnless],
   goadedBy: [...c.goadedBy],
   mustAttack: [...c.mustAttack],
@@ -521,6 +528,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "doesntUntap":
       c.doesntUntap = true;
       return;
+    case "untapsDuringOthers":
+      c.untapsDuringOthers = true;
+      return;
     case "blocksOnlyFlyers":
       c.blocksOnlyFlyers = true;
       return;
@@ -532,6 +542,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBeBlockedBy":
       c.cantBeBlockedBy.push(m.filter);
+      return;
+    case "cantBlockCreatures":
+      c.cantBlockCreatures.push(m.filter);
       return;
     case "maxOneBlocker":
       c.maxOneBlocker = true;

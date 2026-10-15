@@ -68,6 +68,15 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
+  // "Target creature's owner puts it on their choice of the top or bottom of their library", "The owner of target
+  // nonland permanent puts it ...": one permanent, its owner choosing as it resolves.
+  if ((m = /^(?:(target .+?)'s owner|The owner of ((?:up to one (?:other )?)?target .+?)|Its owner) puts it on their choice of the top or bottom of their library$/i.exec(s))) {
+    const what = parseObject(m[1] ?? m[2] ?? "it", ctx);
+    if (what?.ref !== "target" || (what.n ?? 1) !== 1) return null;
+    const spec = ctx.targets[what.index];
+    if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
+    return [{ type: "putInLibrary", what, position: "ownersChoice" }];
+  }
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   if ((m = /^Put (target .+?|~) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);

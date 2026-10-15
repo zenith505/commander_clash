@@ -296,6 +296,8 @@ export type Modification =
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   | { kind: "doesntUntap" }
+  /** "Untap ~ during each other player's untap step" (CR 502.3). */
+  | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
   | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
   /** Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able. */
@@ -304,6 +306,8 @@ export type Modification =
   | { kind: "mustAttackPlayer"; player: PlayerId }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
+  /** "Can't block creatures with power 2 or greater" (a blocking restriction on the blocker, CR 509.1b). */
+  | { kind: "cantBlockCreatures"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
   | { kind: "maxOneBlocker" }
   /** "Its activated abilities can't be activated" (Arrest), mana abilities included (CR 605.1a) unless `exceptMana`. */
@@ -440,8 +444,11 @@ export type Effect =
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
   | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean; /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */ attachToSubject?: boolean }
-  /** "Put target card from your graveyard on top of / on the bottom of its owner's library". */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }
+  /**
+   * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
+   * creature's owner puts it on their choice of the top or bottom of their library".
+   */
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */

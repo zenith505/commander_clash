@@ -5,6 +5,7 @@ import type { CountMod, TokenSpec } from "./abilities";
 import { abilitiesOf } from "./cards";
 import { controllerOf, characteristics } from "./layers";
 import type { GameObject, GameState, PlayerId } from "./types";
+import { fireEvent } from "./effects";
 
 function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source: string }[] {
   const out: { mod: CountMod; controller: PlayerId; source: string }[] = [];
@@ -54,6 +55,9 @@ export function tokensToCreate(s: GameState, pid: PlayerId, token: Pick<TokenSpe
 /** Put counters on a permanent through those replacement effects; returns how many were put on. */
 export function putCounters(s: GameState, o: GameObject, kind: string, n: number, entering = false): number {
   const m = countersToPut(s, o, kind, n, entering);
-  if (m > 0) o.counters[kind] = (o.counters[kind] ?? 0) + m;
+  if (m > 0) {
+    o.counters[kind] = (o.counters[kind] ?? 0) + m;
+    fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m });
+  }
   return m;
 }

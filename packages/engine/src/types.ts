@@ -98,10 +98,14 @@ export interface GameObject {
   activatedThisTurn?: number[];
   /** Renown's designation (CR 702.112b), until it leaves the battlefield. */
   renowned?: boolean;
+  /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
+  monstrous?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
   skipNextUntap?: boolean;
   /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */
   damagedBy?: ObjectId[];
+  /** It was dealt damage this turn (forgotten in the cleanup step, CR 514.2, and when it leaves the battlefield). */
+  wasDealtDamage?: true;
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
   /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
@@ -245,6 +249,8 @@ export interface Player {
   drewFromEmptyLibrary: boolean;
   /** Cards drawn in turn `turn`, for "whenever you draw your second card each turn". */
   draws?: { turn: number; n: number };
+  /** The turn of their draw step in which they last drew (the first card drawn in it isn't doubled by Alhammarret's Archive). */
+  firstDrawStepDraw?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
   /** The players this player attacked with creatures in the latest combat, and its turn (melee, CR 702.121a). */
@@ -471,7 +477,7 @@ export type PendingDecision =
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
    */
-  | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; after?: "drawStep" }
+  | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; /** Of those, draws this one already stands for (Alhammarret's Archive). */ ready?: number; after?: "drawStep" }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
    * mulligans this player has taken so far; `bottomIfKept` how many cards keeping now costs.
@@ -604,7 +610,7 @@ export interface GameState {
    */
   unblockedChoice?: { turn: number; step: Step; asked: PlayerId[]; ids: ObjectId[] };
   /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */
-  declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][] };
+  declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][]; /** Attackers that may still be exerted (CR 701.43d), and those that were. */ exert?: ObjectId[]; exerted?: ObjectId[] };
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
   mulligans?: MulliganState | null;

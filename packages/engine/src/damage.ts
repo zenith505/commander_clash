@@ -113,6 +113,7 @@ export function dealDamage(
     }
     if (has(src, "Deathtouch")) o.deathtouchDamage = true;
     if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);
+    o.wasDealtDamage = true;
     // "Whenever ~ deals damage to a creature" (combat damage is all dealt before any of it triggers anything).
     if (src.id && c.types.includes("Creature")) fireEvent(s, { type: "damagedCreature", source: src.id, id: o.id, amount: n, combat: !!opts.combat });
   } else {
@@ -121,8 +122,12 @@ export function dealDamage(
       p.poison = (p.poison ?? 0) + n;
       log(s, `${src.name} deals ${n} damage to ${p.name} (${n} poison counter${n === 1 ? "" : "s"}).`);
     } else {
-      loseLife(s, p.id, n);
-      log(s, `${src.name} deals ${n} damage to ${p.name}.`);
+      // "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): the damage is
+      // all dealt, only the life lost changes; not if they're below 1 already (rulings).
+      const floor = Math.max(0, ...s.battlefield.map((id) => (controllerOf(s, obj(s, id)) === p.id ? (abilitiesOf(s, obj(s, id)).lifeFloor ?? 0) : 0)));
+      const lost = floor && p.life >= floor && p.life - n < floor ? p.life - floor : n;
+      loseLife(s, p.id, lost);
+      log(s, `${src.name} deals ${n} damage to ${p.name}${lost < n ? ` (their life total can't go below ${floor})` : ""}.`);
     }
     if (!(s.damagedThisTurn ??= []).includes(p.id)) s.damagedThisTurn.push(p.id);
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).

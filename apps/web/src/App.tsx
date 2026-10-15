@@ -69,6 +69,7 @@ import {
   compileCard,
   kickerName,
   canEnterUntapped,
+  entersRulesOf,
   crewPower,
   potentialAttackers,
   attackedName,
@@ -687,7 +688,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
     if (o.zone === "hand" && (handAbilities(s, o.id).length || compileCard(cardOf(s, o.id)).altCosts?.length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
-    if (o.zone === "hand" && isLand(s, o.id) && compileCard(cardOf(s, o.id)).entersTappedChoice) return setMenu(o.id);
+    if (o.zone === "hand" && isLand(s, o.id) && entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
     if (o.zone === "hand" || o.zone === "command") return startCast(o.id);
     if (o.zone === "battlefield" && controllerOf(s, o) === HUMAN) {
@@ -2345,7 +2346,7 @@ function AbilityMenu({
   const inYard = o.zone === "graveyard";
   const land = isLand(s, objectId);
   const playable = inHand && (land ? canPlayLand(s, objectId) : canCastWithTaps(s, objectId));
-  const choice = inHand && land ? compileCard(d).entersTappedChoice : undefined;
+  const choice = inHand && land ? entersRulesOf(s, HUMAN, objectId).entersTappedChoice : undefined;
   return (
     <div className="ability-menu">
       <strong>{d.name}</strong>
@@ -2651,6 +2652,8 @@ function Controls({
               ? `reveal any number of cards in your hand that share a creature type with it (amplify): click them, then reveal.`
               : pending.action === "band"
                 ? `put attacking creatures in a band if you want: click creatures with banding and up to one without, all attacking the same player. Blocking one blocks them all, and you divide blockers' damage among them.`
+                : pending.action === "exert"
+                ? `exert attacking creatures if you want: click them. An exerted creature doesn't untap during your next untap step, and its "when you do" ability triggers.`
                 : pending.action === "enlist"
                 ? `enlist a creature that isn't attacking, if you want: click it to tap it, and ${pending.source} gets +X/+0 until end of turn, where X is its power.`
                 : pending.action === "unblocked"
@@ -2660,7 +2663,7 @@ function Controls({
                 : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

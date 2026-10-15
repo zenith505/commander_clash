@@ -30,6 +30,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const n = num(m[3]!) * (m[2]!.toLowerCase() === "minus" ? -1 : 1);
     return c && { ...c, plus: (c.plus ?? 0) + n };
   }
+  // "The greatest power among creatures you control" (0 with none), "among other creatures you control".
+  if (!each && (m = /^the greatest power among (other )?(creatures you control|creatures on the battlefield)$/i.exec(p))) {
+    const spec = parseTargetPhrase(/you control/i.test(m[2]!) ? "creature you control" : "creature", { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return { count: { kind: "greatestPower", filter: { ...spec, text: m[2]! }, ...(m[1] ? { other: true as const } : {}) } };
+  }
   if (!each) {
     const nb = /^the number of (.+)$/i.exec(p);
     if (nb) return parseCount(nb[1]!, ctx, true);
@@ -47,6 +53,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });
   }
+  // "Card types among cards in all graveyards" (Tarmogoyf), "in your graveyard", "in your opponents' graveyards" (CR 205.2a).
+  if ((m = /^card types? among cards in (your|all|your opponents') graveyards?$/i.exec(p)))
+    return count({ kind: "graveyardCardTypes", who: { ref: m[1] === "your" ? "you" : m[1] === "all" ? "eachPlayer" : "eachOpponent" } as PlayerRef });
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : whosePlayer(m[2]!, ctx);
@@ -109,6 +118,8 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
     return { ref: "target", index: i };
   }
   if ((x === "that player's" || x === "their") && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
+  // "At the beginning of each opponent's upkeep, ~ deals X damage to that player, where X is the number of cards in their hand".
+  if ((x === "that player's" || x === "their") && ctx.eventPlayer) return { ref: "eventPlayer" };
   return null;
 }
 

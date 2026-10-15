@@ -254,6 +254,12 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
     extra.chosen = chosen[2] === "color" ? (chosen[1] ? "notColor" : "color") : chosen[1] ? "notType" : "type";
     p = (p.slice(0, chosen.index) + p.slice(chosen.index + chosen[0].length)).trim();
   }
+  // "creature an opponent controls that was dealt damage this turn"
+  const hurt = / that was dealt damage this turn$/.exec(p);
+  if (hurt) {
+    extra.dealtDamageThisTurn = true;
+    p = p.slice(0, hurt.index);
+  }
   // "creature with a +1/+1 counter on it"
   const counter = / with an? ([+-]1\/[+-]1) counter on (?:it|them)/.exec(p);
   if (counter) {

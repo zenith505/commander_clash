@@ -69,6 +69,12 @@ export type TriggerSourceEvent =
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
+  /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
+  | { type: "countersPut"; id: ObjectId; counter: string; amount: number }
+  /** A permanent became monstrous (CR 701.37b). */
+  | { type: "becameMonstrous"; id: ObjectId }
+  /** An attacker was exerted as it attacked (CR 701.43d). */
+  | { type: "exerted"; id: ObjectId; /** By its "you may exert ~ as it attacks" (its "when you do" is linked to that, CR 607.2h). */ attacking?: true }
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
   | { type: "groupAttack"; controller: PlayerId; ids: ObjectId[] }
   /** In one combat damage step, these creatures of `controller` dealt `player` combat damage. */
@@ -196,7 +202,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
-      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, undefined, event?.amount)))
+      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount)))
         s.triggerQueue.push({
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
           // An ability an effect gave it isn't on its card, so the trigger carries what it does.
@@ -409,6 +415,29 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     }
+  } else if (ev.type === "countersPut") {
+    // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control": "that many" is how many.
+    const o = obj(s, ev.id);
+    const kindOk = (t: TriggeredAbility) => t.countersKind === undefined || t.countersKind === ev.counter;
+    const info = { amount: ev.amount };
+    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && kindOk(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentCountersPut" && kindOk(t) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
+    }
+  } else if (ev.type === "exerted") {
+    // Exert's linked "When you do" (CR 607.2h), and "whenever you exert a creature" (the creature is the subject).
+    const o = obj(s, ev.id);
+    const you = controllerOf(s, o);
+    if (ev.attacking) add(o, you, (e) => e === "selfExerted");
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) === you) add(w, you, (e) => e === "youExert", undefined, undefined, o);
+    }
+  } else if (ev.type === "becameMonstrous") {
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous");
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
@@ -637,7 +666,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active))), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
   }

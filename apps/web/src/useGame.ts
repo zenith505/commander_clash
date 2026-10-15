@@ -16,6 +16,7 @@ import {
   doesNothingNow,
   realDefOf,
   planTurnFaceUp,
+  takeShortcut,
   isType,
   obj,
   waitingOn,
@@ -165,9 +166,26 @@ export const STOPPABLE: Step[] = ["upkeep", "draw", "main1", "beginCombat", "dec
 /** The phase-track step the game is in (both combat damage steps share one marker). */
 const trackStep = (s: GameState): Step => (s.step === "firstStrikeDamage" ? "combatDamage" : s.step);
 
+/**
+ * A loop being recorded for a shortcut (CR 732.2a): where it began, and every player's choices since. The human plays
+ * it once by hand, then repeats it.
+ */
+export interface LoopRecording {
+  start: GameState;
+  body: Action[];
+}
+
+/** Back where the loop began: the human has priority again in the same step, with as much on the stack. */
+export function loopReady(s: GameState, loop: LoopRecording | null): boolean {
+  if (!loop?.body.length || s.over || s.pending || waitingOn(s) !== HUMAN) return false;
+  return s.turn === loop.start.turn && s.step === loop.start.step && s.stack.length === loop.start.stack.length;
+}
+
 /** Should the human automatically pass right now? */
-function shouldAutoPass(s: GameState, mode: PriorityMode, stops: ReadonlySet<Step>): boolean {
+function shouldAutoPass(s: GameState, mode: PriorityMode, stops: ReadonlySet<Step>, loop: LoopRecording | null): boolean {
   if (waitingOn(s) !== HUMAN || s.pending) return false;
+  // Recording a loop: stop once it's back where it began, so it can be repeated.
+  if (loopReady(s, loop)) return false;
   if (s.activePlayer === HUMAN && (s.step === "main1" || s.step === "main2") && s.stack.length === 0) return false;
   // Never pass away mana you've just made: you're partway through paying for something.
   if (Object.values(s.players[HUMAN]!.manaPool).some((n) => n > 0)) return false;
@@ -238,8 +256,17 @@ export function useGame(initial: GameState | null) {
   const [intent, setIntent] = useState<Intent | null>(null);
   const [priorityMode, setModeState] = useState<PriorityMode>(loadMode);
   const [stops, setStops] = useState<Set<Step>>(loadStops);
+  const [loop, setLoopState] = useState<LoopRecording | null>(null);
+  /** What the last shortcut did, until the next action. */
+  const [shortcutNote, setShortcutNote] = useState<string | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const loopRef = useRef(loop);
+  loopRef.current = loop;
+  const setLoop = useCallback((l: LoopRecording | null) => {
+    loopRef.current = l;
+    setLoopState(l);
+  }, []);
 
   const setPriorityMode = useCallback((m: PriorityMode) => {
     setModeState(m);
@@ -275,13 +302,56 @@ export function useGame(initial: GameState | null) {
         if (a.type === "passPriority" && a.player === HUMAN && s.activePlayer !== HUMAN) spendStop(trackStep(s));
         s = applyAction(s, a);
       }
+      const l = loopRef.current;
+      if (l) setLoop(s.over ? null : { ...l, body: [...l.body, ...actions] });
       setError(null);
+      setShortcutNote(null);
       setState(s);
     } catch (e) {
       if (e instanceof RulesError) setError(e.message);
       else throw e;
     }
-  }, [spendStop]);
+  }, [spendStop, setLoop]);
+
+  /** Mark this point as the start of a loop; every choice from here is recorded until it's repeated or cancelled. */
+  const startLoop = useCallback(() => {
+    const s = stateRef.current;
+    if (!s || s.over || s.pending || waitingOn(s) !== HUMAN) return;
+    setLoop({ start: s, body: [] });
+    setShortcutNote(null);
+  }, [setLoop]);
+
+  const cancelLoop = useCallback(() => setLoop(null), [setLoop]);
+
+  /**
+   * Propose the recorded loop as a shortcut, `times` more times (CR 732.2a). Each bot goes along with it or stops it
+   * where it would do something else (732.2b).
+   */
+  const repeatLoop = useCallback(
+    (times: number) => {
+      const s = stateRef.current;
+      const l = loopRef.current;
+      if (!s || !loopReady(s, l)) return;
+      try {
+        const res = takeShortcut(l!.start, l!.body, times, HUMAN, (st, pid) => botActions(st, pid));
+        setLoop(null);
+        setError(null);
+        const rounds = `${res.repeated} more time${res.repeated === 1 ? "" : "s"}`;
+        setShortcutNote(
+          res.stoppedBy !== undefined
+            ? `The loop went round ${rounds}; then ${res.state.players[res.stoppedBy]!.name} stopped it to do something else.`
+            : res.problem
+              ? `The loop went round ${rounds}; it can't go round again the same way (${res.problem}).`
+              : `The loop went round ${rounds}.`,
+        );
+        setState(res.state);
+      } catch (e) {
+        if (e instanceof RulesError) setError(e.message);
+        else throw e;
+      }
+    },
+    [setLoop],
+  );
 
   // Drive bots and the human's auto-passes.
   useEffect(() => {
@@ -289,7 +359,7 @@ export function useGame(initial: GameState | null) {
     const who = waitingOn(state);
     if (who === null) return;
     const isBot = state.players[who]!.isBot;
-    if (!isBot && !shouldAutoPass(state, priorityMode, stops)) return;
+    if (!isBot && !shouldAutoPass(state, priorityMode, stops, loopRef.current)) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const act = () => {
       if (!isBot) return dispatch([{ type: "passPriority", player: HUMAN }]);
@@ -308,9 +378,9 @@ export function useGame(initial: GameState | null) {
       timers.forEach(clearTimeout);
       setIntent(null);
     };
-  }, [state, dispatch, priorityMode, stops]);
+  }, [state, dispatch, priorityMode, stops, loop]);
 
-  return { state, setState, dispatch, error, setError, intent, priorityMode, setPriorityMode, stops, toggleStop };
+  return { state, setState, dispatch, error, setError, intent, priorityMode, setPriorityMode, stops, toggleStop, loop, startLoop, cancelLoop, repeatLoop, shortcutNote };
 }
 
 export const cardOf = (s: GameState, id: string) => defOf(s, obj(s, id));

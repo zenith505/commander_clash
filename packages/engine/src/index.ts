@@ -13,3 +13,4 @@ export * from "./effects";
 export * from "./layers";
 export * from "./modes";
 export * from "./damage";
+export * from "./shortcuts";

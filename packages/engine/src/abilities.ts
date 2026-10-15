@@ -611,7 +611,8 @@ export type TriggerEvent =
   | "selfBlocksCreature"
   | "selfBlockedByCreature" // flanking (CR 702.25a)
   | "selfBlocksOrBlockedByCreature"
-  | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.10)
+  | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
+  | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"

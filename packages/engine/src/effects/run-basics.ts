@@ -1,6 +1,6 @@
 import type { Effect } from "../abilities";
 import { defOf, objIsType, power, toughness } from "../cards";
-import { draw, gainLife, giveCitysBlessing, log, player } from "../game";
+import { draw, gainLife, giveCitysBlessing, log, loseLife, player } from "../game";
 import { MONARCH } from "../oracle";
 import { invalidateCharacteristics } from "../layers";
 import { dealDamage, objectSource } from "../damage";
@@ -93,7 +93,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);
         if (n <= 0) continue;
-        player(s, pid).life -= n;
+        loseLife(s, pid, n);
         total += n;
         log(s, `${player(s, pid).name} loses ${n} life.`);
       }

@@ -1,6 +1,6 @@
 # Roadmap
 
-12,178 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+12,188 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,8 +14,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. **CR 732 loop shortcuts.**
-2. Then by `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
+1. By `npm run blockers`: banding, offspring, enlist, sunburst, For Mirrodin!, squad, ravenous, amplify,
    "assign combat damage as though it weren't blocked", flash with a cleanup sacrifice, Start your engines!.
 
 ## Known gaps (from earlier rounds)
@@ -62,6 +61,14 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Suspend: X or non-mana suspend costs; cards that look at or change suspended cards and time counters (Jhoira,
   Clockspinning, Greater Gargadon, Deep-Sea Kraken, Delay, Dust of Moments, As Foretold, Chronozoa, vanishing).
 - Bestow: non-mana bestow costs. Casualty X (Ob Nixilis), granted casualty (Anhelo). Dredge granted to other cards.
+- Loops (CR 732): bots don't propose shortcuts (a bot activates one ability at most 8 times a turn instead), and the
+  human can't shorten a shortcut someone else proposes. Fragmented loops (732.3) and "[A] unless [B]" loops (732.6).
+  A shortcut replays choices literally, so a loop whose choices depend on what it reveals (scry, which card was drawn)
+  stops after one round; the UI only repeats a loop that ends in the step it began in. A mandatory loop is recognized
+  when the game state repeats with everyone only passing; one that needs a choice each time (a target) or grows a
+  number forever is a draw only after 5,000 resolutions in a row.
+- Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each
+  turn", "draw that many cards"; "players can't gain life" and life-gain replacement effects.
 
 ## Later
 

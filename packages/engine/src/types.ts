@@ -76,7 +76,7 @@ export interface GameObject {
   regenShields?: number;
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
   preventNext?: number;
-  /** Activated abilities (by index) activated this turn, for "activate only once each turn" (CR 602.5b). */
+  /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
   /** Renown's designation (CR 702.112b), until it leaves the battlefield. */
   renowned?: boolean;
@@ -455,6 +455,11 @@ export interface GameState {
    */
   entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean } }[];
   nextId: number;
+  /**
+   * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
+   * see shortcuts.ts): a state seen again means a loop of mandatory actions, and the game is a draw (CR 104.4b).
+   */
+  loopWatch?: { turn: number; step: Step; resolutions: number; seen: string[] };
   log: GameEvent[];
   winner: PlayerId | null;
   over: boolean;

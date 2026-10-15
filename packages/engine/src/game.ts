@@ -3071,8 +3071,11 @@ function attachmentSBAs(s: GameState): boolean {
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     if (c.subtypes.includes("Aura")) {
       const enchant = compileCard(defOf(s, o)).enchant;
-      // Protection from the Aura's color makes it illegal too (CR 702.16c).
-      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false, c);
+      // Protection from the Aura's color makes it illegal too (CR 702.16c), unless that protection is only from an
+      // effect that "doesn't remove" this Aura.
+      const hc = host && characteristics(s, host);
+      const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id) : [];
+      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false) && !protectedFrom(shielding, c);
       if (!legal && o.bestowed) {
         // A bestowed Aura becomes unattached and stops being bestowed: it's an enchantment creature (CR 702.103f).
         o.attachedTo = undefined;

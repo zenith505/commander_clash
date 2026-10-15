@@ -620,6 +620,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
       continue;
     }
+    // "Enchanted creature has protection from the chosen color. This effect doesn't remove ~." (Cho-Manno's Blessing)
+    const spare = /^(Enchanted creature has protection from .+?\.) This effect doesn't remove ~\.$/.exec(line);
+    if (spare) {
+      const st = parseStatic(spare[1]!);
+      const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.every((m) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k)));
+      if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => ({ ...m, spares: true as const })) as typeof st.mods, text: line });
+      else out.unsupported.push(raw);
+      continue;
+    }
     const st = parseStatic(line) ?? parseConditionalStatic(line);
     if (st) {
       out.statics.push(st);

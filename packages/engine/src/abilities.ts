@@ -258,7 +258,8 @@ export type Modification =
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   | { kind: "setColors"; colors: Color[] } // layer 5
-  | { kind: "addKeywords"; keywords: string[] } // layer 6
+  /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
+  | { kind: "addKeywords"; keywords: string[]; spares?: true }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**

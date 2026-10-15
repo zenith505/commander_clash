@@ -28,6 +28,7 @@ import {
   opponents,
   player,
   potentialAttackers,
+  combatDamageOf,
   spellCost,
   graveyardWay,
   graveyardWays,
@@ -1630,13 +1631,13 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
   // (CR 725.2) unless someone else is low enough to finish.
   const lowest = [...opps].sort((a, b) => player(s, a).life - player(s, b).life)[0]!;
-  const reach = potentialAttackers(s, pid).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+  const reach = potentialAttackers(s, pid).reduce((n, o) => n + Math.max(0, combatDamageOf(s, o)), 0);
   const target = s.monarch !== undefined && opps.includes(s.monarch) && player(s, lowest).life > reach ? s.monarch : lowest;
   const theirBlockers = s.battlefield
     .map((id) => obj(s, id))
     .filter((o) => controllerOf(s, o) === target && !o.tapped && objIsType(s, o, "Creature"));
-  const biggestBlocker = Math.max(0, ...theirBlockers.map((o) => power(s, o)));
-  const ready = potentialAttackers(s, pid).filter((o) => power(s, o) > 0 && !attackProblem(s, o, target));
+  const biggestBlocker = Math.max(0, ...theirBlockers.map((o) => combatDamageOf(s, o)));
+  const ready = potentialAttackers(s, pid).filter((o) => combatDamageOf(s, o) > 0 && !attackProblem(s, o, target));
   // Swing with everything when we outnumber their untapped blockers; otherwise only with creatures that survive a block.
   const allIn = ready.length > theirBlockers.length;
   // Creatures that attack each combat if able have to (CR 508.1d), whatever their power, at whoever they can.
@@ -1689,7 +1690,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const used = new Set<string>();
   const blocks: { blocker: string; attacker: string }[] = [];
   // Only damage to us counts toward our life; attackers of our planeswalkers are blocked when that's a good trade.
-  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + power(s, a), 0);
+  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + combatDamageOf(s, a), 0);
   const desperate = totalIncoming >= me.life;
   // Requirements first (CR 509.1c): every creature able to block a lure blocks one, and a creature that
   // must be blocked if able gets our sturdiest blocker (two against menace).
@@ -1736,8 +1737,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     if (blocks.some((b) => b.attacker === at.id)) continue;
     if (blockersNeeded(s, at) > 1 || characteristics(s, at).cantBeBlocked) continue;
     const canBlock = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
-    const good = canBlock.find((b) => toughness(s, b) > power(s, at) && !objHasKeyword(s, at, "Deathtouch"));
-    const trade = canBlock.find((b) => power(s, b) >= toughness(s, at));
+    const good = canBlock.find((b) => toughness(s, b) > combatDamageOf(s, at) && !objHasKeyword(s, at, "Deathtouch"));
+    const trade = canBlock.find((b) => combatDamageOf(s, b) >= toughness(s, at));
     const pick = good ?? trade ?? (desperate ? canBlock[0] : undefined);
     if (pick) {
       used.add(pick.id);

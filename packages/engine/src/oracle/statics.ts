@@ -1,5 +1,5 @@
 import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec } from "../abilities";
-import { CREATURE_TYPES } from "../keywords";
+import { CREATURE_TYPES, SUPPORTED_KEYWORDS } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, capital, singular } from "./words";
 import { replaceX, usesX, scaleAmount } from "./body";
@@ -59,6 +59,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]!.replace(/^an additional /, "")}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [m[2]!], text: `${m[2]} creature` } } };
+  }
+  // Solid Footing: "As long as enchanted creature has vigilance, it assigns combat damage equal to its toughness rather
+  // than its power"; Warmonger's Chariot: "As long as equipped creature has defender, it can attack as though it didn't".
+  if ((m = /^As long as (enchanted|equipped) creature has (\w+), it (assigns combat damage .+|can attack as though .+)$/.exec(text)) && (SUPPORTED_KEYWORDS as readonly string[]).includes(capital(m[2]!))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[3]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], keywords: [capital(m[2]!)], text: `creature with ${m[2]}` } } };
   }
   // Aerial Modification: "As long as enchanted permanent is a Vehicle, it's a creature in addition to its other types."
   // A type-changing effect (layer 4) whose condition looks at the permanent as the earlier effects in that layer left it.
@@ -380,6 +387,16 @@ function parseStaticMods(rest: string): Modification[] | null {
   if (/^attacks? each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }];
   if (/^doesn't untap during (?:its controller's|your) untap step$/.test(rest)) return [{ kind: "doesntUntap" }];
   if (/^loses all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
+  // Doran (CR 510.1a as modified), defender (CR 702.3b).
+  if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/.test(rest)) return [{ kind: "assignsToughness" }];
+  if (/^can attack as though (?:it|they) didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender" }];
+  // "Gets +0/+2 and assigns combat damage equal to its toughness ..." (Gauntlets of Light), "assigns ... and can attack
+  // as though it didn't have defender" (Arcades).
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|assigns? combat damage .+?) and (assigns? combat damage .+|can attack as though .+)$`).exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[4]!);
+    return first && second ? [...first, ...second] : null;
+  }
   return null;
 }
 
@@ -440,10 +457,23 @@ export function parseStatic(line: string): StaticAbility | null {
     const affects = parseAffected(grantsUnblocked[1]!);
     return affects && affects.kind === "filter" ? { affects, mods: [...unblocked], text: line } : null;
   }
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
+  // Bark of Doran: "As long as equipped creature's toughness is greater than its power, it assigns combat damage equal
+  // to its toughness rather than its power" (checked as the damage is assigned).
+  if (/^As long as (?:equipped|enchanted) creature's toughness is greater than its power, it assigns combat damage equal to its toughness rather than its power$/.test(text))
+    return { affects: { kind: "attached" }, mods: [{ kind: "assignsToughness", ifGreater: true }], text: line };
+  // Doran's "each creature you control with toughness greater than its power assigns ...": whether its toughness is
+  // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
+  const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
+  if (greater) text = `${greater[1]} ${greater[2]}`;
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;
+  if (greater) {
+    const mods = parseStaticMods(m[2]!);
+    if (!mods?.some((x) => x.kind === "assignsToughness")) return null;
+    return { affects, mods: mods.map((x) => (x.kind === "assignsToughness" ? { ...x, ifGreater: true as const } : x)), text: line };
+  }
   // "~ gets +1/+1 for each artifact you control": counted continuously (CR 611.3a).
   const each = new RegExp(`^(gets? ${PT}/${PT}) for each (.+)$`).exec(m[2]!);
   let mods = parseStaticMods(each ? each[1]! : m[2]!);

@@ -149,7 +149,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Continuous changes until end of turn: "X gets +2/+2 and gains flying", "X loses all abilities
   // and becomes a blue Frog with base power and toughness 1/1", "X has base power and toughness 0/1".
-  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?) .+) until (end of turn|your next turn)$/i.exec(s))) {
+  // "~ can attack this turn as though it didn't have defender" (CR 702.3b), "target creature you control assigns combat
+  // damage equal to its toughness rather than its power this turn"; "~ gets +3/+0 until end of turn and can attack this
+  // turn as though it didn't have defender" (Nivix Cyclops).
+  if ((m = /^(.+?) (?:((?:gets?|gains?) .+) until end of turn and )?(can attack this turn as though (?:it|they) didn't have defender|assigns combat damage equal to its toughness rather than its power this turn)$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    const mods = what && parseChanges([m[2], m[3]!.replace(/ this turn$/, "")].filter(Boolean).join(" and "));
+    return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
+  }
+  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;

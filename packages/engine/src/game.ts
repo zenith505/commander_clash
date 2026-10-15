@@ -2971,7 +2971,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
     (o) =>
       !o.tapped &&
       !isSummoningSick(s, o) &&
-      !objHasKeyword(s, o, "Defender") &&
+      (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
       !characteristics(s, o).cantAttack &&
       (!characteristics(s, o).attackUnless.length || opps.some((d) => !attackProblem(s, o, d))),
   );
@@ -3413,7 +3413,7 @@ export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
   const out = new Map<PlayerId, ObjectId[]>();
   const fs = s.step === "firstStrikeDamage";
   for (const at of attackers(s)) {
-    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || !dealsDamageThisStep(s, at, fs) || power(s, at) <= 0) continue;
+    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
     const banded = at.blockedBy.some((id) => s.objects[id] && objHasKeyword(s, obj(s, id), "Banding"));
     const who = banded ? at.attacking : controllerOf(s, at);
     out.set(who, [...(out.get(who) ?? []), at.id]);
@@ -3460,13 +3460,24 @@ function bandSplit(s: GameState, source: GameObject, targets: GameObject[], dmg:
   return [...out];
 }
 
+/**
+ * How much combat damage a creature assigns: its power (CR 510.1a), or its toughness under Doran's "assigns combat
+ * damage equal to its toughness rather than its power" (only while its toughness is greater, for "with toughness
+ * greater than its power"). Its power itself doesn't change (rulings).
+ */
+export function combatDamageOf(s: GameState, o: GameObject): number {
+  const c = characteristics(s, o);
+  const [p, t] = [power(s, o), toughness(s, o)];
+  return c.assignsToughness || (c.assignsToughnessIfGreater && t > p) ? t : p;
+}
+
 /** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. True if it waits on a choice. */
 function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
   for (const at of attackers(s)) {
     if (!dealsDamageThisStep(s, at, firstStrikeStep) || at.noCombatDamageTurn === s.turn) continue;
-    let dmg = power(s, at);
+    let dmg = combatDamageOf(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
     const unblocked = s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id);
@@ -3502,7 +3513,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     const bl = obj(s, id);
     if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep) || bl.noCombatDamageTurn === s.turn) continue;
     const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
-    let dmg = power(s, bl);
+    let dmg = combatDamageOf(s, bl);
     if (dmg <= 0) continue;
     // Blocking a creature with banding, the active player divides its damage among those it blocks (CR 702.22k).
     if (blocked.length > 1 && blocked.some((at) => objHasKeyword(s, at, "Banding"))) {

@@ -123,11 +123,11 @@ describe("spell and enchantment subtypes in filters (CR 205.3h, 205.3k)", () => 
   const onna = card("Haru-Onna", "Creature — Spirit", "{3}{G}", { power: "2", toughness: "1", oracleText: "When this creature enters, draw a card.\nWhenever you cast a Spirit or Arcane spell, you may return this creature to its owner's hand." });
   const trial = card("Trial of Ambition", "Enchantment", "{1}{B}", { oracleText: "When this enchantment enters, target opponent sacrifices a creature of their choice.\nWhen a Cartouche you control enters, return this enchantment to its owner's hand." });
   const arcane = card("Peer Through Depths", "Instant — Arcane", "{1}{U}", { oracleText: "Look at the top five cards of your library. You may reveal an instant or sorcery card from among them and put it into your hand. Put the rest back in any order." });
-  const plainInstant = card("Brainstorm", "Instant", "{U}", { oracleText: "Draw three cards, then put two cards from your hand on top of your library in any order." });
+  const plainInstant = card("Opt", "Instant", "{U}", { oracleText: "Draw a card." });
 
   it("the Onna return on a Spirit or Arcane spell; the Trials on a Cartouche", () => {
     supported(onna, trial);
-    // A spell that's neither: only Brainstorm goes on the stack.
+    // A spell that's neither: only Opt goes on the stack.
     const { s: s0, ap, ids } = setup([plainInstant, arcane]);
     const o = putOnBattlefield(s0, ap, onna);
     let s = s0;

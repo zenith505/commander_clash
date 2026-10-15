@@ -133,6 +133,10 @@ export interface Characteristics {
   mustBeBlocked: boolean;
   allMustBlock: boolean;
   mustBlock: boolean;
+  /** Doran: assigns combat damage by its toughness, always or only while its toughness is greater than its power. */
+  assignsToughness: boolean;
+  assignsToughnessIfGreater: boolean;
+  attackDespiteDefender: boolean;
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
   extraBlocks: number;
   blockAny: boolean;
@@ -191,6 +195,9 @@ function printed(s: GameState, o: GameObject): Characteristics {
     mustBeBlocked: false,
     allMustBlock: false,
     mustBlock: false,
+    assignsToughness: false,
+    assignsToughnessIfGreater: false,
+    attackDespiteDefender: false,
     extraBlocks: 0,
     blockAny: false,
   };
@@ -643,7 +650,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":
+    case "attackDespiteDefender":
       c[m.kind] = true;
+      return;
+    case "assignsToughness":
+      if (m.ifGreater) c.assignsToughnessIfGreater = true;
+      else c.assignsToughness = true;
       return;
     case "blockAdditional":
       c.extraBlocks += m.n;

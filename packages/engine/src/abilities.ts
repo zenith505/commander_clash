@@ -381,6 +381,13 @@ export type Modification =
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked" }
   | { kind: "allMustBlock" }
+  /**
+   * Doran: "assigns combat damage equal to its toughness rather than its power" (CR 510.1a as modified); `ifGreater`
+   * for "with toughness greater than its power", checked as the damage is assigned.
+   */
+  | { kind: "assignsToughness"; ifGreater?: true }
+  /** "Can attack as though it didn't have defender" (CR 702.3b). */
+  | { kind: "attackDespiteDefender" }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
   | { kind: "mustBlock" }
   /**

@@ -519,6 +519,12 @@ export function moveObject(
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
+  // "If ~ would die, exile it instead", "If a creature an opponent controls would die, exile it instead" (CR 614.1a): from
+  // the permanent itself or another one on the battlefield, as the creature would leave (CR 603.10a-style look back).
+  if (fromZone === "battlefield" && to === "graveyard" && objIsType(s, o, "Creature") && exiledInsteadOfDying(s, o)) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of dying.`);
+  }
   // Darksteel Colossus: "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's
   // library instead" (CR 614.1a). On the battlefield it's the permanent's ability now (it could have lost it);
   // elsewhere the card's. If an "exile it instead" effect also applies, its owner would choose the order (CR 616.1):
@@ -646,6 +652,8 @@ export function moveObject(
   }
   // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
   // triggers say "put into a graveyard" or "leaves the battlefield".
+  // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
+  if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
   if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
@@ -814,6 +822,10 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
 /** A player gains life (CR 119.3): one life-gain event, which "whenever you gain life" abilities see (CR 119.10). */
 export function gainLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
+  if (!canGainLife(s, pid)) {
+    log(s, `${player(s, pid).name} can't gain life.`); // CR 119.7
+    return;
+  }
   // "If you would gain life, you gain twice that much life instead" (CR 614.1a): each one doubles it again (rulings).
   const doublers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).doubleLifeGain).length;
   if (doublers) {
@@ -824,11 +836,33 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   fireEvent(s, { type: "lifeGained", player: pid, amount: n });
 }
 
+/** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
+export function canGainLife(s: GameState, pid: PlayerId): boolean {
+  const stops = (who: "all" | "opponents" | undefined, controller: PlayerId) => who === "all" || (who === "opponents" && controller !== pid);
+  if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
+  return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id))));
+}
+
+/** Can damage be prevented now, or does a "damage can't be prevented" effect stop prevention effects (CR 615.12)? */
+export function canPreventDamage(s: GameState): boolean {
+  return s.noPreventionTurn !== s.turn && !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).damageCantBePrevented);
+}
+
 /** A player loses life (CR 119.3): from damage (119.2), an effect, or paying life (119.4). One life-loss event. */
 export function loseLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
   player(s, pid).life -= n;
+  if (!(s.lostLifeThisTurn ??= []).includes(pid)) s.lostLifeThisTurn.push(pid);
   fireEvent(s, { type: "lifeLost", player: pid, amount: n });
+}
+
+/** Does an "exile it instead" replacement effect apply to `o` dying: its own, or another permanent's about it? */
+function exiledInsteadOfDying(s: GameState, o: GameObject): boolean {
+  if (abilitiesOf(s, o).exileInsteadOfDying?.self) return true;
+  const applies = (id: ObjectId, x: CompiledCard["exileInsteadOfDying"], controller: PlayerId) => !!x?.filter && !(x.other && id === o.id) && objectMatches(s, x.filter, o, controller, false);
+  if (s.battlefield.some((id) => applies(id, abilitiesOf(s, obj(s, id)).exileInsteadOfDying, controllerOf(s, obj(s, id))))) return true;
+  // One leaving the battlefield at the same time still applies (rulings on Kalitas, Traitor of Ghet).
+  return (s.leftTogether ?? []).some((l) => l.hadAbilities && applies(l.id, withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileInsteadOfDying, l.controller));
 }
 
 /** Is a permanent that dealt `o` damage this turn one that exiles it instead of letting it die (Kumano)? */
@@ -1106,6 +1140,10 @@ function startNextTurn(s: GameState) {
   for (const p of s.players) p.landsPlayedThisTurn = 0;
   for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
   s.damagedThisTurn = undefined;
+  s.diedThisTurn = undefined;
+  s.attackersThisTurn = undefined;
+  s.lostLifeThisTurn = undefined;
+  s.noLifeGain = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
   s.nextCast = undefined;
@@ -2064,6 +2102,12 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
     const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
+    // "Discard a card at random": nothing to choose (CR 701.9b).
+    if (c.kind === "discard" && c.random) {
+      if (chosen?.length) return `${d.name}'s discard is at random`;
+      if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
+      continue;
+    }
     if (!chosen) {
       if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
       continue;
@@ -2133,6 +2177,12 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true });
       }
+    } else if (c.kind === "discard" && c.random) {
+      // Chosen by the game as the cost is paid (CR 701.9b); a spell being cast is on the stack already (CR 601.2a).
+      const pool = [...p.hand];
+      const picked: ObjectId[] = [];
+      for (let i = 0; i < c.n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+      discardCards(s, p.id, picked, " at random");
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
     else {
       const ids = choices.exileCards ?? [];
@@ -2246,7 +2296,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose creatures to crew with");
-  if (ab?.costs?.some((c) => c.kind === "sacrifice" || c.kind === "discard" || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab?.costs?.some((c) => c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
@@ -2856,6 +2906,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid
+  s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };
   s.pending = null;
@@ -3101,8 +3152,9 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
-  if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it (Ring-bearer)`; // CR 701.54c
+  if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it`; // CR 701.54c, 509.1b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
+  for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))

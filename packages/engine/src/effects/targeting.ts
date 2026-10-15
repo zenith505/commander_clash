@@ -158,8 +158,10 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.kind !== "spell") return false;
     // A resolving spell is still on the stack until it finishes (CR 608.2n): "change the target" can pick it.
     const item = s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined);
-    if (!item || item.kind !== "spell" || !item.objectId) return false;
+    if (!item) return false;
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
+    if (item.kind === "ability") return !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered);
+    if (spec.noSpells || !item.objectId) return false;
     // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used.
     return printedMatches(spec, defOf(s, obj(s, item.objectId)));
   }

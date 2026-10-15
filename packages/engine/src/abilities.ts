@@ -91,6 +91,12 @@ export type Count =
   | { kind: "colorsSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
+  /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
+  | { kind: "diedThisTurn"; yours?: true }
+  /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
+  | { kind: "attackersThisTurn" }
+  /** "For each time you've cast your commander from the command zone this game": all of your commanders (CR 903.8, rulings). */
+  | { kind: "commanderCasts" }
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
@@ -175,6 +181,12 @@ export interface TargetSpec {
    * still legal (rulings on Deflection).
    */
   singleTarget?: boolean;
+  /**
+   * For "spell" targets: abilities on the stack it can also target, "target spell, activated ability, or triggered
+   * ability" (CR 115.1c-d; mana abilities never use the stack, 605.3a); `noSpells`: "target activated ability".
+   */
+  stackAbilities?: "activated" | "triggered" | "both";
+  noSpells?: true;
   /** Original text, for display. */
   text: string;
 }
@@ -316,6 +328,17 @@ export type Modification =
   | { kind: "mustAttackPlayer"; player: PlayerId }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
+  /**
+   * "Can't be blocked except by creatures with flying", "... except by black creatures", "... except by Walls and/or
+   * creatures with flying" (CR 509.1b): only a creature matching one of `filters` can block it.
+   */
+  | { kind: "blockableOnlyBy"; filters: TargetSpec[]; text: string }
+  /**
+   * "Prevent all damage that would be dealt to ~", "... dealt by enchanted creature", "... combat damage that would be
+   * dealt to and dealt by ~ this turn" (CR 615.1): `to` and/or `by` it; `combat` "only" or "non" (noncombat);
+   * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
+   */
+  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }
   /** "Can't block creatures with power 2 or greater" (a blocking restriction on the blocker, CR 509.1b). */
   | { kind: "cantBlockCreatures"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
@@ -388,6 +411,11 @@ export type StaticCondition =
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
+  /**
+   * "Activate only during your turn, before attackers are declared": your turn, before its declare attackers step
+   * begins (rulings: before the first combat's declare attackers step; there's one combat a turn here).
+   */
+  | { kind: "beforeAttackers" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
   /** "If you have a full party" (CR 700.8a): four creatures in your party. */
@@ -403,6 +431,12 @@ export type StaticCondition =
   | { kind: "defenderMostLife" }
   /** "Unless it's paired with a creature with soulbond" (CR 702.95b): `not` for "unless". */
   | { kind: "paired"; withKeyword?: string; not?: true }
+  /** Morbid: "if a creature died this turn" (CR 700.4); `n`: "if two or more creatures died this turn"; `yours`: "under your control". */
+  | { kind: "creatureDied"; n?: number; yours?: true }
+  /** "If no creatures are on the battlefield": how many permanents matching `filter` there are, under anyone's control. */
+  | { kind: "onBattlefield"; filter: TargetSpec; max: number }
+  /** "If an opponent lost life this turn". */
+  | { kind: "opponentLostLife" }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
   /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
@@ -468,7 +502,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
@@ -674,6 +708,10 @@ export type Effect =
   | { type: "redirectNext"; n: Amount; from: DamageRecipient; to: DamageRecipient }
   /** "Prevent all combat damage that would be dealt this turn" (CR 615.1). */
   | { type: "preventCombatDamage" }
+  /** "Players can't gain life this turn", "Your opponents can't gain life this turn" (CR 119.7). */
+  | { type: "noLifeGain"; players: "all" | "opponents" }
+  /** "Damage can't be prevented this turn" (CR 615.12). */
+  | { type: "noPrevention" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**
@@ -916,6 +954,11 @@ export interface TriggeredAbility {
    * ~ or equipped creature ...", about either.
    */
   host?: "attached" | "orSelf";
+  /**
+   * "At the beginning of the upkeep of enchanted creature's controller": an "each upkeep" trigger that triggers only in
+   * the upkeep of the player who controls the creature this Aura or Equipment is attached to.
+   */
+  hostControllersUpkeep?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
 }
@@ -1085,7 +1128,8 @@ export interface CostMod {
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean }
-  | { kind: "discard"; n: number; filter?: TargetSpec } // "discard a land card" (retrace)
+  /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true }
   | { kind: "payLife"; n: number }
   | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
@@ -1138,6 +1182,11 @@ export interface CompiledCard {
   entersTapped: boolean;
   /** "If a creature dealt damage by ~ (by enchanted creature) this turn would die, exile it instead." (Kumano) */
   exileWhatItDamaged?: "self" | "attached";
+  /**
+   * "If ~ would die, exile it instead" (`self`), "If a creature an opponent controls would die, exile it instead",
+   * "If another creature would die, ..." (`filter`, from this permanent's controller's view): replacement effects (CR 614.1a).
+   */
+  exileInsteadOfDying?: { self?: true; filter?: TargetSpec; other?: true };
   /** "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead." */
   shuffleInsteadOfGraveyard?: boolean;
   /**
@@ -1204,6 +1253,10 @@ export interface CompiledCard {
   beginOnBattlefield?: boolean;
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
+  /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
+  cantGainLife?: "all" | "opponents";
+  /** "Damage can't be prevented." (CR 615.12) */
+  damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
   youHave?: "hexproof" | "shroud";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */

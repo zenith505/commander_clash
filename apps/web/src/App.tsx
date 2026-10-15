@@ -445,6 +445,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setCostPick({ activate: d, kind: "tap", label: cardOf(s, d.objectId).name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
+      if (c.kind === "discard" && c.random) continue; // the game picks it (CR 701.9b)
       if (d[c.kind] !== undefined) continue;
       const candidates =
         c.kind === "sacrifice"
@@ -497,7 +498,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const specs = spellTargets(s, d.objectId, d.modes, d.alt);
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: [], label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d)) {
-      if (c.kind === "payLife" || c.kind === "tap") continue; // no spell asks to tap a permanent yet
+      if (c.kind === "payLife" || c.kind === "tap" || (c.kind === "discard" && c.random)) continue; // no spell asks to tap a permanent yet
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       if (c.kind === "returnToHand")
@@ -1076,7 +1077,7 @@ function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${what}s`);
   if (c.kind === "payLife") return `pay ${c.n} life`;
   if (c.kind === "sacrifice") return `sacrifice ${n(c.n, c.filter.text)}`;
-  if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}`;
+  if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
 }

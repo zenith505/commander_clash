@@ -738,6 +738,9 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const fits = player(s, pid).hand.filter((x) => x !== id && printedMatches(c.filter!, defOf(s, obj(s, x))));
       if (fits.length < c.n || lands(s, pid) < 5) return null;
       out.discard = fits.slice(0, c.n);
+    } else if (c.kind === "discard" && c.random) {
+      // At random: worth it only with cards to spare.
+      if (player(s, pid).hand.filter((x) => x !== id).length < c.n + 2) return null;
     } else if (c.kind === "discard") {
       const others = player(s, pid).hand.filter((x) => x !== id);
       if (others.length < c.n) return null;
@@ -1122,7 +1125,11 @@ function worst(s: GameState, pid: PlayerId, pool: ChosenTarget[]): ChosenTarget 
 /** How much a target is worth aiming at: for harmful effects, the biggest threat; for helpful ones, the most valuable. */
 function targetWorth(s: GameState, pid: PlayerId, t: ChosenTarget, harmful: boolean, damage: number): number {
   if (t.kind === "player") return harmful ? 100 - player(s, t.id).life : player(s, t.id).life === 0 ? 0 : 1;
-  if (t.kind === "stack") return 50;
+  // On the stack: a spell before an ability, the newest first (what a counterspell usually answers).
+  if (t.kind === "stack") {
+    const i = s.stack.findIndex((x) => x.id === t.id);
+    return 50 + (s.stack[i]?.kind === "spell" ? 10 : 0) + Math.max(0, i) / 100;
+  }
   const o = obj(s, t.id);
   const d = defOf(s, o);
   // A card in a graveyard: what it would be worth back in play.
@@ -1271,6 +1278,8 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
       if (pool.length < c.n) return null;
       out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+    } else if (c.kind === "discard" && c.random) {
+      if (player(s, pid).hand.length < c.n + 4) return null;
     } else if (c.kind === "discard") {
       const hand = player(s, pid).hand.filter((x) => !c.filter || printedMatches(c.filter, defOf(s, obj(s, x))));
       if (hand.length < c.n || player(s, pid).hand.length < c.n + 4) return null;

@@ -10,6 +10,7 @@ import { parseSearch } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
+import { parsePreventAll } from "../statics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -44,6 +45,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const pay = parsePayCost(m[2]!);
     if (!pay || (pay.mana && !plainMana(pay.mana))) return null;
     return [{ type: "may", effects: [], pay, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} to keep ~` }];
+  }
+  // "Sacrifice ~ unless you discard a card" (Masticore), "sacrifice it unless you discard a card at random" (Balduvian
+  // Horde): the choice is made on resolution; with no card to discard, it's sacrificed (rulings).
+  if ((m = /^[Ss]acrifice (~|it) unless you discard a card( at random)?$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const discard: Effect = { type: "discard", who: { ref: "you" }, n: 1, ...(m[2] ? { random: true } : {}) };
+    return [{ type: "may", effects: [discard], otherwise: [sacrificeSelf], keep: true, text: `Discard a card${m[2] ?? ""} to keep ~` }];
   }
   // The Lairs: "sacrifice it unless you return a non-Lair land you control to its owner's hand". Returning one keeps it;
   // with none to return, it's sacrificed.
@@ -84,6 +91,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return to ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
   }
   if (/^Prevent all combat damage that would be dealt this turn$/i.test(s)) return [{ type: "preventCombatDamage" }];
+  if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
+  if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
+  // "Prevent all combat damage that would be dealt to and dealt by that creature this turn" (Maze of Ith), "Prevent all
+  // damage target creature would deal this turn": a prevention effect on that creature until the turn ends (CR 615.1).
+  if ((m = /^(Prevent all .+) this turn$/i.exec(s)) || (m = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s))) {
+    const p = m.length === 2 ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
+    const what = p && /^(~|it|that creature|target .+)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
+    return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
+  }
   // Redirection shields (CR 614.9): "The next 1 damage that would be dealt to ~ this turn is dealt to target creature
   // you control instead" (the en-Kor), "... dealt this turn to target white creature you control is dealt to ~ instead".
   if ((m = new RegExp(`^The next ${NUMX} damage that would be dealt (this turn )?to (.+?)( this turn)? is dealt to (.+) instead$`, "i").exec(s)) && !m[2] !== !m[4]) {

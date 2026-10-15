@@ -184,6 +184,11 @@ const PLURAL_TYPES: Record<string, string> = {
   permanents: "permanent",
   planeswalkers: "planeswalker",
   battles: "battle",
+  // "Destroy all Islands" (basic land types, CR 205.3i); "Plains" is the same in the plural.
+  islands: "Island",
+  swamps: "Swamp",
+  mountains: "Mountain",
+  forests: "Forest",
 };
 
 /**

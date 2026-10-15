@@ -280,7 +280,7 @@ export function parseAdditionalCost(text: string): AdditionalCost | null {
     if (spec?.kind !== "object" || spec.controller || spec.combat) return null;
     return { kind: "sacrifice", filter: { ...spec, text: m[2]! }, n };
   }
-  if ((m = new RegExp(`^discard ${NUM} cards?$`, "i").exec(text))) return { kind: "discard", n: num(m[1]!) };
+  if ((m = new RegExp(`^discard ${NUM} cards?( at random)?$`, "i").exec(text))) return { kind: "discard", n: num(m[1]!), ...(m[2] ? { random: true as const } : {}) };
   if ((m = /^pay (\d+) life$/i.exec(text))) return { kind: "payLife", n: Number(m[1]) };
   if ((m = new RegExp(`^exile ${NUM} (.+?) from your graveyard$`, "i").exec(text))) {
     const filter = parseSearchFilter(m[2]!);

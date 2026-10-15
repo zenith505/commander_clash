@@ -304,6 +304,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "preventNext":
     case "redirectNext":
     case "preventCombatDamage":
+    case "noLifeGain":
+    case "noPrevention":
     case "pumpPerBlocker":
     case "draw":
     case "getEnergy":

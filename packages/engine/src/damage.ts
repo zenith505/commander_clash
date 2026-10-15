@@ -7,7 +7,7 @@
 
 import { abilitiesOf } from "./cards";
 import { fireEvent } from "./effects";
-import { gainLife, log, loseLife, obj, player, turnOrderFrom, useShieldCounter } from "./game";
+import { canPreventDamage, gainLife, log, loseLife, obj, player, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
@@ -62,7 +62,7 @@ export function dealDamage(
   opts: { combat?: boolean; lifelink?: { n: number }; shielded?: boolean } = {},
 ): number {
   if (n <= 0) return 0;
-  if (opts.combat && s.preventCombatDamage) return 0;
+  if (opts.combat && s.preventCombatDamage && canPreventDamage(s)) return 0;
   if (!opts.shielded) {
     const ev: DamageEvent = { src, to: "object" in to ? { object: to.object.id } : { player: to.player }, n, ...(opts.combat ? { combat: true } : {}) };
     return dealDamageBatch(s, [ev], { lifelink: opts.lifelink }).reduce((a, e) => a + e.dealt, 0);
@@ -70,7 +70,7 @@ export function dealDamage(
   const targetName = "object" in to ? characteristics(s, to.object).name : player(s, to.player).name;
   // The Phantom creatures: prevent it all and remove a +1/+1 counter (CR 615). Damage dealt at the same time by
   // several sources (combat) removes only one counter; with none on it, the damage is still prevented (rulings).
-  if ("object" in to && abilitiesOf(s, to.object).phantom) {
+  if ("object" in to && abilitiesOf(s, to.object).phantom && canPreventDamage(s)) {
     const o = to.object;
     const event = opts.combat ? `${s.turn}:${s.step}` : undefined;
     log(s, `Damage from ${src.name} to ${targetName} is prevented.`);
@@ -166,6 +166,7 @@ const srcKey = (src: DamageSource) => src.id ?? `spell:${src.name}`;
 
 type ShieldOp =
   | { kind: "protection"; srcName: string; toName: string }
+  | { kind: "preventAll"; srcName: string; toName: string }
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string };
@@ -218,6 +219,8 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   const preventCap = new Map<string, number>();
   const redirectCap = new Map<string, number>();
   const counters = new Map<ObjectId, number>();
+  // "Damage can't be prevented" (CR 615.12): protection, shield counters and prevention shields don't stop it.
+  const preventing = canPreventDamage(s);
   const holder = (r: Rec) => ("object" in r ? s.objects[r.object] : player(s, r.player));
   const nameOf = (r: Rec) => ("object" in r ? characteristics(s, obj(s, r.object)).name : player(s, r.player).name);
   const chooserOf = (r: Rec) => ("object" in r ? controllerOf(s, obj(s, r.object)) : r.player);
@@ -227,7 +230,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     const out: PlanShield[] = [];
     const pk = `${recKey(r)}:prevent`;
     if (!preventCap.has(pk)) preventCap.set(pk, h.preventNext ?? 0);
-    if (preventCap.get(pk)! > 0 && !applied.has(pk)) out.push({ key: pk, kind: "prevent", cap: preventCap.get(pk)! });
+    if (preventing && preventCap.get(pk)! > 0 && !applied.has(pk)) out.push({ key: pk, kind: "prevent", cap: preventCap.get(pk)! });
     for (const sh of h.redirectNext ?? []) {
       if (!redirectCap.has(sh.id)) redirectCap.set(sh.id, sh.n);
       const dest = redirectDestination(s, sh);
@@ -253,11 +256,16 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     const toName = nameOf(to);
     let incoming: DamageEvent[] = [];
     for (const e of here) {
-      if ("object" in to && protectedFrom(characteristics(s, obj(s, to.object)).keywords, e.src)) {
+      // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
+      if (preventing && preventedAll(s, e)) {
+        ops.push({ kind: "preventAll", srcName: e.src.name, toName });
+        continue;
+      }
+      if (preventing && "object" in to && protectedFrom(characteristics(s, obj(s, to.object)).keywords, e.src)) {
         ops.push({ kind: "protection", srcName: e.src.name, toName });
         continue;
       }
-      if ("object" in to) {
+      if (preventing && "object" in to) {
         const left = counters.get(to.object) ?? obj(s, to.object).counters.shield ?? 0;
         if (left > 0) {
           counters.set(to.object, left - 1);
@@ -366,6 +374,19 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
 }
 
 /**
+ * Is this damage stopped by a "prevent all damage that would be dealt to / by" effect (CR 615.1): one on the permanent
+ * it would be dealt to, or on the permanent dealing it?
+ */
+function preventedAll(s: GameState, e: DamageEvent): boolean {
+  const kind = (p: { combat?: "only" | "non" }) => !p.combat || (p.combat === "only") === !!e.combat;
+  const from = e.src.id ? s.objects[e.src.id] : undefined;
+  if (from?.zone === "battlefield" && characteristics(s, from).preventDamage?.some((p) => p.by && kind(p))) return true;
+  if (!("object" in e.to)) return false;
+  const to = obj(s, e.to.object);
+  return !!characteristics(s, to).preventDamage?.some((p) => p.to && kind(p) && (!p.fromTypes || p.fromTypes.every((t) => e.src.types.includes(t))));
+}
+
+/**
  * How much the player choosing would like this shield to take this damage, for ordering the options. A prevention
  * shield is best spent on damage that does more than its amount (deathtouch, infect, wither, lifelink, a commander's
  * combat damage); a redirection is best spent on plain damage when it lands on our own creature, and on the worst
@@ -386,6 +407,7 @@ function shieldPreference(s: GameState, sh: PlanShield, who: PlayerId, to: Rec, 
 function commitShields(s: GameState, plan: ShieldPlan) {
   for (const op of plan.ops) {
     if (op.kind === "protection") log(s, `Damage from ${op.srcName} to ${op.toName} is prevented (protection).`);
+    else if (op.kind === "preventAll") log(s, `Damage from ${op.srcName} to ${op.toName} is prevented.`);
     else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
     else if (op.kind === "prevent") {
       const h = "object" in op.to ? obj(s, op.to.object) : player(s, op.to.player);

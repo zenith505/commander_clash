@@ -1,6 +1,7 @@
 // Sentences about sacrificing, milling, discarding, scry/surveil, fighting, counterspells, and copying spells.
 
-import type { Effect } from "../../abilities";
+import { parseCount } from "../counts";
+import type { Effect, TargetSpec } from "../../abilities";
 import { NUMX, amt, isGroup, isSeveral } from "../words";
 import { parseUnlessPays, addTarget } from "../body";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
@@ -124,18 +125,30 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }] : null;
   }
   if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] ? 2 : 1, newTargets: false }];
+  // "When you cast this spell, copy it for each time you've cast your commander from the command zone this game", counted
+  // as the ability resolves (rulings on the commander Storms).
+  if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell) for each (.+)$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx, true);
+    return n && [{ type: "copySpell", spell: "cause", n, newTargets: false }];
+  }
+  // Abilities on the stack (CR 115.1c-d): "Counter target spell, activated ability, or triggered ability", "Counter target
+  // activated ability", "Counter target spell or ability unless its controller pays {2}".
+  if ((m = /^Counter target (spell, activated ability, or triggered ability|spell or ability|activated or triggered ability|activated ability|triggered ability)(?: unless its controller pays (.+))?$/i.exec(s))) {
+    const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
+    if (unless === null) return null;
+    return [{ type: "counterSpell", index: addTarget(ctx, stackSpec(m[1]!)), ...(unless ? { unless } : {}) }];
+  }
   if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(`${m[1]}spell`);
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
     if (!spec || unless === null) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
   }
-  // Deflection: "Change the target of target spell with a single target" (CR 115.7a). Not "spell or ability": the
-  // engine's stack targets are spells.
-  if ((m = /^Change the target of target spell with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s))) {
-    const unless = m[1] === undefined ? undefined : parseUnlessPays(m[1], ctx);
+  // Deflection: "Change the target of target spell with a single target" (CR 115.7a); Bolt Bend's "spell or ability".
+  if ((m = /^Change the target of target spell( or ability)? with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s)) && !(m[1] && m[2])) {
+    const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
     if (unless === null) return null;
-    const spec = { kind: "spell" as const, singleTarget: true, text: "target spell with a single target" };
+    const spec = { ...(m[1] ? stackSpec("spell or ability") : { kind: "spell" as const, text: "target spell" }), singleTarget: true, text: `target spell${m[1] ?? ""} with a single target` };
     return [{ type: "changeTarget", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
   }
   // "Whenever a player casts a spell, counter it unless that player pays {1}."
@@ -144,4 +157,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return unless && [{ type: "counterUnlessPays", unless }];
   }
   return undefined;
+}
+
+/** "Target spell or ability", "target activated ability": a stack target that can be an ability (CR 115.1c-d). */
+function stackSpec(what: string): TargetSpec {
+  const w = what.toLowerCase();
+  const spells = w.startsWith("spell");
+  const activated = w.includes("activated") || w === "spell or ability";
+  const triggered = w.includes("triggered") || w === "spell or ability";
+  return { kind: "spell", stackAbilities: activated && triggered ? "both" : activated ? "activated" : "triggered", ...(spells ? {} : { noSpells: true as const }), text: `target ${w}` };
 }

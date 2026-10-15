@@ -104,6 +104,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
+    case "diedThisTurn":
+      return (s.diedThisTurn ?? []).filter((p) => !c.yours || p === ctx.controller).length;
+    case "attackersThisTurn":
+      return s.attackersThisTurn ?? 0;
+    case "commanderCasts":
+      return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
     case "party":
       return partySize(s, ctx.controller, view);
     case "kicked":
@@ -249,6 +255,12 @@ function describeCount(c: Count): string {
       return "life";
     case "speed":
       return "speed";
+    case "diedThisTurn":
+      return "#creatures that died this turn";
+    case "attackersThisTurn":
+      return "#creatures that attacked this turn";
+    case "commanderCasts":
+      return "#times you've cast your commander";
     case "party":
       return "#creatures in your party";
     case "devotion":

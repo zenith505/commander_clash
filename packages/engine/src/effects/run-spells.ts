@@ -210,7 +210,7 @@ function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unless: Unle
 function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
-  if (!item || item.kind !== "spell" || !o) return;
+  if (!item || (item.kind === "spell" && !o)) return;
   const j = (item.targets ?? []).findIndex((t) => t.kind !== "none");
   const current = item.targets?.[j];
   if (!current || current.kind === "none") return;
@@ -220,7 +220,7 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
     if (paid) return;
   }
   const sc = (s.resolving!.scratch ??= {});
-  const spec = (item.body?.targets ?? spellTargetSpecs(defOf(s, o), item.modes))[j];
+  const spec = (item.body?.targets ?? (o ? spellTargetSpecs(defOf(s, o), item.modes) : []))[j];
   if (!spec) return;
   if (!sc.newTarget) {
     const options = changeTargetOptions(s, item, spec, current);
@@ -245,8 +245,9 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
 
 /** The legal new targets for a spell's one target (see changeTarget). */
 export function changeTargetOptions(s: GameState, item: StackItem, spec: TargetSpec, current: TargetChoice): TargetChoice[] {
-  const o = s.objects[item.objectId!]!;
-  const src = sourceQuality(s, undefined, cardIdOf(o));
+  // A spell's own characteristics, or an ability's source's (CR 113.7a), for protection and hexproof.
+  const o = item.objectId ? s.objects[item.objectId] : undefined;
+  const src = o ? sourceQuality(s, undefined, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
   const all: TargetChoice[] = legalTargets(s, spec, item.controller, item.id, src);
   const self = s.resolving?.item;
   if (spec.kind === "spell" && self && self.id !== item.id && isLegalTarget(s, spec, { kind: "stack", id: self.id }, item.controller, src)) all.push({ kind: "stack", id: self.id });

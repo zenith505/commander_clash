@@ -1502,6 +1502,7 @@ function finishCleanup(s: GameState) {
     p.redirectNext = undefined;
   }
   s.preventCombatDamage = undefined;
+  s.damageRules = undefined;
   // "You may play that card this turn" / "until the end of your next turn" ends now.
   for (const q of s.players)
     for (const id of q.exile) {
@@ -2675,7 +2676,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
             ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? "exile from your hand" : "exile";
+    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -2767,7 +2768,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} has ${to.map((q) => player(s, q).name).join(", ")} gain ${c.n} life.`);
       for (const q of to) gainLife(s, q, c.n);
     }
-    else if (c.kind === "exileFromHand") {
+    else if (c.kind === "exileFromHand" && c.toLibrary) {
+      const ids = choices.exileFromHand ?? [];
+      log(s, `${p.name} puts ${ids.length === 1 ? "a card" : `${ids.length} cards`} from their hand on top of their library.`);
+      for (const id of [...ids].reverse()) moveObject(s, id, "library", { top: true });
+    } else if (c.kind === "exileFromHand") {
       const ids = choices.exileFromHand ?? [];
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);
       for (const id of ids) moveObject(s, id, "exile");
@@ -3318,6 +3323,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "venture") {
     (r.scratch ??= {}).venture = choice; // which dungeon, or which room the arrows lead to (CR 701.49a-b)
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "damageSource") {
+    // The source of damage a prevention or redirection effect is about, chosen as it resolves (CR 609.7a).
+    (r.scratch ??= {}).damageSource = choice;
     continueResolution(s);
     return;
   }

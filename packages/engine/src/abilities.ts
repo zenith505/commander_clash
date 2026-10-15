@@ -326,6 +326,30 @@ export type PlayerRef =
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
+/**
+ * What a "damageRule" effect makes (see GameState.damageRules). It applies to damage that matches both `to` and `by`
+ * when it would be dealt, including to and by permanents that weren't there as it resolved: a prevention effect isn't
+ * locked to a set of objects (CR 611.2c). `by.choose`: a source of the controller's choice, chosen as it resolves among
+ * those that match then, and checked again when it would deal damage (CR 609.7a-b, 615.9).
+ */
+export interface DamageRuleSpec {
+  combat?: "only" | "non";
+  /** The damage it applies to, by who'd be dealt it: players, permanents matching `objects`, or a target. Unset = any. */
+  to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; target?: DamageRecipient };
+  /** By which sources: matching `filter` (as the damage would be dealt), a source of your choice, a target spell or permanent. Unset = any. */
+  by?: { filter?: TargetSpec; choose?: TargetSpec; target?: ObjRef };
+  /** "Prevent the next N damage" (CR 615.7): a shield of N for all it applies to together. */
+  n?: Amount;
+  /** "The next time ... would deal damage": the next damage event only, however much (CR 615.8). */
+  nextTime?: true;
+  /** "... is dealt to [it] instead" (CR 614.9) rather than prevented. */
+  redirect?: DamageRecipient;
+  /** "You gain life equal to the damage prevented this way" (CR 615.5); `colors`: only for damage from a source of those colors. */
+  gainLife?: { colors?: Color[] };
+  /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
+  dealBack?: { colors?: Color[] };
+}
+
 /** Does this reference cover target `i`? ("up to two target creatures" covers two in a row.) */
 export const refCovers = (r: object, i: number): boolean =>
   "index" in r && typeof r.index === "number" && i >= r.index && i < r.index + ("n" in r && typeof r.n === "number" ? r.n : 1);
@@ -979,6 +1003,13 @@ export type Effect =
   | { type: "redirectNext"; n: Amount; from: DamageRecipient; to: DamageRecipient }
   /** "Prevent all combat damage that would be dealt this turn" (CR 615.1). */
   | { type: "preventCombatDamage" }
+  /**
+   * A prevention or redirection effect for damage dealt later this turn that isn't a shield on one permanent or player
+   * (CR 615, 614.9): "Prevent all damage that would be dealt to you and creatures you control this turn", "Prevent all
+   * damage a source of your choice would deal this turn", "The next X damage that a source of your choice would deal
+   * to you and/or creatures you control this turn is dealt to any target instead" (Shining Shoal). See DamageRuleSpec.
+   */
+  | { type: "damageRule"; rule: DamageRuleSpec }
   /** "Players can't gain life this turn", "Your opponents can't gain life this turn" (CR 119.7). */
   | { type: "noLifeGain"; players: "all" | "opponents" }
   /**
@@ -1527,6 +1558,8 @@ export type AdditionalCost =
       n: number;
       /** "Exile a red card with mana value X from your hand" (the Shoals): its mana value is the X announced (CR 107.3a). */
       mvX?: true;
+      /** "Put a card from your hand on top of your library" (Penance, Leashling): moved there instead of exiled. */
+      toLibrary?: true;
     }
   /** "Reveal your hand" (Land Grant): all of it, whatever is in it (rulings: even if it's revealed already). */
   | { kind: "revealHand" }

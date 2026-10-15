@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
 import type { DamageEvent } from "./damage";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
@@ -15,6 +15,34 @@ export interface RedirectShield {
   to: { object: ObjectId; zc: number } | { player: PlayerId };
   /** The card whose effect made it, for the log. */
   source: string;
+}
+
+/**
+ * A prevention or redirection effect from a resolved spell or ability, until the turn ends (CR 615, 614.9): what a
+ * "damageRule" effect made, with its choices made and targets fixed as it resolved. `to` and `by` are checked when
+ * damage would be dealt (CR 611.2c, 609.7b).
+ */
+export interface DamageRule {
+  id: string;
+  turn: number;
+  /** "You": who made it, the player "you" and "your" refer to, and who chose the source. */
+  controller: PlayerId;
+  /** The card that made it, a key into `cards`: its name for the log, and the source of the damage `dealBack` deals. */
+  cardId: string;
+  combat?: "only" | "non";
+  to?: { players?: "you" | "opponents" | "all"; objects?: TargetSpec; object?: { id: ObjectId; zc: number }; player?: PlayerId };
+  /**
+   * `chosen`: the source chosen (CR 609.7a), as the object it was then; `spell`: it was a spell, so the permanent it
+   * becomes is that source too. `filter`: what the source has to be when it would deal the damage (CR 609.7b).
+   */
+  by?: { chosen?: { id: ObjectId; zc: number; spell?: true }; filter?: TargetSpec };
+  /** What's left of "the next N damage" (CR 615.7). */
+  left?: number;
+  /** "The next time": it applies to the next damage event it can, then it's used up (CR 615.8). */
+  nextTime?: true;
+  redirect?: { object: ObjectId; zc: number } | { player: PlayerId };
+  gainLife?: { colors?: Color[] };
+  dealBack?: { colors?: Color[] };
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -580,7 +608,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield" | "topOrBottom"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield" | "topOrBottom" | "damageSource"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -665,6 +693,8 @@ export interface GameState {
   effects: ContinuousEffect[];
   /** "Prevent all combat damage that would be dealt this turn" (Fog) is in effect until cleanup. */
   preventCombatDamage?: boolean;
+  /** Prevention and redirection effects from resolved spells and abilities that apply to damage this turn (see DamageRule). */
+  damageRules?: DamageRule[];
   /**
    * Combat damage about to be dealt, waiting on choices about which of it damage shields apply to (CR 615.7, 616.1):
    * the damage as assigned, and the options picked so far (see damage.ts planShields).
@@ -851,6 +881,7 @@ export interface Resolving {
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
+    damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     clash?: { opp?: PlayerId; revealed?: Record<string, ObjectId | null>; queue?: PlayerId[]; bottom?: PlayerId[]; answer?: boolean };
   };
 }

@@ -19,7 +19,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -46,6 +46,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = c[2] ? parseSearchFilter(`${c[2]} card`) : undefined;
       if (filter === null || (filter && c[3])) return "fail";
       extra.push({ kind: "discard", n: num(c[1]!), ...(filter ? { filter } : {}), ...(c[3] ? { random: true as const } : {}) });
+    } else if ((c = new RegExp(`^Put ${NUM} cards? from your hand on top of your library$`).exec(part))) {
+      // Several cards go on top in the order their owner chooses (CR 401.4): the first one picked ends up on top.
+      extra.push({ kind: "exileFromHand", n: num(c[1]!), toLibrary: true });
     }
   }
   let effectText = m[2]!;

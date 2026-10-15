@@ -53,7 +53,7 @@ import {
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
 import { castingBody, compileCard } from "./oracle";
-import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId } from "./types";
+import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_PROTECTION } from "./keywords";
 
@@ -187,6 +187,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
+    if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
@@ -250,7 +251,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -271,6 +272,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
+      // Damage prevention waits for damage coming (chooseDamageShield).
+      .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
       .map((id) => {
         const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
@@ -1536,6 +1539,7 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (ab.body.effects.some((e) => e.type === "redirectNext")) continue; // only in a combat it would lose (chooseRedirect)
+      if (shieldBody(ab.body)) continue; // only when damage is coming (chooseDamageShield)
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
@@ -1759,6 +1763,155 @@ function chooseRedirect(s: GameState, pid: PlayerId): Action[] | null {
     }
   }
   return null;
+}
+
+/** Damage about to be dealt to a bot or its creatures: an opponent's spell or ability on the stack, or unblocked attackers. */
+type DamageThreat =
+  | { kind: "stack"; item: StackItem; def: CardDef; source?: GameObject; toMe: number; creatures: GameObject[] }
+  | { kind: "combat"; attackers: GameObject[]; toMe: number; creatures: GameObject[] };
+
+function damageThreat(s: GameState, pid: PlayerId): DamageThreat | null {
+  const top = s.stack[s.stack.length - 1];
+  if (top && top.controller !== pid) {
+    const spell = top.kind === "spell" && top.objectId ? s.objects[top.objectId] : undefined;
+    const def = spell ? defOf(s, spell) : top.sourceCardId ? s.cards[top.sourceCardId] : undefined;
+    const body = top.body ?? (spell ? castingBody(defOf(s, spell)) : undefined);
+    if (!def || !body) return null;
+    let toMe = 0;
+    const creatures: GameObject[] = [];
+    for (const e of allEffects(body.effects)) {
+      if (e.type !== "damage") continue;
+      const n = estimate(e.amount, top.x ?? 0);
+      if (e.to.ref === "eachOpponent" || e.to.ref === "eachPlayer") toMe += n;
+      for (const [i, t] of (top.targets ?? []).entries()) {
+        if (!refCovers(e.to, i)) continue;
+        if (t.kind === "player" && t.id === pid) toMe += t.amount ?? n;
+        if (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && controllerOf(s, obj(s, t.id)) === pid && lethalDamage(s, obj(s, t.id)) <= (t.amount ?? n)) creatures.push(obj(s, t.id));
+      }
+    }
+    if (toMe < 3 && !creatures.some((c) => objIsType(s, c, "Creature"))) return null;
+    const source = spell ?? (top.sourceId ? s.objects[top.sourceId] : undefined);
+    return { kind: "stack", item: top, def, ...(source ? { source } : {}), toMe, creatures };
+  }
+  if (s.step !== "declareBlockers" || s.stack.length || s.activePlayer === pid) return null;
+  const attackers = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid && !o.blockedBy?.length);
+  const toMe = attackers.reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+  return toMe >= Math.min(4, player(s, pid).life) ? { kind: "combat", attackers, toMe, creatures: [] } : null;
+}
+
+/** A body that only prevents or redirects damage this turn (and maybe gains life), which a bot keeps for when damage comes. */
+function shieldBody(body: AbilityBody | undefined): boolean {
+  if (!body || body.modal) return false;
+  return body.effects.some((e) => e.type === "damageRule") && body.effects.every((e) => e.type === "damageRule" || (e.type === "gainLife" && e.who.ref === "you"));
+}
+
+/**
+ * How much of the threatened damage a damage rule would stop or send elsewhere, roughly: damage to the bot, or the
+ * worth of creatures it would save. Redirections only count when the damage can go to any target (an opponent).
+ */
+function shieldValue(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageThreat, chosen: Chosen | undefined): number {
+  let best = 0;
+  for (const e of body.effects) {
+    if (e.type !== "damageRule") continue;
+    const r = e.rule;
+    if (r.combat && (r.combat === "only") !== (t.kind === "combat")) continue;
+    if (r.redirect && r.redirect.ref !== "anyTarget") continue;
+    const me = !r.to || r.to.players === "you" || r.to.players === "all" || (!!r.to.target && r.to.target.ref === "anyTarget");
+    const mine = !r.to || (!!r.to.objects && r.to.objects.controller !== "opponent") || !!r.to.target;
+    const saved = (cs: GameObject[]) => (mine ? cs.reduce((n, c) => n + worth(s, pid, c), 0) : 0);
+    const fits = (spec: TargetSpec, o: GameObject | undefined, d: CardDef) => (o?.zone === "battlefield" ? objectMatches(s, spec, o, pid, false) : printedMatches(spec, d));
+    let v = 0;
+    if (t.kind === "stack") {
+      if (r.by?.choose && !fits(bindChosen(r.by.choose, chosen), t.source, t.def)) continue;
+      if (r.by?.filter && !fits(bindChosen(r.by.filter, chosen), t.source, t.def)) continue;
+      if (r.by?.target && t.item.kind !== "spell") continue;
+      v = (me ? t.toMe : 0) + saved(t.creatures);
+    } else {
+      if (r.by?.target) continue;
+      const hits = t.attackers.filter((a) => (!r.by?.choose || objectMatches(s, bindChosen(r.by.choose, chosen), a, pid, false)) && (!r.by?.filter || objectMatches(s, bindChosen(r.by.filter, chosen), a, pid, false)));
+      const powers = hits.map((a) => Math.max(0, power(s, a))).sort((a, b) => b - a);
+      // A source of one's choice is one attacker: the biggest.
+      v = me ? (r.by?.choose ? (powers[0] ?? 0) : powers.reduce((a, b) => a + b, 0)) : 0;
+    }
+    if (r.n !== undefined) v = Math.min(v, estimate(r.n));
+    best = Math.max(best, v);
+  }
+  return best;
+}
+
+/** Targets for a damage rule answering a threat: the bot itself as what's protected, the threat's controller for where damage is redirected, the threatening spell. */
+function shieldTargets(s: GameState, pid: PlayerId, body: AbilityBody, t: DamageThreat, sourceId?: ObjectId): TargetChoice[] | null {
+  const out: TargetChoice[] = [];
+  const foe = t.kind === "stack" ? t.item.controller : (t.attackers[0] ? controllerOf(s, t.attackers[0]) : undefined);
+  for (const [i, spec] of body.targets.entries()) {
+    const rules = body.effects.flatMap((e) => (e.type === "damageRule" ? [e.rule] : []));
+    const legal = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId);
+    const pick = (want: TargetChoice | undefined) => (want && legal.some((x) => sameTarget(x, want)) ? want : undefined);
+    let choice: TargetChoice | undefined;
+    if (rules.some((r) => r.to?.target && refCovers(r.to.target, i))) choice = pick(t.toMe > 0 ? { kind: "player", id: pid } : t.creatures[0] ? { kind: "object", id: t.creatures[0].id } : undefined);
+    else if (rules.some((r) => r.redirect && refCovers(r.redirect, i))) choice = pick(foe !== undefined ? { kind: "player", id: foe } : undefined);
+    else if (rules.some((r) => r.by?.target && refCovers(r.by.target, i)) && t.kind === "stack") choice = pick({ kind: "stack", id: t.item.id });
+    if (!choice) return null;
+    out.push(choice);
+  }
+  return out;
+}
+
+/**
+ * Answer damage about to be dealt to us with a spell or ability that prevents or redirects it (CR 615, 614.9): an
+ * opponent's damage spell or ability on the stack, or unblocked attackers once blocks are declared. Not when such an
+ * effect of ours is already waiting for that damage.
+ */
+function chooseDamageShield(s: GameState, pid: PlayerId): Action[] | null {
+  const t = damageThreat(s, pid);
+  if (!t) return null;
+  if ((s.damageRules ?? []).some((r) => r.controller === pid && r.turn === s.turn && (t.kind === "combat" || !r.by?.chosen || r.by.chosen.id === t.source?.id))) return null;
+  const enough = Math.min(3, player(s, pid).life);
+  for (const id of player(s, pid).hand) {
+    const d = defOf(s, obj(s, id));
+    const body = compileCard(d).spell;
+    if (!body || !shieldBody(body) || parseManaCost(d.manaCost).hasX || shieldValue(s, pid, body, t, undefined) < enough) continue;
+    const targets = shieldTargets(s, pid, body, t, id);
+    const plan = targets && planCast(s, pid, id, targets.length ? targets : undefined, undefined, "auto");
+    if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.mana || !shieldBody(ab.body) || parseManaCost(ab.manaCost).hasX) continue;
+      const v = shieldValue(s, pid, ab.body, t, o.chosen);
+      // Sacrificing the permanent (or a creature) for it only against a lot of damage.
+      if (v < enough || ((ab.sacrificeSelf || ab.costs?.some((c) => c.kind === "sacrifice")) && v < 5)) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const targets = shieldTargets(s, pid, ab.body, t, id);
+      if (!targets) continue;
+      const costs = abilityCosts(s, pid, o, ab, targets);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/** The source a bot's prevention effect is about (CR 609.7a): the newest opponent's spell or ability on the stack, else the biggest creature attacking it, else the biggest opposing creature. */
+function chooseDamageSource(s: GameState, pid: PlayerId, options: string[]): string {
+  const score = (key: string) => {
+    const o = s.objects[key.split("@")[0]!];
+    if (!o) return -1000;
+    let onStack = -1;
+    s.stack.forEach((x, i) => ((x.kind === "spell" && x.objectId === o.id) || (x.kind === "ability" && x.sourceId === o.id)) && (onStack = i));
+    const ctrl = onStack >= 0 ? s.stack[onStack]!.controller : o.zone === "battlefield" ? controllerOf(s, o) : o.owner;
+    if (ctrl === pid) return -500;
+    let v = onStack >= 0 ? 200 + onStack : 0;
+    if (o.zone === "battlefield" && objIsType(s, o, "Creature")) v += Math.max(0, power(s, o)) * (o.attacking === pid ? 10 : 1);
+    return v;
+  };
+  return [...options].sort((a, b) => score(b) - score(a))[0]!;
 }
 
 /**

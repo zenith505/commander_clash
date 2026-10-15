@@ -1,6 +1,6 @@
 # Roadmap
 
-13,022 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+13,226 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,21 +14,36 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: "whenever enchanted land is tapped for mana, its controller adds an additional one mana"
-   (Fertile Ground) and Mana Flare's "adds one mana of any type that land produced", the en-Kor "next N damage that
-   would be dealt to ~ this turn is dealt to target creature you control instead", "each player can't cast more than
-   one spell each turn", Auras with "protection from the chosen color. This effect doesn't remove ~", Lairs' "sacrifice
-   it unless you return a non-Lair land", Borderposts' alternative cost, "spells your opponents cast that target ~ cost
-   {N} more", "when ~ dies, put its counters on target creature you control", "whenever enchanted creature deals
-   damage, you gain that much life", "divided as you choose among any number of targets".
+1. By `npm run blockers`: the en-Kor "next N damage that would be dealt to ~ this turn is dealt to target creature you
+   control instead" (when several sources deal damage at once, its controller chooses which is redirected, CR 615.7;
+   the "prevent the next N damage" shields don't ask yet either), "when ~ enters, empower Jace N", "whenever you cast
+   a multicolored spell, you may return ~ from your graveyard to your hand" (the Eidolons), Dragon Breath's "return ~
+   from your graveyard to the battlefield attached to that creature", the Onna's "return ~ to its owner's hand",
+   Darksteel Colossus's "shuffle it into its owner's library instead", "whenever ~ becomes tapped", "{T}: You may put
+   a land card from your hand onto the battlefield", Fellwar Stone's "mana of any color that a land an opponent
+   controls could produce", "if a creature dealt damage by ~ this turn would die, exile it instead", learn, the
+   Gustcloaks' "untap it and remove it from combat".
 
 ## Known gaps (from earlier rounds)
 
 - Layer 3 (text-changing effects).
-- "Divided as you choose", "up to X target", targets that must share something ("from a single graveyard").
+- "Divided as you choose" with X ("X damage divided", Rolling Thunder, Fire Covenant), distributing counters
+  ("distribute three +1/+1 counters among one, two, or three target creatures"), divided prevention (Remedy), on a
+  planeswalker (Chandra, Flameshaper); "up to X target", targets that must share something ("from a single
+  graveyard").
 - "The first spell you cast each turn costs less", "costs {1} less for each target", reductions of colored mana.
 - Granted static abilities ('has "This creature can't block"'), battles, "can't attack unless", "becomes tapped".
-- Protection from a player; Auras whose protection doesn't remove themselves.
+- Protection from a player; protection that doesn't remove other Auras (Spectra Ward, Benevolent Blessing).
+- Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
+  a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
+  (Host of the Hereafter).
+- Alternative costs that aren't mana ("exile a green card from your hand", Pyrokinesis, Flameshot, Lashknife, Vine
+  Dryad), for every spell (Fist of Suns, Jodah).
+- Mana: "until end of turn, whenever a player taps an Island for mana" (High Tide, Bubbling Muck), "tapped for mana"
+  triggers that aren't mana abilities (Manabarbs) or have conditions (Regal Behemoth, Barbflare Gremlin), "may add"
+  (Snowfall), "for each Elf" (Elvish Guidance); replacing mana ("produces twice as much", Mana Reflection,
+  Contamination). Autopay skips a land whose own mana can't be spent on the cost even when the extra mana from
+  Mana Flare (which has no restriction) could be.
 - "One or more creatures enter/die" (once per batch), "whenever ~ connives", "while ~ is in your graveyard".
 - Choosing what to proliferate. "Exile any number of them and put the rest back in any order".
 - Effects on the attackers as a group; impulse draw from an opponent's library; "play lands from the top of your
@@ -42,8 +57,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   defending player controls". A blocker's damage among several attackers is divided automatically, like an
   attacker's among several blockers.
 - Soulbond: "whenever ~ or a creature it's paired with is dealt damage" (Donna Noble, also Doctor's companion);
-  granted triggers Breathkeeper Seraph's "at the beginning of your next upkeep" and Tandem Lookout's "deals damage
-  to an opponent".
+  granted trigger Breathkeeper Seraph's "at the beginning of your next upkeep".
 - Backgrounds that grant static abilities (Criminal Past, Inspiring Leader, Master Chef, Raised by Giants), "enters
   or leaves the battlefield" triggers (Candlekeep Sage, Cryogen Relic), Veteran Soldier's "tapped and attacking that
   opponent", Faceless One. The sample decks have one commander each; two commanders (partners or a Background) work

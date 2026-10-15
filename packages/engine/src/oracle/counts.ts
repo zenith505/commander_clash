@@ -37,6 +37,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   const count = (c: Count): AmountExpr => ({ count: c });
   // Life and hands.
   if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
+  if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
     return who && count({ kind: m[2]!.toLowerCase() === "hand" ? "cardsInHand" : "cardsInLibrary", who });

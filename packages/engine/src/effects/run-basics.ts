@@ -80,6 +80,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "becomeMonarch":
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
       return;
+    case "increaseSpeed": {
+      // The intervening "if your speed is less than 4" again as it resolves (CR 603.4).
+      const p = player(s, ctx.controller);
+      if ((p.speed ?? 0) >= 4) return;
+      p.speed = (p.speed ?? 0) + 1;
+      invalidateCharacteristics(s); // max speed abilities
+      log(s, `${p.name}'s speed increases to ${p.speed}${p.speed === 4 ? " (max speed)" : ""}.`);
+      return;
+    }
     case "gainLife":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);

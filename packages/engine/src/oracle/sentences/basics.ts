@@ -15,9 +15,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
-  // "Sacrifice it at end of combat", "destroy that creature at end of combat" (CR 511.2, 603.7): a delayed trigger
+  // "Sacrifice it at end of combat", "destroy that creature at end of combat" (CR 511.2, 603.7), "return ~ to its
+  // owner's hand at the beginning of the next cleanup step" (514.3a): a delayed trigger
   // about the source or about the object the trigger was about, with no targets of its own.
-  if ((m = /^(.+?) at end of combat$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
+  if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
     const before = ctx.targets.length;
     const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
     if (!inner || ctx.targets.length !== before) return null;
@@ -30,11 +31,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     if (!players || refs.size !== 1) return null;
     const [ref] = refs;
-    if (ref === "subject") return [{ type: "delayed", when: "endOfCombat", each: "subject", effects: inner, text: m[1]! }];
+    const when = m[2] === "end of combat" ? "endOfCombat" : "nextCleanup";
+    if (ref === "subject") return [{ type: "delayed", when, each: "subject", effects: inner, text: m[1]! }];
     if (ref !== "self") return null;
     // The delayed trigger is about the source as it is now: if it leaves, it's a new object (CR 400.7).
     const effects = JSON.parse(JSON.stringify(inner).replace(/\{"ref":"self"\}/g, '{"ref":"subject"}')) as Effect[];
-    return [{ type: "delayed", when: "endOfCombat", effects, text: m[1]! }];
+    return [{ type: "delayed", when, effects, text: m[1]! }];
   }
   // "Sacrifice ~ unless you pay {U}" (upkeep costs): pay to keep it, or it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you pay (.+)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {

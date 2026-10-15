@@ -11,7 +11,7 @@ import { kickedMatches } from "./run-spells";
 import { isSuspended } from "./run-zones";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
-const STEP_TRIGGERS: Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]> = {
+const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]>> = {
   upkeep: ["yourUpkeep", "eachUpkeep"],
   draw: ["yourDrawStep", "eachDrawStep"],
   end: ["yourEndStep", "eachEndStep"],
@@ -67,10 +67,12 @@ export type TriggerSourceEvent =
   | { type: "turnedFaceUp"; id: ObjectId }
   /** It's the only creature declared as an attacker this combat (CR 506.5, exalted 702.83b). */
   | { type: "attacksAlone"; id: ObjectId }
+  /** An attacking creature enlisted another by tapping it (CR 702.154c). */
+  | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
-  | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -157,6 +159,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const printed = compileCard(defOf(s, o)).triggers;
     triggers.forEach((t, index) => {
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
+      // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
+      if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller)))
         s.triggerQueue.push({
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
@@ -190,7 +194,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -285,6 +289,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e) => e === "opponentLosesLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+    speedTrigger(s, ev.player);
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
@@ -321,6 +326,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         subject: { id: o.id, zc: o.zoneChanges ?? 0 },
         body: { targets: [], effects: [{ type: "suspendCast" }], text: "Suspend: the last time counter was removed from ~. You may cast it without paying its mana cost." },
       });
+  } else if (ev.type === "enlists") {
+    // Enlist's "when you do" (CR 702.154a) and "whenever ~ enlists a creature": that creature is the subject.
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfEnlists", undefined, undefined, obj(s, ev.enlisted));
   } else if (ev.type === "attacksAlone") {
     // Exalted: each permanent its controller controls with exalted triggers (CR 702.83a).
     const attacker = obj(s, ev.id);
@@ -410,8 +419,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Delayed triggers whose moment this is (CR 603.7): each triggers once.
     for (const d of [...(s.delayed ?? [])]) {
       // Made during that step, "the next end step" or "end of combat" is a later one (CR 603.7c, 511.2).
+      // "The next cleanup step": every one made before this one began, so also during an earlier cleanup step of
+      // this turn (CR 514.3a).
       const due =
-        d.when === "nextEndStep"
+        d.when === "nextCleanup"
+          ? ev.step === "cleanup"
+          : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
@@ -437,7 +450,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
             body: { targets: [], effects: [{ type: "suspendTick" }], text: "Suspend: remove a time counter from ~." },
           });
       }
-    const [want, each] = STEP_TRIGGERS[ev.step];
+    const pair = STEP_TRIGGERS[ev.step];
+    if (!pair) return;
+    const [want, each] = pair;
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
@@ -516,7 +531,7 @@ export function checkStateTriggers(s: GameState) {
     const o = s.objects[id]!;
     const triggers = abilitiesOf(s, o).triggers;
     triggers.forEach((t, index) => {
-      if (t.event !== "state" || !t.state) return;
+      if (t.event !== "state" || !t.state || (t.activeIf && !staticConditionNow(s, t.activeIf, id, controllerOf(s, o)))) return;
       const waiting = s.triggerQueue.some((q) => q.sourceId === id && q.index === index) || s.stack.some((x) => x.sourceId === id && x.stateIndex === index && x.sourceZc === (o.zoneChanges ?? 0));
       if (waiting || !staticConditionNow(s, t.state, id, controllerOf(s, o))) return;
       s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: controllerOf(s, o), index, sourceZc: o.zoneChanges ?? 0 });
@@ -560,4 +575,27 @@ export function pushTrigger(s: GameState, t: PendingTrigger, targets: TargetChoi
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });
+}
+
+/** Stands in as the "source" of speed's inherent triggered ability, which has none (CR 702.179d). */
+export const SPEED: CardDef = { oracleId: "speed", name: "Speed", manaCost: "", cmc: 0, typeLine: "", supertypes: [], types: [], subtypes: [], oracleText: "", colors: [], colorIdentity: [], keywords: [] };
+
+/**
+ * Speed's inherent ability (CR 702.179d), controlled by the active player if they have speed: "Whenever one or more
+ * opponents lose life during your turn, if your speed is less than 4, your speed increases by 1. This ability
+ * triggers only once each turn."
+ */
+function speedTrigger(s: GameState, loser: PlayerId) {
+  const ap = s.activePlayer;
+  const p = player(s, ap);
+  if (loser === ap || p.lost || !p.speed || p.speed >= 4 || p.speedTurn === s.turn) return;
+  p.speedTurn = s.turn;
+  s.cards[SPEED.oracleId] ??= SPEED;
+  s.triggerQueue.push({
+    sourceId: "",
+    sourceCardId: SPEED.oracleId,
+    controller: ap,
+    index: -1,
+    body: { targets: [], effects: [{ type: "increaseSpeed" }], text: "Whenever one or more opponents lose life during your turn, if your speed is less than 4, your speed increases by 1." },
+  });
 }

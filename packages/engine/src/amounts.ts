@@ -96,6 +96,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       );
     case "life":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
+    case "speed":
+      return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
     case "kicked":
       return (ctx.kicked ?? []).filter((i) => c.which === undefined || i === c.which).length;
     case "wasKicked":
@@ -191,6 +193,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":
       return "life";
+    case "speed":
+      return "speed";
     case "devotion":
       return "devotion";
     case "attachedToSelf":

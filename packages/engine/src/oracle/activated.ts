@@ -13,7 +13,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -60,6 +60,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const symbols = [...costs.replace(/Pay (?:\{E\})+|Pay \w+ \{E\}/, "").matchAll(/\{([^}]+)\}/g)].map((x) => x[1]!);
   if (symbols.some((x) => x === "Q" || x === "E")) return "fail";
   const tap = symbols.includes("T");
+  // "{3}, Exile this card from your graveyard: ...": it works only from your graveyard (CR 113.6j).
+  const fromYard = /Exile ~ from your graveyard/.test(costs);
+  if (fromYard && (tap || /Sacrifice ~|Remove /.test(costs))) return "fail";
   const manaCost = symbols
     .filter((x) => x !== "T")
     .map((x) => `{${x}}`)
@@ -76,6 +79,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     sorcerySpeed,
     body,
     text: raw,
+    ...(fromYard ? { zone: "graveyard" as const, exileSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),

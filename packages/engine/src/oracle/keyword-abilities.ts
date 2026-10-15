@@ -59,8 +59,8 @@ export function parseGraveyardKeyword(
 
 /**
  * Keywords about costs: echo (CR 702.30), cumulative upkeep (702.24), evoke (702.74), dash (702.109),
- * delve (702.66), living weapon (702.92), scavenge (702.97), bestow (702.103), madness (702.35), suspend (702.62),
- * casualty (702.153), dredge (702.52).
+ * delve (702.66), living weapon (702.92) and For Mirrodin! (702.163), scavenge (702.97), bestow (702.103), madness (702.35),
+ * suspend (702.62), casualty (702.153), dredge (702.52).
  */
 export function parseCostKeyword(
   line: string,
@@ -148,6 +148,24 @@ export function parseCostKeyword(
             { type: "attach", what: { ref: "created" } },
           ],
           text: "Living weapon: when ~ enters, create a 0/0 black Phyrexian Germ creature token, then attach ~ to it.",
+        },
+      },
+    };
+  }
+  if (line === "For Mirrodin!") {
+    // CR 702.163a: "When this Equipment enters, create a 2/2 red Rebel creature token, then attach this Equipment to it."
+    if (!d.subtypes.includes("Equipment")) return "fail";
+    const rebel: TokenSpec = { name: "Rebel", power: 2, toughness: 2, colors: ["R"], types: ["Creature"], subtypes: ["Rebel"], keywords: [] };
+    return {
+      trigger: {
+        event: "selfEnters",
+        body: {
+          targets: [],
+          effects: [
+            { type: "createToken", who: { ref: "you" }, n: 1, token: rebel },
+            { type: "attach", what: { ref: "created" } },
+          ],
+          text: "For Mirrodin!: when ~ enters, create a 2/2 red Rebel creature token, then attach ~ to it.",
         },
       },
     };
@@ -242,12 +260,16 @@ interface KeywordParts {
   /** Fading N's fade counters, vanishing N's time counters (CR 702.32a, 702.63a). */
   entersCounter?: { counter: CounterKind; n: number };
   devour?: { n: number; filter: TargetSpec };
+  /** Sunburst (CR 702.44a); "Modular—Sunburst" always means +1/+1 counters (702.44c). */
+  sunburst?: { counter?: "+1/+1" };
+  amplify?: number;
+  enlist?: boolean;
 }
 
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
   const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0, entersOptions: [], statics: [] };
   const plus = (n: number, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
-  for (const raw of line.split(/,\s*/)) {
+  for (const raw of line.split(/[,;]\s*/)) {
     const p = raw.trim();
     let m: RegExpExecArray | null;
     if (keywordOf(p)) continue;
@@ -350,10 +372,14 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         ifCond: { kind: "selfCounter", counter: "+1/+1" },
         body: { targets: [], effects: [{ type: "may", effects: [{ type: "moveCounter", counter: "+1/+1", from: { ref: "self" }, to: { ref: "subject" } }], text }], text: `Graft: you may ${text}.` },
       });
-    } else if ((m = /^modular (\d+)$/i.exec(p))) {
+    } else if ((m = /^modular(?: (\d+)|—(sunburst))$/i.exec(p))) {
       // CR 702.43a: "This permanent enters with N +1/+1 counters on it" and "When this permanent is put into a graveyard
       // from the battlefield, you may put a +1/+1 counter on target artifact creature for each +1/+1 counter on this permanent."
-      out.plusCounters += Number(m[1]);
+      // "Modular—Sunburst": a +1/+1 counter for each color of mana spent to cast it instead (CR 702.44c).
+      if (m[2]) {
+        if (out.sunburst) return null;
+        out.sunburst = { counter: "+1/+1" };
+      } else out.plusCounters += Number(m[1]);
       const text = "put a +1/+1 counter on target artifact creature for each +1/+1 counter on ~";
       out.triggers.push({
         event: "selfToGraveyard",
@@ -363,6 +389,16 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
           text: `Modular: you may ${text}.`,
         },
       });
+    } else if ((m = /^amplify (\d+)$/i.exec(p))) {
+      // CR 702.38a; two instances would each work separately (702.38b): not modeled.
+      if (out.amplify) return null;
+      out.amplify = Number(m[1]);
+    } else if (/^sunburst$/i.test(p)) {
+      // CR 702.44a: "If this object is entering as a creature, ignoring any type-changing effects that would affect it, it
+      // enters with a +1/+1 counter on it for each color of mana spent to cast it. Otherwise, it enters with a charge
+      // counter on it for each color of mana spent to cast it." Two instances would each work (702.44d): not modeled.
+      if (out.sunburst) return null;
+      out.sunburst = {};
     } else if ((m = /^afflict (\d+)$/i.exec(p))) {
       // CR 702.130a: "Whenever this creature becomes blocked, defending player loses N life."
       const n = Number(m[1]);
@@ -370,6 +406,17 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
     } else if (/^dethrone$/i.test(p)) {
       // CR 702.105a: "Whenever this creature attacks the player with the most life or tied for most life, put a +1/+1 counter on this creature."
       out.triggers.push({ event: "selfAttacks", attacksMostLife: true, body: { targets: [], effects: [plus(1)], text: "Dethrone: put a +1/+1 counter on ~." } });
+    } else if (/^enlist$/i.test(p)) {
+      // CR 702.154a: "As this creature attacks, you may tap up to one untapped creature you control that you didn't
+      // choose to attack with and that either has haste or has been under your control continuously since this turn
+      // began. When you do, this creature gets +X/+0 until end of turn, where X is the tapped creature's power."
+      // Each instance works on its own (702.154d): not modeled.
+      if (out.enlist) return null;
+      out.enlist = true;
+      out.triggers.push({
+        event: "selfEnlists",
+        body: { targets: [], effects: [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: { count: { kind: "power", of: { ref: "subject" } } }, toughness: 0 }], duration: "endOfTurn" }], text: "Enlist: ~ gets +X/+0 until end of turn, where X is the enlisted creature's power." },
+      });
     } else if (/^training$/i.test(p)) {
       // CR 702.149a: "Whenever this creature and at least one other creature with power greater than this
       // creature's power attack, put a +1/+1 counter on this creature."
@@ -578,7 +625,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
  */
 export function textKeywords(line: string): string[] {
   const out: string[] = [];
-  for (const raw of line.split(/,\s*/)) {
+  for (const raw of line.split(/[,;]\s*/)) {
     const p = raw.trim();
     if (/^protection from /i.test(p) && keywordOf(p)) out.push(keywordOf(p)!);
     const tox = /^toxic (\d+)$/i.exec(p);
@@ -589,6 +636,6 @@ export function textKeywords(line: string): string[] {
 
 export function isKeywordLine(line: string): boolean {
   return line
-    .split(/,\s*/)
+    .split(/[,;]\s*/)
     .every((p) => !!keywordOf(p));
 }

@@ -18,7 +18,11 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
 /** "populate": create a token that's a copy of the picked creature token (CR 701.36). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair";
+/** "reveal": amplify's cards revealed from the hand as a permanent enters (CR 702.38a). */
+/** "band": attacking creatures declared to be in a band (CR 702.22c). */
+/** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
+/** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -63,6 +67,8 @@ export type Count =
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   | { kind: "life"; who: PlayerRef }
+  /** "Your speed": 0 if you have none (CR 702.179f). */
+  | { kind: "speed" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
@@ -216,6 +222,10 @@ export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: nu
 export const refCovers = (r: object, i: number): boolean =>
   "index" in r && typeof r.index === "number" && i >= r.index && i < r.index + ("n" in r && typeof r.n === "number" ? r.n : 1);
 
+/** What a card's kicker-like cost is called (see CompiledCard.kicker). */
+export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" =>
+  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.multi ? "multikicker" : "kicker";
+
 export interface TokenSpec {
   name: string;
   /** Unset for noncreature tokens such as Treasure. */
@@ -257,6 +267,8 @@ export type Modification =
   | { kind: "cantAttack" }
   | { kind: "cantBlock" }
   | { kind: "cantBeBlocked" }
+  /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
+  | { kind: "unblockedDamage" }
   | { kind: "doesntUntap" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
   | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
@@ -328,6 +340,8 @@ export type StaticCondition =
   | { kind: "yourTurn" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** Max speed (CR 702.178a, 702.179e): your speed is 4. */
+  | { kind: "maxSpeed" }
   /**
    * "Whenever ~ attacks a player, if no opponent has more life than that player": none of the attacking player's
    * opponents has more life than the attacked player (rulings; the attacker's own life isn't compared).
@@ -398,7 +412,8 @@ export type Effect =
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1" }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
-  | { type: "sacrifice"; what: ObjRef }
+  /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
+  | { type: "sacrifice"; what: ObjRef; byController?: true }
   /**
    * Exploit (CR 702.110a-b): "you may sacrifice a creature". If the source is still on the battlefield as this
    * resolves, it "exploits" the sacrificed creature, which its "when ~ exploits a creature" abilities see.
@@ -425,7 +440,7 @@ export type Effect =
    * `each`: about each token just created, or about the object the trigger was about ("destroy that creature at end
    * of combat"), instead of the source.
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat"; effects: Effect[]; text: string; each?: "created" | "subject" }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup"; effects: Effect[]; text: string; each?: "created" | "subject" }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -502,6 +517,8 @@ export type Effect =
   | { type: "castFromExileFree" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
+  /** Speed's inherent trigger (CR 702.179d): "if your speed is less than 4, your speed increases by 1". */
+  | { type: "increaseSpeed" }
   /**
    * "It gets +1/+1 until end of turn for each creature blocking it (beyond the first)": rampage
    * (CR 702.23a) and the like. The number of blockers is counted as it resolves (CR 702.23b).
@@ -540,7 +557,7 @@ export type Effect =
 export type ChoiceKind = "creatureType" | "color";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
@@ -579,6 +596,8 @@ export type TriggerEvent =
   | "permanentDies"
   | "selfBecomesTarget" // "When this becomes the target of a spell or ability"
   | "selfAttacks" // Whenever this attacks
+  /** Enlist's trigger (CR 702.154a), "Whenever ~ enlists a creature": the subject is the enlisted creature. */
+  | "selfEnlists"
   | "selfDealsCombatDamageToPlayer"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
@@ -672,12 +691,16 @@ export interface TriggeredAbility {
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */
   ifEvoked?: boolean;
+  /** Ravenous's "if X is 5 or more" (CR 702.156a): the X of the spell it was (CR 107.3m), which can't change. */
+  ifX?: number;
   /** Casualty's "if a casualty cost was paid for it" (CR 702.153a). */
   ifCasualty?: boolean;
   /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
   ifEcho?: boolean;
   /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
   ifSoulbond?: boolean;
+  /** It has the ability only while this is true, like "Max speed — Whenever ..." (CR 702.178a): not an intervening if. */
+  activeIf?: StaticCondition;
 }
 
 export interface ActivatedAbility {
@@ -743,6 +766,8 @@ export interface ManaAbility {
   skipNextUntap?: boolean;
   /** "Activate only once each turn." (CR 602.5b) */
   oncePerTurn?: boolean;
+  /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
+  activeIf?: StaticCondition;
 }
 
 /**
@@ -846,6 +871,23 @@ export interface CompiledCard {
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**
+   * Sunburst (CR 702.44a): entering from the stack, a counter for each color of mana spent to cast it: +1/+1 counters
+   * if it's a creature (its printed types, ignoring type-changing effects), charge counters otherwise. `counter`:
+   * always that kind ("Modular—Sunburst", 702.44c).
+   */
+  sunburst?: { counter?: "+1/+1" };
+  /**
+   * "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller
+   * of the permanent it becomes sacrifices it at the beginning of the next cleanup step."
+   */
+  flashSacrifice?: boolean;
+  /** Enlist (CR 702.154a): as it attacks, it may tap a creature that isn't attacking, see declareAttackers. */
+  enlist?: boolean;
+  /** Start your engines! (CR 702.179a): a player with no speed who controls it gets speed 1 (a state-based action). */
+  startYourEngines?: boolean;
+  /** Amplify N (CR 702.38a): as it enters, reveal cards from your hand that share a creature type with it; N +1/+1 counters for each. */
+  amplify?: number;
+  /**
    * Devour N (CR 702.82a, c): "As this object enters, you may sacrifice any number of [creatures]. This permanent
    * enters with N +1/+1 counters on it for each [one] sacrificed this way." `n: "devoured"`: Thromok's "Devour X,
    * where X is the number of creatures devoured this way".
@@ -880,8 +922,11 @@ export interface CompiledCard {
    * Kicker (CR 702.33): the optional additional costs, each payable once; multikicker's can be paid
    * any number of times (702.33c).
    */
-  /** `replicate`: it's really replicate (CR 702.56a), paid like multikicker. */
-  kicker?: { costs: string[]; multi?: boolean; replicate?: boolean };
+  /**
+   * `replicate`: it's really replicate (CR 702.56a), paid like multikicker; `squad` is squad (CR 702.157a), paid the
+   * same way; `offspring` is offspring (CR 702.175a), paid once like kicker. None of these is "kicked" for other cards.
+   */
+  kicker?: { costs: string[]; multi?: boolean; replicate?: boolean; squad?: boolean; offspring?: boolean };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];
   /** Flashback, jump-start, retrace, escape: casting it from your graveyard. */

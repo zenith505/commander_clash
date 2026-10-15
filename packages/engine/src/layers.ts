@@ -41,6 +41,7 @@ export function layerOf(m: Modification): Layer {
     case "removeKeywords":
     case "loseAllAbilities":
     case "addAbility":
+    case "unblockedDamage":
       return "6";
     case "definePT":
       return "7a";
@@ -86,6 +87,8 @@ export interface Characteristics {
   cantAttack: boolean;
   cantBlock: boolean;
   cantBeBlocked: boolean;
+  /** "You may have ~ assign its combat damage as though it weren't blocked." */
+  unblockedDamage: boolean;
   doesntUntap: boolean;
   /** "Can block only creatures with flying" (CR 509.1b). */
   blocksOnlyFlyers: boolean;
@@ -139,6 +142,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantAttack: false,
     cantBlock: false,
     cantBeBlocked: false,
+    unblockedDamage: false,
     doesntUntap: false,
     blocksOnlyFlyers: false,
     attacksIfAble: false,
@@ -262,6 +266,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.activePlayer === you;
     case "monarch":
       return s.monarch === you;
+    case "maxSpeed":
+      return s.players[you]?.speed === 4;
     case "defenderMostLife": {
       // The player it attacked: from the trigger event, or the one it's attacking as it triggers.
       const that = eventPlayer ?? src.attacking;
@@ -399,6 +405,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.keywords = [];
       c.hasPrintedAbilities = false;
       c.grantedAbilities = [];
+      c.unblockedDamage = false;
+      return;
+    case "unblockedDamage":
+      c.unblockedDamage = true;
       return;
     case "addAbility":
       c.grantedAbilities.push(m.text);

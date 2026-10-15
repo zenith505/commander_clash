@@ -96,6 +96,8 @@ export interface GameObject {
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
   blocking?: ObjectId[];
   blockedBy?: ObjectId[];
+  /** The attacking band it's in (CR 702.22c), for the rest of combat or until it's removed from combat (702.22e-f). */
+  band?: string;
   /** Set when a commander lands in graveyard/exile; consumed by the SBA in CR 903.9a. */
   justMovedForCommander?: boolean;
   /**
@@ -106,6 +108,8 @@ export interface GameObject {
   zoneChanges?: number;
   /** As a spell, and as the permanent it became: the kicker costs paid for it, by index (CR 702.33d). */
   kicked?: number[];
+  /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
+  colorsSpent?: Color[];
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
   castVia?: CastFromGraveyardKind;
@@ -158,6 +162,9 @@ export interface Player {
   command: ObjectId[];
   manaPool: Record<ManaType, number>;
   landsPlayedThisTurn: number;
+  /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
+  speed?: number;
+  speedTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
   commanderCasts: Record<ObjectId, number>;
   /** Poison counters (CR 122.1f); ten or more loses the game (CR 704.5c). */
@@ -242,7 +249,7 @@ export interface StackItem {
  * beginning of your next upkeep". It triggers once, about `subject` (the card as it was then).
  */
 export interface DelayedTrigger {
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat";
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat" | "nextCleanup";
   controller: PlayerId;
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };
@@ -443,6 +450,13 @@ export interface GameState {
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
+  /**
+   * In a combat damage step, before damage is assigned: the players who've chosen which blocked creatures assign
+   * their combat damage as though they weren't blocked, and those creatures (CR 510.1).
+   */
+  unblockedChoice?: { turn: number; step: Step; asked: PlayerId[]; ids: ObjectId[] };
+  /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */
+  declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][] };
   pending: PendingDecision | null;
   /** The mulligan process before the first turn (CR 103.5), or null once everyone has kept. */
   mulligans?: MulliganState | null;
@@ -453,7 +467,7 @@ export interface GameState {
    * Choices made as permanents enter (CR 614.12), still to ask. `enters`: its enters event waits for
    * the choice (riot, unleash: whether it has a +1/+1 counter as it enters matters to what triggers).
    */
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,

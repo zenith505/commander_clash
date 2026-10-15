@@ -139,6 +139,34 @@ export function normalizeSelf(d: CardDef): string {
   return t;
 }
 
+/**
+ * A max speed ability's ability, added to `out` with the condition: one static, triggered, activated or mana ability
+ * and nothing else. False if it's anything else, or a static ability that already has a condition.
+ */
+function maxSpeedAbility(d: CardDef, text: string, out: CompiledCard): boolean {
+  const inner = compile({ ...d, oracleText: text });
+  const base = compile({ ...d, oracleText: "" });
+  if (inner.unsupported.length) return false;
+  const lists = ["triggers", "activated", "mana", "statics"] as const;
+  const rest = (c: CompiledCard) => JSON.stringify(Object.entries(c).filter(([k]) => !(lists as readonly string[]).includes(k)).sort(([a], [b]) => a.localeCompare(b)));
+  if (rest(inner) !== rest(base) || lists.some((k) => base[k].length)) return false;
+  const cond = { kind: "maxSpeed" } as const;
+  const [kind, ...more] = lists.flatMap((k) => inner[k].map(() => k));
+  if (!kind || more.length) return false;
+  if (kind === "statics") {
+    const st = inner.statics[0]!;
+    if (st.condition) return false;
+    out.statics.push({ ...st, condition: cond });
+  } else if (kind === "triggers") out.triggers.push({ ...inner.triggers[0]!, activeIf: cond });
+  else if (kind === "mana") out.mana.push({ ...inner.mana[0]!, activeIf: cond });
+  else {
+    const ab = inner.activated[0]!;
+    if (ab.activateIf) return false;
+    out.activated.push({ ...ab, activateIf: cond });
+  }
+  return true;
+}
+
 export function compile(d: CardDef): CompiledCard {
   const out: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
@@ -148,6 +176,16 @@ export function compile(d: CardDef): CompiledCard {
   for (const [li, raw] of lines.entries()) {
     const line = raw.trim();
     if (!line) continue;
+    if (line === "Start your engines!") {
+      out.startYourEngines = true; // CR 702.179a
+      continue;
+    }
+    // "Max speed — [Ability]": "As long as your speed is 4, this object has '[Ability]'" (CR 702.178a).
+    const maxSpeed = /^Max speed — (.+)$/.exec(line);
+    if (maxSpeed) {
+      if (!maxSpeedAbility(d, maxSpeed[1]!, out)) out.unsupported.push(raw);
+      continue;
+    }
     const manaAb = parseManaAbility(line);
     if (manaAb) {
       out.mana.push(manaAb);
@@ -232,6 +270,27 @@ export function compile(d: CardDef): CompiledCard {
         out.entersWithCounters = { counter: kw.entersCounter.counter, n: kw.entersCounter.n };
       }
       if (kw.bloodthirst) out.bloodthirst = (out.bloodthirst ?? 0) + kw.bloodthirst;
+      if (kw.sunburst) {
+        if (out.sunburst) {
+          out.unsupported.push(raw); // two sunburst abilities: not modeled
+          continue;
+        }
+        out.sunburst = kw.sunburst;
+      }
+      if (kw.enlist) {
+        if (out.enlist) {
+          out.unsupported.push(raw); // two enlist abilities: not modeled (CR 702.154d)
+          continue;
+        }
+        out.enlist = true;
+      }
+      if (kw.amplify) {
+        if (out.amplify) {
+          out.unsupported.push(raw);
+          continue;
+        }
+        out.amplify = kw.amplify;
+      }
       if (kw.devour) {
         if (out.devour) {
           out.unsupported.push(raw); // two devour abilities: not modeled
@@ -263,6 +322,22 @@ export function compile(d: CardDef): CompiledCard {
       else out.devour = { n: "devoured", filter: { kind: "object", types: ["Creature"], text: "creature" } };
       continue;
     }
+    // Mirage's flash Auras and enchantments: castable any time, sacrificed in the next cleanup step if that wasn't a
+    // time a sorcery could have been cast (see castSpell).
+    if (line === "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step.") {
+      out.flashSacrifice = true;
+      continue;
+    }
+    // Ravenous (CR 702.156a): "This permanent enters with X +1/+1 counters on it" and "When this permanent enters, if X
+    // is 5 or more, draw a card."
+    if (line === "Ravenous") {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else {
+        out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } } };
+        out.triggers.push({ event: "selfEnters", ifX: 5, body: { targets: [], effects: [{ type: "draw", who: { ref: "you" }, n: 1 }], text: "Ravenous: if X is 5 or more, draw a card." } });
+      }
+      continue;
+    }
     // Replicate (CR 702.56a): an additional cost paid any number of times, like multikicker, and "when you cast this
     // spell, if a replicate cost was paid for it, copy it for each time its replicate cost was paid".
     const replicate = /^Replicate ((?:\{[^}]+\})+)$/.exec(line);
@@ -271,6 +346,27 @@ export function compile(d: CardDef): CompiledCard {
       else {
         out.kicker = { costs: [replicate[1]!], multi: true, replicate: true };
         out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "kicked", newTargets: true }], text: "Replicate: copy ~ for each time its replicate cost was paid." } });
+      }
+      continue;
+    }
+    // Offspring (CR 702.175a): "You may pay an additional [cost] as you cast this spell" and "When this permanent enters,
+    // if its offspring cost was paid, create a token that's a copy of it, except it's 1/1." Squad (CR 702.157a): "As an
+    // additional cost to cast this spell, you may pay [cost] any number of times" and "When this creature enters, if its
+    // squad cost was paid, create a token that's a copy of it for each time its squad cost was paid." Both are paid
+    // like kicker; the copy is of it as it last existed if it has left (rulings, CR 608.2h).
+    const offspring = /^(Offspring|Squad) ((?:\{[^}]+\})+)$/.exec(line);
+    if (offspring) {
+      const squad = offspring[1] === "Squad";
+      if (out.kicker || !plainMana(offspring[2]!)) out.unsupported.push(raw);
+      else {
+        out.kicker = { costs: [offspring[2]!], ...(squad ? { multi: true, squad: true } : { offspring: true }) };
+        out.triggers.push({
+          event: "selfEnters",
+          ifKicked: { kind: "kicked" },
+          body: squad
+            ? { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: { count: { kind: "kicked" } }, what: { ref: "self" } }], text: "Squad: create a token that's a copy of ~ for each time its squad cost was paid." }
+            : { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "self" }, except: { pt: [1, 1] } }], text: "Offspring: create a token that's a copy of ~, except it's 1/1." },
+        });
       }
       continue;
     }

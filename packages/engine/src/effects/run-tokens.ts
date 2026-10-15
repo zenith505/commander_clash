@@ -6,6 +6,7 @@ import { copyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameState, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault } from "./triggers";
+import { copiedValues } from "./run-copies";
 
 /** Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). */
 export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
@@ -54,9 +55,9 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "createTokenCopy": {
       // The copiable values of what it copies as it is now, or as it last existed (CR 707.2, 608.2h): a card in
-      // a graveyard is copied as that card.
-      const source = e.ofSource ? undefined : objects(s, e.what, ctx)[0];
-      const base = e.ofSource ? ctx.sourceDef : source && defOf(s, source);
+      // a graveyard is copied as that card; "a copy of it" for a creature that has left is of it as it last was
+      // (offspring and squad rulings).
+      const base = e.ofSource ? ctx.sourceDef : copiedValues(s, e.what, ctx);
       if (!base) return;
       const n = amountNow(s, e.n, ctx);
       if (s.resolving) s.resolving.created = [];

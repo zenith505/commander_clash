@@ -53,7 +53,7 @@ export interface Payment {
  * symbols first so a greedy pass doesn't spend mana a later symbol needed.
  * Phyrexian symbols fall back to 2 life when `life` allows.
  */
-export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity): Payment | null {
+export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean } = {}): Payment | null {
   if (!cost.supported) return null;
   const p = { ...pool };
   let generic = extraGeneric;
@@ -85,10 +85,13 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     if (p[c] > 0) p[c]--;
     else generic += 2;
   }
-  // Generic: spend colorless first, then whichever color we have most of.
+  // Generic: spend colorless first, then whichever color we have most of. With `spreadColors` (sunburst, which counts
+  // the colors spent, CR 702.44a), a color not spent yet comes first: the caster chooses what pays for it (CR 601.2h).
+  const spent = (c: ManaType) => p[c] < pool[c];
   while (generic > 0) {
+    const fresh = opts.spreadColors ? COLORS.filter((c) => p[c] > 0 && !spent(c))[0] : undefined;
     const from: ManaType | undefined =
-      p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0] as ManaType | undefined);
+      fresh ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0] as ManaType | undefined));
     if (!from) return null;
     p[from]--;
     generic--;

@@ -55,6 +55,7 @@ import {
   planSuspend,
   suspendProblem,
   compileCard,
+  kickerName,
   canEnterUntapped,
   crewPower,
   potentialAttackers,
@@ -198,7 +199,7 @@ type DelvePick = { draft: CastDraft; label: string; max: number; candidates: str
 type BuybackPick = { draft: CastDraft; label: string; cost: string };
 
 /** Choosing which kicker costs to pay (CR 702.33). */
-type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; chosen: number[] };
+type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[] };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined } | { activate: ActivateDraft; draft?: undefined }) & {
@@ -411,7 +412,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.alt ? { alt: d.alt } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     if (d.kicks === undefined && compiled.kicker)
-      return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, chosen: [] });
+      return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
     if (d.buyback === undefined && compiled.buyback) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback });
     // Cast without paying its mana cost, X is 0 (CR 107.3b).
     if (d.x === undefined && parseManaCost(card.manaCost).hasX && !free && !d.via && !d.alt) {
@@ -1047,7 +1048,7 @@ function KickPickBar({
     return (
       <div className="targeting x-pick">
         <span>
-          <strong>{pick.label}</strong>: multikicker <ManaCost cost={pick.costs[0]!} size="sm" />, how many times?
+          <strong>{pick.label}</strong>: {pick.name} <ManaCost cost={pick.costs[0]!} size="sm" />, how many times?
         </span>
         <button className="ghost" disabled={n <= 0} onClick={() => set(n - 1)} aria-label="Kick one time fewer">
           −
@@ -1056,7 +1057,7 @@ function KickPickBar({
         <button className="ghost" disabled={!can([...pick.chosen, 0])} onClick={() => set(n + 1)} aria-label="Kick one more time">
           +
         </button>
-        <button onClick={() => onDone(pick.chosen)}>{n ? `Kick ${n === 1 ? "once" : `${n} times`}` : "Don't kick"}</button>
+        <button onClick={() => onDone(pick.chosen)}>{n ? `${pick.name === "multikicker" ? "Kick" : "Pay"} ${n === 1 ? "once" : `${n} times`}` : pick.name === "multikicker" ? "Don't kick" : "Don't pay"}</button>
         {cancel}
       </div>
     );
@@ -1065,12 +1066,12 @@ function KickPickBar({
     return (
       <div className="targeting">
         <span>
-          <strong>{pick.label}</strong>: pay kicker <ManaCost cost={pick.costs[0]!} size="sm" />?
+          <strong>{pick.label}</strong>: pay {pick.name} <ManaCost cost={pick.costs[0]!} size="sm" />?
         </span>
         <button disabled={!can([0])} onClick={() => onDone([0])}>
-          Kick it
+          {pick.name === "kicker" ? "Kick it" : `Pay ${pick.name}`}
         </button>
-        <button onClick={() => onDone([])}>Don't kick</button>
+        <button onClick={() => onDone([])}>{pick.name === "kicker" ? "Don't kick" : "Don't pay"}</button>
         {cancel}
       </div>
     );
@@ -1513,6 +1514,11 @@ function Seat({
         {(p.energy ?? 0) > 0 && (
           <span className="energy" title={`${p.energy} energy counter${p.energy === 1 ? "" : "s"}, spent to pay {E} costs.`}>
             ⚡ {p.energy}
+          </span>
+        )}
+        {p.speed !== undefined && (
+          <span className="energy" title={`Speed ${p.speed}${p.speed === 4 ? " (max speed)" : ""}: it increases once on each of their turns when an opponent loses life. Max speed is 4.`}>
+            🏁 {p.speed === 4 ? "Max speed" : `Speed ${p.speed}`}
           </span>
         )}
         {(p.poison ?? 0) > 0 && (
@@ -2343,15 +2349,27 @@ function Controls({
     // Devour: any number of them; exploit: none or one (pending.min).
     const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
     const n = discards.length;
-    const ok = pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count;
+    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1);
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong>{" "}
-          {pending.action === "pair" ? (pending.options.length === 1 ? `click ${cardOf(s, pending.options[0]!).name} to pair the two (soulbond), if you want.` : "click a creature of yours to pair it with (soulbond), if you want.") : `click ${what} of yours to ${verb}.`}
+          {pending.action === "pair"
+            ? pending.options.length === 1
+              ? `click ${cardOf(s, pending.options[0]!).name} to pair the two (soulbond), if you want.`
+              : "click a creature of yours to pair it with (soulbond), if you want."
+            : pending.action === "reveal"
+              ? `reveal any number of cards in your hand that share a creature type with it (amplify): click them, then reveal.`
+              : pending.action === "band"
+                ? `put attacking creatures in a band if you want: click creatures with banding and up to one without, all attacking the same player. Blocking one blocks them all, and you divide blockers' damage among them.`
+                : pending.action === "enlist"
+                ? `enlist a creature that isn't attacking, if you want: click it to tap it, and ${pending.source} gets +X/+0 until end of turn, where X is its power.`
+                : pending.action === "unblocked"
+                ? `click the blocked attackers that assign their combat damage to the player they're attacking, as though they weren't blocked (the rest damage their blockers).`
+                : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

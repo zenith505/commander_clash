@@ -51,6 +51,7 @@ for play. When we add search-based AI we'll switch to structural sharing.
 | `mana.ts`, `manaabilities.ts`, `autopay.ts` | Mana costs, mana abilities, automatic payment. |
 | `amounts.ts`, `modes.ts`, `keywords.ts` | Amounts (X, "for each"), modal spells, keyword tables. |
 | `bot.ts` | Bot decisions, using the same legal-action helpers as the UI. |
+| `shortcuts.ts` | Loops (CR 732): replaying a loop as a shortcut, the other players accepting or shortening it; a loop of mandatory actions is a draw (104.4b). |
 | `rng.ts`, `deck.ts` | Seeded randomness in state; deck validation. |
 
 ## How a card works
@@ -67,5 +68,5 @@ for play. When we add search-based AI we'll switch to structural sharing.
 
 ## Client (`apps/web`)
 
-`useGame.ts` holds the game state and runs the bots; `App.tsx` draws the table, hand, stack, log and every choice
+`useGame.ts` holds the game state, runs the bots and records a loop for a shortcut ("Start a loop", then "Repeat"); `App.tsx` draws the table, hand, stack, log and every choice
 bar. Play-test URL params: `?hand=A|B`, `&board=`, `&yard=` (the cards must be in your deck).

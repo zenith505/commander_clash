@@ -11,6 +11,7 @@ import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
 import { nextRandom, shuffle } from "./rng";
+import { watchForMandatoryLoop } from "./shortcuts";
 import {
   RulesError,
   type Action,
@@ -226,12 +227,25 @@ export function waitingOn(s: GameState): PlayerId | null {
 export function applyAction(state: GameState, action: Action): GameState {
   if (state.over) throw new RulesError("game is over");
   const s = cloneState(state);
+  applyInPlace(s, action);
+  return s;
+}
+
+/**
+ * `applyAction` on a state that's changed in place, for a shortcut repeating a loop (shortcuts.ts). A RulesError can
+ * leave `s` half-changed, so the caller keeps a copy to go back to.
+ */
+export function applyInPlace(s: GameState, action: Action): void {
+  if (s.over) throw new RulesError("game is over");
+  invalidateCharacteristics(s); // a fresh copy would start with nothing cached
   const p = player(s, action.player);
   if (action.type === "concede") {
     playerLoses(s, p.id, "conceded");
     afterAction(s);
-    return s;
+    return;
   }
+  /** Everyone passed in succession: the top of the stack resolved, or the step ended. */
+  let allPassed = false;
   const expected = waitingOn(s);
   if (action.player !== expected) throw new RulesError(`waiting on player ${expected}, not ${action.player}`);
 
@@ -240,7 +254,7 @@ export function applyAction(state: GameState, action: Action): GameState {
       requireNoPending(s);
       // Triggers held while activating mana abilities go on the stack before anyone passes (CR 117.5).
       if (s.triggerQueue.length) break;
-      passPriority(s, p.id);
+      allPassed = passPriority(s, p.id);
       break;
     case "playLand":
       requireNoPending(s);
@@ -328,7 +342,7 @@ export function applyAction(state: GameState, action: Action): GameState {
   // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
   afterAction(s, action.type === "activateMana");
-  return s;
+  watchForMandatoryLoop(s, action, allPassed);
 }
 
 /**
@@ -690,7 +704,14 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
 export function gainLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
   player(s, pid).life += n;
-  fireEvent(s, { type: "lifeGained", player: pid });
+  fireEvent(s, { type: "lifeGained", player: pid, amount: n });
+}
+
+/** A player loses life (CR 119.3): from damage (119.2), an effect, or paying life (119.4). One life-loss event. */
+export function loseLife(s: GameState, pid: PlayerId, n: number) {
+  if (n <= 0) return;
+  player(s, pid).life -= n;
+  fireEvent(s, { type: "lifeLost", player: pid, amount: n });
 }
 
 /**
@@ -1030,7 +1051,8 @@ function turnOrderFrom(s: GameState, pid: PlayerId): PlayerId[] {
 // ---------------------------------------------------------------------------
 // Priority and the stack (CR 117, 405, 608)
 
-function passPriority(s: GameState, pid: PlayerId) {
+/** Returns whether every player has now passed in succession (CR 117.4). */
+function passPriority(s: GameState, pid: PlayerId): boolean {
   if (!s.passedInSuccession.includes(pid)) s.passedInSuccession.push(pid);
   const living = livingPlayers(s);
   if (living.every((id) => s.passedInSuccession.includes(id))) {
@@ -1041,9 +1063,10 @@ function passPriority(s: GameState, pid: PlayerId) {
     } else {
       advanceStep(s); // CR 500.2
     }
-    return;
+    return true;
   }
   s.priority = nextLivingAfter(s, pid);
+  return false;
 }
 
 function resolveTop(s: GameState) {
@@ -1177,7 +1200,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
   p.landsPlayedThisTurn++;
   if (untapped && choice?.kind === "payLife") {
-    p.life -= choice.n;
+    loseLife(s, p.id, choice.n);
     log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
   } else if (untapped && choice?.kind === "reveal") {
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
@@ -1214,7 +1237,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) p.manaPool = payFromPool(parseManaCost(ab.manaCost), p.manaPool)!.pool;
   if (ab.tap) o.tapped = true;
-  if (ab.lifeCost) p.life -= ab.lifeCost;
+  if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
@@ -1523,7 +1546,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const cost = costToPay(s, p.id, o, convoke, improvise, x, choices.kicks, { ...choices, targets }) as { cost: ParsedCost; extra: number };
   const paid = payFromPool(cost.cost, p.manaPool, cost.extra, p.life)!;
   p.manaPool = paid.pool;
-  p.life -= paid.lifePaid;
+  loseLife(s, p.id, paid.lifePaid);
   for (const c of [...(convoke ?? []), ...(improvise ?? [])]) obj(s, c).tapped = true;
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
@@ -1717,7 +1740,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         moveObject(s, id, "hand");
       }
     } else if (c.kind === "payLife") {
-      p.life -= c.n;
+      loseLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "sacrifice") {
       for (const id of choices.sacrifice ?? []) {
@@ -1838,10 +1861,10 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   p.manaPool = paid.pool;
-  p.life -= paid.lifePaid + (ab.lifeCost ?? 0);
+  loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
-  if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(index);
+  (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
   if (ab.tap) o.tapped = true;
   for (const c of tapCreatures ?? []) obj(s, c).tapped = true;
   const sourceZc = o.zoneChanges ?? 0;
@@ -2103,11 +2126,8 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     if ((p.energy ?? 0) < energy) throw new RulesError(`you don't have ${energy} energy`);
     const paid = mana ? payFromPool(parseManaCost(mana), p.manaPool, 0, p.life - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
-    if (paid) {
-      p.manaPool = paid.pool;
-      p.life -= paid.lifePaid;
-    }
-    p.life -= life;
+    if (paid) p.manaPool = paid.pool;
+    loseLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     p.energy = (p.energy ?? 0) - energy;
     log(s, `${p.name} pays ${describePay(pend.pay)} for ${pend.source}.`);
   }
@@ -2129,7 +2149,7 @@ function payUnless(s: GameState, p: Player, pay: boolean) {
     const paid = payFromPool(parseManaCost(pend.cost), p.manaPool, 0, p.life - life);
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
     p.manaPool = paid.pool;
-    p.life -= paid.lifePaid + life;
+    loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
   }
   (r.scratch ??= {}).paid = pay;

@@ -77,7 +77,7 @@ import {
   type TargetSpec,
   COLOR_NAMES,
 } from "@cc/engine";
-import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, newGame, useGame, type DeckBundle, type PriorityMode } from "./useGame";
+import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
 import { ManaCost, ManaPoolView, RulesText } from "./Mana";
 
@@ -241,7 +241,7 @@ function maxX(plan: (x: number) => unknown): number {
 }
 
 function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) {
-  const { state: s, dispatch, error, intent, priorityMode, setPriorityMode, stops, toggleStop } = useGame(initial);
+  const { state: s, dispatch, error, intent, priorityMode, setPriorityMode, stops, toggleStop, loop, startLoop, cancelLoop, repeatLoop, shortcutNote } = useGame(initial);
   const [hover, setHover] = useState<CardDef | null>(null);
   const [attacks, setAttacks] = useState<Record<string, PlayerId>>({});
   /** The creature you've clicked to attack with, waiting for you to click the player it attacks. */
@@ -877,10 +877,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           )}
           {!targeting && !modePick && !tapPick && !picking && pending?.kind !== "chooseModes" && <Controls s={s} pending={pending} attacks={attacks} aim={aim} blocks={blocks} blocker={blocker} discards={discards} dispatch={dispatch} onCastFree={(id) => startCast(id)} onHover={setHover} />}
           <PriorityToggle mode={priorityMode} onChange={setPriorityMode} />
+          {!s.over && <LoopBar s={s} loop={loop} note={shortcutNote} onStart={startLoop} onCancel={cancelLoop} onRepeat={repeatLoop} />}
           {error && <div className="error">{error}</div>}
           {s.over && (
             <div className="game-over">
-              {s.winner === HUMAN ? "You win!" : `${s.winner !== null ? s.players[s.winner]!.name : "Nobody"} wins.`}
+              {s.winner === HUMAN ? "You win!" : s.winner !== null ? `${s.players[s.winner]!.name} wins.` : "The game is a draw."}
               <button onClick={onQuit}>Back to lobby</button>
             </div>
           )}
@@ -2885,6 +2886,45 @@ function PriorityToggle({ mode, onChange }: { mode: PriorityMode; onChange: (m: 
       >
         Auto-pass
       </button>
+    </div>
+  );
+}
+
+/**
+ * Shortcuts for loops (CR 732.2): mark where a loop starts, play it once by hand, then have it go round as many more
+ * times as you like. The bots go along with it, or stop it where they'd do something else.
+ */
+function LoopBar({ s, loop, note, onStart, onCancel, onRepeat }: { s: GameState; loop: LoopRecording | null; note: string | null; onStart: () => void; onCancel: () => void; onRepeat: (times: number) => void }) {
+  const [times, setTimes] = useState(10);
+  const canStart = waitingOn(s) === HUMAN && !s.pending;
+  if (!loop)
+    return (
+      <div className="loop-bar">
+        <button
+          disabled={!canStart}
+          onClick={onStart}
+          title="For a loop you can repeat (a combo): start here, play it once, and when you're back here with priority, repeat it as many times as you like. This is a shortcut, like in paper Magic (CR 732)."
+        >
+          Start a loop
+        </button>
+        {note && <span className="small">{note}</span>}
+      </div>
+    );
+  const ready = loopReady(s, loop);
+  return (
+    <div className="loop-bar recording">
+      <span className="small">
+        {ready ? "Back where the loop began." : `Recording a loop (${loop.body.length} action${loop.body.length === 1 ? "" : "s"}): play it once, until you have priority here again.`}
+      </span>
+      {ready && (
+        <>
+          <input type="number" min={1} max={999} value={times} onChange={(e) => setTimes(Math.max(1, Math.min(999, Math.floor(Number(e.target.value)) || 1)))} aria-label="Times to repeat" />
+          <button onClick={() => onRepeat(times)} title="Repeat the loop this many more times. Each opponent can stop it where they'd do something else (CR 732.2b).">
+            Repeat
+          </button>
+        </>
+      )}
+      <button onClick={onCancel}>{ready ? "Done" : "Cancel"}</button>
     </div>
   );
 }

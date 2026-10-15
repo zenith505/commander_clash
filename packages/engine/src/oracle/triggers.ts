@@ -35,6 +35,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ becomes blocked, (.+)$/, "selfBecomesBlocked"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
+  [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
   [/^At the beginning of each (?:player's )?upkeep, (.+)$/, "eachUpkeep"],
   [/^At the beginning of your draw step, (.+)$/, "yourDrawStep"],
@@ -193,7 +194,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" });
   if (!body) return "fail";
-  if (thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, bodyText) };
   return { event, body, ...(group ? { group } : {}) };
 }
 
@@ -277,9 +278,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         body0 = kicked[2]!;
       }
       let text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
-      // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt.
-      const damage = event === "selfDealsDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer";
-      const thatMuch = damage && /\bthat (?:much|many)\b/.test(text);
+      // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
+      const amount = event === "selfDealsDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
+      const thatMuch = amount && /\bthat (?:much|many)\b/.test(text);
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;
         text = text.replace(/\bthat (?:much|many)\b/g, "X");
@@ -287,10 +288,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
-      if (body && thatMuch) body = replaceX(body, { count: { kind: "eventAmount" } });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked", selfCastSpell: event === "selfCast" });
+      if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       return body ? { event, body, ...(ifKicked ? { ifKicked } : {}) } : ("fail" as const);
     }
   }
   return "fail" as const;
+}
+
+/** The text shown for a trigger whose "that much" was parsed as X: the words it had ("loses that much life"). */
+function unX(text: string, original: string): string {
+  const words = [...original.matchAll(/\bthat (?:much|many)\b/g)].map((m) => m[0]);
+  let i = 0;
+  return text.replace(/\bX\b/g, (x) => words[i++] ?? x);
 }

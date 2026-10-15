@@ -52,8 +52,10 @@ export type TriggerSourceEvent =
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
-  /** A player gained life (one life-gain event, CR 119.10). */
-  | { type: "lifeGained"; player: PlayerId }
+  /** A player gained life (one life-gain event, CR 119.9). */
+  | { type: "lifeGained"; player: PlayerId; amount: number }
+  /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
+  | { type: "lifeLost"; player: PlayerId; amount: number }
   | { type: "attacks"; id: ObjectId }
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
   | { type: "groupAttack"; controller: PlayerId; ids: ObjectId[] }
@@ -274,7 +276,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "lifeGained") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
-      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife");
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
+  } else if (ev.type === "lifeLost") {
+    // Every other player is an opponent (CR 102.3); "that player" is the one who lost life, "that much" how much.
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you !== ev.player) add(o, you, (e) => e === "opponentLosesLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);

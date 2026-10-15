@@ -324,6 +324,9 @@ button.ghost { background: var(--panel-2); color: var(--text); }
 .cmd-row.danger .cmd-bar > span { background: var(--attack); }
 
 /* Priority toggle */
+.loop-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.loop-bar.recording { background: var(--panel-2); border-radius: 8px; padding: 6px 8px; }
+.loop-bar input { width: 64px; }
 .prio-toggle { display: inline-flex; align-items: center; gap: 4px; background: var(--panel-2); border-radius: 8px; padding: 3px 3px 3px 10px; }
 .prio-toggle button { background: transparent; color: var(--muted); padding: 6px 12px; font-size: 13px; }
 .prio-toggle button.on { background: var(--accent); color: #1a1a1a; }

@@ -896,6 +896,9 @@ function best(s: GameState, pid: PlayerId, pool: ChosenTarget[], harmful: boolea
   return [...pool].sort((a, b) => targetWorth(s, pid, b, harmful, damage) - targetWorth(s, pid, a, harmful, damage))[0]!;
 }
 
+/** How many times a bot activates one ability in a turn at most, so it can't go round a loop forever. */
+const BOT_LOOP_LIMIT = 8;
+
 function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -909,6 +912,8 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
       if ((ab.sacrificeSelf && !cashIn) || freeCost) continue;
+      // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.
+      if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
       if (doesNothingNow(s, id, ab.body)) continue;

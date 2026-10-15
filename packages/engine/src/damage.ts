@@ -5,7 +5,7 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
-import { gainLife, log, player, useShieldCounter } from "./game";
+import { gainLife, log, loseLife, player, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
@@ -95,7 +95,7 @@ export function dealDamage(
       p.poison = (p.poison ?? 0) + n;
       log(s, `${src.name} deals ${n} damage to ${p.name} (${n} poison counter${n === 1 ? "" : "s"}).`);
     } else {
-      p.life -= n;
+      loseLife(s, p.id, n);
       log(s, `${src.name} deals ${n} damage to ${p.name}.`);
     }
     if (!(s.damagedThisTurn ??= []).includes(p.id)) s.damagedThisTurn.push(p.id);

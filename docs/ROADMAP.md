@@ -1,6 +1,6 @@
 # Roadmap
 
-12,572 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+12,772 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,10 +14,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: assist, the initiative (and dungeons), "{N}{B}: Return ~ from your graveyard to your hand",
-   party, ingest, incubate, warp, plot, blitz, reconfigure, Arrest-style "can't attack or block, and its activated
-   abilities can't be activated", "spend this mana only to cast a creature spell", "can't be blocked except by three
-   or more creatures", "whenever ~ attacks, tap target creature defending player controls".
+1. By `npm run blockers`: "spend this mana only to cast a creature spell", Kashi-Tribe's "tap that creature and it
+   doesn't untap during its controller's next untap step", "{N}: ~ becomes the creature type of your choice",
+   "when enchanted creature dies, return that card to the battlefield under your control", clash, bolster, endure,
+   "you may play lands from your graveyard", Powerstone tokens, "creatures your opponents control enter tapped",
+   melee, threshold.
 
 ## Known gaps (from earlier rounds)
 
@@ -92,6 +93,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   ("Galadriel", "Samwise", CR 201.5c) aren't recognized as the card itself yet.
 - Phasing: "any number of target", "phases out until ~ leaves the battlefield" (Oubliette, The Moment), "can't phase
   in", "whenever ~ phases in or out", Teferi's Protection; flavor words before an ability ("Teleport —", CR 207.2d).
+- Dungeons: "venture into the dungeon" (Lost Mine of Phandelver, Dungeon of the Mad Mage, Tomb of Annihilation) stays
+  unsupported until every room of those three is modeled (Tomb's "unless" rooms, the Mad Mage's last rooms); only
+  Undercity and the initiative work. Dungeoneer's Pack's compound sentence. "Completed a dungeon" conditions.
+- Blitz and warp with non-mana costs; cards that care about warped or plotted cards ("void", "if it was warped").
+  Reconfigure with non-mana costs. Transforming anything but an Incubator token (double-faced cards).
+- Assist: bots never ask for or give help (everyone else is an opponent). Gang Up's "power X or less" target.
+  Assist kicker (All-Star Kicker) and team-play cards.
 
 ## Later
 

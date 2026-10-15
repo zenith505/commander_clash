@@ -138,6 +138,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (unless === null) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, stackSpec(m[1]!)), ...(unless ? { unless } : {}) }];
   }
+  // A mix of abilities and spells (CR 115.1c-d): "Counter target triggered ability or colorless spell" (Consign to Memory),
+  // "... activated ability, triggered ability, or legendary spell" (Tale's End), "instant spell, sorcery spell, or
+  // triggered ability".
+  if ((m = /^Counter target (.+)$/i.exec(s)) && /\babilit/.test(m[1]!) && /\bspell\b/.test(m[1]!)) {
+    const spec = mixedStackSpec(m[1]!);
+    return spec && [{ type: "counterSpell", index: addTarget(ctx, spec) }];
+  }
   if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(`${m[1]}spell`);
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
@@ -157,6 +164,28 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return unless && [{ type: "counterUnlessPays", unless }];
   }
   return undefined;
+}
+
+/** "Triggered ability or colorless spell": the kinds of abilities, and one kind of spell (several only if they're just card types). */
+function mixedStackSpec(what: string): TargetSpec | null {
+  let activated = false;
+  let triggered = false;
+  const spells: TargetSpec[] = [];
+  for (const item of what.split(/,? or |, /)) {
+    if (item === "activated ability") activated = true;
+    else if (item === "triggered ability") triggered = true;
+    else if (item === "legendary spell") spells.push({ kind: "spell", supertypes: ["Legendary"], text: item });
+    else if (/ spell$/.test(item)) {
+      const spec = parseTargetPhrase(item);
+      if (spec?.kind !== "spell") return null;
+      spells.push(spec);
+    } else return null;
+  }
+  if (!(activated || triggered) || !spells.length) return null;
+  const onlyTypes = (x: TargetSpec) => Object.entries(x).every(([k, v]) => ["kind", "text", "types"].includes(k) || (Array.isArray(v) && !v.length));
+  if (spells.length > 1 && !spells.every(onlyTypes)) return null;
+  const spell: TargetSpec = spells.length > 1 ? { kind: "spell", types: spells.flatMap((x) => x.types ?? []), text: "" } : spells[0]!;
+  return { ...spell, kind: "spell", stackAbilities: activated && triggered ? "both" : activated ? "activated" : "triggered", text: `target ${what.toLowerCase()}` };
 }
 
 /** "Target spell or ability", "target activated ability": a stack target that can be an ability (CR 115.1c-d). */

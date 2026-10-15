@@ -282,6 +282,16 @@ export function parseAdditionalCost(text: string): AdditionalCost | null {
   }
   if ((m = new RegExp(`^discard ${NUM} cards?( at random)?$`, "i").exec(text))) return { kind: "discard", n: num(m[1]!), ...(m[2] ? { random: true as const } : {}) };
   if ((m = /^pay (\d+) life$/i.exec(text))) return { kind: "payLife", n: Number(m[1]) };
+  // "Return a land you control to its owner's hand" (Deprive).
+  if ((m = /^return an? (.+?) you control to its owner's hand$/i.exec(text))) {
+    const spec = parseTargetPhrase(m[1]!);
+    if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped !== undefined) return null;
+    return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[1]} you control` }, n: 1 };
+  }
+  if ((m = /^reveal an? (.+? card) from your hand$/i.exec(text))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? { kind: "reveal", filter, n: 1 } : null;
+  }
   if ((m = new RegExp(`^exile ${NUM} (.+?) from your graveyard$`, "i").exec(text))) {
     const filter = parseSearchFilter(m[2]!);
     if (filter === null) return null;

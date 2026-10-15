@@ -1146,6 +1146,7 @@ function startNextTurn(s: GameState) {
   s.noLifeGain = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
+  s.cantBlockThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
   s.lastKnown = undefined;
@@ -1630,6 +1631,9 @@ export function castProblem(
   if (isType(d, "Land")) return "lands are played, not cast";
   const limit = castLimitProblem(s, pid, d);
   if (limit) return limit;
+  // "Cast this spell only if you've cast another spell this turn" (Illusory Angel), checked as it's proposed, before it
+  // counts itself (CR 601.3); the other spell needn't have resolved (rulings). Face down it has no abilities (CR 708.2).
+  if (compileCard(d).castOnlyAfterAnother && !choices?.faceDown && !(s.castThisTurn ?? []).some((c) => c.player === pid)) return `${d.name} can be cast only if you've cast another spell this turn`;
   // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
   if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
@@ -1662,6 +1666,11 @@ export function castProblem(
   if (madness && x && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
+  const or = compileCard(d).costOr;
+  if (choices?.costOr !== undefined && (!or || !Number.isInteger(choices.costOr) || !or[choices.costOr])) return `${d.name} has no such cost to choose`;
+  // Not chosen yet: one of the ways has to be possible (a mana one is, as far as the mana check below goes).
+  if (or && choices?.costOr === undefined && or.every((c) => c.cost && extraCostProblem(s, pid, o, [c.cost], undefined, `cast ${d.name}`)))
+    return `you can't pay ${d.name}'s additional cost (${or.map((c) => c.text).join(" or ")})`;
   if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices);
   if (ap) return ap;
@@ -1680,12 +1689,12 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown"> & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr"> & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
   const kicker = compileCard(d).kicker;
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "");
+  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
@@ -1883,6 +1892,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const spell = compileCard(d).spell;
   // Modes first (CR 601.2b), then the targets they need (601.2c).
   if (spell?.modal && modes === undefined) throw new RulesError(castProblem(s, p.id, id) ?? `choose ${describeCount(spell.modal.min, spell.modal.max)} for ${d.name}`);
+  // "Sacrifice a creature or pay {3}{B}": which one is announced as it's cast (CR 601.2b).
+  const or = compileCard(d).costOr;
+  if (or && choices.costOr === undefined) throw new RulesError(`choose how to pay ${d.name}'s additional cost: ${or.map((x) => x.text).join(" or ")}`);
   const specs = spellTargets(s, id, modes);
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
   if (problem) throw new RulesError(problem);
@@ -1965,12 +1977,13 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
+    (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
   else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
-  const sacrificed = payAdditionalCosts(s, p, d, choices, [...(via?.costs ?? []), ...(altCost(d, choices.alt)?.costs ?? [])]);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices), choices);
   if (sacrificed.length) item.sacrificed = sacrificed;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
@@ -2059,9 +2072,13 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt">): AdditionalCost[] {
-  return [...(compileCard(d).additionalCosts ?? []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): AdditionalCost[] {
+  const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
+  return [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
 }
+
+/** "Sacrifice a creature or pay {3}{B}": the extra mana of the way chosen to pay it, if that's mana (CR 601.2f). */
+const costOrMana = (d: CardDef, i?: number) => (i === undefined ? "" : (compileCard(d).costOr?.[i]?.mana ?? ""));
 
 /**
  * Can these costs beyond mana be paid, for a spell (`o` is the card being cast) or an ability (`o` is its
@@ -2070,9 +2087,9 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
 function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: AdditionalCost[], choices: CostChoices | undefined, doing: string): string | null {
   const d = defOf(s, o);
   const p = player(s, pid);
-  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap") => choices?.[k];
-  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k}`;
+  const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal") => choices?.[k];
+  for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap", "reveal"] as const)
+    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k}`;
   const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
   for (const c of costs) {
@@ -2087,7 +2104,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"
           ? returnCandidates(s, pid, c)
-          : c.kind === "discard"
+          : c.kind === "discard" || c.kind === "reveal"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
@@ -2095,12 +2112,12 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
         ? `${c.n === 1 ? (c.other ? "another" : "a") : c.n} ${c.filter.text}`
         : c.kind === "tap"
         ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
-        : c.kind === "discard"
+        : c.kind === "discard" || c.kind === "reveal"
           ? c.filter
-            ? `${c.n === 1 ? "a" : c.n} ${c.filter.text}`
+            ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : "exile";
+    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -2141,11 +2158,6 @@ export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<Additio
   });
 }
 
-/** Pay a spell's additional costs; returns what was sacrificed as it last existed. */
-function payAdditionalCosts(s: GameState, p: Player, d: CardDef, choices: CostChoices, more: AdditionalCost[] = []) {
-  return payExtraCosts(s, p, [...(compileCard(d).additionalCosts ?? []), ...more], choices);
-}
-
 /**
  * Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h).
  * `returned` gets whom a creature returned to hand was attacking (ninjutsu, CR 702.49c).
@@ -2184,6 +2196,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (let i = 0; i < c.n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
       discardCards(s, p.id, picked, " at random");
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
+    else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else {
       const ids = choices.exileCards ?? [];
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
@@ -2229,6 +2242,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
+  if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
     if (!canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
@@ -3096,7 +3110,7 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
-  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !characteristics(s, o).cantBlock && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
+  const mine = creaturesOf(s, pid).filter((o) => !o.tapped && !cantBlockNow(s, o) && !(characteristics(s, o).cantBlockAlone && !earlier && blocking.size <= 1 && !blocking.has(o.id)));
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
@@ -3136,12 +3150,17 @@ const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Isla
  * Why `blocker` can't block `attacker` on its own, or null. Covers evasion and blocking
  * restrictions; menace (needs two blockers) is checked over the whole declaration.
  */
+/** "Can't block": from its abilities, or from a rule for the turn like Falter's. */
+export function cantBlockNow(s: GameState, o: GameObject): boolean {
+  return characteristics(s, o).cantBlock || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false));
+}
+
 export function blockProblem(s: GameState, blocker: GameObject, attacker: GameObject, defender = attacker.attacking): string | null {
   const b = characteristics(s, blocker);
   const a = characteristics(s, attacker);
   const has = (c: typeof a, k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (!b.types.includes("Creature") || blocker.tapped) return `${b.name} can't block`;
-  if (b.cantBlock) return `${b.name} can't block`;
+  if (cantBlockNow(s, blocker)) return `${b.name} can't block`;
   if (a.cantBeBlocked) return `${a.name} can't be blocked`;
   if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach")) return `${b.name} can't block a creature with flying`; // CR 702.9b
   if (has(a, "Shadow") !== has(b, "Shadow")) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b

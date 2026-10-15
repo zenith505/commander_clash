@@ -3,7 +3,7 @@
 import type { Effect, Modification, PlayerRef } from "../../abilities";
 import { NUM, amt, num } from "../words";
 import { mayBeAura, parseSearchFilter } from "../search";
-import { pickFilter, parsePlayer, parseObject, PERMANENT_TYPES, parseCardTarget } from "../targets";
+import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import type { Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -104,6 +104,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.
   // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
+  if ((m = /^Creatures( without flying)? can't block this turn$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1] ? "creature without flying" : "creature");
+    return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;
+  }
   if ((m = /^(.+?) can't (block|attack|attack or block|be blocked) (this turn|until your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods: Modification[] =

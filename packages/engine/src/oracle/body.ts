@@ -6,6 +6,7 @@ import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
 import { compileQuoted } from "./grants";
 import { parsePlayer } from "./targets";
+import { parseSearchFilter } from "./search";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -44,7 +45,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "takeFromHand", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
@@ -99,6 +100,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     .flatMap((x) => (/^If you do, /.test(x) || WHEEL.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
+    // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
+    .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;
@@ -140,6 +143,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       effects.push({ type: "revealTopToHand", ...(life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
       if (life) si++;
+      continue;
+    }
+    // Hand disruption: "Target opponent reveals their hand. You choose a nonland card from it. That player discards
+    // that card." Another player picks the card (CR 701.9b), among those that match.
+    const choose = /^You choose an? (.+?) from it( with mana value \d+ or (?:less|greater))?( and exile that card)?$/.exec(s);
+    if (choose) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
+      const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "")?.[0];
+      if (!then) return null;
+      const filter = parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`);
+      if (filter === null) return null;
+      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: /discards/.test(then) ? "discard" : "exile" });
+      if (!choose[3]) si++;
       continue;
     }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);

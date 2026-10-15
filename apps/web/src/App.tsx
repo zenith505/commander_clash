@@ -231,7 +231,14 @@ type CastDraft = {
   casualty?: string[];
   /** Assist (CR 702.132a): the player asked to help pay its generic mana. */
   assist?: PlayerId;
+  /** Cards revealed from your hand for a cost ("reveal a Pirate card from your hand"). */
+  reveal?: string[];
+  /** Which way to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
+  costOr?: number;
 };
+
+/** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
+type CostOrPick = { draft: CastDraft; label: string; options: string[] };
 
 /** Choosing cards to exile for delve: any number up to `max`. */
 type DelvePick = { draft: CastDraft; label: string; max: number; candidates: string[]; chosen: string[] };
@@ -244,7 +251,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "tap";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "tap" | "reveal";
   label: string;
   what: string;
   n: number;
@@ -300,6 +307,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [xPick, setXPick] = useState<XPick | null>(null);
   const [kickPick, setKickPick] = useState<KickPick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
+  const [costOrPick, setCostOrPick] = useState<CostOrPick | null>(null);
   const [costPick, setCostPick] = useState<CostPick | null>(null);
   const [delvePick, setDelvePick] = useState<DelvePick | null>(null);
   const [stackHidden, setStackHidden] = useState(false);
@@ -336,7 +344,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, controllerOf(s, s.objects[id]!));
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || delvePick || dividing);
+  const picking = !!(xPick || kickPick || costPick || costOrPick || delvePick || dividing);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -350,6 +358,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setXPick(null);
         setKickPick(null);
         setCostPick(null);
+        setCostOrPick(null);
         setAim(null);
         setBlocker(null);
         setTargeting((t) => (answering(t) ? t : null));
@@ -485,11 +494,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.alt ? { alt: d.alt } : {}) };
+    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     if (d.kicks === undefined && compiled.kicker)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
     if (d.buyback === undefined && compiled.buyback) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback });
+    if (d.costOr === undefined && compiled.costOr) return setCostOrPick({ draft: d, label: card.name, options: compiled.costOr.map((c) => c.text) });
     // Cast without paying its mana cost, X is 0 (CR 107.3b).
     if (d.x === undefined && parseManaCost(card.manaCost).hasX && !free && !d.via && !d.alt) {
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
@@ -507,11 +517,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const candidates =
         c.kind === "sacrifice"
           ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
-          : c.kind === "discard"
+          : c.kind === "discard" || c.kind === "reveal"
             ? me.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))))
             : me.graveyard.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
-      const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
-      const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : "exile from your graveyard";
+      const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
+      const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : "exile from your graveyard";
       return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
     // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
@@ -527,6 +537,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
       ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}),
+      ...(d.reveal?.length ? { reveal: d.reveal } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -958,6 +969,28 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 Don&apos;t
               </button>
               <button className="ghost" onClick={() => setBuybackPick(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {costOrPick && (
+            <div className="targeting">
+              <span>
+                <strong>{costOrPick.label}</strong>: as an additional cost,
+              </span>
+              {costOrPick.options.map((text, i) => (
+                <button
+                  key={i}
+                  disabled={planCast(s, HUMAN, costOrPick.draft.objectId, undefined, costOrPick.draft.modes, costOrPick.draft.convoke ?? "auto", undefined, { costOr: i, ...(costOrPick.draft.kicks?.length ? { kicks: costOrPick.draft.kicks } : {}), ...(costOrPick.draft.buyback ? { buyback: true } : {}) }) === null}
+                  onClick={() => {
+                    setCostOrPick(null);
+                    continueCast({ ...costOrPick.draft, costOr: i });
+                  }}
+                >
+                  {text.charAt(0).toUpperCase() + text.slice(1)}
+                </button>
+              ))}
+              <button className="ghost" onClick={() => setCostOrPick(null)}>
                 Cancel
               </button>
             </div>
@@ -2117,7 +2150,9 @@ function LibrarySearch({
       <div className="modal search">
         <header>
           <strong>
-            {dig
+            {dig && pending.hand !== undefined
+              ? `${pending.source}: choose ${pending.what} ${dig.to}`
+              : dig
               ? `${pending.source}: put ${pending.what} ${dig.to}`
               : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
@@ -2125,7 +2160,9 @@ function LibrarySearch({
           </strong>
           <span className="muted">
             {" "}
-            {dig
+            {dig && pending.hand !== undefined
+              ? `The rest ${dig.rest}.`
+              : dig
               ? `The rest go ${dig.rest}.`
               : pending.firstTo
                 ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
@@ -2156,7 +2193,7 @@ function LibrarySearch({
           )}
           {dig && (
             <>
-              <h4>The top of your library</h4>
+              <h4>{pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand` : "The top of your library"}</h4>
               <div className="modal-cards">
                 {dig.looked
                   .filter((id) => !found.includes(id))

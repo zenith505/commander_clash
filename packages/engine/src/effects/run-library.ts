@@ -82,6 +82,30 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const pid of apnap(s, who)) discardCards(s, pid, sc.chosen![pid] ?? [], "", false, false, ctx.controller);
       return;
     }
+    case "takeFromHand": {
+      // Another player chooses the card (CR 701.9b): the ability's controller, among the matching cards in the hand.
+      const pid = players(s, e.who, ctx)[0];
+      if (pid === undefined) return;
+      const p = player(s, pid);
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.found) {
+        const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        if (!cards.length) return;
+        const kind = e.filter?.text ?? "card";
+        const what = `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+        const to = e.action === "discard" ? `for ${p.name} to discard` : "to exile";
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: 1, max: 1, dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
+        return "paused";
+      }
+      const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
+      if (e.action === "discard") discardCards(s, pid, ids, "", false, false, ctx.controller);
+      else
+        for (const id of ids) {
+          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s hand.`);
+          moveObject(s, id, "exile");
+        }
+      return;
+    }
     case "scry":
     case "surveil": {
       const p = player(s, ctx.controller);

@@ -360,6 +360,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "opponentLostLife":
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "attachedIs": {
+      const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
+      const c = host && chars.get(host.id);
+      return !!c && objectMatches(s, cond.filter, host, you, false, undefined, c);
+    }
+    case "opponentPoison":
+      return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (s.players[p]!.poison ?? 0) >= cond.n);
     case "increment": {
       const c = chars.get(sourceId);
       return !!c && c.types.includes("Creature") && eventAmount !== undefined && (eventAmount > c.power || eventAmount > c.toughness);

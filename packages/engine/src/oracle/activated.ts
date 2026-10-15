@@ -7,7 +7,7 @@ import { pickFilter } from "./targets";
 import { parseStaticCondition } from "./statics";
 
 /** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
-const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
+const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
 
 /** A line without its ability word ("Threshold — "), which has no rules meaning (CR 207.2c). */
 export function stripAbilityWord(raw: string): string {
@@ -56,6 +56,13 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     oncePerTurn = limit[1]!.includes("once");
     effectText = effectText.slice(0, limit.index);
   }
+  // "Activate no more than twice each turn." (CR 602.5b)
+  let maxPerTurn: number | undefined;
+  const most = / Activate no more than (twice|three times) each turn\.$/.exec(effectText);
+  if (most) {
+    maxPerTurn = most[1] === "twice" ? 2 : 3;
+    effectText = effectText.slice(0, most.index);
+  }
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
   let activateIf: ActivatedAbility["activateIf"];
   // "Activate only during your turn[, before attackers are declared]." (CR 602.5b)
@@ -65,9 +72,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (turn[2]) oncePerTurn = true;
     effectText = effectText.slice(0, turn.index);
   }
-  const onlyIf = / Activate only if ([^.]+)\.$/.exec(effectText);
+  const onlyIf = / Activate only if ([^.]+?)( and only once each turn)?\.$/.exec(effectText);
   if (onlyIf) {
     if (activateIf) return "fail";
+    if (onlyIf[2]) oncePerTurn = true;
     activateIf = parseStaticCondition(onlyIf[1]!, { affects: { kind: "self" }, mods: [], text: "" }) ?? undefined;
     if (!activateIf) return "fail";
     effectText = effectText.slice(0, onlyIf.index);
@@ -102,6 +110,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     text: raw,
     ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf ? {} : { exileSelf: true }) } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
+    ...(maxPerTurn ? { maxPerTurn } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(energy ? { energyCost: energy } : {}),

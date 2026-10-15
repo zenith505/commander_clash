@@ -12,6 +12,7 @@ import {
   attackTax,
   attackTaxPer,
   blockProblem,
+  cantBlockNow,
   provokerOf,
   tapCostCandidates,
   maxBlocks,
@@ -103,6 +104,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
     // Free from the hand: the most expensive card is the best deal.
+    // From an opponent's revealed hand: take their most expensive card.
+    if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
@@ -536,6 +539,14 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   const cost = parseManaCost(graveyardCast(d, via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free) return null;
+  // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
+  const effects = compileCard(d).spell?.effects ?? [];
+  if (!free && effects.length && effects.every((e) => e.type === "addMana" || e.type === "choose")) {
+    const added = effects.reduce((n, e) => n + (e.type !== "addMana" ? 0 : (e.mana?.match(/\{/g)?.length ?? e.chosen ?? 0)), 0);
+    const avail = availableMana(s, pid);
+    const gain = added - manaValue(cost);
+    if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
+  }
   const xs = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
@@ -657,7 +668,18 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
-  const extra = chooseExtraCosts(s, pid, id, targets ?? [], via, alt);
+  // "Sacrifice a creature or pay {3}{B}" (CR 601.2b): the first way we're willing and able to pay.
+  const ors = compileCard(defOf(s, obj(s, id))).costOr?.map((_, i) => i) ?? [undefined];
+  let extra: CostChoices | null = null;
+  for (const costOr of ors) {
+    const e = chooseExtraCosts(s, pid, id, targets ?? [], via, alt, costOr);
+    if (!e) continue;
+    if (costOr !== undefined) e.costOr = costOr;
+    if (costOr === undefined || planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...e, ...(via ? { via } : {}), ...(alt ? { alt } : {}) })) {
+      extra = e;
+      break;
+    }
+  }
   if (extra) {
     // Casualty: a token or a cheap creature for a copy of the spell (CR 702.153a).
     const victim = casualtyCandidates(s, pid, castDef(s, id, alt))
@@ -708,11 +730,11 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): nu
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt })) {
+  for (const c of castExtraCosts(d, { via, alt, costOr })) {
     if (c.kind === "returnToHand") {
       // A Borderpost's basic land: a tapped one (its mana may already be paying for this), and only with lands to spare.
       const pool = returnCandidates(s, pid, c)
@@ -722,6 +744,11 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       if (pool.length < c.n || lands(s, pid) < 4) return null;
       out.returnToHand = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "tap") return null; // no spell asks for that
+    else if (c.kind === "reveal") {
+      const fits = player(s, pid).hand.filter((x) => x !== id && printedMatches(c.filter, defOf(s, obj(s, x))));
+      if (fits.length < c.n) return null;
+      out.reveal = fits.slice(0, c.n);
+    }
     else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
     } else if (c.kind === "sacrifice") {
@@ -1076,6 +1103,9 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         break;
       case "discard":
         v += e.who.ref === "you" ? -2 * estimate(e.n) : 3 * estimate(e.n);
+        break;
+      case "takeFromHand":
+        v += 4;
         break;
       case "scry":
       case "surveil":
@@ -1615,7 +1645,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const mine = s.battlefield
     .map((id) => obj(s, id))
-    .filter((o) => controllerOf(s, o) === pid && !o.tapped && objIsType(s, o, "Creature") && !characteristics(s, o).cantBlock);
+    .filter((o) => controllerOf(s, o) === pid && !o.tapped && objIsType(s, o, "Creature") && !cantBlockNow(s, o));
   const used = new Set<string>();
   const blocks: { blocker: string; attacker: string }[] = [];
   // Only damage to us counts toward our life; attackers of our planeswalkers are blocked when that's a good trade.

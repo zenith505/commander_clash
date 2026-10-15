@@ -11,6 +11,8 @@ import { parseSearchFilter } from "./search";
 
 export interface Ctx {
   targets: TargetSpec[];
+  /** Parsing what follows "you may": "collect evidence 4" can only be done by choice. */
+  mayNow?: boolean;
   /** In a trigger about another object ("blocks a creature"), "that creature" is that object. */
   subject?: boolean;
   /** "Whenever a creature you control enters": "it", "its power", "that land" are the entering permanent too. */
@@ -63,6 +65,7 @@ const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" 
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
+  e.type === "collectEvidence" ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
@@ -342,6 +345,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       prev.otherwise = inner;
       continue;
     }
+    // "You may collect evidence 3. When you do, put a +1/+1 counter on target creature you control": a reflexive
+    // trigger (CR 603.12), with targets of its own chosen as it's put on the stack. The rest of the ability is its.
+    const whenDo = /^When you do, (.+)$/.exec(s);
+    if (whenDo) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence") || si !== sentences.length - 1) return null;
+      const reflexive = parseBody(whenDo[1]!.charAt(0).toUpperCase() + whenDo[1]!.slice(1), {
+        ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
+        ...(ctx.selfIt ? { selfIt: true } : {}),
+        ...(ctx.selfCard ? { selfCard: true } : {}),
+        ...(ctx.activated ? { activated: true } : {}),
+        ...(ctx.eventPlayer ? { eventPlayer: true } : {}),
+        ...(ctx.defending ? { defending: true } : {}),
+      });
+      if (!reflexive || reflexive.modal) return null;
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -387,7 +408,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // don't control": ~ does it, if you choose.
       const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `)
         .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able");
+      ctx.mayNow = true;
       const inner = parseOne(rest, ctx);
+      ctx.mayNow = false;
       if (!inner) return null;
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
       if (inner.length > 1 && inner.some((e) => pauses(e))) return null;
@@ -500,6 +523,8 @@ export function parsePayCost(text: string): PayCost | null {
 const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
+  // In a spell, or its permanent's enters trigger (compile checks it's one of those).
+  { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
   { re: "the gift wasn't promised", cond: { kind: "gift" }, not: true },
 ];

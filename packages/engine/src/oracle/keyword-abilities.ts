@@ -422,6 +422,8 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const filter = parseTargetPhrase(`${num(m[1]!) > 1 ? m[2]!.split(" ").map(singularWord).join(" ") : m[2]}${m[3] ?? ""}`);
     return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}` }, n: num(m[1]!) } : null;
   }
+  // "Collect evidence 3" (CR 701.59a): exile cards from your graveyard with total mana value 3 or more.
+  if ((m = /^collect evidence (\d+)$/i.exec(text))) return { kind: "collectEvidence", n: Number(m[1]) };
   if ((m = /^pay (\d+) life$/i.exec(text))) return { kind: "payLife", n: Number(m[1]) };
   if (allowX && /^pay X life$/i.test(text)) return { kind: "payLife", n: 0, x: true };
   // "Return X Swamps you control to their owner's hand" (Infernal Harvest).

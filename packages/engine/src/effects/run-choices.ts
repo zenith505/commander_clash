@@ -2,12 +2,12 @@ import type { Effect, PayCost } from "../abilities";
 import { parseManaCost } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { draw, log, obj, player } from "../game";
-import { defOf } from "../cards";
+import { autoEvidence, collectEvidence, draw, evidenceProblem, log, obj, player } from "../game";
+import { cardIdOf, defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
 import { choiceOptions, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, runEffect, amountNow, gifteeOf } from "./resolve";
+import { ResolveCtx, apnap, objects, players, runEffect, amountNow, gifteeOf, evidenceCollected } from "./resolve";
 import { kickedMatches } from "./run-spells";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
@@ -27,7 +27,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         else if (!canDoNow(s, e.effects, ctx)) sc.may = false; // nothing to discard: "if you do" can't happen
         // Paying to untap what's already untapped gets nothing: not worth asking.
         else if (e.pay && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
-        else {
+        else if (e.effects.length === 1 && e.effects[0]!.type === "collectEvidence") {
+          // "You may collect evidence N": picking the cards is the answer, none is "no" (CR 701.59a).
+          s.pending = { kind: "collectEvidence", player: ctx.controller, n: e.effects[0]!.n, source: src };
+          return "paused";
+        } else {
           s.pending = { kind: "chooseMay", player: ctx.controller, prompt: e.text.replace(/~/g, src), source: src, ...(e.pay ? { pay: e.pay } : {}), ...(e.keep ? { keep: true } : {}) };
           return "paused";
         }
@@ -59,6 +63,35 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       // Each instruction once, also when one of them waits on a player (a draw that stops for dredge).
       for (sc.mayStep ??= 0; sc.mayStep < e.effects.length; sc.mayStep++) if (runEffect(s, e.effects[sc.mayStep]!, ctx) === "paused") return "paused";
+      return;
+    }
+    case "collectEvidence": {
+      // The cards picked as it asked (see "may"); anyone else's choice is made for them, the fewest that do.
+      const sc = s.resolving!.scratch ?? {};
+      const p = player(s, ctx.controller);
+      const ids = sc.evidence?.filter((id) => p.graveyard.includes(id)) ?? autoEvidence(s, p.id, e.n);
+      if (evidenceProblem(s, p.id, e.n, ids)) return;
+      collectEvidence(s, p, ids, e.n);
+      return;
+    }
+    case "reflexive": {
+      // "When you do, ...": it triggers now and is put on the stack the next time a player would receive priority,
+      // with its targets chosen then (CR 603.12, 603.3).
+      const item = s.resolving!.item;
+      const sourceId = ctx.sourceId ?? item.objectId ?? "";
+      const cardId = item.sourceCardId ?? (sourceId && s.objects[sourceId] ? cardIdOf(s.objects[sourceId]!) : undefined);
+      if (!cardId) return;
+      s.triggerQueue.push({
+        sourceId,
+        sourceCardId: cardId,
+        controller: ctx.controller,
+        index: -1,
+        body: e.body,
+        ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}),
+        ...(item.subject ? { subject: item.subject } : {}),
+        ...(item.event ? { event: item.event } : {}),
+        ...(item.x ? { x: item.x } : {}),
+      });
       return;
     }
     case "cumulativeUpkeep": {
@@ -95,6 +128,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
+            : e.cond.kind === "evidence"
+            ? evidenceCollected(s, ctx)
             : e.cond.kind === "teamwork"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"
@@ -148,6 +183,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // Damage to a target that's no longer legal isn't dealt (CR 608.2b); a creature that's gone deals none.
     if (e.type === "damage" && "index" in e.to && !ctx.legal[e.to.index]) return false;
     if (e.type === "bite" && (!objects(s, e.a, ctx).length || !objects(s, e.b, ctx).length)) return false;
+    // Collecting evidence takes enough mana value in your graveyard (CR 701.59b).
+    if (e.type === "collectEvidence" && evidenceProblem(s, ctx.controller, e.n, undefined)) return false;
     // "Unless you return a non-Lair land you control": you can't if you have none.
     if (e.type === "pick" && e.who.ref === "you" && pickOptions(s, e, ctx.controller, ctx.sourceId).length < amountNow(s, e.n, ctx)) return false;
   }

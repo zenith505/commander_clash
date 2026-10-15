@@ -17,6 +17,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // "You may collect evidence 4" as it resolves (CR 701.59a): only after "you may" (a player can't be made to).
+  if ((m = /^Collect evidence (\d+)$/.exec(s))) return ctx.mayNow ? [{ type: "collectEvidence", n: Number(m[1]) }] : null;
   // Additional phases (CR 500.8): "After this main phase, there is an additional combat phase followed by an additional
   // main phase", "after this phase, there are two additional combat phases", and, after "If it's your main phase,",
   // "there is an additional combat phase after this phase".

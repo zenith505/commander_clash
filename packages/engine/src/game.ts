@@ -358,6 +358,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "chooseMay":
       chooseMay(s, p, action.yes);
       break;
+    case "collectEvidence":
+      chooseEvidence(s, p, action.ids);
+      break;
     case "chooseOption":
       chooseOption(s, p, action.choice);
       break;
@@ -618,6 +621,7 @@ export function moveObject(
     o.colorsSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
+    o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -1934,7 +1938,8 @@ export function castProblem(
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
-    if (!altCost(d, choices.alt, s, pid)) return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : `${d.name} doesn't have ${choices.alt}`;
+    if (!altCost(d, choices.alt, s, pid))
+      return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
@@ -2014,7 +2019,7 @@ export function castProblem(
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices, x ?? 0);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
@@ -2029,7 +2034,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain" | "evidence"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -2045,6 +2050,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const mods = costModsFor(s, pid, o, d, x);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
   if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
+  // "This spell costs {2} less to cast if evidence was collected" (CR 601.2f).
+  if (how.evidence && !how.faceDown) mods.less += compileCard(d).evidenceReduction ?? 0;
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];
@@ -2178,6 +2185,10 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
   if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
+  if (alt === "evidence") {
+    const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
+    return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
+  }
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
 
@@ -2189,10 +2200,27 @@ const controlsPayWUBRG = (s: GameState, pid: PlayerId) =>
     return c.controller === pid && c.hasPrintedAbilities;
   });
 
-/** The alternative costs `pid` could cast this card for: its own, and Fist of Suns' (CR 118.9). */
+/**
+ * Conspiracy Unraveler's "You may collect evidence 10 rather than pay the mana cost for spells you cast": the N, the
+ * smallest if `pid` controls several (each is the same choice, CR 118.9).
+ */
+function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
+  let best: number | undefined;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const n = compileCard(defOf(s, o)).payEvidence;
+    if (n === undefined) continue;
+    const c = characteristics(s, o);
+    if (c.controller === pid && c.hasPrintedAbilities && (best === undefined || n < best)) best = n;
+  }
+  return best;
+}
+
+/** The alternative costs `pid` could cast this card for: its own, Fist of Suns' and Conspiracy Unraveler's (CR 118.9). */
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
-  return controlsPayWUBRG(s, pid) && !isType(defOf(s, o), "Land") ? [...own, { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" }] : own;
+  if (isType(defOf(s, o), "Land")) return own;
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? []))];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -2225,15 +2253,16 @@ const convokeProblem = (s: GameState, pid: PlayerId, ids: ObjectId[]) => tapCrea
 export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => spellTargetSpecs(castDef(s, id, alt), modes, how);
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
-export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift">): CastHow => ({
+export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence">): CastHow => ({
   ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
   ...(choices?.bargain ? { bargained: true } : {}),
+  ...(choices?.evidence ? { evidence: true } : {}),
   ...(choices?.teamwork?.length ? { teamwork: true } : {}),
   ...(choices?.gift !== undefined ? { gift: true } : {}),
 });
 const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
 /** Every optional cost paid (each kicker cost too): the most targets a spell can have. */
-const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true };
+const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true };
 
 /** What casting this card puts on the stack: the card, or for a bestowed cast, the Aura it is then (CR 702.103b, d). */
 export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
@@ -2371,7 +2400,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
@@ -2381,7 +2410,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices, x ?? 0), choices, returned);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices, x ?? 0, s, p.id), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
@@ -2395,6 +2424,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} sacrifices ${nameOf(s, choices.bargain)} (bargain).`);
     moveObject(s, choices.bargain, "graveyard", { sacrificed: true });
     o.bargained = true;
+  }
+  // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a, c).
+  if (choices.evidence) {
+    collectEvidence(s, p, choices.evidence, compileCard(d).evidence ?? 0);
+    o.evidence = true;
   }
   // Teamwork: "you may tap any number of creatures you control with total power N or more".
   if (choices.teamwork?.length) {
@@ -2584,6 +2618,56 @@ function bargainProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDef
   return null;
 }
 
+/** A card's mana value in a graveyard: its mana cost's, X as 0 (CR 202.3). */
+const cardMv = (s: GameState, id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+
+/** The total mana value of these cards, for collecting evidence (CR 701.59a). */
+export const evidenceValue = (s: GameState, ids: ObjectId[]) => ids.reduce((n, id) => n + cardMv(s, id), 0);
+
+/** The cards `pid` could exile to collect evidence: their graveyard, but not `not` (a spell on its way to the stack) or `taken`. */
+export const evidenceCandidates = (s: GameState, pid: PlayerId, not?: ObjectId, taken: ObjectId[] = []) => player(s, pid).graveyard.filter((id) => id !== not && !taken.includes(id));
+
+/**
+ * Why `ids` can't collect evidence N, or null: cards in `pid`'s graveyard with total mana value N or more (CR 701.59a).
+ * Without `ids`, whether they could: without enough, they can't choose to (701.59b).
+ */
+export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = []): string | null {
+  const pool = evidenceCandidates(s, pid, not, taken);
+  if (!ids) return evidenceValue(s, pool) >= n ? null : `you need cards with total mana value ${n} or more in your graveyard`;
+  if (new Set(ids).size !== ids.length || ids.some((id) => !pool.includes(id))) return "collect evidence with cards from your graveyard";
+  if (evidenceValue(s, ids) < n) return `collect evidence ${n}: those cards have total mana value ${evidenceValue(s, ids)}`;
+  return null;
+}
+
+/** Cards to collect evidence N with when nobody picked them: the fewest, biggest mana values first (null if it can't be done). */
+export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = []): ObjectId[] {
+  const pool = evidenceCandidates(s, pid, not, taken).sort((a, b) => cardMv(s, b) - cardMv(s, a));
+  const out: ObjectId[] = [];
+  for (const id of pool) {
+    if (evidenceValue(s, out) >= n) break;
+    out.push(id);
+  }
+  // Then drop the biggest ones the rest already make up for, so as little as possible is exiled.
+  for (let i = 0; i < out.length; i++) if (evidenceValue(s, out.filter((_, j) => j !== i)) >= n) out.splice(i--, 1);
+  return out;
+}
+
+/** Collect evidence N with these cards (CR 701.59a): they're exiled, and "whenever you collect evidence" triggers. */
+export function collectEvidence(s: GameState, p: Player, ids: ObjectId[], n: number) {
+  log(s, `${p.name} collects evidence ${n}${ids.length ? `, exiling ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard` : ""}.`);
+  for (const id of ids) moveObject(s, id, "exile");
+  fireEvent(s, { type: "evidenceCollected", player: p.id });
+}
+
+/** "You may collect evidence N" as an additional cost to cast it (CR 701.59a). */
+function evidenceCastProblem(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, choices?: CostChoices): string | null {
+  if (!choices?.evidence) return null;
+  const n = compileCard(d).evidence;
+  if (n === undefined) return `${d.name} doesn't let you collect evidence`;
+  const taken = [...(choices.exileCards ?? []), ...(choices.delve ?? []), ...(choices.collect ?? [])];
+  return evidenceProblem(s, pid, n, choices.evidence, o.id, taken);
+}
+
 function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {
   const id = choices?.casualty;
   if (id === undefined) return null;
@@ -2597,13 +2681,13 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
 function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, choices, x), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, choices, x, s, pid), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -2633,7 +2717,16 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
   const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
+  if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
+  if (costs.filter((c) => c.kind === "collectEvidence").length > 1) return `${d.name} would collect evidence twice`;
   for (const c of costs) {
+    if (c.kind === "collectEvidence") {
+      // Each card pays one cost only: not also exiled for another cost, delve or the spell's own evidence.
+      const taken = [...(choices?.exileCards ?? []), ...(choices?.delve ?? []), ...(choices?.evidence ?? [])];
+      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken);
+      if (problem) return `${problem} to ${doing}`;
+      continue;
+    }
     if (c.kind === "payLife") {
       if (p.life < c.n) return `you can't pay ${c.n} life`; // CR 119.4
       continue;
@@ -2776,7 +2869,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const ids = choices.exileFromHand ?? [];
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);
       for (const id of ids) moveObject(s, id, "exile");
-    } else {
+    } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n), c.n);
+    else {
       const ids = choices.exileCards ?? [];
       if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
@@ -3505,6 +3599,21 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   (r.scratch ??= {}).may = yes;
   // The prompt speaks to the player ("discard your hand"); the log is about them.
   if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/\byour\b/g, "their")}.`);
+  s.pending = null;
+  continueResolution(s);
+}
+
+/** "You may collect evidence N" as it resolves: the cards to exile, or none for "no" (CR 701.59a). */
+function chooseEvidence(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "collectEvidence" || pend.player !== p.id || !r) throw new RulesError("nothing to collect evidence for");
+  if (ids.length) {
+    const problem = evidenceProblem(s, p.id, pend.n, ids, pend.not);
+    if (problem) throw new RulesError(problem);
+  } else log(s, `${p.name} chooses not to collect evidence.`);
+  (r.scratch ??= {}).may = ids.length > 0;
+  if (ids.length) r.scratch.evidence = ids;
   s.pending = null;
   continueResolution(s);
 }

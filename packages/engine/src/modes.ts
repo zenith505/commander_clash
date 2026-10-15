@@ -84,6 +84,7 @@ export interface CastHow {
   bargained?: boolean;
   teamwork?: boolean;
   gift?: boolean;
+  evidence?: boolean;
 }
 
 /** Whether a spell cast this way meets a condition on how it was cast ("if ~ was kicked", "if the gift was promised"). */
@@ -97,6 +98,8 @@ export function castConditionMet(cond: SpellCondition, how: CastHow): boolean {
       return !!how.teamwork;
     case "gift":
       return !!how.gift;
+    case "evidence":
+      return !!how.evidence;
     default:
       return true;
   }

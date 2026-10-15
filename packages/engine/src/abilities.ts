@@ -966,6 +966,16 @@ export type Effect =
    * age counter on it; if you don't, sacrifice it.
    */
   | { type: "cumulativeUpkeep"; pay: PayCost } // "If you don't, ...": fabricate (CR 702.123a)
+  /**
+   * "You may collect evidence N" as it resolves (CR 701.59a), always inside a "may": its controller picks cards in their
+   * graveyard with total mana value N or more (they can say yes only if they have them, 701.59b).
+   */
+  | { type: "collectEvidence"; n: number }
+  /**
+   * "When you do, ..." (CR 603.12): a reflexive triggered ability, triggered by doing what the "you may" before it said.
+   * It's put on the stack the next time a player would receive priority, its targets chosen then (603.3d).
+   */
+  | { type: "reflexive"; body: AbilityBody }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
@@ -1075,6 +1085,8 @@ export type SpellCondition =
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
+  /** "If evidence was collected" (CR 701.59c): its "you may collect evidence N" additional cost was paid. */
+  | { kind: "evidence" }
   /** "If this spell was cast using teamwork": its teamwork cost was paid. */
   | { kind: "teamwork" }
   /** "If the gift was promised" (CR 702.174b, k). */
@@ -1194,6 +1206,8 @@ export type TriggerEvent =
   | "playerDraws"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
+  /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
+  | "youCollectEvidence"
   /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
@@ -1311,6 +1325,8 @@ export interface TriggeredAbility {
   ifCasualty?: boolean;
   /** "When ~ enters, if it was bargained, ..." (CR 702.166b). */
   ifBargained?: boolean;
+  /** "When ~ enters, if evidence was collected, ..." (CR 701.59c, an intervening if). */
+  ifEvidence?: boolean;
   /** "When ~ enters, if tribute wasn't paid" (CR 702.104b). */
   ifTributeUnpaid?: boolean;
   /** Conspire's "if its conspire cost was paid" (CR 702.78a). */
@@ -1567,7 +1583,12 @@ export type AdditionalCost =
    * "Have an opponent gain 3 life" (Invigorate: the caster picks which, CostChoices.lifeTo), "have each other player gain
    * 6 life" (`each`; Reverent Silence).
    */
-  | { kind: "giveLife"; n: number; each?: true };
+  | { kind: "giveLife"; n: number; each?: true }
+  /**
+   * "Collect evidence N" (CR 701.59a): exile any number of cards from your graveyard with total mana value N or greater,
+   * as a cost (an ability's, Conspiracy Unraveler's alternative cost); paid with CostChoices.collect.
+   */
+  | { kind: "collectEvidence"; n: number };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,
@@ -1588,7 +1609,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak";
+/** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
@@ -1873,6 +1895,12 @@ export interface CompiledCard {
   bargain?: true;
   /** "~ costs {2} less to cast if it's bargained." */
   bargainReduction?: number;
+  /** "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a, c): paid with CostChoices.evidence. */
+  evidence?: number;
+  /** "This spell costs {2} less to cast if evidence was collected." */
+  evidenceReduction?: number;
+  /** "You may collect evidence N rather than pay the mana cost for spells you cast" (Conspiracy Unraveler, CR 118.9). */
+  payEvidence?: number;
   /** Teamwork N: as an additional cost, you may tap any number of creatures you control with total power N or more. */
   teamwork?: number;
   /** "You may cast this spell as though it had flash if it's cast using teamwork." */

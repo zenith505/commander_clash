@@ -549,6 +549,20 @@ export function compile(d: CardDef): CompiledCard {
         };
       continue;
     }
+    // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a), maybe with "This spell costs
+    // {2} less to cast if evidence was collected" in the same paragraph.
+    const evidence = !d.types.includes("Land") ? /^As an additional cost to cast ~, you may collect evidence (\d+)\.(?: ~ costs \{(\d+)\} less to cast if evidence was collected\.)?$/.exec(line) : null;
+    if (evidence && out.evidence === undefined) {
+      out.evidence = Number(evidence[1]);
+      if (evidence[2]) out.evidenceReduction = Number(evidence[2]);
+      continue;
+    }
+    // Conspiracy Unraveler: "You may collect evidence 10 rather than pay the mana cost for spells you cast" (CR 118.9).
+    const payEvidence = /^You may collect evidence (\d+) rather than pay the mana cost for spells you cast\.$/.exec(line);
+    if (payEvidence) {
+      out.payEvidence = Number(payEvidence[1]);
+      continue;
+    }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
     if (extra) {
@@ -1141,6 +1155,11 @@ function checkCastingLinks(out: CompiledCard) {
     visit(ab);
   }
   if ([...needs].some((k) => !choices.has(k))) bad = true;
+  // "If evidence was collected" needs the "you may collect evidence N" it's linked to (CR 701.59c): in the spell, or its
+  // permanent's enters trigger.
+  const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');
+  if ((evidenceIn(out.spell) || out.triggers.some((t) => t.ifEvidence || evidenceIn(t.body))) && out.evidence === undefined) bad = true;
+  if (out.triggers.some((t) => t.event !== "selfEnters" && evidenceIn(t.body)) || evidenceIn(out.activated) || evidenceIn(out.statics)) bad = true;
   // "Enters with a counter for each creature of the chosen type" would be counted before the choice is made.
   needs.clear();
   visit(out.entersWithCounters);

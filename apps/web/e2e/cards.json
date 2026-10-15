@@ -138,6 +138,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ff387264-31da-4f6b-88c6-2843f56acbda",
+  "name": "Bite Down on Crime",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may collect evidence 6. This spell costs {2} less to cast if evidence was collected. (To collect evidence 6, exile cards with total mana value 6 or greater from your graveyard.)\nTarget creature you control gets +2/+0 until end of turn. It deals damage equal to its power to target creature you don't control.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Collect evidence"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ccba143d-ed9b-4044-bdad-f010a0e38e47",
   "name": "Blazing Shoal",
   "manaCost": "{X}{R}{R}",
@@ -425,6 +453,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e4541d02-2860-46ef-b630-1d6307b60766",
+  "name": "Conspiracy Unraveler",
+  "manaCost": "{5}{U}{U}",
+  "cmc": 7,
+  "typeLine": "Creature — Sphinx Detective",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx",
+   "Detective"
+  ],
+  "oracleText": "Flying\nYou may collect evidence 10 rather than pay the mana cost for spells you cast. (To collect evidence 10, exile cards with total mana value 10 or greater from your graveyard.)",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Collect evidence"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "46779609-4fa7-4fd2-b5b4-7d4d749339e6",
   "name": "Courser of Kruphix",
   "manaCost": "{1}{G}{G}",
@@ -454,6 +516,70 @@
   "set": "cp2",
   "releasedAt": "2015-01-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6a462a69-3e42-41de-a3aa-a488d9f38d69",
+  "name": "Craw Wurm",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wurm"
+  ],
+  "oracleText": "",
+  "power": "6",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5e238e67-00f2-4656-bf69-0115e47321a5",
+  "name": "Crimestopper Sprite",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Faerie Detective",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Detective"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may collect evidence 6. (Exile cards with total mana value 6 or greater from your graveyard.)\nFlying\nWhen this creature enters, tap target creature. If evidence was collected, put a stun counter on it. (If a permanent with a stun counter would become untapped, remove one from it instead.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Collect evidence"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -841,6 +967,39 @@
   "gameChanger": true
  },
  {
+  "oracleId": "75e7f7c7-fa98-497b-bf5e-8f74571e190c",
+  "name": "Forensic Researcher",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Merfolk Detective",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Detective"
+  ],
+  "oracleText": "{T}: Untap another target permanent you control.\n{T}, Collect evidence 3: Tap target creature you don't control. (To collect evidence 3, exile cards with total mana value 3 or greater from your graveyard.)",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Collect evidence"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
   "name": "Forest",
   "manaCost": "",
@@ -1221,6 +1380,45 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8074afbf-190b-4a24-b939-cc559bdffe38",
+  "name": "Izoni, Center of the Web",
+  "manaCost": "{4}{B}{G}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Elf Detective",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Detective"
+  ],
+  "oracleText": "Menace\nWhenever Izoni enters or attacks, you may collect evidence 4. If you do, create two 2/1 black and green Spider creature tokens with reach and menace.\nSacrifice four tokens: Surveil 2, then draw two cards. You gain 2 life.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [
+   "Collect evidence",
+   "Surveil",
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -331,6 +331,8 @@ export interface LastKnown {
   attacking?: PlayerId;
   /** Its copiable values as it last existed (CR 707.2, 608.2h), a key into GameState.cards: "becomes a copy of that creature". */
   copyKey?: string;
+  /** Who controlled it as it last existed: "that creature's controller" after it died (CR 608.2h). */
+  controller?: PlayerId;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */

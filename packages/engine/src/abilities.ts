@@ -405,7 +405,7 @@ export type Effect =
   | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount } }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
-  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean }
+  | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean }
   /** "Put target card from your graveyard on top of / on the bottom of its owner's library". */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"

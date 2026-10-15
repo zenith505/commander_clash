@@ -45,6 +45,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (!what || !spec || !spec.types?.length || spec.types.some((ty) => ty === "Enchantment" || !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}) }];
   }
+  // "When enchanted creature dies, return that card to the battlefield under your control" (False Demise): the card
+  // that went to the graveyard, if it's still there (CR 400.7); a token is gone (CR 111.7).
+  if ((m = /^Return (that card|it) to the battlefield( tapped)? under (your|its owner's) control$/i.exec(s)) && ctx.subjectLeft) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}), ...(m[3]!.toLowerCase() === "its owner's" ? { owner: true } : {}) }] : null;
+  }
   if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three )?target .+ graveyard) on (top|the bottom) of (your|its owner's) library$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;

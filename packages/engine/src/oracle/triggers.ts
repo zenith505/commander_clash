@@ -151,7 +151,7 @@ const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) dies, (.+)
  * dies": "it" and "that card" are the card in the graveyard, "its power" as it last existed (CR 603.10a).
  */
 function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
-  const attached = /^Whenever (equipped|enchanted) creature dies, (.+)$/.exec(line);
+  const attached = /^When(?:ever)? (equipped|enchanted) creature dies, (.+)$/.exec(line);
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const bodyText = attached ? attached[2]! : m![3]!;

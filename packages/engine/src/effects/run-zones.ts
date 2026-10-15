@@ -293,8 +293,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // An Aura put onto the battlefield this way needs a choice of what it enchants (CR 303.4f);
         // the compiler doesn't produce this effect for cards that could be Auras, so this is a safeguard.
         if (!isPermanentCard(d) || d.subtypes.includes("Aura")) continue;
-        log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, ctx.controller).name}'s control${e.tapped ? ", tapped" : ""}.`);
-        moveObject(s, o.id, "battlefield", { controller: ctx.controller, tapped: e.tapped }); // CR 110.2a
+        const under = e.owner ? o.owner : ctx.controller;
+        log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under).name}'s control${e.tapped ? ", tapped" : ""}.`);
+        moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped }); // CR 110.2a
       }
       return;
     case "putInLibrary":

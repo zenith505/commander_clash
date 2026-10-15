@@ -249,7 +249,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever another creature dies", "a creature you control", "equipped creature": abilities of permanents
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     if (ev.to === "graveyard" && ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
         add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);

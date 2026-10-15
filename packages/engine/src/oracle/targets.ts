@@ -197,7 +197,9 @@ export function parseGroup(phrase: string, bare = false): { filter: TargetSpec; 
   const whose = / (you control|your opponents control|an opponent controls|you don't control)\b/i;
   // "Attacking creatures get +1/+1 until end of turn": whichever are attacking as it resolves (CR 611.2c).
   const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p);
-  if (!all && !whose.test(p) && !bare && !combat) return null;
+  // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type.
+  const ofChosen = /^creatures of the chosen type$/i.test(p);
+  if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();

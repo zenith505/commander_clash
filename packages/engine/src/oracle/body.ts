@@ -258,6 +258,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push({ type: "choose", choice: "color" });
       s = s.replace("the color of your choice", "the chosen color");
     }
+    // "~ becomes the creature type of your choice until end of turn", "Creatures of the creature type of your choice
+    // get +X/+X until end of turn": the type is chosen as it resolves (CR 608.2d). Not "target creatures of the
+    // creature type of your choice", which would need the choice as the targets are chosen.
+    if (/\bbecomes? the creature type of your choice\b/.test(s) || (/\bof the creature type of your choice\b/.test(s) && !/\btarget\b/i.test(s))) {
+      effects.push({ type: "choose", choice: "creatureType" });
+      s = s.replace(/\b(becomes?) the creature type of your choice\b/, "$1 the chosen creature type").replace(/\bof the creature type of your choice\b/, "of the chosen type");
+    }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."
     if (/^You gain life equal to the (?:total )?life lost this way$/.test(s)) {
       const last = effects[effects.length - 1];

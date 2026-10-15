@@ -3,7 +3,7 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CHOSEN_PROTECTION } from "../keywords";
+import { bindChosenKeywords, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import type { CardDef, Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, StackItem, TriggerEventInfo } from "../types";
@@ -288,7 +288,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
       : // "Gains protection from the color of your choice": the color chosen as it resolved.
         m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PROTECTION)
         ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
-        : m,
+        : // "Becomes the creature type of your choice": the type chosen as it resolved.
+          (m.kind === "setSubtypes" || m.kind === "addTypes") && m.subtypes.includes(CHOSEN_TYPE)
+          ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_TYPE ? [st] : s.resolving?.chosen?.type ? [s.resolving.chosen.type] : [])) }
+          : m,
   );
 }
 

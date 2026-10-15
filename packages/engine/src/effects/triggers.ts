@@ -153,6 +153,8 @@ function trains(s: GameState, o: GameObject): boolean {
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;
+  // While set, `add` is looking at the abilities of a card in a graveyard that work there (CR 113.6m).
+  let fromYard = false;
   // Abilities that trigger on the battlefield use the permanent's abilities right now;
   // leaves-the-battlefield triggers look back in time (CR 603.10a), so "dies" passes them in.
   const add = (
@@ -172,6 +174,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     triggers.forEach((t, index) => {
       // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
       if (hosting ? !t.host : t.host === "attached") return;
+      if ((t.zone === "graveyard") !== fromYard) return;
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
@@ -212,6 +215,25 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     }
   };
+  /**
+   * The cards in graveyards with abilities that work there, each with its owner, who controls those abilities
+   * (CR 113.6m, 113.8); `f` adds the ones that trigger.
+   */
+  const fromGraveyards = (f: (o: GameObject, owner: PlayerId) => void) => {
+    for (const pid of s.turnOrder) {
+      if (player(s, pid).lost) continue;
+      for (const id of player(s, pid).graveyard) {
+        const o = obj(s, id);
+        if (!compileCard(defOf(s, o)).triggers.some((t) => t.zone === "graveyard")) continue;
+        fromYard = true;
+        try {
+          f(o, pid);
+        } finally {
+          fromYard = false;
+        }
+      }
+    }
+  };
   if (ev.type === "enters") {
     // Static effects apply as it enters, before checking what triggers (CR 611.3c).
     invalidateCharacteristics(s);
@@ -244,17 +266,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Evolve only triggers if the new creature is bigger in some way (CR 702.100a, 603.4).
         add(o, you, (e, t) => e === "anotherCreatureYouControlEnters" && (!t.ifEvolves || evolves(s, o, lki)) && (!t.ifSoulbond || pairable(s, o, entering, you)), undefined, undefined, entering, lki);
       }
+      fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "anotherCreatureYouControlEnters", undefined, undefined, entering, lki));
     }
     // Landfall. The land itself sees itself enter too (CR 603.6a).
-    if (objIsType(s, entering, "Land"))
+    if (objIsType(s, entering, "Land")) {
       for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "landYouControlEnters");
+      fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
+    }
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
-    for (const id of s.battlefield) {
-      const o = obj(s, id);
-      const ctrl = controllerOf(s, o);
-      add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering);
-    }
+    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering);
+    for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
+    fromGraveyards(entersWatch);
   } else if (ev.type === "dies") {
     const o = obj(s, ev.id);
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
@@ -350,9 +373,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
-    for (const id of s.battlefield) {
-      const o = obj(s, id);
-      if (controllerOf(s, o) !== ev.controller) continue;
+    const groupWatch = (o: GameObject) => {
       // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
       const fits = (t: TriggeredAbility) => ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)));
       for (const t of abilitiesOf(s, o).triggers) {
@@ -363,7 +384,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group);
         add(o, ev.controller, (_, tt) => same(tt), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount } : undefined);
       }
-    }
+    };
+    for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
+    fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
@@ -436,16 +459,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
-    for (const id of s.battlefield) {
-      const o = obj(s, id);
-      const you = controllerOf(s, o);
+    const castWatch = (o: GameObject, you: PlayerId) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you)) return false;
         return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
       }, undefined, ev.stackId); // "counter it unless that player pays" acts on the spell cast
-    }
+    for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
+    fromGraveyards(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.
     const targeted = new Set(ev.copy ? [] : (item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
     for (const id of targeted) {
@@ -533,12 +555,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const pair = STEP_TRIGGERS[ev.step];
     if (!pair) return;
     const [want, each] = pair;
-    for (const id of s.battlefield) {
-      const o = obj(s, id);
-      const you = controllerOf(s, o);
-      // "That player" in "at the beginning of each player's upkeep" is the active player.
+    // "That player" in "at the beginning of each player's upkeep" is the active player.
+    const stepWatch = (o: GameObject, you: PlayerId) =>
       add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || e === each, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
-    }
+    for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
+    fromGraveyards(stepWatch);
   }
 }
 

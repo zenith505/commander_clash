@@ -112,6 +112,8 @@ export interface TargetSpec {
   notColors?: Color[];
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
+  /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
+  colorCount?: "multicolored" | "monocolored" | "colorless";
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
@@ -730,6 +732,11 @@ export type TriggerEvent =
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /**
+   * "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": an ability whose
+   * effect moves the card out of a zone works only in that zone (CR 113.6m), and its owner controls it there.
+   */
+  zone?: "graveyard";
   /** For "state": the game state that triggers it, checked whenever state-based actions are (CR 603.8). */
   state?: StaticCondition;
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */

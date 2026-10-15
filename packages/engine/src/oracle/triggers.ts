@@ -296,10 +296,24 @@ function parseExploitsTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "creatureYouControlExploits", body, ...(filter ? { subjectFilter: { ...filter, text: m[1]! } } : {}) };
 }
 
+/** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
+const YARD_EVENTS: TriggerEvent[] = ["castSpell", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
+  // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
+  // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?))\.$/.exec(line);
+  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!)) {
+    const t = parseTrigger(`${yard[1]}, draw a card.`);
+    if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
+    if (!YARD_EVENTS.includes(t.event) || t.host) return "fail";
+    const body = parseBody(`${yard[2]![0]!.toUpperCase()}${yard[2]!.slice(1)}.`, { selfCard: true });
+    return body ? { ...t, body, zone: "graveyard" } : "fail";
+  }
   // "Whenever the Ring tempts you" (CR 701.54d). "If you chose a creature other than ~ as your Ring-bearer" is an
   // intervening if (CR 603.4) about the choice just made, so it can't change by the time it resolves.
   const ring = /^Whenever the Ring tempts you, (if you chose a creature other than ~ as your Ring-bearer, )?(.+)$/.exec(line);

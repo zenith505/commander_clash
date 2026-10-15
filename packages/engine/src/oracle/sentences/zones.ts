@@ -14,9 +14,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
 
   // Graveyards. Cards in a graveyard (CR 109.2a): returning them, reanimating them, exiling them.
-  // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j): the card itself,
-  // while it's still the object whose ability was activated (CR 400.7).
-  if (ctx.selfCard && ctx.activated && (m = /^Return ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s)))
+  // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j) or "Whenever you
+  // cast a multicolored spell, you may return ~ from your graveyard to your hand" (CR 113.6m): the card itself,
+  // while it's still the object whose ability was activated or triggered (CR 400.7).
+  if (ctx.selfCard && (m = /^Return ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s)))
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all) graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();

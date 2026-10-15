@@ -69,6 +69,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? !!s.resolving!.did
           : e.cond.kind === "wonClash"
             ? !!s.resolving!.wonClash
+            : e.cond.kind === "foretold"
+            ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "state"
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)
             : kickedMatches(ctx.kicked, e.cond);

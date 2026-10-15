@@ -124,7 +124,12 @@ export interface GameObject {
    * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
    * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery.
    */
-  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot"; turn: number };
+  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot" | "foretell"; turn: number };
+  /**
+   * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
+   * spell it's cast as, for "if this spell was foretold".
+   */
+  foretold?: true;
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
   /**
@@ -780,6 +785,8 @@ export type Action =
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
   /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
   | { type: "plot"; player: PlayerId; objectId: ObjectId }
+  /** Foretell a card from your hand: pay {2} and exile it face down, a special action (CR 116.2h, 702.143a). */
+  | { type: "foretell"; player: PlayerId; objectId: ObjectId }
   /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */
   | { type: "assist"; player: PlayerId; n: number }
   /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */

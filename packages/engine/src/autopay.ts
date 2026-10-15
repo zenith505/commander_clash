@@ -1,7 +1,7 @@
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
 import type { TargetChoice } from "./abilities";
@@ -429,6 +429,14 @@ export function planSuspend(s: GameState, pid: PlayerId, id: ObjectId): Action[]
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost(sus.cost)) : [];
   return taps ? [...taps, { type: "suspend", player: pid, objectId: id }] : null;
+}
+
+/** Tap mana for {2}, then foretell the card (CR 702.143a), or null if that can't be done now. */
+export function planForetell(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const problem = foretellProblem(s, pid, id);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem ? planMana(s, pid, parseManaCost("{2}")) : [];
+  return taps ? [...taps, { type: "foretell", player: pid, objectId: id }] : null;
 }
 
 /** Tap mana for a card's plot cost, then plot it (CR 702.170a), or null if that can't be done now. */

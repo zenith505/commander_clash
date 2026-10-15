@@ -81,6 +81,7 @@ export function parseCostKeyword(
   madness?: string;
   suspend?: { n: number; cost: string };
   plot?: string;
+  foretell?: string;
   casualty?: number;
   dredge?: number;
 } | "fail" | null {
@@ -143,6 +144,9 @@ export function parseCostKeyword(
   // Plot [cost] (CR 702.170a): exile it from your hand as a special action, cast it free on a later turn.
   if ((m = /^Plot ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !d.types.includes("Land") ? { plot: m[1]! } : "fail";
   if (/^Plot\b/.test(line)) return "fail";
+  // Foretell [cost] (CR 702.143a). An {X} foretell cost isn't modeled.
+  if ((m = /^Foretell ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) && !d.types.includes("Land") ? { foretell: m[1]! } : "fail";
+  if (/^Foretell\b/.test(line)) return "fail";
   // Blitz [cost] (CR 702.152a) and warp [cost] (CR 702.185a): alternative costs that send the permanent away at the next
   // end step. "Blitz—{2}{B}{B}, Discard a card" and "Warp—{B}, Pay 2 life" aren't modeled.
   if ((m = /^(Blitz|Warp)(?: |—)(.+?)\.?$/.exec(line))) {

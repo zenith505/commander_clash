@@ -383,6 +383,10 @@ export function applyInPlace(s: GameState, action: Action): void {
       requireNoPending(s);
       plotCard(s, p, action.objectId);
       break;
+    case "foretell":
+      requireNoPending(s);
+      foretellCard(s, p, action.objectId);
+      break;
     case "assist":
       assistPays(s, p, action.n);
       break;
@@ -550,6 +554,7 @@ export function moveObject(
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   o.discardedTurn = undefined;
+  o.foretold = undefined; // a spell that was foretold is cast without moving it here; anywhere else it's a new object
   if (fromZone === "stack") {
     o.castFrom = undefined;
     o.castVia = undefined;
@@ -1549,7 +1554,10 @@ export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): bo
 }
 
 /** A warped or plotted card in exile, which its owner may cast on a later turn (CR 702.185a, 702.170d). */
-const castOnlyFromExile = (o: GameObject) => o.mayPlay?.until === "warp" || o.mayPlay?.until === "plot";
+const castOnlyFromExile = (o: GameObject) => o.mayPlay?.until === "warp" || o.mayPlay?.until === "plot" || o.mayPlay?.until === "foretell";
+
+/** A foretold card its owner may cast now, for its foretell cost (CR 702.143a). */
+export const foretoldCast = (s: GameState, pid: PlayerId, o: GameObject): boolean => o.mayPlay?.until === "foretell" && mayPlayFromExile(s, o, pid);
 
 /** A plotted card `pid` may cast now, without paying its mana cost (CR 702.170d). */
 export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean {
@@ -1720,12 +1728,16 @@ export function castProblem(
     if (!altCost(d, choices.alt, s, pid)) return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
+    // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
+    if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
     if (choices.alt === "freerunning" && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
     // Only one alternative cost can be applied to a spell (CR 118.9a).
     if (via || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
+  // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
+  if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
   const limit = castLimitProblem(s, pid, d);
   if (limit) return limit;
@@ -1926,6 +1938,7 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 
 /** A card's own alternative cost of that kind; with `s` and the caster, Fist of Suns' {W}{U}{B}{R}{G} too (CR 118.9). */
 export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): { kind: AltCostKind; mana: string; costs?: AdditionalCost[] } | undefined {
+  if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
@@ -3927,6 +3940,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
+    if (foretellProblem(s, pid, id) === null) out.push({ type: "foretell", player: pid, objectId: id });
   }
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
@@ -4046,6 +4060,39 @@ export function plotProblem(s: GameState, pid: PlayerId, id: ObjectId): string |
   if (!canActAtSorcerySpeed(s, pid)) return "you can only plot during your main phase while the stack is empty";
   if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to plot ${d.name} (${cost})`;
   return null;
+}
+
+/**
+ * Why `pid` can't foretell this card right now, or null (with the mana in their pool). Foretelling is a special action
+ * (CR 116.2h) any time they have priority during their own turn (CR 702.143a), even with spells on the stack.
+ */
+export function foretellProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const o = s.objects[id];
+  if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be foretold";
+  const d = defOf(s, o);
+  if (!compileCard(d).foretell) return `${d.name} doesn't have foretell`;
+  if (s.priority !== pid || s.pending) return "you don't have priority";
+  if (s.activePlayer !== pid) return "you can only foretell during your own turn";
+  if (!canPayFromPool(s, pid, parseManaCost("{2}"), "other")) return `not enough mana to foretell ${d.name} ({2})`;
+  return null;
+}
+
+/**
+ * Foretell a card (CR 702.143a): pay {2} and exile it face down. Only its owner may look at it (the others see that a
+ * card was foretold); it can be cast for its foretell cost after this turn.
+ */
+function foretellCard(s: GameState, p: Player, id: ObjectId) {
+  const problem = foretellProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const o = obj(s, id);
+  const d = defOf(s, o);
+  spendFromPool(s, p.id, parseManaCost("{2}"), "other");
+  moveObject(s, id, "exile");
+  o.foretold = true;
+  o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn };
+  log(s, `${p.name} foretells a card.`);
+  log(s, `(You foretold ${d.name}: cast it on a later turn for ${compileCard(d).foretell}.)`, p.id);
+  s.passedInSuccession = [];
 }
 
 /** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */

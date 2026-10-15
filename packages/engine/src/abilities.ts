@@ -849,6 +849,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
+  | { kind: "foretold" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition };
 
@@ -1295,7 +1297,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning";
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
@@ -1518,6 +1520,11 @@ export interface CompiledCard {
   reconfigure?: true;
   /** Plot [cost] (CR 702.170a): exile it from your hand as a special action, and cast it free on a later turn (702.170d). */
   plot?: string;
+  /**
+   * Foretell [cost] (CR 702.143a): during your turn, pay {2} and exile it from your hand face down (a special action);
+   * on a later turn, cast it for this cost (an alternative cost, AltCostKind "foretell").
+   */
+  foretell?: string;
   /** Dredge N (CR 702.52a): in your graveyard, a draw may be replaced by milling N and returning it to your hand. */
   dredge?: number;
   /** Casualty N (CR 702.153a): you may sacrifice a creature with power N or greater as you cast it, to copy it. */

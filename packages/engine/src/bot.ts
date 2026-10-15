@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
-import { autoCrew, planActivate, planCast, planMana, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
+import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -28,6 +28,7 @@ import {
   opponents,
   player,
   potentialAttackers,
+  foretoldCast,
   combatDamageOf,
   spellCost,
   graveyardWay,
@@ -258,6 +259,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (s.step === "main2") {
       const plot = choosePlot(s, pid);
       if (plot) return plot;
+      const foretell = chooseForetell(s, pid);
+      if (foretell) return foretell;
     }
     // Unearth a creature to attack with this turn (CR 702.84a).
     if (s.step === "main1") {
@@ -559,6 +562,8 @@ function targetIndexOf(e: Effect): number | undefined {
  */
 function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const d = defOf(s, obj(s, id));
+  // A foretold card is cast for its foretell cost (CR 702.143a).
+  if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   const cost = parseManaCost(graveyardWay(s, obj(s, id), via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free) return null;
@@ -637,6 +642,22 @@ function choosePlot(s: GameState, pid: PlayerId): Action[] | null {
     .sort((a, b) => mv(s, b) - mv(s, a));
   for (const id of options) {
     const plan = planPlot(s, pid, id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * A card to foretell (CR 702.143a) with mana we'd otherwise not use this turn: the one whose foretell cost saves the
+ * most on a later turn.
+ */
+function chooseForetell(s: GameState, pid: PlayerId): Action[] | null {
+  const saving = (id: string) => mv(s, id) - manaValue(parseManaCost(compileCard(defOf(s, obj(s, id))).foretell ?? ""));
+  const options = player(s, pid)
+    .hand.filter((id) => compileCard(defOf(s, obj(s, id))).foretell)
+    .sort((a, b) => saving(b) - saving(a));
+  for (const id of options) {
+    const plan = planForetell(s, pid, id);
     if (plan) return plan;
   }
   return null;

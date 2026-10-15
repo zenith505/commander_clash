@@ -218,6 +218,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       else effects.push({ type: "if", cond, effects: fx.effects });
       continue;
     }
+    // "If this spell was foretold, scry 2", "... create X of those tokens instead" (CR 702.143c).
+    const foretold = ctx.spell ? /^If (?:this spell|~) was foretold, (.+)$/.exec(s) : null;
+    if (foretold) {
+      const fx = parseKicked(foretold[1]!, effects.slice(prevStart), ctx);
+      if (!fx) return null;
+      const cond: SpellCondition = { kind: "foretold" };
+      if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
+      else effects.push({ type: "if", cond, effects: fx.effects });
+      continue;
+    }
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     const where = /^(.+), where X is (.+)$/.exec(s);

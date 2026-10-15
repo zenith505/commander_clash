@@ -335,6 +335,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnExiled":
     case "exileIfDies":
     case "noCombatDamage":
+    case "lookAtHand":
     case "sacrifice":
     case "exploit":
     case "soulbond":

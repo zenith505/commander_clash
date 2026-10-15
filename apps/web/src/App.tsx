@@ -2824,7 +2824,8 @@ function Controls({
 }
 
 function GameLog({ s }: { s: GameState }) {
-  const entries = s.log.slice(-80).reverse(); // newest first
+  // Hidden information is only shown to the player who may see it (CR 402.3).
+  const entries = s.log.filter((e) => e.to === undefined || e.to === HUMAN).slice(-80).reverse(); // newest first
   return (
     <div className="log">
       {entries.map((e) => (

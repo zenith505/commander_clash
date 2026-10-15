@@ -558,6 +558,15 @@ export function compile(d: CardDef): CompiledCard {
       else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
       continue;
     }
+    const youHave = /^You have (hexproof|shroud)\.$/.exec(line);
+    if (youHave) {
+      out.youHave = youHave[1] as "hexproof" | "shroud";
+      continue;
+    }
+    if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
+      out.beginOnBattlefield = true;
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;
@@ -669,12 +678,19 @@ export function compile(d: CardDef): CompiledCard {
       spellLines.push(line);
       continue;
     }
-    // "When you cast or cycle ~, ..." and "When you cycle ~ and when ~ dies, ...": two triggered abilities with one
-    // effect (CR 702.29c).
-    const twice = /^When you cast or cycle ~, (.+)$/.exec(line) ?? /^When you cycle ~ and when ~ dies, (.+)$/.exec(line);
-    if (twice) {
-      const first = /^When you cast/.test(line) ? `When you cast ~, ${twice[1]}` : `When ~ dies, ${twice[1]}`;
-      const both = [parseTrigger(first), parseTrigger(`When you cycle ~, ${twice[1]}`)];
+    // "When you cast or cycle ~, ...", "When you cycle ~ and when ~ dies, ...", "Whenever ~ enters or attacks, ...",
+    // "When ~ enters or dies, ...": one ability that triggers on either event, which works like two with the same
+    // effect (CR 702.29c). The text is read for each event ("it" after it died is the card).
+    const twice =
+      /^When you cast or cycle ~, (.+)$/.exec(line) ?? /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ?? /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield), (.+)$/.exec(line);
+    if (twice && !/\bonly once\b/.test(line)) {
+      const effect = twice[twice.length - 1]!;
+      const events = /^When you cast/.test(line)
+        ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
+        : /^When you cycle/.test(line)
+          ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]
+          : [`When ~ enters, ${effect}`, `${twice[1] === "attacks" ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
+      const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);
       else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));
       continue;

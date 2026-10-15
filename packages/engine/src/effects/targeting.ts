@@ -1,6 +1,6 @@
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Range, TargetChoice, TargetSpec } from "../abilities";
 import { manaValue, parseManaCost } from "../mana";
-import { defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { livingPlayers, obj, player } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
 import { modeCountProblem } from "../modes";
@@ -20,7 +20,8 @@ const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) =>
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics): boolean {
   if (o.zone !== "battlefield") return false;
   const c = chars ?? characteristics(s, o);
-  if (spec.types?.length && !spec.types.some((t) => c.types.includes(t))) return false;
+  const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
+  if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype)) return false;
   if (spec.allTypes?.some((t) => !c.types.includes(t))) return false;
   if (spec.notTypes?.some((t) => c.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => c.colors.includes(col))) return false;
@@ -28,7 +29,6 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
   if (spec.supertypes?.some((t) => !c.supertypes.includes(t))) return false;
   if (spec.notSupertypes?.some((t) => c.supertypes.includes(t))) return false;
-  const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
@@ -102,7 +102,9 @@ export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): Sou
 
 /** Filters checked against a card's printed characteristics, for spells and cards in graveyards. */
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
-  if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty))) return false;
+  // Changeling gives every creature type wherever the card is (CR 702.73a).
+  const hasSubtype = (st: string) => d.subtypes.includes(st) || (d.keywords.includes("Changeling") && CREATURE_TYPES.has(st));
+  if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype)) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
   if (spec.colors?.length && !spec.colors.some((col) => d.colors.includes(col))) return false;
@@ -110,8 +112,6 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.colorCount && !colorCountIs(spec.colorCount, d.colors.length)) return false;
   if (spec.supertypes?.some((x) => !d.supertypes.includes(x))) return false;
   if (spec.notSupertypes?.some((x) => d.supertypes.includes(x))) return false;
-  // Changeling gives every creature type wherever the card is (CR 702.73a).
-  const hasSubtype = (st: string) => d.subtypes.includes(st) || (d.keywords.includes("Changeling") && CREATURE_TYPES.has(st));
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   if (spec.chosen === "type" || spec.chosen === "color" || spec.counter) return false;
@@ -129,11 +129,27 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
 
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
 
+/** Hexproof or shroud a player has from a permanent they control ("You have hexproof"). */
+export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shroud" | undefined {
+  let out: "hexproof" | undefined;
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (controllerOf(s, o) !== pid) continue;
+    const has = abilitiesOf(s, o).youHave;
+    if (has === "shroud") return "shroud";
+    if (has) out = has;
+  }
+  return out;
+}
+
 export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, controller: PlayerId, src?: SourceQuality): boolean {
   if (t.kind === "none") return false;
   if (t.kind === "player") {
     const p = s.players[t.id];
     if (!p || p.lost) return false;
+    // "You have hexproof": not by opponents' spells and abilities (CR 702.11d); "you have shroud": by none (CR 702.18d).
+    const prot = playerProtection(s, t.id);
+    if (prot === "shroud" || (prot === "hexproof" && t.id !== controller)) return false;
     if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
     return !spec.opponent || t.id !== controller;

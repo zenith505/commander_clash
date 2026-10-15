@@ -115,8 +115,32 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
   if (opts.mulligans) {
     s.mulligans = { taken: {}, kept: [], toDeclare: turnOrderFrom(s, first), going: [] };
     nextMulliganDecision(s);
-  } else beginStep(s, "untap");
+  } else startOpeningActions(s);
   return s;
+}
+
+/**
+ * Once mulligans are done, the starting player and then each other player in turn order may take the actions their
+ * opening hands allow (CR 103.6): the Leylines' "begin the game with it on the battlefield" (103.6a). Then the
+ * first turn begins.
+ */
+function startOpeningActions(s: GameState) {
+  s.openingActions = turnOrderFrom(s, s.activePlayer).filter((pid) => !player(s, pid).lost);
+  nextOpeningAction(s);
+}
+
+function nextOpeningAction(s: GameState) {
+  while (s.openingActions?.length) {
+    const pid = s.openingActions[0]!;
+    const cards = player(s, pid).hand.filter((id) => compileCard(defOf(s, obj(s, id))).beginOnBattlefield);
+    if (cards.length) {
+      s.pending = { kind: "searchLibrary", player: pid, source: "Opening hand", what: "these cards", cards, min: 0, max: cards.length, fromHand: true, opening: true };
+      return;
+    }
+    s.openingActions.shift();
+  }
+  s.openingActions = undefined;
+  beginStep(s, "untap");
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +184,7 @@ function nextMulliganDecision(s: GameState) {
   // If the starting player left during mulligans, the next player in turn order starts instead.
   if (player(s, s.activePlayer).lost) s.activePlayer = s.priority = nextLivingAfter(s, s.activePlayer);
   log(s, "Everyone has kept. The game begins.");
-  beginStep(s, "untap");
+  startOpeningActions(s);
 }
 
 function declareMulligan(s: GameState, p: Player, keep: boolean) {
@@ -393,8 +417,8 @@ export const livingPlayers = (s: GameState) => s.turnOrder.filter((id) => !playe
 export const opponents = (s: GameState, pid: PlayerId) => livingPlayers(s).filter((id) => id !== pid);
 export const nameOf = (s: GameState, id: ObjectId) => defOf(s, obj(s, id)).name;
 
-export function log(s: GameState, text: string) {
-  s.log.push({ seq: s.log.length, turn: s.turn, text });
+export function log(s: GameState, text: string, to?: PlayerId) {
+  s.log.push({ seq: s.log.length, turn: s.turn, text, ...(to !== undefined ? { to } : {}) });
 }
 
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */
@@ -2315,6 +2339,17 @@ const LOYALTY_USED = -1;
 /** The cards a library search found (CR 701.23). */
 function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   const pend = s.pending;
+  if (pend?.kind === "searchLibrary" && pend.opening && pend.player === p.id) {
+    if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
+    s.pending = null;
+    for (const id of found) {
+      moveObject(s, id, "battlefield");
+      log(s, `${p.name} begins the game with ${nameOf(s, id)} on the battlefield.`);
+    }
+    s.openingActions!.shift();
+    nextOpeningAction(s);
+    return;
+  }
   const r = s.resolving;
   if (pend?.kind !== "searchLibrary" || pend.player !== p.id || !r) throw new RulesError("you aren't searching a library");
   if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);

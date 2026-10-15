@@ -119,6 +119,8 @@ export interface TargetSpec {
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
+  /** Or one of these subtypes instead of one of `types`: "creature or Vehicle". */
+  orSubtypes?: string[];
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
   keywords?: string[]; // "creature with flying"
   notKeywords?: string[]; // "creature without flying"
@@ -451,6 +453,8 @@ export type Effect =
   | { type: "connive"; what: ObjRef; n: Amount }
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   | { type: "exileIfDies"; what: ObjRef }
+  /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
+  | { type: "lookAtHand"; who: PlayerRef; reveal?: true }
   /** "~ assigns no combat damage this turn" (CR 510.1). */
   | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
@@ -1105,6 +1109,10 @@ export interface CompiledCard {
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
    */
   castLimits?: { who: "each" | "you"; filter?: TargetSpec; text: string }[];
+  /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
+  beginOnBattlefield?: boolean;
+  /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
+  youHave?: "hexproof" | "shroud";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
   /** "Whenever enchanted land is tapped for mana, its controller adds an additional {G}" and the like (CR 605.1b). */

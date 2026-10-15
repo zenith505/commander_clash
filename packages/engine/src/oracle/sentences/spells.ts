@@ -29,6 +29,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Discarding (CR 701.9): "Target player discards two cards", "Each opponent discards a card at random", "Discard a card"
   if ((m = new RegExp(`^Discard ${NUMX} cards?( at random)?$`, "i").exec(s))) return [{ type: "discard", who: { ref: "you" }, n: amt(m[1]!), random: !!m[2] }];
+  // "Look at target opponent's hand", "target player reveals their hand" (CR 402.3, 701.20).
+  if ((m = /^Look at (.+?)'s? hand$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "lookAtHand", who }] : null;
+  }
+  if ((m = /^(.+?) reveals? (?:their|his or her) hand$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "lookAtHand", who, reveal: true }] : null;
+  }
   // "Discard your hand", "each opponent discards their hand", "discard all the cards in your hand" (CR 701.9b: no
   // choice to make). Wheels: "each player discards their hand, then draws seven cards" (all of them discard, then all
   // of them draw, CR 608.2c), "then draw that many cards", "then draws cards equal to the greatest number of cards a

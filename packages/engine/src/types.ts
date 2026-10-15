@@ -226,6 +226,8 @@ export interface GameObject {
   bargained?: true;
   /** As a spell, and as the permanent it became: its "you may collect evidence N" additional cost was paid (CR 701.59c). */
   evidence?: true;
+  /** As a spell, and as the permanent it became: how much mana from Treasures was spent to cast it (CR 106.3). */
+  treasureSpent?: number;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**
@@ -300,6 +302,8 @@ export interface Player {
   manaPool: Record<ManaType, number>;
   /** Mana in the pool (counted in manaPool too) that can only be spent some ways (CR 106.6). */
   restrictedMana?: RestrictedMana[];
+  /** Mana in the pool (counted in manaPool too, none of it restricted) that a Treasure produced: "mana from a Treasure" (CR 106.3). */
+  treasureMana?: Partial<Record<ManaType, number>>;
   /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
   combatMana?: number;
   landsPlayedThisTurn: number;
@@ -405,7 +409,9 @@ export interface StackItem {
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
    */
-  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[] };
+  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** Its source was a Treasure as it was activated: its mana is "mana from a Treasure" (CR 106.3). */ treasure?: true };
+  /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
+  treasureSpent?: number;
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
   ifCond?: StaticCondition;
   /** For a spell: how many spells were cast before it this turn (storm, CR 702.40a). */
@@ -835,6 +841,8 @@ export interface TriggerEventInfo {
   gift?: PlayerId;
   /** A permanent's enters trigger: evidence was collected for its spell (CR 701.59c). */
   evidence?: true;
+  /** A permanent's enters trigger, or a cast trigger: how much mana from Treasures was spent to cast that spell (CR 106.3). */
+  treasureSpent?: number;
 }
 
 export interface Resolving {

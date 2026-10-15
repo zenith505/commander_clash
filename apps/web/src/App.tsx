@@ -2873,6 +2873,7 @@ function AbilityMenu({
                 <>
                   {ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" />
                   {a.text ? ` and ${a.text}` : ""}
+                  {a.treasureOnly ? " (mana from Treasures only)" : ""}
                 </>
               )}
             </button>

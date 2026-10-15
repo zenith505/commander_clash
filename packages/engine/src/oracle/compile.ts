@@ -1160,6 +1160,9 @@ function checkCastingLinks(out: CompiledCard) {
   const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');
   if ((evidenceIn(out.spell) || out.triggers.some((t) => t.ifEvidence || evidenceIn(t.body))) && out.evidence === undefined) bad = true;
   if (out.triggers.some((t) => t.event !== "selfEnters" && evidenceIn(t.body)) || evidenceIn(out.activated) || evidenceIn(out.statics)) bad = true;
+  // Mana from Treasures spent (CR 106.3) is known for a spell, its permanent's enters trigger, and an activated ability.
+  const treasureIn = (v: unknown) => /"kind":"treasure(?:Spent)?"/.test(JSON.stringify(v ?? null));
+  if (out.triggers.some((t) => t.event !== "selfEnters" && treasureIn(t.body)) || treasureIn(out.statics) || JSON.stringify(out.activated ?? null).includes('"kind":"treasureSpent"')) bad = true;
   // "Enters with a counter for each creature of the chosen type" would be counted before the choice is made.
   needs.clear();
   visit(out.entersWithCounters);

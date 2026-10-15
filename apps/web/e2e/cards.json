@@ -1273,6 +1273,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f3a0f155-05d8-465c-b0ef-35aa12e93013",
+  "name": "Hired Hexblade",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Elf Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warlock"
+  ],
+  "oracleText": "When this creature enters, if mana from a Treasure was spent to cast it, you draw a card and you lose 1 life.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f6bd2902-7f8b-419e-bbc7-bcab0c1b7e01",
   "name": "Impulse",
   "manaCost": "{1}{U}",
@@ -2316,6 +2347,39 @@
   "commanderLegal": "legal",
   "set": "bfz",
   "releasedAt": "2015-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dffc6785-31b0-487c-b9a0-980bca39753d",
+  "name": "Security Rhox",
+  "manaCost": "{2}{R}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Rhino Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rhino",
+   "Warrior"
+  ],
+  "oracleText": "You may pay {R}{G} rather than pay this spell's mana cost. Spend only mana produced by Treasures to cast it this way.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

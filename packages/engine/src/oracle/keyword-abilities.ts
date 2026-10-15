@@ -108,6 +108,10 @@ export function parseCostKeyword(
     const each = m[2] === "each other player";
     return { alt: { kind: "alternative", mana: "", costs: [{ kind: "giveLife", n: Number(m[3]), ...(each ? { each: true as const } : {}) }], if: cond, text: `have ${m[2]} gain ${m[3]} life` } };
   }
+  // "You may pay {R}{G} rather than pay ~'s mana cost. Spend only mana produced by Treasures to cast it this way."
+  // (Security Rhox): only mana a Treasure made can pay it (CR 106.3).
+  if ((m = /^You may pay ((?:\{[^}]+\})+) rather than pay ~'s mana cost\. Spend only mana produced by Treasures to cast it this way\.$/.exec(line)))
+    return plainMana(m[1]!) ? { alt: { kind: "alternative", mana: m[1]!, treasureOnly: true } } : "fail";
   if ((m = /^(?:(?:Raid — )?If ([^,]+), )?[Yy]ou may (.+?) rather than pay ~'s mana cost(?: if ([^,]+?))?\.?$/.exec(line))) {
     const when = m[1] ?? m[3];
     const cond = when ? altCondition(when) : undefined;

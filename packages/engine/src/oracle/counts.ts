@@ -85,6 +85,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Converge: "the number of colors of mana spent to cast this spell", "for each color of mana spent to cast it".
   // "It" is the object itself only where nothing else can be "it" (not "whenever you cast a spell").
   if ((m = /^colou?rs? of mana spent to cast (~|it)$/i.exec(p)) && (m[1] === "~" || ctx === null || ctx.selfIt || ctx.spell)) return count({ kind: "colorsSpent" });
+  // "For each mana from a Treasure spent to cast it" (CR 106.3): the spell's, or its permanent's enters trigger's (compile
+  // checks it's one of those).
+  if ((m = /^mana from a Treasure (?:that was )?spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it"))) return count({ kind: "treasureSpent" });
   // Multikicker: "for each time it was kicked", "the number of times ~ was kicked" (CR 702.33d).
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".

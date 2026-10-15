@@ -103,6 +103,8 @@ export type Count =
   | { kind: "eventAmount" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
   | { kind: "colorsSpent" }
+  /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
+  | { kind: "treasureSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
@@ -1087,6 +1089,8 @@ export type SpellCondition =
   | { kind: "bargained" }
   /** "If evidence was collected" (CR 701.59c): its "you may collect evidence N" additional cost was paid. */
   | { kind: "evidence" }
+  /** "If mana from a Treasure was spent to cast ~" / "to activate this ability" (CR 106.3). */
+  | { kind: "treasure" }
   /** "If this spell was cast using teamwork": its teamwork cost was paid. */
   | { kind: "teamwork" }
   /** "If the gift was promised" (CR 702.174b, k). */
@@ -1258,7 +1262,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
@@ -1327,6 +1331,8 @@ export interface TriggeredAbility {
   ifBargained?: boolean;
   /** "When ~ enters, if evidence was collected, ..." (CR 701.59c, an intervening if). */
   ifEvidence?: boolean;
+  /** "When ~ enters, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR 603.4). */
+  ifTreasure?: boolean;
   /** "When ~ enters, if tribute wasn't paid" (CR 702.104b). */
   ifTributeUnpaid?: boolean;
   /** Conspire's "if its conspire cost was paid" (CR 702.78a). */
@@ -1873,6 +1879,8 @@ export interface CompiledCard {
     if?: StaticCondition;
     /** What's paid, as the card says it: "pay 1 life and exile a blue card from your hand". */
     text?: string;
+    /** Security Rhox: "Spend only mana produced by Treasures to cast it this way" (CR 106.3, 106.6). */
+    treasureOnly?: true;
   }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;

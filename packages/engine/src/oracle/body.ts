@@ -257,7 +257,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const howCast = parseHowCast(s, ctx);
     if (howCast) {
       const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx, true);
-      if (!fx || (howCast.not && fx.instead)) return null;
+      if (!fx || (howCast.not && fx.instead) || (howCast.noTargets && ctx.targets.length !== curTargets)) return null;
       if (!gateNewTargets(ctx, howCast.cond, howCast.not, fx, effects.slice(prevStart), prevTargets, curTargets)) return null;
       if (howCast.not) effects.push({ type: "if", cond: howCast.cond, effects: [], otherwise: fx.effects });
       else if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: howCast.cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
@@ -520,32 +520,38 @@ export function parsePayCost(text: string): PayCost | null {
 }
 
 /** The ways a spell can have been cast that a sentence may depend on, as said in its text. */
-const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true }[] = [
+const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // In a spell, or its permanent's enters trigger (compile checks it's one of those).
   { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
   { re: "the gift wasn't promised", cond: { kind: "gift" }, not: true },
+  // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
+  { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },
+  { re: "mana from a Treasure was spent to activate this ability", cond: { kind: "treasure" }, activatedOnly: true, noTargets: true },
 ];
 
 /**
  * "If ~ was bargained, X", "X if ~ was cast using teamwork", "Also X if ...", "X instead if ...", "X unless ~ was cast
  * using teamwork" (the same as "if it wasn't"): the condition, and X ("instead" kept for parseKicked).
  */
-function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string } | null {
+function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string; noTargets?: true } | null {
   for (const h of HOW_CAST) {
     if (h.spellOnly && !ctx.spell) continue;
-    const lead = new RegExp(`^If ${h.re}, (.+)$`).exec(s);
-    if (lead) return { cond: h.cond, not: !!h.not, text: lead[1]! };
-    const trail = new RegExp(`^(?:Also )?(.+?)( instead)? (if|unless) ${h.re}$`).exec(s);
-    if (trail) {
-      const not = !!h.not !== (trail[3] === "unless");
-      if (trail[3] === "unless" && trail[2]) return null;
-      return { cond: h.cond, not, text: `${trail[1]!}${trail[2] ?? ""}` };
-    }
+    if (h.activatedOnly && !ctx.activated) continue;
+    const found = howCastText(s, h);
+    if (found) return { ...found, ...(h.noTargets ? { noTargets: true as const } : {}) };
   }
   return null;
+}
+
+function howCastText(s: string, h: (typeof HOW_CAST)[number]): { cond: SpellCondition; not: boolean; text: string } | null {
+  const lead = new RegExp(`^If ${h.re}, (.+)$`).exec(s);
+  if (lead) return { cond: h.cond, not: !!h.not, text: lead[1]! };
+  const trail = new RegExp(`^(?:Also )?(.+?)( instead)? (if|unless) ${h.re}$`).exec(s);
+  if (!trail || (trail[3] === "unless" && trail[2])) return null;
+  return { cond: h.cond, not: !!h.not !== (trail[3] === "unless"), text: `${trail[1]!}${trail[2] ?? ""}` };
 }
 
 /**

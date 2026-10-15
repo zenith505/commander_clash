@@ -12,7 +12,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
-import { addMana, canPayFromPool, spendFromPool } from "./spend";
+import { addMana, canPayFromPool, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { CREATURE_TYPES } from "./keywords";
@@ -622,6 +622,7 @@ export function moveObject(
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
+    o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -1261,6 +1262,7 @@ function advanceStep(s: GameState): void {
     const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R - restrictedRed) : 0;
     p.manaPool = emptyPool();
     p.restrictedMana = undefined;
+    p.treasureMana = undefined;
     p.manaPool.R = keep;
     p.combatMana = keep || undefined;
   }
@@ -1843,6 +1845,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
   if (!picked) throw new RulesError(triggered.length > 1 ? `choose the mana that tapping ${name} also adds` : `${name} adds no other mana to choose`);
   const src = objectSource(s, o);
+  // Mana from a Treasure (CR 106.3): what its source was as it was activated, before it's sacrificed.
+  const treasure = isTreasure(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
   if (ab.tap) tapPermanent(s, o);
@@ -1856,12 +1860,18 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
-  addMana(s, p.id, adds, ab.spendOnly);
+  addMana(s, p.id, adds, ab.spendOnly, treasure);
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addMana(s, p.id, picked.adds);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
 }
+
+/** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
+export const spellUse = (d: CardDef, alt?: AltCostKind): ManaUse => (altCost(d, alt)?.treasureOnly ? { spell: d, treasureOnly: true } : { spell: d });
+
+/** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
+export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
 
 export function commanderTax(p: Player, o: GameObject) {
   return 2 * (p.commanderCasts[o.id] ?? 0); // CR 903.8
@@ -2026,7 +2036,7 @@ export function castProblem(
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
     return "the assisting player can't pay that much";
-  if (!canPayFromPool(s, pid, cost.cost, { spell: d }, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
+  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt), cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
 }
 
@@ -2328,7 +2338,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
-  const paid = spendFromPool(s, p.id, cost.cost, { spell: d }, cost.extra, p.life, { spreadColors: sunburst })!;
+  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -2343,6 +2353,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
+  o.treasureSpent = paid.treasure || undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
   // A once-a-turn permission to cast from the top is used up (Johann).
@@ -2454,7 +2465,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors] });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
-  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent });
+  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}) });
   fireEvent(s, { type: "targeted", stackId });
 }
 
@@ -3059,6 +3070,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets);
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
+  // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
+  const treasure = !!manaPick && isTreasure(s, o);
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
@@ -3109,7 +3122,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
-    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}) } } : {}),
+    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(treasure ? { treasure: true as const } : {}) } } : {}),
+    ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
   };
   if (manaPick) {
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).

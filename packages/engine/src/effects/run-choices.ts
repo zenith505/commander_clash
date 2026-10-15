@@ -130,6 +130,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
             : e.cond.kind === "evidence"
             ? evidenceCollected(s, ctx)
+            : e.cond.kind === "treasure"
+            ? (ctx.treasureSpent ?? 0) > 0
             : e.cond.kind === "teamwork"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"

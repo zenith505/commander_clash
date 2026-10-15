@@ -42,6 +42,8 @@ export interface ResolveCtx {
   kicked?: number[];
   /** Colors of mana spent to cast it, or the spell its permanent was (CR 207.2c). */
   colorsSpent?: number;
+  /** Mana from Treasures spent to cast it (or the spell its permanent was) or to activate it (CR 106.3). */
+  treasureSpent?: number;
   /** What was sacrificed to cast it, as it last existed. */
   sacrificed?: LastKnown[];
   /** A station ability's tapped creature (CR 702.184a). */
@@ -123,6 +125,8 @@ export function continueResolution(s: GameState): Resolution {
     event: item.event,
     kicked: item.kicked,
     colorsSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.colorsSpent?.length ?? 0) : item.colorsSpent,
+    // A spell's own; an activated ability's; an enters or cast trigger's, its spell's (CR 106.3).
+    treasureSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.treasureSpent ?? 0) : (item.treasureSpent ?? item.event?.treasureSpent ?? 0),
     sacrificed: item.sacrificed,
     stationed: item.stationed,
     sourceUntaps: item.sourceUntaps,
@@ -343,6 +347,7 @@ const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   lki: ctx.lki,
   kicked: ctx.kicked,
   colorsSpent: ctx.colorsSpent,
+  treasureSpent: ctx.treasureSpent,
   sacrificed: ctx.sacrificed,
   stationed: ctx.stationed,
   chosen: ctx.chosen,

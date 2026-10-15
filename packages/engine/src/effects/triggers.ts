@@ -105,7 +105,7 @@ export type TriggerSourceEvent =
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
   | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
-  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number }
+  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   | { type: "targeted"; stackId: string }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
@@ -303,7 +303,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifSneaked || entering.castAlt === "sneak") && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifSneaked || entering.castAlt === "sneak") && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) &&  (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -311,7 +311,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       ev.x,
       entering.kicked,
       // Whom its spell's gift was promised to: "the chosen player" (CR 702.174b).
-      entering.gift !== undefined || entering.evidence ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}) } : undefined,
+      entering.gift !== undefined || entering.evidence || entering.treasureSpent ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}) } : undefined,
       entering.colorsSpent?.length,
     );
     if (objIsType(s, entering, "Creature")) {
@@ -634,8 +634,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length !== t.cast.nth) return false;
+        if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
         return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
-      }, undefined, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}) }); // "counter it unless that player pays" acts on the spell cast
+      }, undefined, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.

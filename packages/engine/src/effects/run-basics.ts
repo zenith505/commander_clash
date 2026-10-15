@@ -187,6 +187,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
       for (const m of added.matchAll(/\{([WUBRGC])\}/g)) {
         p.manaPool[m[1] as "W"]++;
+        // A Treasure's mana ability: "mana from a Treasure" (CR 106.3).
+        if (s.resolving?.item.manaAbility?.treasure) (p.treasureMana ??= {})[m[1] as ManaType] = (p.treasureMana[m[1] as ManaType] ?? 0) + 1;
         if (s.resolving?.item.manaAbility) (s.resolving.made ??= []).push(m[1] as ManaType);
       }
       if (added) log(s, `${p.name} adds ${added}.`);

@@ -10,7 +10,19 @@ import type { CardDef, GameObject, GameState, ManaType, PlayerId } from "./types
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef } | { ability: GameObject } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true } | { ability: GameObject } | "other";
+
+/** How much of `pid`'s pool a Treasure made, by type (CR 106.3): never more than is there. */
+export function treasurePool(s: GameState, pid: PlayerId): ManaPool {
+  const p = s.players[pid]!;
+  const out = emptyPool();
+  if (!p.treasureMana) return out;
+  for (const m of Object.keys(out) as ManaType[]) {
+    const restricted = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === m ? r.n : 0), 0);
+    out[m] = Math.max(0, Math.min(p.treasureMana[m] ?? 0, p.manaPool[m] - restricted));
+  }
+  return out;
+}
 
 /** Can mana restricted this way be spent on `use`? */
 export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: ManaUse): boolean {
@@ -24,16 +36,22 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
   return !!only.anyZone && printedMatches(only.abilities, defOf(s, use.ability));
 }
 
-/** The mana `pid` can spend on `use`, and how much of it is restricted mana that's best spent first. */
-export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: ManaPool; prefer: ManaPool } {
+/**
+ * The mana `pid` can spend on `use`, and how much of it is restricted mana that's best spent first. `treasure`: how
+ * much of it a Treasure made, spent before other mana of its type on a spell or an ability ("if mana from a Treasure
+ * was spent", the player chooses which mana pays, CR 601.2h).
+ */
+export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: ManaPool; prefer: ManaPool; treasure: ManaPool } {
   const p = s.players[pid]!;
+  const treasure = treasurePool(s, pid);
+  if (use !== "other" && "spell" in use && use.treasureOnly) return { pool: { ...treasure }, prefer: emptyPool(), treasure };
   const pool = { ...p.manaPool };
   const prefer = emptyPool();
   for (const r of p.restrictedMana ?? []) {
     if (spendAllows(s, pid, r.only, use)) prefer[r.mana] += r.n;
     else pool[r.mana] -= r.n;
   }
-  return { pool, prefer };
+  return { pool, prefer, treasure };
 }
 
 /** Could `pid` pay this from their pool for `use`? */
@@ -45,34 +63,46 @@ export function canPayFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, us
  * Pay this from `pid`'s pool for `use`, spending restricted mana it allows first. Returns the payment (with the
  * mana spent by type), or null (and nothing changes) if it can't be paid.
  */
-export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean } = {}): (Payment & { spent: ManaPool }) | null {
+export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number }) | null {
   const p = s.players[pid]!;
-  const { pool, prefer } = poolFor(s, pid, use);
-  const paid = payFromPool(cost, pool, extraGeneric, life, { ...opts, prefer });
+  const { pool, prefer, treasure } = poolFor(s, pid, use);
+  const first = { ...prefer };
+  if (use !== "other") for (const m of Object.keys(first) as ManaType[]) first[m] += treasure[m];
+  const paid = payFromPool(cost, pool, extraGeneric, life, { ...opts, prefer: first });
   if (!paid) return null;
   const spent = emptyPool();
+  let fromTreasures = 0;
   for (const m of Object.keys(spent) as ManaType[]) {
     spent[m] = pool[m] - paid.pool[m];
     p.manaPool[m] -= spent[m];
-    // Restricted mana of that type it may be spent on goes first.
+    // Restricted mana of that type it may be spent on goes first, then mana from Treasures, then the rest.
     let left = spent[m];
     for (const r of p.restrictedMana ?? []) {
-      if (!left || r.mana !== m || !spendAllows(s, pid, r.only, use)) continue;
+      if (!left || r.mana !== m || !spendAllows(s, pid, r.only, use) || (use !== "other" && "spell" in use && use.treasureOnly)) continue;
       const n = Math.min(left, r.n);
       r.n -= n;
       left -= n;
     }
+    // Spent on "other" (a cost while something resolves), the rest of the pool keeps the Treasure mana.
+    const t = use === "other" ? Math.max(0, treasure[m] - (pool[m] - prefer[m] - left)) : Math.min(left, treasure[m]);
+    if (t && p.treasureMana) p.treasureMana[m] = treasure[m] - t;
+    fromTreasures += t;
   }
   if (p.restrictedMana) p.restrictedMana = p.restrictedMana.filter((r) => r.n > 0);
   if (!p.restrictedMana?.length) p.restrictedMana = undefined;
-  return { ...paid, pool: { ...p.manaPool }, spent };
+  if (p.treasureMana && !Object.values(p.treasureMana).some((n) => n)) p.treasureMana = undefined;
+  return { ...paid, pool: { ...p.manaPool }, spent, treasure: fromTreasures };
 }
 
-/** Add mana to `pid`'s pool, restricted if `only` says how it can be spent (CR 106.4, 106.6). */
-export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], only?: ManaSpend): void {
+/**
+ * Add mana to `pid`'s pool, restricted if `only` says how it can be spent (CR 106.4, 106.6). `treasure`: a Treasure
+ * made it (CR 106.3). (Restricted mana from a Treasure isn't tracked as Treasure mana: no Treasure makes any.)
+ */
+export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], only?: ManaSpend, treasure?: boolean): void {
   const p = s.players[pid]!;
   for (const m of mana) {
     p.manaPool[m]++;
+    if (treasure && !only) (p.treasureMana ??= {})[m] = (p.treasureMana[m] ?? 0) + 1;
     if (!only) continue;
     const same = p.restrictedMana?.find((r) => r.mana === m && r.only.text === only.text);
     if (same) same.n++;

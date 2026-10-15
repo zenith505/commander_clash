@@ -215,10 +215,14 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   const spell = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
   if (!spell || spell.kind !== "spell") return "fail";
+  // "Whenever you cast a spell, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR
+  // 603.4) that can't change once it's cast. A copy wasn't cast, so no mana was spent on it.
+  const treasure = /^if mana from a Treasure was spent to cast it, (.+)$/.exec(m[4]!);
+  if (treasure && m[2]) return "fail";
   // "That player" is the one who cast it.
-  const body = parseBody(m[4]!, { castSpell: true, eventPlayer: true });
+  const body = parseBody(treasure ? treasure[1]! : m[4]!, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}) }, body };
 }
 
 /**
@@ -673,6 +677,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifEvidence = true;
         body0 = evidence[1]!;
       }
+      // "When ~ enters, if mana from a Treasure was spent to cast it, ..." (CR 106.3).
+      let ifTreasure = false;
+      const treasure = /^if mana from a Treasure was spent to cast it, (.+)$/i.exec(body0);
+      if (treasure) {
+        if (event !== "selfEnters") return "fail" as const;
+        ifTreasure = true;
+        body0 = treasure[1]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -714,7 +726,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
         : ("fail" as const);
     }
   }

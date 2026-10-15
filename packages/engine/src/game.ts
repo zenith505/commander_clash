@@ -4,7 +4,7 @@ import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf,
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
-import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, type CastHow } from "./modes";
+import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -1953,7 +1953,13 @@ export function castProblem(
       if (mp) return mp;
     }
   }
-  const specs = spellTargetSpecs(d, modes, castHow(choices));
+  let specs = spellTargetSpecs(d, modes, castHow(choices));
+  if (targets && manySlot(specs) >= 0) {
+    // "Any number of target creatures": as many as were chosen (CR 601.2c).
+    const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, x);
+    if (typeof fit === "string") return fit;
+    [specs, targets] = [fit.body.targets, fit.targets];
+  }
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
     // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
@@ -2001,7 +2007,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const spree = compileCard(d).spell?.modal?.costs;
   const spell = compileCard(d).spell;
   const entwine = spell && entwined(spell, how.modes) ? spell.modal!.entwine! : "";
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine;
+  // Strive's cost for each target beyond the first is one too, paid even when it's cast without paying its mana cost (rulings).
+  const strive = compileCard(d).strive?.repeat(Math.max(0, (how.targets ?? []).filter((t) => t.kind !== "none").length - 1)) ?? "";
+  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive;
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
@@ -2245,7 +2253,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
   if (problem) throw new RulesError(problem);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
-  const body = spell ? gateBody(withModes(spell, modes), castHow(choices)) : undefined;
+  let body = spell ? gateBody(withModes(spell, modes), castHow(choices)) : undefined;
+  if (body && manySlot(body.targets) >= 0) {
+    // As many targets as were chosen for "any number of target ..." (CR 601.2c); castProblem checked them.
+    const fit = fitMany(body, targets ?? [], x) as Exclude<ReturnType<typeof fitMany>, string>;
+    [body, targets] = [fit.body, fit.targets];
+  }
   const fromCommand = o.zone === "command";
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
@@ -2760,7 +2773,13 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
     if (mp) return mp;
   }
-  const body = withModes(ab.body, modes);
+  let body = withModes(ab.body, modes);
+  if (targets && manySlot(body.targets) >= 0) {
+    // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
+    const fit = fitMany(body, targets, x);
+    if (typeof fit === "string") return fit;
+    [body, targets] = [fit.body, fit.targets];
+  }
   if (body.targets.length) {
     const src = sourceQuality(s, id);
     const tp = targets ? targetProblem(s, body.targets, targets, pid, src, id) : hasLegalTargetsFor(s, body.targets, pid, src, id) ? null : "no legal targets";
@@ -2849,9 +2868,13 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   if (ab?.costs?.some((c) => c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
-  const body = ab ? withModes(ab.body, modes) : undefined;
+  let body = ab ? withModes(ab.body, modes) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
+  if (manySlot(body.targets) >= 0) {
+    const fit = fitMany(body, targets ?? [], x) as Exclude<ReturnType<typeof fitMany>, string>;
+    [body, targets] = [fit.body, fit.targets];
+  }
   const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
   if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
@@ -3014,7 +3037,10 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   const pend = s.pending;
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
   const t = s.triggerQueue[0]!;
-  const problem = targetProblem(s, pend.specs, targets, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
+  // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
+  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets);
+  if (typeof fit === "string") throw new RulesError(fit);
+  const problem = targetProblem(s, fit.body.targets, fit.targets, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);
   s.pending = null;
   pushTrigger(s, t, targets);

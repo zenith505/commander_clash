@@ -2,8 +2,8 @@ import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget,
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
-import { withModes, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
+import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   abilityProblem,
   faceUpWays,
@@ -419,7 +419,11 @@ const isCounterOnly = (b: AbilityBody) => b.effects.some((e) => e.type === "coun
  * they'd kill or the biggest threat), helpful ones at our own stuff. Returns null when
  * there's no sensible choice. With `forced`, always returns some legal choice.
  */
-export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
+export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
+  // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
+  const body = offerMany(s, printed, pid, x, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId);
+  const many = manySlot(printed.targets);
+  if (!forced && many >= 0 && !printed.targets[many]!.skip && body.targets[many]!.skip) return null;
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.
@@ -855,6 +859,11 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const specs = body?.targets ?? spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
   if (specs.length && !targets) return null;
+  // Strive: each target beyond the first costs more (rulings), so only as many of the best ones as we can pay for.
+  if (targets && compileCard(defOf(s, obj(s, id))).strive) {
+    const way = { ...(via ? { via } : {}), ...(alt ? { alt } : {}) };
+    for (let i = targets.length - 1; i > 0 && !planCast(s, pid, id, targets, modes, "auto", x, way); i--) if (targets[i]!.kind !== "none") targets[i] = { kind: "none" };
+  }
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;

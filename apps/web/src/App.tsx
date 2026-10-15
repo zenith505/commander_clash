@@ -34,6 +34,8 @@ import {
   withModes,
   planActivate,
   spellTargets,
+  offerTargets,
+  sourceQuality,
   castHow,
   isSummoningSick,
   legalActions,
@@ -384,8 +386,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setBlocker(null);
     setDiscards([]);
     setTapPick(null);
-    if (pending?.kind === "chooseTargets") setTargeting({ mode: "trigger", specs: pending.specs, chosen: [], label: pending.description });
-    else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
+    if (pending?.kind === "chooseTargets") {
+      const specs = offerTargets(s!, pending.specs, HUMAN, 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
+      setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: pending.description });
+    } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
     else setTargeting((t) => (answering(t) ? null : t));
   }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" ? pending.stackId : ""]);
@@ -496,7 +500,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return setXPick({ mode: "activate", objectId, index, label, cost: "−X loyalty", max, value: max, modes });
     }
     const body = withModes(ab.body, modes);
-    if (body.targets.length) return setTargeting({ mode: "activate", objectId, index, specs: body.targets, chosen: [], label, modes, x });
+    // "Any number of target ...": an "up to" target for each there could be (CR 601.2c).
+    const offered = offerTargets(s, body.targets, HUMAN, x ?? 0, sourceQuality(s, objectId), objectId);
+    if (offered.length) return setTargeting({ mode: "activate", objectId, index, specs: offered, chosen: skipped(offered, []), label, modes, x });
     continueActivate({ objectId, index, modes, x, ...(pick ? { pick } : {}) });
   }
 
@@ -576,7 +582,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.casualty?.includes(id));
       if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
     }
-    const specs = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
+    // "Any number of target ...": an "up to" target for each there could be, "up to X" no more than X (CR 601.2c).
+    const specs = offerTargets(s, spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) })), HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId);
     // Every target skipped: it's cast as if it had none.
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });

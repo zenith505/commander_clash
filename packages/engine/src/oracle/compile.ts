@@ -924,6 +924,12 @@ export function compile(d: CardDef): CompiledCard {
     // "Partner—Friends forever" and the other "partner—[text]" abilities only matter for deck building (CR 702.124i; see
     // commanderPairProblem).
     if (/^Partner—(?:Character select|Father & son|Friends forever|Survivors)$/.test(line)) continue;
+    // Strive: "This spell costs {2}{G} more to cast for each target beyond the first" (CR 207.2c ability word).
+    const strive = /^(?:Strive — )?(?:~|This spell) costs ((?:\{[^}]+\})+) more to cast for each target beyond the first\.$/.exec(line);
+    if (strive && !out.strive) {
+      out.strive = strive[1]!;
+      continue;
+    }
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);

@@ -220,6 +220,12 @@ export interface TargetSpec {
   onlyIf?: { cond: SpellCondition; not?: true };
   /** Set by `gateTargets` for a target the spell is cast as if it didn't have: nothing ({ kind: "none" }) is chosen. */
   skip?: true;
+  /**
+   * "Any number of target creatures" ("any"), "up to X target artifacts" ("x"): a variable number of targets, announced
+   * as it's cast (CR 601.2c), any number from 0 (115.6), or up to X. This one entry stands for all of them until then;
+   * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
+   */
+  many?: "any" | "x";
   /** Original text, for display. */
   text: string;
 }
@@ -1672,6 +1678,8 @@ export interface CompiledCard {
   costLessIf?: { n: number; cond: StaticCondition }[];
   /** "This spell costs {3} less to cast if it targets a tapped creature" (CR 601.2f). */
   costLessIfTargets?: { n: number; filter: TargetSpec }[];
+  /** Strive: "This spell costs {2}{G} more to cast for each target beyond the first", an additional cost (CR 601.2f, rulings). */
+  strive?: string;
   /** "Spells your opponents cast that target ~ cost {2} more to cast": once per spell however often it targets it (rulings). */
   targetTax?: number;
   /**

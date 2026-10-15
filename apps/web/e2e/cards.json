@@ -343,6 +343,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8ac493f2-9519-44d7-b6ac-8c020ad2cede",
+  "name": "Consign to Dust",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Strive — This spell costs {2}{G} more to cast for each target beyond the first.\nDestroy any number of target artifacts and/or enchantments.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Strive"
+  ],
+  "commanderLegal": "legal",
+  "set": "jou",
+  "releasedAt": "2014-05-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "46779609-4fa7-4fd2-b5b4-7d4d749339e6",
   "name": "Courser of Kruphix",
   "manaCost": "{1}{G}{G}",
@@ -860,6 +888,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8e04a5e0-e22c-430b-a39a-c9f38e16ea86",
+  "name": "Guardian of Faith",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Spirit Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Knight"
+  ],
+  "oracleText": "Flash\nVigilance\nWhen this creature enters, any number of other target creatures you control phase out. (Treat them and anything attached to them as though they don't exist until their controller's next turn.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "342199e0-15b6-4824-83da-25caef2592b3",
   "name": "Hill Giant",
   "manaCost": "{3}{R}",
@@ -1250,6 +1312,31 @@
   "set": "acr",
   "releasedAt": "2024-07-05",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c97361b5-af16-4a7b-af85-a429dbaf4ad2",
+  "name": "Mind Stone",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{1}, {T}, Sacrifice this artifact: Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

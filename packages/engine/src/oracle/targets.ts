@@ -132,7 +132,7 @@ function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];
 }
 
-const SEVERAL_TARGETS = /^(?:(up to )?(one|two|three|four|five|six|\d+) (other )?|(another) |(one or two|one, two, or three) )target (.+)$/i;
+const SEVERAL_TARGETS = /^(?:(up to )?(one|two|three|four|five|six|\d+|X) (other )?|(another) |(one or two|one, two, or three|any number of) (other )?)target (.+)$/i;
 
 /**
  * "Up to two target creatures", "two target artifacts", "one or two target creatures", "another target
@@ -142,15 +142,21 @@ const SEVERAL_TARGETS = /^(?:(up to )?(one|two|three|four|five|six|\d+) (other )
  * than the ability's source.
  */
 function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjRef | null {
-  const [, upTo, count, other, another, range, phrase] = m;
-  const [required, n] = range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
+  const [, upTo, count, other0, another, range0, other1, phrase] = m;
+  const range = range0?.toLowerCase();
+  const other = other0 ?? other1;
+  // "Any number of target creatures" (CR 601.2c, 115.6), "up to X target artifacts" with the spell's X (107.3a): how
+  // many is announced as it's cast, so one entry stands for them all until then (TargetSpec.many).
+  const many = range === "any number of" ? ("any" as const) : count === "X" ? ("x" as const) : undefined;
+  if (count === "X" && (!upTo || !ctx.spell || ctx.whereX)) return null;
+  const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
   const [mine0, theirs] = thatPlayerControls(phrase!, ctx);
   // "Cards from a single graveyard" (all in one), "creature cards that share a creature type" (each with each other).
   const single = n > 1 && / from a single graveyard$/.test(mine0);
   const share = n > 1 && / that share a creature type(?= from |$)/.test(mine0);
   const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "");
-  const parsed = parseTargetPhrase(n > 1 ? singularPhrase(mine) : mine);
+  const parsed = parseTargetPhrase(n > 1 || many ? singularPhrase(mine) : mine);
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   const spec: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
   const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "card" ? [i] : []));
@@ -160,6 +166,14 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
     notSource = !before.length;
   }
   const first = ctx.targets.length;
+  if (many) {
+    if (single || share || ctx.targets.some((t) => t.many)) return null;
+    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), many });
+    // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return { ref: "target", index: first, n: 2 };
+  }
   for (let k = 0; k < n; k++) {
     const distinct = [...(other || another ? before : []), ...Array.from({ length: k }, (_, j) => first + j)];
     const group = Array.from({ length: k }, (_, j) => first + j);

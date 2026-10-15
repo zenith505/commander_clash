@@ -31,6 +31,8 @@ export interface Ctx {
   lastGroup?: ObjRef;
   /** Index of the most recent player target, for "that player's hand". */
   lastPlayerTarget?: number;
+  /** "Any number of target players": that target (see TargetSpec.many); "those players" are all of them. */
+  manyPlayers?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */
   activated?: boolean;
   /** The last sentence created one token: "put a +1/+1 counter on it" means that token. */
@@ -598,12 +600,13 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
 
 /** Run a parse that may fail halfway, undoing any targets it added. */
 function attempt<T>(ctx: Ctx, f: () => T | null): T | null {
-  const saved = { n: ctx.targets.length, o: ctx.lastObjectTarget, p: ctx.lastPlayerTarget, a: ctx.lastAttached };
+  const saved = { n: ctx.targets.length, o: ctx.lastObjectTarget, p: ctx.lastPlayerTarget, a: ctx.lastAttached, mp: ctx.manyPlayers };
   const r = f();
   if (r === null) {
     ctx.targets.length = saved.n;
     ctx.lastObjectTarget = saved.o;
     ctx.lastPlayerTarget = saved.p;
+    ctx.manyPlayers = saved.mp;
     ctx.lastAttached = saved.a;
   }
   return r;
@@ -782,7 +785,8 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
     const second = first && parseSentence(`${m[3]!.charAt(0).toUpperCase()}${m[3]!.slice(1)}`, ctx);
     return first && second ? [...first, ...second] : null;
   }
-  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
+  // "Any number of target players each mill a card and lose 1 life" (Tinybones Joins Up): all of them both times.
+  const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^any number of target (players|opponents) each$/i.test(subject) ? "Each of those players" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
   if (!again) return null;
   const first = parseSentence(`${subject} ${m[2]}`, ctx);
   const second = first && parseSentence(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`, ctx);

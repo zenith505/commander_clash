@@ -254,8 +254,13 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "eachPlayer":
       return livingPlayers(s);
     case "target": {
-      const t = ctx.targets[ref.index];
-      return ctx.legal[ref.index] && t?.kind === "player" ? [t.id] : [];
+      // "Any number of target players": each of them still a legal target (CR 608.2b).
+      const out: PlayerId[] = [];
+      for (let i = ref.index; i < ref.index + (ref.n ?? 1); i++) {
+        const t = ctx.targets[i];
+        if (ctx.legal[i] && t?.kind === "player") out.push(t.id);
+      }
+      return out;
     }
     case "eventPlayer":
       return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];

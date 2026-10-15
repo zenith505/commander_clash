@@ -1461,6 +1461,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e9f5feb2-2c1a-46ce-885a-4f378d7d10af",
+  "name": "Mystic Gate",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{W/U}, {T}: Add {W}{W}, {W}{U}, or {U}{U}.",
+  "colors": [],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "exp",
+  "releasedAt": "2016-01-22",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "713332c1-5bd8-400f-bfff-c1ca0697a043",
   "name": "Opt",
   "manaCost": "{U}",
@@ -1695,6 +1725,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9c47888b-28a5-4c43-9ee4-a9059e3c367d",
+  "name": "Rolling Thunder",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Rolling Thunder deals X damage divided as you choose among any number of targets.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f748b2fb-6c2a-400a-8e96-fa4e4a1dfe80",
   "name": "Shelldock Isle",
   "manaCost": "",
@@ -1825,6 +1881,31 @@
   "set": "war",
   "releasedAt": "2019-05-03",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a494fcee-6885-434c-aad5-6f83640c4472",
+  "name": "Stonespeaker Crystal",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}{C}.\n{2}, {T}, Sacrifice this artifact: Exile any number of target players' graveyards. Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

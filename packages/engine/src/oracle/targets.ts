@@ -54,8 +54,21 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   if (x === "defending player" && ctx.defending) return { ref: "eventPlayer" };
   if (x === "enchanted player" || x === "enchanted opponent") return { ref: "enchantedPlayer" };
+  // "Any number of target players each mill two cards" (CR 601.2c, 115.6): one entry for them all until it's cast
+  // (TargetSpec.many); "those players", "each of those players" are all of them.
+  const many = /^any number of target (players|opponents)(?: each)?$/.exec(x);
+  if (many) {
+    if (ctx.targets.some((t) => t.many)) return null;
+    const one = many[1] === "players" ? "target player" : "target opponent";
+    const index = addTarget(ctx, { kind: "player", opponent: many[1] === "opponents", text: one, many: "any" });
+    ctx.lastPlayerTarget = index;
+    ctx.manyPlayers = index;
+    return { ref: "target", index, n: 2 };
+  }
+  const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
+  if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
   // "Target player discards two cards. ... that player discards a card": the player targeted before.
-  if (x === "that player" && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
+  if (x === "that player" && ctx.lastPlayerTarget !== undefined && !manyNow) return { ref: "target", index: ctx.lastPlayerTarget };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };

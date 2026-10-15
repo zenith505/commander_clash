@@ -32,13 +32,24 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (["destroy", "exile", "bounce", "tap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
-    if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison") && e.who.ref === "target") mark(e.who.index);
+    if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "exileGraveyard") && e.who.ref === "target") mark(e.who.index, e.who.n);
     if (e.type === "counterSpell") mark(e.index);
-    if ((e.type === "discard" || e.type === "takeFromHand" || (e.type === "lookAtHand" && e.reveal)) && e.who.ref === "target") mark(e.who.index);
+    if ((e.type === "discard" || e.type === "takeFromHand" || (e.type === "lookAtHand" && e.reveal)) && e.who.ref === "target") mark(e.who.index, e.who.n);
     if ((e.type === "fight" || e.type === "bite") && e.b.ref === "target") mark(e.b.index);
     // Removing all counters (loyalty, +1/+1) is aimed at others' permanents, unless it can only be your own.
     if (e.type === "removeAllCounters" && e.what.ref === "target" && body.targets[e.what.index]?.controller !== "you") mark(e.what.index, e.what.n);
   }
+  // Target players whose permanents are counted ("X is the number of creatures those opponents control", Call the
+  // Coppercoats): opponents, who have the most of them.
+  const counted = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(counted);
+    if (!v || typeof v !== "object") return;
+    const o = v as Record<string, unknown>;
+    const w = o.whose as { ref?: string; index?: number; n?: number } | undefined;
+    if (o.kind === "permanents" && w?.ref === "target" && w.index !== undefined) mark(w.index, w.n);
+    Object.values(o).forEach(counted);
+  };
+  counted(body.effects);
   // An Aura spell with "enchant player" is a Curse, aimed at an opponent.
   body.targets.forEach((t, i) => t.kind === "player" && / to enchant$/.test(t.text) && mark(i));
   return harm;

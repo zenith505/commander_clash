@@ -1,6 +1,6 @@
 # Roadmap
 
-14,873 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+15,036 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,13 +15,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. By `npm run blockers` (a long tail of 3-card lines): "equip abilities you activate that target ~ cost {N} less",
-   "when ~ enters, manifest dread, then attach ~ to that creature", "if you would draw a card except the first one you
-   draw in each of your draw steps", "damage that would reduce your life total to less than N reduces it to N
-   instead", "if you descended this turn", "exile up to three target cards from a single graveyard", "destroy target
-   creature an opponent controls that was dealt damage this turn", "each opponent sacrifices a permanent of their
-   choice unless they pay {N}", "whenever ~ becomes tapped, you gain N life and scry N", "when you cast a creature
-   spell, sacrifice ~", Glyph Keeper's "becomes the target ... for the first time each turn", Hellfire Mongrel, "if
-   you would gain life, you gain that much life plus N instead".
+   "when ~ enters, manifest dread, then attach ~ to that creature", "~ gets +N/+N as long as you have N or more life",
+   "if you descended this turn", "exile up to three target cards from a single graveyard", "each opponent sacrifices
+   a permanent of their choice unless they pay {N}" (Rishadan: "unless" for each opponent), Glyph Keeper's "becomes
+   the target ... for the first time each turn", "whenever ~ becomes unattached from a permanent, sacrifice that
+   permanent", Torpor Orb's "creatures entering don't cause abilities to trigger", "return two target creature cards
+   that share a creature type".
 
 ## Known gaps (from earlier rounds)
 
@@ -133,7 +132,9 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "Multicolored creatures you control have ..." and other statics on multicolored or colorless permanents (Maze
   Glider, Glass of the Guildpact), "hexproof from monocolored", "for each of that spell's colors".
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each
-  turn", "draw that many cards"; life-gain replacement effects other than doubling.
+  turn", "draw that many cards"; life-gain replacements other than doubling and "plus N". When Alhammarret's Archive
+  and Heron of Hope both apply, "plus 1" is always applied first (the better order); the player should choose (CR
+  616.1). Archive's draw doubling applies before dredge is offered (the player should choose the order).
 - Discarding: "whenever you discard one or more cards" (once per batch, "that many"), "draw that many cards" after "you
   may discard your hand. If you do" (Book Devourer), Hollow One's "for each card you've cycled or discarded this turn",
   "when you discard ~" (Bartered Cow); Ward—Discard a card at random and other ward costs (sacrifice, blight).
@@ -191,11 +192,18 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Mana: "add N mana in any combination of colors" from a spell or trigger; mana that stays ("until end of turn, you don't lose this mana");
   Rite of Flame's count. Bots cast rituals only when the mana lets them cast a card they couldn't otherwise.
 - Other "cast this spell only ..." restrictions (only "if you've cast another spell this turn" is supported).
-- Land types (CR 305.7): a shock land's "you may pay 2 life" is still asked under Blood Moon (it has no abilities
-  then, so it should just enter tapped); copy effects of lands under a land-type effect; "doesn't untap" for one
+- Land types (CR 305.7): copy effects of lands under a land-type effect; "doesn't untap" for one
   enchanted permanent with "loses all abilities" (Stop Cold); Winter Orb ("players can't untap more than one land").
 - Granted flashback is only "until end of turn" with the card's mana cost (Snapcaster Mage, Past in Flames); a
   static grant (Lier, Disciple of the Drowned) and Mission Briefing's "you may cast it this turn" are not modeled.
+
+- Mana abilities with costs other than {T} and mana (Ashnod's Altar, Phyrexian Altar and about 50 other supported
+  cards) use the stack like other activated abilities; they shouldn't (CR 605.3b). Exert as a mana-ability cost
+  (Oasis Ritualist, Arena of Glory) stays unsupported until that's fixed.
+- Monstrosity X and "when ~ becomes monstrous" that uses X (Polukranos, Hydra Broodmaster); "becomes monstrous" on
+  legendary names shortened without a comma (Hythonia). Combat Celebrant's exert ("untap all other creatures you
+  control and after this phase, there is an additional combat phase"). "Whenever a source deals damage, if it
+  dealt damage this turn" and sources "that dealt damage this turn".
 
 ## Later
 

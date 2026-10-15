@@ -242,6 +242,21 @@ export function parseCostKeyword(
       },
     };
   }
+  // Outlast (CR 702.107a): "[Cost], {T}: Put a +1/+1 counter on this creature. Activate only as a sorcery."
+  if ((m = /^Outlast ((?:\{[^}]+\})+)$/.exec(line))) {
+    const cost = m[1]!;
+    if (!plainMana(cost)) return "fail";
+    return {
+      activated: {
+        manaCost: cost,
+        tap: true,
+        sacrificeSelf: false,
+        sorcerySpeed: true,
+        body: { targets: [], effects: [{ type: "counters", what: { ref: "self" }, counter: "+1/+1", n: 1 }], text: "Put a +1/+1 counter on ~." },
+        text: `Outlast ${cost}`,
+      },
+    };
+  }
   if ((m = /^Scavenge ((?:\{[^}]+\})+)$/.exec(line))) {
     const cost = m[1]!;
     if (!plainMana(cost) || !/^\d+$/.test(d.power ?? "")) return "fail";

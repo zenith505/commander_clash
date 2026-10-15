@@ -13,7 +13,9 @@ import { harmfulCounter } from "./run-permanents";
 export function doesNothingNow(s: GameState, sourceId: ObjectId, body: AbilityBody): boolean {
   const o = s.objects[sourceId];
   if (!o || body.modal || body.targets.length || !body.effects.length) return false;
-  return body.effects.every((e) => (e.type === "untap" || e.type === "tap") && e.what.ref === "self" && o.tapped === (e.type === "tap"));
+  return body.effects.every(
+    (e) => ((e.type === "untap" || e.type === "tap") && e.what.ref === "self" && o.tapped === (e.type === "tap")) || (e.type === "adapt" && (o.counters["+1/+1"] ?? 0) > 0) || (e.type === "monstrosity" && !!o.monstrous),
+  );
 }
 
 /** Which targets of a body are aimed at something bad for the target (damage, removal, shrink)? Used by bots and the UI. */

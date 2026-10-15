@@ -22,7 +22,8 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "band": attacking creatures declared to be in a band (CR 702.22c). */
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion";
+/** "exert": attackers their controller exerts as they attack (CR 701.43d). */
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -81,6 +82,10 @@ export type Count =
   | { kind: "attachedToSelf"; subtypes: string[] }
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes" }
+  /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
+  | { kind: "graveyardCardTypes"; who: PlayerRef }
+  /** "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). */
+  | { kind: "greatestPower"; filter: TargetSpec; other?: boolean }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */
@@ -162,6 +167,8 @@ export interface TargetSpec {
   distinctFrom?: number[];
   /** true: tapped; false: untapped. */
   tapped?: boolean;
+  /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
+  dealtDamageThisTurn?: true;
   /** true: a token; false: "nontoken". */
   token?: boolean;
   /** "a card named ~": the source's name (only for searches). */
@@ -413,7 +420,7 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
@@ -451,6 +458,8 @@ export type StaticCondition =
   | { kind: "attackedThisTurn" }
   /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
   | { kind: "increment" }
+  /** "If that player has two or fewer cards in hand": the trigger's player (whose upkeep it is), checked as it triggers and resolves (CR 603.4). */
+  | { kind: "eventPlayerHand"; max?: number; min?: number }
   /**
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
@@ -572,6 +581,10 @@ export type Effect =
   | { type: "explore"; what?: ObjRef }
   /** Renown N (CR 702.112a): if it isn't renowned, N +1/+1 counters and it becomes renowned. */
   | { type: "renown"; n: number }
+  /** Adapt N (CR 701.46a): if this permanent has no +1/+1 counters on it, put N +1/+1 counters on it. */
+  | { type: "adapt"; n: Amount }
+  /** Monstrosity N (CR 701.37a): if this permanent isn't monstrous, put N +1/+1 counters on it and it becomes monstrous. */
+  | { type: "monstrosity"; n: Amount }
   /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */
   /** "Draw a card at the beginning of the next turn's upkeep": a delayed trigger made as this resolves (CR 603.7a). */
   /**
@@ -817,6 +830,18 @@ export type TriggerEvent =
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
+  /**
+   * "Whenever one or more +1/+1 counters are put on ~" (once for each time counters are put on it, also as it enters
+   * with them, CR 122.6); "on a creature you control" with TriggeredAbility.tappedFilter as the filter. See countersKind.
+   */
+  | "selfCountersPut"
+  /** "When ~ becomes monstrous" (CR 701.37b). */
+  | "selfBecomesMonstrous"
+  /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
+  | "selfExerted"
+  /** "Whenever you exert a creature": the exerted creature is the subject. */
+  | "youExert"
+  | "permanentCountersPut"
   /** "Whenever a creature you control enters", "another Ally", "~ or another artifact": see TriggeredAbility.enters. */
   | "permanentEnters"
   /** "Whenever another creature dies", "a creature you control", "equipped creature": see TriggeredAbility.dies. */
@@ -902,6 +927,8 @@ export interface TriggeredAbility {
   body: AbilityBody;
   /** For "permanentBecomesTapped": which permanent ("a Dwarf you control"); it's the subject ("put a wind counter on it"). */
   tappedFilter?: TargetSpec;
+  /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */
+  countersKind?: string;
   /**
    * "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": an ability whose
    * effect moves the card out of a zone works only in that zone (CR 113.6m), and its owner controls it there.
@@ -991,6 +1018,8 @@ export interface TriggeredAbility {
    * the upkeep of the player who controls the creature this Aura or Equipment is attached to.
    */
   hostControllersUpkeep?: true;
+  /** "At the beginning of each opponent's upkeep / draw step / end step": an "each" step trigger only on an opponent's turn. */
+  opponentsTurn?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
 }
@@ -1026,6 +1055,8 @@ export interface ActivatedAbility {
   costs?: AdditionalCost[];
   /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */
   removeCounters?: { counter: CounterKind; n: number };
+  /** "{T}, Exert ~: ..." (CR 701.43a): it won't untap during your next untap step; possible even if already exerted (701.43b). */
+  exertCost?: true;
   /** "Put a -1/-1 counter on ~" as part of the cost (Devoted Druid): replacement effects on counters apply (Vizier of Remedies rulings). */
   putCounters?: { counter: CounterKind; n: number };
   /**
@@ -1272,6 +1303,11 @@ export interface CompiledCard {
   flashSacrifice?: boolean;
   /** Enlist (CR 702.154a): as it attacks, it may tap a creature that isn't attacking, see declareAttackers. */
   enlist?: boolean;
+  /**
+   * "You may exert ~ as it attacks" (CR 701.43d): an optional cost to attack (508.1g); its "When you do, ..." is a
+   * linked trigger (event "selfExerted", CR 607.2h). An exerted permanent doesn't untap during your next untap step.
+   */
+  exert?: boolean;
   /** Start your engines! (CR 702.179a): a player with no speed who controls it gets speed 1 (a state-based action). */
   startYourEngines?: boolean;
   /** Amplify N (CR 702.38a): as it enters, reveal cards from your hand that share a creature type with it; N +1/+1 counters for each. */
@@ -1300,6 +1336,12 @@ export interface CompiledCard {
   beginOnBattlefield?: boolean;
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
+  /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
+  lifeGainPlus?: number;
+  /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
+  lifeFloor?: number;
+  /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
+  drawTwoInstead?: true;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents";
   /** "Damage can't be prevented." (CR 615.12) */

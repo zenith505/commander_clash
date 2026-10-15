@@ -1,5 +1,5 @@
 import type { TriggeredAbility, SpellCondition, TargetSpec, TriggerEvent } from "../abilities";
-import { X, num, singularWord } from "./words";
+import { NUM, X, num, singularWord } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseTargetPhrase } from "./targets";
@@ -49,6 +49,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
+  [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
+  [/^Whenever you exert a creature, (.+)$/, "youExert"],
   [/^When(?:ever)? ~ exploits a creature, (.+)$/, "selfExploits"],
   // Heroic (an ability word): "Whenever you cast a spell that targets ~".
   [/^Whenever you cast a spell that targets ~, (.+)$/, "selfTargetedByYourSpell"],
@@ -58,7 +60,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous",
 ];
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
@@ -166,7 +168,7 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
  * "Whenever you cast a noncreature spell", "Whenever an opponent casts a creature spell",
  * "Whenever a player casts a spell", magecraft's "whenever you cast or copy an instant or sorcery spell".
  */
-const CAST_TRIGGER = /^Whenever (you|an opponent|a player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|a player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
 const CAST_BY = { you: "you", "an opponent": "opponent", "a player": "any" } as const;
 
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -436,12 +438,24 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
   // "If it's attacking" is about the source only in an ability about the source itself.
   const aboutIt = intervening && /^(it|~)\b/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!);
-  const ifCond = intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
+  const thatHand = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
+  const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
+  const ifCond = handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
     const t = parseTrigger(`${intervening[1]}, ${intervening[3]}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
+  }
+  // "At the beginning of each opponent's upkeep, ~ deals 1 damage to that player": an "each upkeep" trigger that
+  // triggers only on its controller's opponents' turns; "that player" is the active player.
+  const oppStep = /^At the beginning of each opponent's (upkeep|draw step|end step), (.+)$/.exec(line);
+  if (oppStep) {
+    const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : "eachEndStep";
+    // "They lose 2 life", "~ deals 2 damage to them": that player.
+    const body = parseBody(oppStep[2]!.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
+    return body ? { event, body, opponentsTurn: true } : "fail";
   }
   // Heroic before the other "whenever you cast" triggers.
   const heroic = /^Whenever you cast a spell that targets ~, (.+)$/.exec(line);
@@ -459,6 +473,26 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const cast = parseCastTrigger(line);
   if (cast) return cast;
+  // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with
+  // them). "That many" is how many were put on it.
+  const put = /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);
+  if (put) {
+    const self = put[2] === "~";
+    let text = put[3]!;
+    const thatMuch = /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch) {
+      if (/\bX\b/.test(text)) return "fail";
+      text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    }
+    let body = parseBody(self ? text.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ") : text, self ? { selfIt: true } : { subjectIt: true });
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, put[3]!) };
+    const kind = put[1] ? { countersKind: "+1/+1" } : {};
+    if (self) return { event: "selfCountersPut", body, ...kind };
+    const filter = parseTargetPhrase(put[2]!.replace(/^another /, "creature ").replace(/^a creature/, "creature"));
+    if (filter?.kind !== "object") return "fail";
+    return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind };
+  }
   // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped".
   const tapped = /^Whenever an? (.+?) becomes tapped, (.+)$/.exec(line);
   if (tapped) {

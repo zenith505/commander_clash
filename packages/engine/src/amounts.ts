@@ -182,6 +182,22 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
       }).length;
     }
+    case "graveyardCardTypes": {
+      const types = new Set<string>();
+      for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) for (const t of defOf(s, s.objects[id]!).types) types.add(t);
+      return types.size;
+    }
+    case "greatestPower": {
+      let best = 0;
+      const filter = bindChosen(c.filter, ctx.chosen);
+      for (const id of s.battlefield) {
+        const o = s.objects[id]!;
+        if (c.other && id === ctx.sourceId) continue;
+        const ch = view(o);
+        if (ch && objectMatches(s, filter, o, ctx.controller, false, undefined, ch)) best = Math.max(best, ch.power);
+      }
+      return best;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       for (const id of s.battlefield) {
@@ -269,6 +285,10 @@ function describeCount(c: Count): string {
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";
+    case "graveyardCardTypes":
+      return "#card types in graveyards";
+    case "greatestPower":
+      return `the greatest power among ${c.other ? "other " : ""}${c.filter.text}`;
     case "kicked":
       return "times kicked";
     case "wasKicked":

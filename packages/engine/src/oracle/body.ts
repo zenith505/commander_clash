@@ -300,8 +300,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
     const may = /^[Yy]ou may (.+)$/.exec(s);
     if (may) {
-      // "You may have ~ deal damage equal to its power to target creature": ~ deals it, if you choose.
-      const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) deal /, (_, w: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} deals `);
+      // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
+      // don't control": ~ does it, if you choose.
+      const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `);
       const inner = parseOne(rest, ctx);
       if (!inner) return null;
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
@@ -626,9 +627,16 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
  */
 function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
   const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?)`;
-  const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+)$`).exec(s);
+  const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+|scry \\d+|surveil \\d+)$`).exec(s);
   if (!m) return null;
   const subject = m[1]!;
+  // "You gain 1 life and scry 1": scry and surveil are only ever yours.
+  if (/^(scry|surveil) /.test(m[3]!)) {
+    if (!/^you$/i.test(subject)) return null;
+    const first = parseSentence(`${subject} ${m[2]}`, ctx);
+    const second = first && parseSentence(`${m[3]!.charAt(0).toUpperCase()}${m[3]!.slice(1)}`, ctx);
+    return first && second ? [...first, ...second] : null;
+  }
   const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
   if (!again) return null;
   const first = parseSentence(`${subject} ${m[2]}`, ctx);

@@ -48,6 +48,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.controller === "opponent" && c.controller === controller) return false;
   if (spec.controller === "eventPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
+  if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it

@@ -339,6 +339,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "maxSpeed":
       return s.players[you]?.speed === 4;
+    case "eventPlayerHand":
+      if (eventPlayer === undefined) return false;
+      return (cond.max === undefined || s.players[eventPlayer]!.hand.length <= cond.max) && (cond.min === undefined || s.players[eventPlayer]!.hand.length >= cond.min);
     case "defenderMostLife": {
       // The player it attacked: from the trigger event, or the one it's attacking as it triggers.
       const that = eventPlayer ?? src.attacking;
@@ -379,6 +382,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
       if (cond.is === "tapped" || cond.is === "untapped") return src.tapped === (cond.is === "tapped");
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
+      if (cond.is === "monstrous") return !!src.monstrous; // CR 701.37b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");

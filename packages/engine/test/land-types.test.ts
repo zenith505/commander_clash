@@ -7,7 +7,9 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, putOnBattlefield, setup, target } from "./helpers";
 import {
+  canEnterUntapped,
   characteristics,
+  entersRulesOf,
   invalidateCharacteristics,
   isFullySupported,
   manaAbilitiesOn,
@@ -33,6 +35,7 @@ const reefShaman = card("Reef Shaman", "Creature — Merfolk Shaman", "{U}", { p
 const tidalWarrior = card("Tidal Warrior", "Creature — Merfolk Warrior", "{U}", { power: "1", toughness: "1", oracleText: "{T}: Target land becomes an Island until end of turn." });
 const chameleon = card("Kavu Chameleon", "Creature — Kavu", "{3}{G}{G}", { power: "4", toughness: "4", oracleText: "This spell can't be countered.\n{G}: This creature becomes the color of your choice until end of turn." });
 const tomb = card("Ancient Tomb", "Land", "", { oracleText: "{T}: Add {C}{C}. This land deals 2 damage to you." });
+const steamVents = card("Steam Vents", "Land — Island Mountain", "", { oracleText: "({T}: Add {U} or {R}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped." });
 const tapland = card("Dismal Backwater", "Land", "", { oracleText: "This land enters tapped.\nWhen this land enters, you gain 1 life.\n{T}: Add {U} or {B}." });
 const aerial = card("Aerial Modification", "Enchantment — Aura", "{4}{W}", {
   oracleText: "Enchant creature or Vehicle\nAs long as enchanted permanent is a Vehicle, it's a creature in addition to its other types.\nEnchanted creature gets +2/+2 and has flying.",
@@ -144,6 +147,37 @@ describe("basic land types (CR 305.7)", () => {
     expect(s.objects[id]!.tapped).toBe(false);
     expect(s.players[ap]!.life).toBe(life);
     expect(makes(s, id)).toEqual(["R"]);
+  });
+
+  it("a shock land under Blood Moon has no 2-life choice: it just enters untapped (CR 614.12, rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, bloodMoon);
+    const id = toHand(s0, ap, steamVents);
+    const life = s0.players[ap]!.life;
+    expect(entersRulesOf(s0, ap, id).entersTappedChoice).toBeUndefined();
+    expect(canEnterUntapped(s0, ap, id)).toBe(false);
+    expect(s0.objects[id]!.zone).toBe("hand"); // looking didn't move it
+    expect(subtypes(s0, id)).toEqual(["Island", "Mountain"]);
+    expect(() => act(s0, { type: "playLand", player: ap, objectId: id, untapped: true })).toThrow(/no choice/);
+    const s = settle(act(s0, { type: "playLand", player: ap, objectId: id }));
+    expect(s.objects[id]!.tapped).toBe(false);
+    expect(s.players[ap]!.life).toBe(life);
+    expect(makes(s, id)).toEqual(["R"]);
+    // A bot plays it without paying life too.
+    const { s: s1, ap: ap1 } = setup([]);
+    putOnBattlefield(s1, ap1, bloodMoon);
+    const v1 = toHand(s1, ap1, steamVents);
+    s1.players[ap1]!.hand = [v1];
+    const play = botActions(s1, ap1).find((a) => a.type === "playLand");
+    expect(play).toMatchObject({ objectId: v1 });
+    expect(play).not.toHaveProperty("untapped");
+    // Without Blood Moon the choice is still there.
+    const { s: s2, ap: ap2 } = setup([]);
+    const v2 = toHand(s2, ap2, steamVents);
+    expect(entersRulesOf(s2, ap2, v2).entersTappedChoice).toMatchObject({ kind: "payLife", n: 2 });
+    const s3 = act(s2, { type: "playLand", player: ap2, objectId: v2, untapped: true });
+    expect(s3.objects[v2]!.tapped).toBe(false);
+    expect(s3.players[ap2]!.life).toBe(s2.players[ap2]!.life - 2);
   });
 
   it("Reef Shaman: the target land becomes the chosen basic land type until end of turn", () => {

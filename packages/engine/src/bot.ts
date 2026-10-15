@@ -18,6 +18,7 @@ import {
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
+  entersRulesOf,
   conditionHolds,
   isSummoningSick,
   canActAtSorcerySpeed,
@@ -114,6 +115,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
     if (pend.kind === "pickPermanents" && pend.action === "ringBearer") return [{ type: "pickPermanents", player: pid, ids: [chooseRingBearer(s, pid, pend.options)] }];
     if (pend.kind === "pickPermanents" && pend.action === "band") return [{ type: "pickPermanents", player: pid, ids: [] }];
+    // Exert (CR 701.43d): for its "when you do" bonus, while there's life to spare for it not untapping.
+    if (pend.kind === "pickPermanents" && pend.action === "exert") return [{ type: "pickPermanents", player: pid, ids: chooseExert(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
@@ -267,6 +270,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
 }
 
 /**
+ * Exert (CR 701.43d): for what it triggers (its own "when you do", or "whenever you exert a creature"), while there's
+ * life to spare for it not untapping to block.
+ */
+function chooseExert(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  if (player(s, pid).life <= 10) return [];
+  const onExert = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.event === "youExert"));
+  return options.filter((id) => onExert || abilitiesOf(s, obj(s, id)).triggers.some((t) => t.event === "selfExerted"));
+}
+
+/**
  * Enlist (CR 702.154a): tap the creature with the most power for the bonus, unless we're low on life and it's the
  * last creature we have left to block with.
  */
@@ -301,7 +314,7 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
   const lands = legalActions(s, pid).filter((a): a is Extract<Action, { type: "playLand" }> => a.type === "playLand");
   const p = player(s, pid);
   const options = lands.map((a) => {
-    const c = compileCard(defOf(s, obj(s, a.objectId)));
+    const c = entersRulesOf(s, pid, a.objectId); // under Blood Moon a nonbasic land has none of its abilities (CR 614.12)
     const untapped = c.entersTappedChoice ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind === "reveal" || p.life >= 16) : undefined;
     const tapped = c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false);
     return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };

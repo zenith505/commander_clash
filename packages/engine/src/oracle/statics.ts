@@ -162,8 +162,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, max: 0 } : null;
   }
   // "It" is the source only when the ability is about the source itself.
-  const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped)$/.exec(text);
-  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" };
+  const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
+  if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
@@ -242,6 +242,9 @@ function parseAffected(subject: string): Affects | null {
   m = /^(Other )?([A-Z][a-z]+) you control$/.exec(x);
   if (m && CREATURE_TYPES.has(singular(m[2]!))) return { kind: "filter", types: ["Creature"], subtypes: [singular(m[2]!)], controller: "you", other: !!m[1] };
   if (/^(All creatures|Each creature)$/i.test(x)) return { kind: "filter", types: ["Creature"] };
+  // "Creature tokens get -1/-1" (Illness in the Ranks): everyone's; "creature tokens you control".
+  if ((m = /^Creature tokens( you control| your opponents control)?$/.exec(x)))
+    return { kind: "filter", types: ["Creature"], spec: { kind: "object", token: true, text: "creature token" }, ...(m[1] ? { controller: m[1] === " you control" ? ("you" as const) : ("opponent" as const) } : {}) };
   // A Background's "Commander creatures you own": whoever controls them (rulings).
   if (/^Commander creatures you own$/.test(x)) return { kind: "filter", types: ["Creature"], ownedCommanders: true };
   // Anything else a group can say: "Each creature you control with a +1/+1 counter on it", "Creatures of the chosen type".

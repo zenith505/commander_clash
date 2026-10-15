@@ -600,6 +600,7 @@ export function moveObject(
   o.tapped = false;
   o.damage = 0;
   o.damagedBy = undefined;
+  o.wasDealtDamage = undefined;
   o.deathtouchDamage = false;
   o.regenShields = undefined;
   o.preventNext = undefined;
@@ -607,6 +608,7 @@ export function moveObject(
   o.activatedThisTurn = undefined;
   o.skipNextUntap = undefined;
   o.renowned = undefined;
+  o.monstrous = undefined;
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   o.counters = {};
@@ -821,12 +823,37 @@ export function conditionHolds(s: GameState, cond: EntersCondition, you: PlayerI
 }
 
 /**
+ * The abilities a card about to enter the battlefield under `pid`'s control would have there, which decide how it
+ * enters (CR 614.12): under Blood Moon a nonbasic land has lost them (CR 305.7), so a shock land doesn't ask for 2
+ * life and a tapland enters untapped (rulings). Looked at by putting it on the battlefield for a moment, with the
+ * newest timestamp, and taking it back.
+ */
+export function entersRulesOf(s: GameState, pid: PlayerId, id: ObjectId): CompiledCard {
+  const o = obj(s, id);
+  const compiled = compileCard(defOf(s, o));
+  if (o.zone === "battlefield") return characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
+  const was = { zone: o.zone, controller: o.controller, timestamp: o.timestamp };
+  o.zone = "battlefield";
+  o.controller = pid;
+  o.timestamp = s.nextTimestamp;
+  s.battlefield.unshift(id);
+  invalidateCharacteristics(s);
+  try {
+    return characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
+  } finally {
+    s.battlefield.shift();
+    Object.assign(o, was);
+    invalidateCharacteristics(s);
+  }
+}
+
+/**
  * Can this land enter untapped by its "you may pay 2 life / reveal a card" choice right now?
  * Paying life needs at least that much life (CR 119.4); revealing needs a matching card in hand
  * besides the land itself.
  */
 export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId): boolean {
-  const choice = compileCard(defOf(s, obj(s, landId))).entersTappedChoice;
+  const choice = entersRulesOf(s, pid, landId).entersTappedChoice;
   if (!choice) return false;
   const p = player(s, pid);
   if (choice.kind === "payLife") return p.life >= choice.n;
@@ -839,6 +866,13 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   if (!canGainLife(s, pid)) {
     log(s, `${player(s, pid).name} can't gain life.`); // CR 119.7
     return;
+  }
+  // "You gain that much life plus 1 instead" (rulings: one more for each), then "twice that much" (CR 614.1a): the
+  // player gaining life chooses the order (CR 616.1, Alhammarret's Archive rulings); adding first gains the most.
+  const plus = s.battlefield.reduce((a, id) => a + (controllerOf(s, obj(s, id)) === pid ? (abilitiesOf(s, obj(s, id)).lifeGainPlus ?? 0) : 0), 0);
+  if (plus) {
+    n += plus;
+    log(s, `${player(s, pid).name} gains ${plus} more life.`);
   }
   // "If you would gain life, you gain twice that much life instead" (CR 614.1a): each one doubles it again (rulings).
   const doublers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).doubleLifeGain).length;
@@ -1013,16 +1047,38 @@ export function removeFromCombat(s: GameState, o: GameObject) {
  * card that could, the draws stop for that choice and it returns false; answering it (chooseDredge) does the rest
  * of them, then carries on with what was drawing (`after`, or the resolving spell or ability).
  */
-export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep"): boolean {
-  for (let i = 0; i < n; i++) {
+export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", ready = 0): boolean {
+  // `ready`: draws a replacement effect already made of an earlier one, which nothing replaces again (CR 614.5).
+  while (n > 0 || ready > 0) {
+    if (ready === 0) {
+      n--;
+      ready = drawsInstead(s, pid);
+    }
     const options = dredgeOptions(s, pid);
     if (options.length) {
-      s.pending = { kind: "dredge", player: pid, options, left: n - i, ...(after ? { after } : {}) };
+      s.pending = { kind: "dredge", player: pid, options, left: n + ready, ready, ...(after ? { after } : {}) };
       return false;
     }
+    ready--;
     if (!drawOne(s, pid)) break;
   }
   return true;
+}
+
+/**
+ * How many cards one draw becomes: "If you would draw a card except the first one you draw in each of your draw
+ * steps, draw two cards instead" (Alhammarret's Archive), each one doubling it again (rulings: two make four). Applied
+ * before dredge, which can still replace each of those draws (the player would choose the order, CR 616.1).
+ */
+function drawsInstead(s: GameState, pid: PlayerId): number {
+  const p = player(s, pid);
+  if (s.step === "draw" && s.activePlayer === pid && p.firstDrawStepDraw !== s.turn) {
+    p.firstDrawStepDraw = s.turn;
+    return 1;
+  }
+  const k = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoInstead).length;
+  if (k) log(s, `${p.name} draws ${2 ** k} cards instead of one.`);
+  return 2 ** k;
 }
 
 function drawOne(s: GameState, pid: PlayerId): boolean {
@@ -1065,7 +1121,8 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
     moveObject(s, id, "hand");
     log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
   } else drawOne(s, p.id);
-  if (!draw(s, p.id, pend.left - 1, pend.after)) return;
+  const ready = pend.ready ?? 1;
+  if (!draw(s, p.id, pend.left - ready, pend.after, ready - 1)) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
 }
@@ -1269,6 +1326,7 @@ function finishCleanup(s: GameState) {
     const o = obj(s, id);
     o.damage = 0; // CR 514.2, phased-out permanents too
     o.damagedBy = undefined;
+    o.wasDealtDamage = undefined;
     o.deathtouchDamage = false;
     o.regenShields = undefined; // "this turn" effects end
     o.preventNext = undefined;
@@ -1500,7 +1558,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
   if (!canActAtSorcerySpeed(s, p.id)) throw new RulesError("lands can only be played at sorcery speed");
   if (p.landsPlayedThisTurn >= landsAllowed(s, p.id)) throw new RulesError("already played a land this turn"); // CR 305.2
-  const choice = compileCard(d).entersTappedChoice;
+  const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
   p.landsPlayedThisTurn++;
@@ -2366,6 +2424,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
   if (ab.tap) tapPermanent(s, o);
+  if (ab.exertCost && o.zone === "battlefield") {
+    o.skipNextUntap = true; // CR 701.43a
+    log(s, `${p.name} exerts ${d.name}.`);
+    fireEvent(s, { type: "exerted", id: o.id });
+  }
   for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
@@ -2475,11 +2538,15 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
-  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
     throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
+  if (pend.action === "exert") {
+    exertChosen(s, ids);
+    return;
+  }
   if (pend.action === "enlist") {
     enlistChosen(s, pend.objectId!, ids);
     return;
@@ -2966,7 +3033,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   // Optional costs to attack, like enlist's, are chosen as the attackers are tapped (CR 508.1g; enlist rulings).
   const ids = attacks.map((a) => a.attacker);
-  s.declaring = { ids, bands: canBand(s, ids), enlist: ids.filter((id) => objHasKeyword(s, obj(s, id), "Enlist") && abilitiesOf(s, obj(s, id)).enlist), enlisted: [] };
+  const exert = ids.filter((id) => abilitiesOf(s, obj(s, id)).exert);
+  s.declaring = { ids, bands: canBand(s, ids), enlist: ids.filter((id) => objHasKeyword(s, obj(s, id), "Enlist") && abilitiesOf(s, obj(s, id)).enlist), enlisted: [], ...(exert.length ? { exert, exerted: [] } : {}) };
   finishAttacks(s);
 }
 
@@ -3035,12 +3103,32 @@ function finishAttacks(s: GameState) {
     s.pending = { kind: "pickPermanents", player: controllerOf(s, obj(s, at)), source: nameOf(s, at), action: "enlist", what: "creature to enlist", options, count: 1, min: 0, objectId: at };
     return;
   }
+  // "You may exert ~ as it attacks" (CR 701.43d): one choice for all of them; it's still attacking (rulings).
+  const exertable = (d.exert ?? []).filter((id) => s.objects[id]?.attacking !== undefined);
+  if (exertable.length) {
+    d.exert = [];
+    s.pending = { kind: "pickPermanents", player: s.activePlayer, source: "Exert", action: "exert", what: "attacking creatures to exert", options: exertable, count: exertable.length, min: 0 };
+    return;
+  }
   s.declaring = undefined;
   const attacks = d.ids.filter((id) => s.objects[id]?.attacking !== undefined);
   for (const id of attacks) fireEvent(s, { type: "attacks", id }); // CR 508.3a
   if (attacks.length) fireEvent(s, { type: "groupAttack", controller: s.activePlayer, ids: attacks });
   if (attacks.length === 1) fireEvent(s, { type: "attacksAlone", id: attacks[0]! }); // CR 506.5
   for (const [at, enlisted] of d.enlisted) fireEvent(s, { type: "enlists", id: at, enlisted });
+  for (const id of d.exerted ?? []) fireEvent(s, { type: "exerted", id, attacking: true });
+}
+
+/** The attackers their controller exerts (CR 701.43a): they don't untap during that player's next untap step. */
+function exertChosen(s: GameState, ids: ObjectId[]) {
+  const d = s.declaring!;
+  for (const id of ids) {
+    obj(s, id).skipNextUntap = true;
+    (d.exerted ??= []).push(id);
+    log(s, `${player(s, s.activePlayer).name} exerts ${nameOf(s, id)}.`);
+  }
+  s.pending = null;
+  finishAttacks(s);
 }
 
 /** An attacker enlists the chosen creature (or none): tap it as the cost (CR 702.154a, c). */

@@ -322,6 +322,18 @@ export function compile(d: CardDef): CompiledCard {
       ascendSpell = true;
       continue;
     }
+    // Exert (CR 701.43d): "You may exert ~ as it attacks. When you do, it gets +2/+2 until end of turn." The "when you
+    // do" ability triggers when it's exerted (linked, CR 607.2h); "it" is the exerted creature itself.
+    const exert = /^You may exert ~ as (?:it|he|she|they) attacks?\.(?: When you do, (.+))?$/.exec(line);
+    if (exert) {
+      const body = exert[1] ? parseBody(exert[1].replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|can't)\b)/, "~ ").replace(/^(?:he|she) /, "it "), { selfIt: true }) : undefined;
+      if (out.exert || body === null) out.unsupported.push(raw);
+      else {
+        out.exert = true;
+        if (body) out.triggers.push({ event: "selfExerted", body });
+      }
+      continue;
+    }
     // "Firebending X, where X is ~'s power" (CR 702.189a): X is counted as the ability resolves.
     const fireX = /^Firebending X, where X is (.+)\.$/.exec(line);
     if (fireX) {
@@ -580,6 +592,20 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If you would gain life, you gain twice that much life instead.") {
       out.doubleLifeGain = true;
+      continue;
+    }
+    const plusLife = /^If you would gain life, you gain that much life plus (\d+) instead\.$/.exec(line);
+    if (plusLife) {
+      out.lifeGainPlus = (out.lifeGainPlus ?? 0) + Number(plusLife[1]);
+      continue;
+    }
+    const floor = /^Damage that would reduce your life total to less than (\d+) reduces it to \1 instead\.$/.exec(line);
+    if (floor) {
+      out.lifeFloor = Number(floor[1]);
+      continue;
+    }
+    if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
+      out.drawTwoInstead = true;
       continue;
     }
     const youHave = /^You have (hexproof|shroud)\.$/.exec(line);

@@ -244,6 +244,34 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${characteristics(s, o).name} gets ${e.n} +1/+1 counter${e.n > 1 ? "s" : ""} and becomes renowned.`);
       return;
     }
+    case "adapt": {
+      // As it resolves: any +1/+1 counter on it, for whatever reason, and it gets none (rulings). Gone: nothing.
+      const o = objects(s, { ref: "self" }, ctx)[0];
+      if (!o) return;
+      if ((o.counters["+1/+1"] ?? 0) > 0) {
+        log(s, `${characteristics(s, o).name} already has a +1/+1 counter, so it doesn't adapt.`);
+        return;
+      }
+      const n = amountNow(s, e.n, ctx);
+      invalidateCharacteristics(s);
+      const put = n > 0 ? putCounters(s, o, "+1/+1", n) : 0;
+      log(s, `${characteristics(s, o).name} adapts: it gets ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+      return;
+    }
+    case "monstrosity": {
+      // "If this permanent isn't monstrous" as it resolves (CR 701.37a); it becomes monstrous even if no counters
+      // end up on it (X is 0, CR 701.37c).
+      const o = objects(s, { ref: "self" }, ctx)[0];
+      if (!o || o.monstrous) return;
+      const n = amountNow(s, e.n, ctx);
+      invalidateCharacteristics(s);
+      const put = n > 0 ? putCounters(s, o, "+1/+1", n) : 0;
+      o.monstrous = true;
+      invalidateCharacteristics(s); // "as long as ~ is monstrous"
+      log(s, `${characteristics(s, o).name} gets ${put} +1/+1 counter${put === 1 ? "" : "s"} and becomes monstrous.`);
+      fireEvent(s, { type: "becameMonstrous", id: o.id });
+      return;
+    }
     case "evolve": {
       // Compared again as it resolves; with the entering creature gone, as it last existed (CR 603.4, 702.100a).
       const o = objects(s, { ref: "self" }, ctx)[0];

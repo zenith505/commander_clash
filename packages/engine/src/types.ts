@@ -331,6 +331,8 @@ export interface StackItem {
   /** For a state trigger: which of its source's triggered abilities it is (CR 603.8). */
   stateIndex?: number;
   lki?: LastKnown;
+  /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
+  stationed?: { id: ObjectId; zc: number; power: number };
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */

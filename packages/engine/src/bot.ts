@@ -277,7 +277,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Use activated abilities once we're done casting spells, then cycle what we can't use.
     if (s.step === "main2") {
-      const act = chooseActivation(s, pid) ?? chooseCycling(s, pid);
+      const act = chooseStation(s, pid) ?? chooseActivation(s, pid) ?? chooseCycling(s, pid);
       if (act) return act;
     }
   }
@@ -1275,7 +1275,9 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
       // A cost of nothing, "{0}" included, could be paid over and over.
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
-      if ((ab.sacrificeSelf && !cashIn) || freeCost) continue;
+      if ((ab.sacrificeSelf && !cashIn) || freeCost || ab.station) continue;
+      // Level up (CR 702.87a) past the last level symbol does nothing more.
+      if (ab.body.effects.some((e) => e.type === "counters" && e.counter === "level") && (o.counters.level ?? 0) >= lastStriation(s, o, "level")) continue;
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.
       if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
@@ -1587,6 +1589,34 @@ function chooseSaddle(s: GameState, pid: PlayerId): Action[] | null {
     const givenUp = riders.reduce((n, c) => n + (isSummoningSick(s, obj(s, c)) ? 0 : Math.max(0, power(s, obj(s, c)))), 0);
     if (givenUp > 0 && givenUp >= power(s, o)) continue;
     const plan = planActivate(s, pid, id, i, undefined, undefined, riders);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/** The counters a permanent needs for its last level or station symbol (CR 711.2, 721.2). */
+function lastStriation(s: GameState, o: GameObject, counter: string): number {
+  const conds = abilitiesOf(s, o).statics.map((st) => st.condition);
+  return Math.max(0, ...conds.map((c) => (c?.kind === "selfCounters" && c.counter === counter ? c.min : 0)));
+}
+
+/**
+ * Station (CR 702.184a) after combat, until the last station symbol: tap the creature with the greatest power that
+ * couldn't have attacked, or any untapped creature while our life is comfortable.
+ */
+function chooseStation(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const i = abilitiesOf(s, o).activated.findIndex((ab) => ab.station);
+    if (i < 0 || (o.counters.charge ?? 0) >= lastStriation(s, o, "charge")) continue;
+    const comfortable = s.players[pid]!.life > 20;
+    const crew = s.battlefield
+      .map((x) => obj(s, x))
+      .filter((c) => c.id !== id && controllerOf(s, c) === pid && !c.tapped && objIsType(s, c, "Creature") && power(s, c) > 0 && (comfortable || isSummoningSick(s, c)))
+      .sort((a, b) => power(s, b) - power(s, a))[0];
+    if (!crew || abilityProblem(s, pid, id, i, undefined, undefined, [crew.id])) continue;
+    const plan = planActivate(s, pid, id, i, undefined, undefined, [crew.id]);
     if (plan) return plan;
   }
   return null;

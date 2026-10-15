@@ -41,6 +41,8 @@ export interface ResolveCtx {
   colorsSpent?: number;
   /** What was sacrificed to cast it, as it last existed. */
   sacrificed?: LastKnown[];
+  /** A station ability's tapped creature (CR 702.184a). */
+  stationed?: StackItem["stationed"];
   /** The creature type or color chosen as it resolves, or else as its source entered. */
   chosen?: Chosen;
 }
@@ -101,6 +103,7 @@ export function continueResolution(s: GameState): Resolution {
     kicked: item.kicked,
     colorsSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.colorsSpent?.length ?? 0) : item.colorsSpent,
     sacrificed: item.sacrificed,
+    stationed: item.stationed,
   };
   Object.defineProperty(ctx, "chosen", { get: () => r.chosen ?? sourceChosen(s, ctx), enumerable: true });
   while (r.next < r.body.effects.length) {
@@ -259,6 +262,7 @@ const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   kicked: ctx.kicked,
   colorsSpent: ctx.colorsSpent,
   sacrificed: ctx.sacrificed,
+  stationed: ctx.stationed,
   chosen: ctx.chosen,
   objects: (r) => {
     if (r.ref === "subject") return subjectEvenIfGone(s, ctx);

@@ -148,9 +148,15 @@ export interface Characteristics {
  * the text says which ("Protection from black", "Toxic 2"), so those come from the text.
  */
 export function printedKeywords(d: CardDef): string[] {
-  const fromText = compileCard(d).textKeywords;
-  if (!fromText.length) return [...d.keywords];
-  return [...d.keywords.filter((k) => k !== "Protection" && k !== "Toxic"), ...fromText];
+  const c = compileCard(d);
+  const fromText = c.textKeywords;
+  // A keyword in a level or station striation is there only while the striation applies (CR 711.2, 721.2).
+  const striated = new Set((c.striatedKeywords ?? []).map((k) => k.toLowerCase()));
+  // Scryfall lists "Protection from X" as "Protection".
+  const inStriation = (k: string) => [...striated].some((x) => x === k.toLowerCase() || x.startsWith(`${k.toLowerCase()} `));
+  const own = striated.size ? d.keywords.filter((k) => !inStriation(k)) : d.keywords;
+  if (!fromText.length) return [...own];
+  return [...own.filter((k) => k !== "Protection" && k !== "Toxic"), ...fromText];
 }
 
 /** Characteristics straight from the card, with no effects applied. */
@@ -333,6 +339,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return yard().filter((d) => d.types.some((t) => PERMANENT_CARD_TYPES.includes(t))).length >= cond.n;
     case "selfCounter": // unleash (CR 702.98a)
       return (src.counters[cond.counter] ?? 0) > 0;
+    case "selfCounters": {
+      const n = src.counters[cond.counter] ?? 0;
+      return n >= cond.min && (cond.max === undefined || n <= cond.max);
+    }
     case "yourTurn":
       return s.activePlayer === you;
     case "beforeAttackers":

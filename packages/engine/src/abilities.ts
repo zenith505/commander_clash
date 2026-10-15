@@ -105,7 +105,9 @@ export type Count =
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
-  | { kind: "counters"; counter: CounterKind; of: ObjRef };
+  | { kind: "counters"; counter: CounterKind; of: ObjRef }
+  /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
+  | { kind: "stationPower" };
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
@@ -440,6 +442,8 @@ export type StaticCondition =
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
+  /** A level symbol's "at least N1 and no more than N2 level counters" (CR 711.2), a station symbol's "N or more charge counters" (CR 721.2). */
+  | { kind: "selfCounters"; counter: CounterKind; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
@@ -1151,6 +1155,8 @@ export interface ActivatedAbility {
   crew?: number;
   /** Saddle N (CR 702.171a): `crew` is N, and the creatures tapped saddle this permanent (CR 702.171c). */
   saddle?: true;
+  /** Station (CR 702.184a): the cost is tapping one other untapped creature you control (`tapCreatures`). */
+  station?: true;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
   /** "Activate no more than twice each turn" (CR 602.5b). */
@@ -1490,6 +1496,11 @@ export interface CompiledCard {
    * 702.171a). `saddles`: for saddle costs too, not only crew.
    */
   crewsAs?: { n?: number; toughness?: true; saddles: boolean };
+  /**
+   * Keywords the card data lists that it has only in a striation of a leveler or station card (CR 711.2, 721.2): they
+   * come from those static abilities, not printed on it unconditionally.
+   */
+  striatedKeywords?: string[];
   /**
    * "Equip abilities you activate cost {1} less to activate" (CR 602.2b, 601.2f); `targetSelf`: "that target ~";
    * `otherEquipment`: "of other Equipment".

@@ -19,6 +19,7 @@ import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept } from "./tokens";
 import { parseSearchFilter } from "./search";
+import { addStriation, simpleKeywords, striations } from "./striations";
 
 const cache = new Map<string, CompiledCard>();
 
@@ -123,7 +124,7 @@ const RING_TRIGGERS: TriggeredAbility[] = [
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege", "Spacecraft"];
+const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
@@ -196,7 +197,7 @@ export function normalizeSelf(d: CardDef): string {
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Aura|planeswalker)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker)\b/g, "~");
   return t;
 }
 
@@ -233,7 +234,11 @@ export function compile(d: CardDef): CompiledCard {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
-  const lines = joinModes(normalizeSelf(d).split("\n"));
+  const all = joinModes(normalizeSelf(d).split("\n"));
+  // Leveler and station cards (CR 711, 721): the striations' abilities are compiled after the rest, each with its condition.
+  const striated = striations(d, all);
+  if (striated === "fail") out.unsupported.push("(a striated text box that doesn't read as levels or station symbols)");
+  const lines = striated && striated !== "fail" ? striated.base : all;
   // Spree (CR 702.172a): "Choose one or more modes. As an additional cost to cast this spell, pay the costs associated
   // with those modes." Each mode is a "+ [cost] — [effect]" line.
   let spree: { costs: string[]; texts: string[]; lines: string[] } | undefined;
@@ -915,6 +920,14 @@ export function compile(d: CardDef): CompiledCard {
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
+  }
+  if (striated && striated !== "fail") {
+    const empty = compile({ ...d, oracleText: "", keywords: [] });
+    for (const part of striated.parts)
+      if (!addStriation(part, out, (line) => compile({ ...d, oracleText: line, keywords: [] }), empty)) out.unsupported.push(part.header, ...part.lines);
+    // A keyword printed outside the striations too is the card's own.
+    const own = new Set(lines.flatMap((l) => simpleKeywords(l.trim()) ?? []).map((k) => k.toLowerCase()));
+    if (out.striatedKeywords) out.striatedKeywords = out.striatedKeywords.filter((k) => !own.has(k.toLowerCase()));
   }
   checkX(d, out);
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.

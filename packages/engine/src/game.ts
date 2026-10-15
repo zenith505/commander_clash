@@ -507,6 +507,9 @@ export function moveObject(
 ) {
   const o = obj(s, id);
   const fromZone = o.zone;
+  // A creature tapped for a station ability that's still on the stack: its power as it last existed (rulings on station).
+  if (fromZone === "battlefield")
+    for (const item of s.stack) if (item.stationed?.id === id && item.stationed.zc === (o.zoneChanges ?? 0)) item.stationed.power = power(s, o);
   // A copy of a spell anywhere but the stack ceases to exist (CR 707.10a); it isn't a card, so nothing sees it arrive.
   if (o.spellCopy && to !== "stack" && to !== "battlefield") {
     delete s.objects[id];
@@ -2529,6 +2532,16 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.crew !== undefined) {
     const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle);
     if (cp) return cp;
+  } else if (ab.station) {
+    // Station (CR 702.184a): tap another untapped creature you control, whatever its power.
+    if (tapCreatures === undefined) {
+      if (!crewCandidates(s, pid, o.id).length) return "no other untapped creature to tap for station";
+    } else {
+      if (tapCreatures.length !== 1) return "station taps exactly one other creature";
+      if (tapCreatures[0] === o.id) return "the creature tapped for station must be another one";
+      const tp = tapCreaturesProblem(s, pid, tapCreatures, "station");
+      if (tp) return tp;
+    }
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
@@ -2616,6 +2629,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const d = defOf(s, o);
   const ab = abilitiesOf(s, o).activated[index];
   if (ab?.body.modal && modes === undefined) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose ${describeCount(ab.body.modal.min, ab.body.modal.max)} for ${d.name}'s ability`);
+  if (ab?.station && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose a creature to tap for station");
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   if (ab?.costs?.some((c) => c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap") && !costs) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   const body = ab ? withModes(ab.body, modes) : undefined;
@@ -2672,10 +2686,12 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(lki ? { lki } : {}),
     ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
+    ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
   });
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
   else if (ab.crew !== undefined) log(s, `${p.name} ${ab.saddle ? "saddles" : "crews"} ${d.name} with ${tapCreatures!.map((c) => nameOf(s, c)).join(", ")}.`);
+  else if (ab.station) log(s, `${p.name} stations ${d.name} with ${nameOf(s, tapCreatures![0]!)}.`);
   else {
     // Say which ability: its cost and, for a modal one, the chosen modes.
     const cost = ab.text.split(":")[0]!;

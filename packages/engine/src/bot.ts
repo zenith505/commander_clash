@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
+import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
@@ -38,6 +38,7 @@ import {
   spellTargets,
   availableMana,
   exilePlayable,
+  topPlayable,
   castDef,
   casualtyCandidates,
   castExtraCosts,
@@ -107,7 +108,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const taps = planMana(s, pid, parseManaCost(pend.cost));
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
-    if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
+    if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter) }];
     // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
     if (pend.kind === "handToTop") return [{ type: "handToTop", player: pid, objectIds: chooseDiscards(s, pid, pend.count).reverse() }];
     // Free from the hand: the most expensive card is the best deal.
@@ -175,6 +176,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const rank = (id: ObjectId) => (wantOnTop(s, owner, id) ? 1 : 0) * (owner === pid ? -1 : 1);
       return [{ type: "arrangeTop", player: pid, top: [...pend.cards].sort((a, b) => rank(a) - rank(b)), away: [] }];
     }
+    // Going to the bottom (CR 401.4): the order hardly matters to a bot.
+    if (pend.kind === "arrangeTop" && pend.how === "bottom") return [{ type: "arrangeTop", player: pid, top: [...pend.cards], away: [] }];
     if (pend.kind === "arrangeTop") {
       const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
       return [{ type: "arrangeTop", player: pid, top: keep, away: pend.cards.filter((id) => !keep.includes(id)) }];
@@ -219,7 +222,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -238,7 +241,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const p = player(s, pid);
     const fromYard = p.graveyard.filter((id) => graveyardWays(s, obj(s, id)).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
-    const options = [...exilePlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
+    const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
       .map((id) => {
         const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
@@ -786,7 +789,15 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
   for (const c of castExtraCosts(d, { via, alt, costOr })) {
-    if (c.kind === "returnToHand") {
+    if (c.kind === "returnToHand" && c.unblockedAttacker) {
+      // Sneak: the least valuable unblocked attacker that isn't our commander (see chooseSneak).
+      const pool = returnCandidates(s, pid, c)
+        .map((x) => obj(s, x))
+        .filter((o) => !o.isCommander)
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+      if (pool.length < c.n) return null;
+      out.returnToHand = pool.slice(0, c.n).map((o) => o.id);
+    } else if (c.kind === "returnToHand") {
       // A Borderpost's basic land: a tapped one (its mana may already be paying for this), and only with lands to spare.
       const pool = returnCandidates(s, pid, c)
         .map((x) => obj(s, x))
@@ -899,6 +910,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
   if (!r || e?.type !== "may") return true;
+  // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
+  // smaller loss (only asked when it can be done).
+  if (e.keep && e.otherwise?.some((x) => (x.type === "sacrifice" || x.type === "exile") && x.what.ref === "self") && e.effects.every((x) => x.type === "discard" || x.type === "pick")) return true;
+  if (e.keep && e.otherwise?.length === 1 && e.otherwise[0]!.type === "discard" && e.effects.length === 1 && e.effects[0]!.type === "discard") return true;
   const provoke = e.effects.find((x) => x.type === "mustBlockSource");
   if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
     const t = r.item.targets?.[provoke.what.index];
@@ -923,6 +938,7 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       if (!t || t.kind === "none" || !r.legal[i]) continue;
       v += harm[i] !== isMine(s, pid, t) ? 1 : -1;
     } else if ((inner.type === "loseLife" || inner.type === "discard") && "who" in inner && inner.who.ref === "you") v -= 1;
+    else if (inner.type === "pick" && inner.action === "bounce" && inner.who.ref === "you") v -= 1; // our own permanent back to hand
     else if (inner.type === "moveCounter") {
       // Graft: only onto our own creatures.
       const to = r.item.subject && s.objects[r.item.subject.id];
@@ -1182,7 +1198,7 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
 }
 
 /** Which cards to discard: extra lands once we have enough, otherwise what we're furthest from casting. */
-function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: string): string[] {
+function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: string, filter?: TargetSpec): string[] {
   const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
   const keepScore = (id: string) => {
     const d = defOf(s, obj(s, id));
@@ -1190,7 +1206,7 @@ function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: str
     return 8 - Math.max(0, mv(s, id) - lands);
   };
   return player(s, pid)
-    .hand.filter((id) => id !== except)
+    .hand.filter((id) => id !== except && (!filter || printedMatches(filter, defOf(s, obj(s, id)))))
     .sort((a, b) => keepScore(a) - keepScore(b))
     .slice(0, count);
 }
@@ -1308,6 +1324,27 @@ function chooseNinjutsu(s: GameState, pid: PlayerId): Action[] | null {
       const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, undefined, { returnToHand: [pool[0]!.id] });
       if (plan) return plan;
     }
+  }
+  return null;
+}
+
+/**
+ * Sneak (CR 702.190a) once blockers are declared, with the stack empty: trade the least valuable unblocked attacker (a
+ * token, or anything worth less than the card) for the card, which costs less this way.
+ */
+function chooseSneak(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer !== pid || s.step !== "declareBlockers" || s.stack.length) return null;
+  const me = player(s, pid);
+  for (const id of [...me.hand, ...me.command]) {
+    const d = defOf(s, obj(s, id));
+    const sneak = altCost(d, "sneak");
+    const cost = sneak?.costs?.find((c) => c.kind === "returnToHand");
+    if (!sneak || cost?.kind !== "returnToHand") continue;
+    const value = isType(d, "Creature") ? (Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0) : manaValue(parseManaCost(d.manaCost));
+    const ok = returnCandidates(s, pid, cost).some((x) => !obj(s, x).isCommander && (obj(s, x).isToken || worth(s, pid, obj(s, x)) < value));
+    if (!ok) continue;
+    const plan = castPlan(s, pid, id, false, undefined, "sneak");
+    if (plan) return plan;
   }
   return null;
 }

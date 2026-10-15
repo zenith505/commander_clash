@@ -48,7 +48,13 @@ export function backupTriggers(ns: number[], below: string[]): TriggeredAbility[
     const k = isKeywordLine(line) ? parseKeywordList(line) : null;
     if (k) kws.push(...k);
     else if (grantable(line)) mods.push({ kind: "addAbility", text: line });
-    else return null;
+    else {
+      // A static ability about the creature itself ("This creature can't be blocked by creatures with power 2 or
+      // less", "assigns combat damage equal to its toughness"): the same change, on the target until end of turn.
+      const st = selfStatic(line);
+      if (!st) return null;
+      mods.push(...st);
+    }
   }
   if (kws.length) mods.unshift({ kind: "addKeywords", keywords: kws });
   if (!mods.length) return null;
@@ -65,8 +71,32 @@ export function backupTriggers(ns: number[], below: string[]): TriggeredAbility[
   }));
 }
 
+/** The modifications of a static ability that changes only the object that has it, with no condition. */
+const SELF_ONLY: Modification["kind"][] = ["cantBeBlockedBy", "assignsToughness", "attackDespiteDefender"];
+function selfStatic(text: string): Modification[] | null {
+  const c = compileGranted(text);
+  const { statics, triggers, activated, mana, entersTapped, unsupported, textKeywords, ...rest } = c;
+  const st = statics[0];
+  if (statics.length !== 1 || triggers.length || activated.length || mana.length || entersTapped || unsupported.length || textKeywords.length || Object.keys(rest).length) return null;
+  if (st!.affects.kind !== "self" || st!.condition || !st!.mods.every((m) => SELF_ONLY.includes(m.kind))) return null;
+  return st!.mods;
+}
+
 const describeGrants = (kws: string[], mods: Modification[]) =>
-  [...kws.map((k) => k.toLowerCase()), ...mods.flatMap((m) => (m.kind === "addAbility" ? [`"${m.text.replace(/~/g, "this creature")}"`] : []))].join(" and ");
+  [
+    ...kws.map((k) => k.toLowerCase()),
+    ...mods.flatMap((m) =>
+      m.kind === "addAbility"
+        ? [`"${m.text.replace(/~/g, "this creature")}"`]
+        : m.kind === "cantBeBlockedBy"
+          ? [`"can't be blocked by ${m.filter.text}"`]
+          : m.kind === "assignsToughness"
+            ? ['"assigns combat damage equal to its toughness rather than its power"']
+            : m.kind === "attackDespiteDefender"
+              ? ['"can attack as though it didn\'t have defender"']
+              : [],
+    ),
+  ].join(" and ");
 
 /**
  * What follows "has", "have" or "gains": keywords, quoted abilities, or both ('flying and "{T}: ..."').

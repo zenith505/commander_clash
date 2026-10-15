@@ -178,6 +178,8 @@ export interface GameObject {
   discardedTurn?: number;
   /** As a spell, and as the permanent it became: evoke or dash paid (CR 702.74a, 702.109a). */
   castAlt?: AltCostKind;
+  /** A spell cast for its sneak cost: whom the creature returned to pay it was attacking (CR 702.190b). */
+  sneak?: LastKnown;
   /**
    * Face down (CR 708): a 2/2 creature with no name, text, subtypes or mana cost (with ward {2} for
    * disguise). Only its controller may look at it (CR 708.5).
@@ -468,12 +470,13 @@ export type PendingDecision =
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[] }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
   | { kind: "handToTop"; player: PlayerId; count: number; source: string }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
-  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order"; cards: ObjectId[]; source: string; owner?: PlayerId }
+  /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
+  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
   | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean }
   /**
@@ -721,6 +724,8 @@ export interface Resolving {
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
+    moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
+    ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
     paid?: boolean; // the answer to "unless that player pays ..."
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
@@ -768,6 +773,7 @@ export type Action =
   | { type: "declareBlockers"; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[] }
   | { type: "discard"; player: PlayerId; objectIds: ObjectId[] }
   /** Answer to arrangeTop: `top` goes back on top in this order (first = top); `away` goes to the bottom (scry) or graveyard (surveil). */
+  /** For "bottom", `top` is the order the cards take at the bottom (first = highest, last = the very bottom). */
   | { type: "arrangeTop"; player: PlayerId; top: ObjectId[]; away: ObjectId[] }
   /** Answer to searchLibrary: the cards found (first = the one for `firstTo`). */
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }

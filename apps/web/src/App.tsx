@@ -15,6 +15,10 @@ import {
   castExtraCosts,
   mayPlayFromExile,
   mayPlayLandFromGraveyard,
+  mayPlayFromTop,
+  topRevealed,
+  topPlayable,
+  handRevealed,
   assistedRemaining,
   dungeonByName,
   commanderTax,
@@ -173,7 +177,7 @@ function seatCorners(s: GameState): Record<Corner, PlayerId | undefined> {
   return { br: HUMAN, bl: at(1), tl: at(2), tr: at(3) };
 }
 
-type ZoneView = { pid: PlayerId; zone: "graveyard" | "exile" };
+type ZoneView = { pid: PlayerId; zone: "graveyard" | "exile" | "hand" };
 
 /** The human is picking targets for a spell, an activated ability, or a triggered ability (after its modes, if modal). */
 type Targeting =
@@ -695,7 +699,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
+    // A commander with an alternative cost (sneak): choose how to cast it.
+    if (o.zone === "command" && o.owner === HUMAN && altCostsFor(s, HUMAN, o).length) return setMenu(o.id);
     if (o.zone === "hand" || o.zone === "command") return startCast(o.id);
+    // Courser of Kruphix, Future Sight: play the top card of your library.
+    if (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) {
+      if (!isLand(s, o.id)) return startCast(o.id);
+      if (entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
+      return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
+    }
     if (o.zone === "battlefield" && controllerOf(s, o) === HUMAN) {
       const mana = usableManaOptions(s, o);
       const abs = manaAbilitiesOn(s, o);
@@ -1084,7 +1096,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           view={viewing}
           onClose={() => setViewing(null)}
           onHover={setHover}
-          canPick={(id) => !pending && (viewing.zone === "graveyard" ? viewing.pid === HUMAN && graveyardOptions(s, id) : exileOptions(s, id))}
+          canPick={(id) => !pending && viewing.zone !== "hand" && (viewing.zone === "graveyard" ? viewing.pid === HUMAN && graveyardOptions(s, id) : exileOptions(s, id))}
           onPick={(id) => {
             setViewing(null);
             setMenu(id);
@@ -1102,7 +1114,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", emerge: "Emerge", freerunning: "Freerunning" };
+const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1116,6 +1128,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   emerge: "sacrifice a creature as you cast it: the cost is reduced by its mana value",
   freerunning: "only if a player was dealt combat damage this turn by an Assassin or a commander you controlled",
   foretell: "a foretold card is cast for its foretell cost",
+  sneak: "during your declare blockers step: return an unblocked attacker to your hand; a creature enters tapped and attacking",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
@@ -1683,12 +1696,15 @@ function Seat({
   waiting: boolean;
   targetable?: boolean;
   onSelect?: () => void;
-  onViewZone: (zone: "graveyard" | "exile") => void;
+  onViewZone: (zone: ZoneView["zone"]) => void;
   cardProps: CardProps;
 }) {
   const p = s.players[pid]!;
   const yardPlayable = pid === HUMAN && !s.pending && p.graveyard.some((id) => graveyardOptions(s, id));
   const exilePlayableHere = !s.pending && p.exile.some((id) => exileOptions(s, id));
+  // The top of a library is shown when it's revealed (CR 401.5), or to you when you may play it.
+  const topCanPlay = pid === HUMAN && !s.pending && topPlayable(s, HUMAN).some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)));
+  const topShown = topRevealed(s, pid) || (pid === HUMAN && topPlayable(s, HUMAN).length > 0);
   // Auras and Equipment sit with whatever they're attached to, even in another player's area.
   const onField = new Set(s.battlefield);
   const mine = s.battlefield
@@ -1774,11 +1790,16 @@ function Seat({
             ☠ {p.poison}
           </span>
         )}
-        {pid !== HUMAN && (
-          <span className="muted" data-hand={pid}>
-            Hand {p.hand.length}
-          </span>
-        )}
+        {pid !== HUMAN &&
+          (handRevealed(s, pid, HUMAN) ? (
+            <button className="hand-peek" data-hand={pid} onClick={(e) => (e.stopPropagation(), onViewZone("hand"))} title="This hand is revealed (Telepathy, Revelation). Click to see it.">
+              Hand {p.hand.length} 👁
+            </button>
+          ) : (
+            <span className="muted" data-hand={pid}>
+              Hand {p.hand.length}
+            </span>
+          ))}
         {p.lost && <span className="error">Out: {p.lossReason}</span>}
         <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} restricted={p.restrictedMana} />}</span>
       </header>
@@ -1797,9 +1818,27 @@ function Seat({
               <div className="zone-empty">on battlefield</div>
             )}
           </div>
-          <div className="zone" title="Library: hidden, in order. Only the number of cards is public (CR 401.2).">
-            <div className="zone-title">Library</div>
-            {p.library.length ? <CardBack count={p.library.length} /> : <div className="zone-empty">empty</div>}
+          <div
+            className={`zone${topCanPlay ? " has-options" : ""}`}
+            title={
+              topCanPlay
+                ? "Library: you may play its top card. Click it to play it."
+                : topShown
+                  ? "Library: played with its top card revealed (CR 401.5)."
+                  : "Library: hidden, in order. Only the number of cards is public (CR 401.2)."
+            }
+          >
+            <div className="zone-title">Library{topCanPlay ? " ✦" : ""}</div>
+            {!p.library.length ? (
+              <div className="zone-empty">empty</div>
+            ) : topShown ? (
+              <div className="zone-card">
+                <CardView o={s.objects[p.library[0]!]!} {...cardProps} playable={topCanPlay} />
+                <span className="small muted">{p.library.length} cards</span>
+              </div>
+            ) : (
+              <CardBack count={p.library.length} />
+            )}
           </div>
           <div
             className={`zone clickable-zone${yardPlayable ? " has-options" : ""}`}
@@ -1863,9 +1902,9 @@ function ZoneViewer({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header>
           <strong>
-            {view.pid === HUMAN ? "Your" : `${p.name}'s`} {view.zone === "graveyard" ? "graveyard" : "exile"}
+            {view.pid === HUMAN ? "Your" : `${p.name}'s`} {view.zone === "graveyard" ? "graveyard" : view.zone === "hand" ? "revealed hand" : "exile"}
           </strong>
-          <span className="muted"> {ids.length} card(s), newest first</span>
+          <span className="muted"> {ids.length} card(s){view.zone === "hand" ? "" : ", newest first"}</span>
           <button onClick={onClose}>Close</button>
         </header>
         <div className="modal-cards">
@@ -1986,7 +2025,7 @@ function ArrangeTop({
   onDone,
 }: {
   s: GameState;
-  how: "scry" | "surveil" | "order";
+  how: "scry" | "surveil" | "order" | "bottom";
   /** Whose library, when it isn't yours. */
   owner?: string;
   source: string;
@@ -1998,7 +2037,7 @@ function ArrangeTop({
   const [away, setAway] = useState<string[]>([]);
   const awayName = how === "scry" ? "Bottom of library" : "Graveyard";
   const toggle = (id: string) => {
-    if (how === "order") return; // they all go back on top
+    if (how === "order" || how === "bottom") return; // they all go back together
     if (top.includes(id)) {
       setTop(top.filter((x) => x !== id));
       setAway([...away, id]);
@@ -2007,13 +2046,14 @@ function ArrangeTop({
       setTop([...top, id]);
     }
   };
-  const move = (i: number, by: number) => {
-    const next = [...top];
+  const move = (ids: string[], set: (ids: string[]) => void, i: number, by: number) => {
+    const next = [...ids];
     const [id] = next.splice(i, 1);
     next.splice(i + by, 0, id!);
-    setTop(next);
+    set(next);
   };
-  const row = (ids: string[], ordered: boolean) => (
+  // The cards for the bottom are ordered too (CR 401.4): the rightmost ends up at the very bottom.
+  const row = (ids: string[], ordered: boolean, set: (ids: string[]) => void = setTop, bottom = false) => (
     <div className="modal-cards arrange-row">
       {ids.length === 0 && <span className="muted">No cards.</span>}
       {ids.map((id, i) => {
@@ -2025,11 +2065,11 @@ function ArrangeTop({
             </div>
             {ordered && ids.length > 1 && (
               <div className="arrange-order">
-                <button className="ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move toward the top">
+                <button className="ghost" disabled={i === 0} onClick={() => move(ids, set, i, -1)} aria-label="Move toward the top">
                   ◀
                 </button>
-                <span>{i === 0 ? "Top" : `#${i + 1}`}</span>
-                <button className="ghost" disabled={i === ids.length - 1} onClick={() => move(i, 1)} aria-label="Move deeper">
+                <span>{bottom ? (i === ids.length - 1 ? "Bottom" : `#${i + 1}`) : i === 0 ? "Top" : `#${i + 1}`}</span>
+                <button className="ghost" disabled={i === ids.length - 1} onClick={() => move(ids, set, i, 1)} aria-label="Move deeper">
                   ▶
                 </button>
               </div>
@@ -2044,18 +2084,23 @@ function ArrangeTop({
       <div className="modal arrange">
         <header>
           <strong>
-            {source}: {how === "order" ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order` : `${how} ${cards.length}`}
+            {source}:{" "}
+            {how === "order"
+              ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order`
+              : how === "bottom"
+                ? `put ${cards.length} cards on the bottom of your library in any order`
+                : `${how} ${cards.length}`}
           </strong>
-          <span className="muted">{how === "order" ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>
+          <span className="muted">{how === "order" || how === "bottom" ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>
           <button onClick={() => onDone(top, away)}>Done</button>
         </header>
         <div className="modal-body">
-          <h4>Top of library (leftmost on top)</h4>
-          {row(top, true)}
-          {how !== "order" && (
+          <h4>{how === "bottom" ? "Bottom of library (rightmost at the very bottom)" : "Top of library (leftmost on top)"}</h4>
+          {row(top, true, setTop, how === "bottom")}
+          {how !== "order" && how !== "bottom" && (
             <>
-              <h4>{awayName}</h4>
-              {row(away, false)}
+              <h4>{how === "scry" ? `${awayName} (rightmost at the very bottom)` : awayName}</h4>
+              {row(away, how === "scry", setAway, true)}
             </>
           )}
         </div>
@@ -2369,7 +2414,7 @@ function AbilityMenu({
   const d = seenCardOf(s, objectId);
   // A card you may play from exile for now works like one in your hand (impulse draw), and so does a land you may
   // play from your graveyard (Crucible of Worlds).
-  const inHand = o.zone === "hand" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN);
+  const inHand = o.zone === "hand" || o.zone === "command" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN) || mayPlayFromTop(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
@@ -2957,10 +3002,11 @@ function Controls({
       <div className="controls">
         <span>
           {pending.kind === "discard" ? <strong>{pending.source}: </strong> : "Hand size: "}
-          click {pending.count} card{pending.count === 1 ? "" : "s"} in your hand to discard.
+          click {pending.count} {pending.kind === "discard" && pending.filter ? pending.filter.text.replace(/^(?:an? )/, "") : "card"}
+          {pending.count === 1 ? "" : "s"} in your hand to discard.
         </span>
         <button
-          disabled={discards.length !== pending.count}
+          disabled={discards.length !== pending.count || (pending.kind === "discard" && !!pending.filter && discards.some((id) => !printedMatches(pending.filter!, cardOf(s, id))))}
           onClick={() => dispatch([{ type: "discard", player: HUMAN, objectIds: discards }])}
         >
           Discard

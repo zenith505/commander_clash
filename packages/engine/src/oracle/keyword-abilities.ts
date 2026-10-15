@@ -1,5 +1,5 @@
 import type { CopyExcept } from "../copies";
-import type { Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, AltCostKind, EntersOption } from "../abilities";
+import type { AbilityBody, Amount, CounterKind, ActivatedAbility, TriggeredAbility, StaticAbility, Effect, ObjRef, AdditionalCost, TargetSpec, TokenSpec, PayCost, CastFromGraveyard, AltCostKind, EntersOption } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { CardDef, FaceDownKind } from "../types";
@@ -174,6 +174,13 @@ export function parseCostKeyword(
   // Freerunning [cost] (CR 702.173a); "Freerunning—Return a blue creature ..." and {X} costs aren't modeled.
   if ((m = /^Freerunning ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) ? { alt: { kind: "freerunning", mana: m[1]! } } : "fail";
   if (/^Freerunning\b/.test(line)) return "fail";
+  // Sneak [cost] (CR 702.190a): during your declare blockers step, cast it for [cost] and by returning an unblocked
+  // attacker you control to its owner's hand; a permanent spell enters tapped and attacking (702.190b).
+  if ((m = /^Sneak ((?:\{[^}]+\})+)$/.exec(line)))
+    return plainMana(m[1]!)
+      ? { alt: { kind: "sneak", mana: m[1]!, costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }] } }
+      : "fail";
+  if (/^Sneak\b/.test(line)) return "fail";
   if (line === "Delve") return { delve: true };
   if (line === "Assist") return { assist: true }; // CR 702.132a
   if (line === "Living weapon") {
@@ -405,6 +412,10 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // the resulting spell's mana value is less than this spell's mana value. Then put all cards exiled this way that
       // weren't cast on the bottom of your library in a random order." Each instance triggers (CR 702.85c).
       out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "cascade" }], text: "Cascade: exile cards from the top of your library until you exile a cheaper nonland card. You may cast it without paying its mana cost." } });
+    }
+    else if ((m = /^ripple (\d+)$/i.exec(p))) {
+      // CR 702.60a; each instance triggers separately (702.60b).
+      out.triggers.push({ event: "selfCast", body: rippleBody(Number(m[1])) });
     }
     else if ((m = /^affinity for (\w+)$/i.exec(p))) {
       // CR 702.41a: "This spell costs {1} less to cast for each [text] you control."
@@ -813,4 +824,17 @@ export function isKeywordLine(line: string): boolean {
   return line
     .split(/[,;]\s*/)
     .every((p) => !!keywordOf(p));
+}
+
+/**
+ * Ripple N (CR 702.60a): "When you cast this spell, you may reveal the top N cards of your library. If you do, you may
+ * cast any of those cards with the same name as this spell without paying their mana costs, then put all revealed
+ * cards not cast this way on the bottom of your library in any order." `of`: given by Thrumming Stone, the spell cast.
+ */
+export function rippleBody(n: number, of?: "cause"): AbilityBody {
+  return {
+    targets: [],
+    effects: [{ type: "may", effects: [{ type: "ripple", n, ...(of ? { of } : {}) }], text: `reveal the top ${n} cards of your library (ripple ${n})` }],
+    text: `Ripple ${n}: you may reveal the top ${n} cards of your library and cast those with the same name as ${of ? "that spell" : "~"} without paying their mana costs. Put the rest on the bottom of your library in any order.`,
+  };
 }

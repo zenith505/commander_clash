@@ -3,7 +3,7 @@ import { abilitiesOf, defOf, isPermanentCard, objIsType } from "../cards";
 import { attackedName, attackedPlaneswalker, auraHostFor, castProblem, destroyPermanent, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
-import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
+import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
@@ -45,7 +45,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     while (sc.payQueue.length) {
       const pid = sc.payQueue[0]!;
       // The prompt reads "pay {2} or you sacrifice a permanent".
-      const paid = pickOptions(s, e, pid).length ? paidUnless(s, ctx, pid, e.unless, src, e.filter.text, `you ${e.action === "sacrifice" ? "sacrifice" : "choose"} ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text}`) : false;
+      const paid = pickOptions(s, e, pid, ctx.sourceId).length ? paidUnless(s, ctx, pid, e.unless, src, e.filter.text, `you ${e.action === "sacrifice" ? "sacrifice" : "choose"} ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text}`) : false;
       if (paid === "paused") return "paused";
       if (paid) (sc.paidBy ??= []).push(pid);
       sc.paid = undefined;
@@ -59,7 +59,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   }
   while (sc.queue.length) {
     const pid = sc.queue[0]!;
-    const options = pickOptions(s, e, pid);
+    const options = pickOptions(s, e, pid, ctx.sourceId);
     if (options.length > n) {
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.least ? `${e.filter.text} with the least toughness` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}) };
       return "paused";
@@ -549,19 +549,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!o || o.zone !== "hand" || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
       moveObject(s, o.id, "battlefield", { tapped: true });
       if ((o.zone as string) !== "battlefield") return;
-      // Attacking the same player or planeswalker (CR 702.49c); a planeswalker that's gone leaves it not attacking (CR 506.3c).
-      const defender = ctx.lki?.attacking;
-      const pw = ctx.lki?.attackingPermanent;
-      if (defender !== undefined && inCombat(s) && livingPlayers(s).includes(defender)) {
-        o.attacking = defender;
-        if (pw) {
-          o.attackingPermanent = pw;
-          if (!attackedPlaneswalker(s, o)) {
-            o.attacking = undefined;
-            o.attackingPermanent = undefined;
-          }
-        }
-      }
+      if (ctx.lki) enterAttacking(s, o, ctx.lki);
       log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
       return;
     }
@@ -587,4 +575,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
   }
+}
+
+/**
+ * A permanent put onto the battlefield attacking whom a returned creature was attacking: ninjutsu (CR 702.49c), sneak
+ * (CR 702.190b). It was never declared as an attacker (CR 506.3a, 508.4). A planeswalker that's gone, or a player
+ * who has left, leaves it not attacking (CR 506.3c). Whether it's attacking now.
+ */
+export function enterAttacking(s: GameState, o: GameObject, returned: LastKnown): boolean {
+  const defender = returned.attacking;
+  const pw = returned.attackingPermanent;
+  if (defender === undefined || !inCombat(s) || !livingPlayers(s).includes(defender)) return false;
+  o.attacking = defender;
+  if (pw) {
+    o.attackingPermanent = pw;
+    if (!attackedPlaneswalker(s, o)) {
+      o.attacking = undefined;
+      o.attackingPermanent = undefined;
+      return false;
+    }
+  }
+  return true;
 }

@@ -594,6 +594,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifKicked = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}) };
         body0 = kicked[2]!;
       }
+      // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a).
+      let ifSneaked = false;
+      const sneaked = /^if (?:its|his|her|their) sneak cost was paid, (.+)$/i.exec(body0);
+      if (sneaked) {
+        if (event !== "selfEnters") return "fail" as const;
+        ifSneaked = true;
+        body0 = sneaked[1]!;
+      }
       let text = self ? body0.replace(/^it (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
@@ -608,7 +616,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
-      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}) } : ("fail" as const);
+      return body ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(attacksPlayer ? { attacksPlayer } : {}) } : ("fail" as const);
     }
   }
   return "fail" as const;

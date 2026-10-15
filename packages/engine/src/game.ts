@@ -3,7 +3,7 @@ import type { ActivatedAbility, AdditionalCost, AltCostKind, ChoiceKind, CastFro
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem, enterAttacking } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -594,6 +594,7 @@ export function moveObject(
     o.kicked = undefined;
     o.colorsSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
+    o.sneak = undefined;
     o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
     o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
     o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
@@ -1445,8 +1446,12 @@ function resolveTop(s: GameState) {
       o.bestowed = undefined;
       log(s, `${d.name}'s target is gone, so it resolves as a creature.`);
     }
-    log(s, `${d.name} resolves and enters the battlefield.`);
-    moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}) });
+    log(s, `${d.name} resolves and enters the battlefield${o.castAlt === "sneak" ? " tapped" : ""}.`);
+    const sneak = o.castAlt === "sneak" ? o.sneak : undefined;
+    o.sneak = undefined;
+    moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}) });
+    // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
+    if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
     if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
     if (o.zone === "battlefield" && o.castAlt === "blitz") blitzed(s, o, item.controller);
     if (o.zone === "battlefield" && o.castAlt === "warp") warped(s, o, item.controller);
@@ -1573,6 +1578,43 @@ export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: Playe
   return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard);
 }
 
+/**
+ * The top card of `pid`'s own library, which "you may play lands / cast creature spells from the top of your library"
+ * lets them play (Courser of Kruphix, Future Sight), at its usual timing (CR 401.5, rulings).
+ */
+export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return false;
+  const d = defOf(s, o);
+  const land = isType(d, "Land");
+  return s.battlefield.some((id) => {
+    const top = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).fromTop : undefined;
+    return !!top && (land ? top.lands : top.spells === "any" || (!!top.spells && printedMatches(top.spells, d)));
+  });
+}
+
+/** Cards `pid` may play from the top of their library right now (see mayPlayFromTop). */
+export function topPlayable(s: GameState, pid: PlayerId): ObjectId[] {
+  const top = player(s, pid).library[0];
+  return top !== undefined && mayPlayFromTop(s, obj(s, top), pid) ? [top] : [];
+}
+
+/** Whether everyone can see the top card of `pid`'s library (CR 401.5): "play with the top card of your library revealed". */
+export function topRevealed(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => {
+    const r = abilitiesOf(s, obj(s, id)).revealTop;
+    return r === "players" || (r === "you" && controllerOf(s, obj(s, id)) === pid);
+  });
+}
+
+/** Whether `pid`'s hand is revealed (to `viewer`): "players play with their hands revealed", Telepathy (CR 402.3). */
+export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
+  if (pid === viewer) return true;
+  return s.battlefield.some((id) => {
+    const r = abilitiesOf(s, obj(s, id)).revealHands;
+    return r === "players" || (r === "opponents" && controllerOf(s, obj(s, id)) !== pid);
+  });
+}
+
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   let n = 1;
@@ -1583,7 +1625,7 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
 function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
   const o = obj(s, id);
   const d = defOf(s, o);
-  if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id) || mayPlayLandFromGraveyard(s, o, p.id))) throw new RulesError("land must be in your hand");
+  if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id) || mayPlayLandFromGraveyard(s, o, p.id) || mayPlayFromTop(s, o, p.id))) throw new RulesError("land must be in your hand");
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
   if (!canActAtSorcerySpeed(s, p.id)) throw new RulesError("lands can only be played at sorcery speed");
   if (p.landsPlayedThisTurn >= landsAllowed(s, p.id)) throw new RulesError("already played a land this turn"); // CR 305.2
@@ -1720,7 +1762,7 @@ export function castProblem(
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
-  if (!free && !via && !mayPlayFromExile(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
+  if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
@@ -1732,6 +1774,8 @@ export function castProblem(
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
     if (choices.alt === "freerunning" && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
+    // Sneak (CR 702.190a): only during your declare blockers step, once blockers are declared (an unblocked attacker).
+    if (choices.alt === "sneak" && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
     // Only one alternative cost can be applied to a spell (CR 118.9a).
     if (via || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
@@ -1749,7 +1793,7 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d);
+  const instantSpeed = choices?.alt === "sneak" || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d);
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
@@ -2120,8 +2164,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices), choices);
+  const returned: LastKnown = {};
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
+  if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
@@ -2623,6 +2669,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   const r = s.resolving;
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
   if (new Set(ids).size !== pend.count || ids.some((id) => !p.hand.includes(id))) throw new RulesError(`choose exactly ${pend.count} card(s) from your hand`);
+  if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;
@@ -2690,7 +2737,7 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   const r = s.resolving;
   if (pend?.kind !== "arrangeTop" || pend.player !== p.id || !r) throw new RulesError("nothing to arrange");
   const all = [...top, ...away];
-  if (pend.how === "order" && away.length) throw new RulesError("put them all back on top");
+  if ((pend.how === "order" || pend.how === "bottom") && away.length) throw new RulesError(pend.how === "order" ? "put them all back on top" : "put them all on the bottom");
   if (all.length !== pend.cards.length || new Set(all).size !== all.length || all.some((id) => !pend.cards.includes(id)))
     throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : "into your graveyard"));
   r.scratch = { ...r.scratch, arranged: { top, away } };
@@ -3933,7 +3980,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   if (s.pending) return [];
   const p = player(s, pid);
   const out: Action[] = [{ type: "passPriority", player: pid }];
-  for (const id of [...p.hand, ...exilePlayable(s, pid)]) {
+  for (const id of [...p.hand, ...exilePlayable(s, pid), ...topPlayable(s, pid)]) {
     const d = defOf(s, obj(s, id));
     if (isType(d, "Land")) {
       if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid)) out.push({ type: "playLand", player: pid, objectId: id });

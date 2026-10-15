@@ -4,7 +4,7 @@ import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { pickFilter } from "./targets";
-import { parseStaticCondition } from "./statics";
+import { parseActivateCondition } from "./statics";
 
 /** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
 const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
@@ -79,7 +79,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (activateIf) return "fail";
     if (onlyIf[2] === " and only once each turn") oncePerTurn = true;
     if (onlyIf[2] === " and only as a sorcery") sorcerySpeed = true;
-    activateIf = parseStaticCondition(onlyIf[1]!, { affects: { kind: "self" }, mods: [], text: "" }) ?? undefined;
+    activateIf = parseActivateCondition(onlyIf[1]!) ?? undefined;
     if (!activateIf) return "fail";
     effectText = effectText.slice(0, onlyIf.index);
   }

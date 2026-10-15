@@ -87,6 +87,8 @@ export interface GameObject {
   tapped: boolean;
   /** Turn number the current controller gained control of it (summoning sickness, CR 302.6). */
   controlledSinceTurn: number;
+  /** Turn number it last entered the battlefield ("activate only if ~ entered this turn"); phasing in isn't entering (CR 702.26d). */
+  enteredTurn?: number;
   damage: number;
   deathtouchDamage: boolean;
   counters: Record<string, number>;

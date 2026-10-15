@@ -58,7 +58,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
  * Frog with base power and toughness 1/1", "becomes a 3/3 Elemental creature", ...
  */
 export function parseChanges(text: string): Modification[] | null {
-  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?) )/i);
+  const parts = text.split(/,? and (?=(?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) )|, (?=(?:assigns?|can attack) )/i);
   const out: Modification[] = [];
   for (const part of parts) {
     const p = part.trim();
@@ -74,6 +74,9 @@ export function parseChanges(text: string): Modification[] | null {
       if (!k) return null;
       out.push({ kind: "removeKeywords", keywords: k });
     } else if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)$/i.exec(p))) out.push({ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) });
+    // Doran (CR 510.1a as modified) and defender (CR 702.3b), for a while.
+    else if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/i.test(p)) out.push({ kind: "assignsToughness" });
+    else if (/^can attack (?:this turn )?as though (?:it|they) didn't have defender$/i.test(p)) out.push({ kind: "attackDespiteDefender" });
     else if ((m = /^becomes? (.+)$/i.exec(p))) {
       const b = parseBecomes(m[1]!);
       if (!b) return null;

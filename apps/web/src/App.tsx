@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   abilityProblem,
+  altCost,
   altCostsFor,
   canCast,
   castProblem,
@@ -65,6 +66,9 @@ import {
   planSuspend,
   suspendProblem,
   planPlot,
+  planForetell,
+  foretellProblem,
+  foretoldCast,
   plotProblem,
   plottedCast,
   compileCard,
@@ -377,7 +381,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   if (!s) return null;
   const me = s.players[HUMAN]!;
   // Discarding, mulligans and bottoming mean looking at or picking from your hand, so it comes out even if you'd tucked it away.
-  const pickingFromHand = pending?.kind === "discard" || pending?.kind === "discardToHandSize" || pending?.kind === "bottomCards";
+  const pickingFromHand = pending?.kind === "discard" || pending?.kind === "discardToHandSize" || pending?.kind === "bottomCards" || pending?.kind === "handToTop";
   const handTucked = handMinimized && !pickingFromHand && pending?.kind !== "mulligan";
 
   const nextSpec = targeting ? targeting.specs[targeting.chosen.length] : undefined;
@@ -680,14 +684,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return;
     }
     if (pending?.kind === "chooseMay" || pending?.kind === "payUnless" || pending?.kind === "mulligan") return;
-    if (pending?.kind === "discardToHandSize" || pending?.kind === "discard" || pending?.kind === "bottomCards") {
+    if (pending?.kind === "discardToHandSize" || pending?.kind === "discard" || pending?.kind === "bottomCards" || pending?.kind === "handToTop") {
       if (o.zone === "hand" && o.owner === HUMAN)
         setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id].slice(-pending.count)));
       return;
     }
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
-    if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
+    if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || compileCard(cardOf(s, o.id)).foretell || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
@@ -940,6 +944,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 dispatch(planPlot(s, HUMAN, menu) ?? [{ type: "plot", player: HUMAN, objectId: menu }]);
               }}
+              onForetell={() => {
+                setMenu(null);
+                dispatch(planForetell(s, HUMAN, menu) ?? [{ type: "foretell", player: HUMAN, objectId: menu }]);
+              }}
               onTurnFaceUp={(way) => {
                 setMenu(null);
                 dispatch(planTurnFaceUp(s, HUMAN, menu, way) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}) }]);
@@ -1094,7 +1102,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for" };
+const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", emerge: "Emerge", freerunning: "Freerunning" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1105,6 +1113,9 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   alternative: "an alternative cost: it's still the same spell, with the same mana value",
   prototype: "the smaller version: the prototype's mana cost, color, power and toughness",
   wubrg: "instead of its mana cost (Fist of Suns); X is 0",
+  emerge: "sacrifice a creature as you cast it: the cost is reduced by its mana value",
+  freerunning: "only if a player was dealt combat damage this turn by an Assassin or a commander you controlled",
+  foretell: "a foretold card is cast for its foretell cost",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
@@ -1128,6 +1139,7 @@ function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKi
 /** A card exiled with "you may play it until ..." that you could play now. */
 function exileOptions(s: GameState, id: string): boolean {
   if (!mayPlayFromExile(s, s.objects[id]!, HUMAN)) return false;
+  if (foretoldCast(s, HUMAN, s.objects[id]!)) return canCastAlt(s, id, "foretell");
   return isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id);
 }
 
@@ -1155,7 +1167,12 @@ function canCastNowIgnoringMana(s: GameState, id: string) {
 /** Could you cast this card from your hand for its evoke or dash cost now, tapping mana as needed? */
 function canCastAlt(s: GameState, id: string, alt: AltCostKind) {
   const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt });
-  return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt }) !== null);
+  if (!problem) return true;
+  if (!/not enough mana/.test(problem)) return false;
+  if (planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt }) !== null) return true;
+  // Emerge: what's sacrificed lowers the cost (CR 702.119a), so try each permanent that could be.
+  const sac = alt === "emerge" ? altCost(cardOf(s, id), alt)?.costs?.find((c) => c.kind === "sacrifice") : undefined;
+  return !!sac && s.battlefield.some((x) => controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, sac.filter, s.objects[x]!, HUMAN, false) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, sacrifice: [x] }) !== null);
 }
 
 /** Indices of a card's abilities that work from your hand (cycling, CR 702.29a). */
@@ -1813,6 +1830,8 @@ function Seat({
 
 function ZoneTop({ s, o, count, onHover }: { s: GameState; o: GameObject | undefined; count: number; onHover: (d: CardDef | null) => void }) {
   if (!o) return <div className="zone-empty">empty</div>;
+  // Someone else's foretold card is face down (CR 702.143a).
+  if (o.foretold && o.owner !== HUMAN) return <CardBack count={count} label="Foretold" />;
   const d = cardOf(s, o.id);
   return (
     <div className="card" data-obj={o.id} {...hoverProps(d, onHover)}>
@@ -1854,6 +1873,8 @@ function ZoneViewer({
           {ids.map((id) => {
             const d = cardOf(s, id);
             const pickable = canPick(id);
+            // Someone else's foretold card is face down; only its owner may look at it (CR 702.143a).
+            if (s.objects[id]!.foretold && s.objects[id]!.owner !== HUMAN) return <CardBack key={id} label="Foretold" />;
             return (
               <div
                 key={id}
@@ -1863,6 +1884,11 @@ function ZoneViewer({
                 {...hoverProps(d, onHover)}
               >
                 <CardFace d={d} />
+                {view.zone === "exile" && s.objects[id]!.foretold && (
+                  <span className="zone-tag" title={`Foretold: only you can see it. On a later turn, cast it for ${compileCard(d).foretell ?? "its foretell cost"}.`}>
+                    foretold
+                  </span>
+                )}
                 {view.zone === "exile" && !!s.objects[id]!.counters.time && (
                   <span className="zone-tag" title="Suspended: one time counter comes off in each of its owner's upkeeps">
                     {s.objects[id]!.counters.time} time counter{s.objects[id]!.counters.time === 1 ? "" : "s"}
@@ -2311,6 +2337,7 @@ function AbilityMenu({
   onCastFaceDown,
   onSuspend,
   onPlot,
+  onForetell,
   onTurnFaceUp,
   onClose,
 }: {
@@ -2332,6 +2359,8 @@ function AbilityMenu({
   onSuspend: () => void;
   /** For a card in hand with plot: exile it, to cast it free on a later turn (CR 702.170a). */
   onPlot: () => void;
+  /** For a card in hand with foretell: pay {2} and exile it face down, to cast it on a later turn (CR 702.143a). */
+  onForetell: () => void;
   /** For your face-down permanent: turn it face up. */
   onTurnFaceUp: (way: number) => void;
   onClose: () => void;
@@ -2344,6 +2373,9 @@ function AbilityMenu({
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
   const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
+  const foretell = o.zone === "hand" ? compileCard(d).foretell : undefined;
+  // A foretold card: cast only for its foretell cost (CR 702.143a).
+  const foretold = foretoldCast(s, HUMAN, o) ? compileCard(d).foretell : undefined;
   // A manifested card with morph can be turned face up either way (CR 701.40c).
   const upWays = o.zone === "battlefield" ? faceUpWays(s, o) : [];
   const inYard = o.zone === "graveyard";
@@ -2358,12 +2390,18 @@ function AbilityMenu({
           Play it untapped ({choice.kind === "payLife" ? `pay ${choice.n} life` : `reveal ${/^[AEIOU]/.test(choice.filter.text) ? "an" : "a"} ${choice.filter.text}`})
         </button>
       )}
-      {inHand && (
+      {foretold && (
+        <button disabled={!canCastAlt(s, objectId, "foretell")} title={castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { alt: "foretell" }) ?? "You foretold it on an earlier turn."} onClick={() => onCastAlt("foretell")}>
+          Cast it for its foretell cost <ManaCost cost={foretold} size="sm" />
+        </button>
+      )}
+      {inHand && !foretold && (
         <button disabled={!playable} onClick={() => onPlay()}>
           {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
       {inHand &&
+        !foretold &&
         altCostsFor(s, HUMAN, o).map((a) => {
           const ok = canCastAlt(s, objectId, a.kind);
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { alt: a.kind }) ?? "");
@@ -2386,6 +2424,11 @@ function AbilityMenu({
       {suspend && (
         <button disabled={!planSuspend(s, HUMAN, objectId)} title={suspendProblem(s, HUMAN, objectId) ?? `Exile it with ${suspend.n} time counter${suspend.n === 1 ? "" : "s"}. One comes off in each of your upkeeps; when the last does, you may cast it for free.`} onClick={onSuspend}>
           Suspend {suspend.n} <ManaCost cost={suspend.cost} size="sm" />
+        </button>
+      )}
+      {foretell && (
+        <button disabled={!planForetell(s, HUMAN, objectId)} title={foretellProblem(s, HUMAN, objectId) ?? `Exile it face down now (only you can see it). On a later turn you may cast it for ${foretell}.`} onClick={onForetell}>
+          Foretell <ManaCost cost="{2}" size="sm" />
         </button>
       )}
       {plot && (
@@ -2898,6 +2941,17 @@ function Controls({
         </button>
       </div>
     );
+  if (pending?.kind === "handToTop" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}: </strong>click {pending.count} card{pending.count === 1 ? "" : "s"} to put on top of your library{pending.count > 1 ? " (first pick ends on top)" : ""}.
+        </span>
+        <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
+          Put on top
+        </button>
+      </div>
+    );
   if (pending?.kind === "discardToHandSize" || pending?.kind === "discard")
     return (
       <div className="controls">
@@ -3273,7 +3327,7 @@ function Hand({ s, ids, cardProps, tucked, onToggle }: { s: GameState; ids: stri
                 className="fan-slot"
                 style={{ ["--rot" as string]: `${off * step}deg`, ["--drop" as string]: (off / Math.max(1, mid)) ** 2 * 0.06 }}
               >
-                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).plot && planPlot(s, HUMAN, id) !== null)} />
+                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).plot && planPlot(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).foretell && planForetell(s, HUMAN, id) !== null)} />
               </div>
             );
           })}

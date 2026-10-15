@@ -365,6 +365,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "mulligan":
       declareMulligan(s, p, action.keep);
       break;
+    case "handToTop":
+      chooseHandToTop(s, p, action.objectIds);
+      break;
     case "bottomCards":
       bottomCards(s, p, action.objectIds);
       break;
@@ -379,6 +382,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "plot":
       requireNoPending(s);
       plotCard(s, p, action.objectId);
+      break;
+    case "foretell":
+      requireNoPending(s);
+      foretellCard(s, p, action.objectId);
       break;
     case "assist":
       assistPays(s, p, action.n);
@@ -547,6 +554,7 @@ export function moveObject(
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
   o.discardedTurn = undefined;
+  o.foretold = undefined; // a spell that was foretold is cast without moving it here; anywhere else it's a new object
   if (fromZone === "stack") {
     o.castFrom = undefined;
     o.castVia = undefined;
@@ -1183,7 +1191,7 @@ function advanceStep(s: GameState): void {
   // this combat only (CR 702.39a).
   if (s.step === "endCombat") {
     for (const o of attackersAndBlockers(s)) clearCombat(o);
-    for (const id of s.battlefield) obj(s, id).provokedBy = undefined;
+    for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
   beginStep(s, next);
@@ -1229,6 +1237,7 @@ function startNextTurn(s: GameState) {
   s.attackersThisTurn = undefined;
   s.lostLifeThisTurn = undefined;
   s.permanentLeftThisTurn = undefined;
+  s.freerunningThisTurn = undefined;
   s.voidThisTurn = undefined;
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
@@ -1545,7 +1554,10 @@ export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): bo
 }
 
 /** A warped or plotted card in exile, which its owner may cast on a later turn (CR 702.185a, 702.170d). */
-const castOnlyFromExile = (o: GameObject) => o.mayPlay?.until === "warp" || o.mayPlay?.until === "plot";
+const castOnlyFromExile = (o: GameObject) => o.mayPlay?.until === "warp" || o.mayPlay?.until === "plot" || o.mayPlay?.until === "foretell";
+
+/** A foretold card its owner may cast now, for its foretell cost (CR 702.143a). */
+export const foretoldCast = (s: GameState, pid: PlayerId, o: GameObject): boolean => o.mayPlay?.until === "foretell" && mayPlayFromExile(s, o, pid);
 
 /** A plotted card `pid` may cast now, without paying its mana cost (CR 702.170d). */
 export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean {
@@ -1716,10 +1728,16 @@ export function castProblem(
     if (!altCost(d, choices.alt, s, pid)) return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
+    // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
+    if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
+    // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
+    if (choices.alt === "freerunning" && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
     // Only one alternative cost can be applied to a spell (CR 118.9a).
     if (via || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
   }
+  // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
+  if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
   const limit = castLimitProblem(s, pid, d);
   if (limit) return limit;
@@ -1781,7 +1799,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr"> & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice"> & { targets?: TargetChoice[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -1808,6 +1826,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
   for (const c of compileCard(d).costLessIf ?? []) if (staticConditionNow(s, c.cond, o.id, pid)) less += c.n;
+  // Emerge (CR 702.119a): the total cost is reduced by the sacrificed creature's mana value, in generic mana only. It's
+  // chosen as the emerge cost is (702.119c), so it's known when the total cost is (601.2f).
+  const emerged = how.alt === "emerge" && how.sacrifice?.[0] !== undefined ? s.objects[how.sacrifice[0]] : undefined;
+  if (emerged?.zone === "battlefield") less += manaValue(parseManaCost(defOf(s, emerged).manaCost));
   // "You may cast ~ as though it had flash if you pay {2} more to cast it": cast when a sorcery couldn't be, it costs more
   // (CR 601.2f). Not when something else lets it be cast then: a resolving madness trigger, or Flash from elsewhere.
   const flashCost = compileCard(d).flashCost;
@@ -1916,6 +1938,7 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 
 /** A card's own alternative cost of that kind; with `s` and the caster, Fist of Suns' {W}{U}{B}{R}{G} too (CR 118.9). */
 export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): { kind: AltCostKind; mana: string; costs?: AdditionalCost[] } | undefined {
+  if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
@@ -2606,6 +2629,17 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   continueResolution(s);
 }
 
+/** Brainstorm's "put two cards from your hand on top of your library in any order": the cards, top one first. */
+function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "handToTop" || pend.player !== p.id || !r) throw new RulesError("no cards to put on top");
+  if (new Set(ids).size !== pend.count || ids.length !== pend.count || ids.some((id) => !p.hand.includes(id))) throw new RulesError(`choose exactly ${pend.count} card(s) from your hand`);
+  ((r.scratch ??= {}).chosen ??= {})[p.id] = ids;
+  s.pending = null;
+  continueResolution(s);
+}
+
 /** "Sacrifice a creature", "return a land you control": the permanents this player picked (see the "pick" effect). */
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
@@ -2957,7 +2991,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
     (o) =>
       !o.tapped &&
       !isSummoningSick(s, o) &&
-      !objHasKeyword(s, o, "Defender") &&
+      (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
       !characteristics(s, o).cantAttack &&
       (!characteristics(s, o).attackUnless.length || opps.some((d) => !attackProblem(s, o, d))),
   );
@@ -3300,7 +3334,7 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
 export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { blocker: ObjectId; attacker: ObjectId }[]): string | null {
   const incoming = s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking === pid);
   const demanding = incoming.filter((a) => characteristics(s, a).allMustBlock || characteristics(s, a).mustBeBlocked);
-  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o));
+  const provoked = creaturesOf(s, pid).filter((o) => provokerOf(s, o) || characteristics(s, o).mustBlock);
   if (!demanding.length && !provoked.length) return null;
   const blocking = new Map<ObjectId, ObjectId[]>();
   for (const b of blocks) blocking.set(b.blocker, [...(blocking.get(b.blocker) ?? []), b.attacker]);
@@ -3319,6 +3353,13 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
     if (mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length < blockersNeeded(s, at) - 1) continue;
     return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
   }
+  // "Target creature blocks this turn if able": it blocks some attacking creature if one it can block, with another
+  // creature beside it against menace (CR 509.1c).
+  for (const b of mine) {
+    if (!characteristics(s, b).mustBlock || blocking.has(b.id)) continue;
+    if (incoming.some((at) => !blockProblem(s, b, at) && mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length >= blockersNeeded(s, at) - 1))
+      return `${characteristics(s, b).name} must block this turn if able`;
+  }
   for (const at of demanding) {
     const ac = characteristics(s, at);
     const could = mine.filter((b) => !blockProblem(s, b, at));
@@ -3336,6 +3377,7 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
 /** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
 export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
   const at = b.provokedBy && s.objects[b.provokedBy.id];
+  if (b.provokedBy?.turn !== undefined && b.provokedBy.turn !== s.turn) return undefined;
   return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === b.provokedBy!.zc && at.attacking === controllerOf(s, b) ? at : undefined;
 }
 
@@ -3391,7 +3433,7 @@ export function unblockedCandidates(s: GameState): Map<PlayerId, ObjectId[]> {
   const out = new Map<PlayerId, ObjectId[]>();
   const fs = s.step === "firstStrikeDamage";
   for (const at of attackers(s)) {
-    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || !dealsDamageThisStep(s, at, fs) || power(s, at) <= 0) continue;
+    if (!at.blockedBy || at.attacking === undefined || !characteristics(s, at).unblockedDamage || !dealsDamageThisStep(s, at, fs) || combatDamageOf(s, at) <= 0) continue;
     const banded = at.blockedBy.some((id) => s.objects[id] && objHasKeyword(s, obj(s, id), "Banding"));
     const who = banded ? at.attacking : controllerOf(s, at);
     out.set(who, [...(out.get(who) ?? []), at.id]);
@@ -3438,13 +3480,24 @@ function bandSplit(s: GameState, source: GameObject, targets: GameObject[], dmg:
   return [...out];
 }
 
+/**
+ * How much combat damage a creature assigns: its power (CR 510.1a), or its toughness under Doran's "assigns combat
+ * damage equal to its toughness rather than its power" (only while its toughness is greater, for "with toughness
+ * greater than its power"). Its power itself doesn't change (rulings).
+ */
+export function combatDamageOf(s: GameState, o: GameObject): number {
+  const c = characteristics(s, o);
+  const [p, t] = [power(s, o), toughness(s, o)];
+  return c.assignsToughness || (c.assignsToughnessIfGreater && t > p) ? t : p;
+}
+
 /** Combat damage is dealt simultaneously (CR 510.2); we compute all assignments first, then apply. True if it waits on a choice. */
 function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
   for (const at of attackers(s)) {
     if (!dealsDamageThisStep(s, at, firstStrikeStep) || at.noCombatDamageTurn === s.turn) continue;
-    let dmg = power(s, at);
+    let dmg = combatDamageOf(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
     const unblocked = s.unblockedChoice?.turn === s.turn && s.unblockedChoice.step === s.step && s.unblockedChoice.ids.includes(at.id);
@@ -3480,7 +3533,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
     const bl = obj(s, id);
     if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep) || bl.noCombatDamageTurn === s.turn) continue;
     const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
-    let dmg = power(s, bl);
+    let dmg = combatDamageOf(s, bl);
     if (dmg <= 0) continue;
     // Blocking a creature with banding, the active player divides its damage among those it blocks (CR 702.22k).
     if (blocked.length > 1 && blocked.some((at) => objHasKeyword(s, at, "Banding"))) {
@@ -3887,6 +3940,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
+    if (foretellProblem(s, pid, id) === null) out.push({ type: "foretell", player: pid, objectId: id });
   }
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
@@ -4006,6 +4060,39 @@ export function plotProblem(s: GameState, pid: PlayerId, id: ObjectId): string |
   if (!canActAtSorcerySpeed(s, pid)) return "you can only plot during your main phase while the stack is empty";
   if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to plot ${d.name} (${cost})`;
   return null;
+}
+
+/**
+ * Why `pid` can't foretell this card right now, or null (with the mana in their pool). Foretelling is a special action
+ * (CR 116.2h) any time they have priority during their own turn (CR 702.143a), even with spells on the stack.
+ */
+export function foretellProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const o = s.objects[id];
+  if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be foretold";
+  const d = defOf(s, o);
+  if (!compileCard(d).foretell) return `${d.name} doesn't have foretell`;
+  if (s.priority !== pid || s.pending) return "you don't have priority";
+  if (s.activePlayer !== pid) return "you can only foretell during your own turn";
+  if (!canPayFromPool(s, pid, parseManaCost("{2}"), "other")) return `not enough mana to foretell ${d.name} ({2})`;
+  return null;
+}
+
+/**
+ * Foretell a card (CR 702.143a): pay {2} and exile it face down. Only its owner may look at it (the others see that a
+ * card was foretold); it can be cast for its foretell cost after this turn.
+ */
+function foretellCard(s: GameState, p: Player, id: ObjectId) {
+  const problem = foretellProblem(s, p.id, id);
+  if (problem) throw new RulesError(problem);
+  const o = obj(s, id);
+  const d = defOf(s, o);
+  spendFromPool(s, p.id, parseManaCost("{2}"), "other");
+  moveObject(s, id, "exile");
+  o.foretold = true;
+  o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "foretell", turn: s.turn };
+  log(s, `${p.name} foretells a card.`);
+  log(s, `(You foretold ${d.name}: cast it on a later turn for ${compileCard(d).foretell}.)`, p.id);
+  s.passedInSuccession = [];
 }
 
 /** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */

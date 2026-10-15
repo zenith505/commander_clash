@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type ObjRef, type TargetChoice, type UnlessPays } from "./abilities";
-import { autoCrew, planActivate, planCast, planMana, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
+import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -28,6 +28,8 @@ import {
   opponents,
   player,
   potentialAttackers,
+  foretoldCast,
+  combatDamageOf,
   spellCost,
   graveyardWay,
   graveyardWays,
@@ -106,6 +108,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count) }];
+    // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
+    if (pend.kind === "handToTop") return [{ type: "handToTop", player: pid, objectIds: chooseDiscards(s, pid, pend.count).reverse() }];
     // Free from the hand: the most expensive card is the best deal.
     // From an opponent's revealed hand: take their most expensive card.
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
@@ -237,7 +241,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const options = [...exilePlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -255,6 +259,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (s.step === "main2") {
       const plot = choosePlot(s, pid);
       if (plot) return plot;
+      const foretell = chooseForetell(s, pid);
+      if (foretell) return foretell;
     }
     // Unearth a creature to attack with this turn (CR 702.84a).
     if (s.step === "main1") {
@@ -556,6 +562,8 @@ function targetIndexOf(e: Effect): number | undefined {
  */
 function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const d = defOf(s, obj(s, id));
+  // A foretold card is cast for its foretell cost (CR 702.143a).
+  if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   const cost = parseManaCost(graveyardWay(s, obj(s, id), via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free) return null;
@@ -595,6 +603,13 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   return null;
 }
 
+/** Freerunning is cheaper than the mana cost: pay it whenever it's allowed (CR 702.173a). */
+function freerunPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "hand" || !altCost(defOf(s, o), "freerunning") || !(s.freerunningThisTurn ?? []).includes(pid)) return null;
+  return castPlan(s, pid, id, false, undefined, "freerunning");
+}
+
 /** Bestow it on one of our creatures when we can afford to (CR 702.103a): the bonus now, and a creature later. */
 function bestowPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   const o = obj(s, id);
@@ -627,6 +642,22 @@ function choosePlot(s: GameState, pid: PlayerId): Action[] | null {
     .sort((a, b) => mv(s, b) - mv(s, a));
   for (const id of options) {
     const plan = planPlot(s, pid, id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * A card to foretell (CR 702.143a) with mana we'd otherwise not use this turn: the one whose foretell cost saves the
+ * most on a later turn.
+ */
+function chooseForetell(s: GameState, pid: PlayerId): Action[] | null {
+  const saving = (id: string) => mv(s, id) - manaValue(parseManaCost(compileCard(defOf(s, obj(s, id))).foretell ?? ""));
+  const options = player(s, pid)
+    .hand.filter((id) => compileCard(defOf(s, obj(s, id))).foretell)
+    .sort((a, b) => saving(b) - saving(a));
+  for (const id of options) {
+    const plan = planForetell(s, pid, id);
     if (plan) return plan;
   }
   return null;
@@ -776,8 +807,9 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const pool = s.battlefield
         .map((x) => obj(s, x))
         .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false))
-        .filter((o) => value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7))
-        .sort((a, b) => value(a) - value(b));
+        .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
+        // Emerge: the creature's mana value comes off the cost (CR 702.119a), so a small creature that cost a lot.
+        .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
       if (pool.length < c.n) return null;
       out.sacrifice = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "discard" && c.filter) {
@@ -1628,13 +1660,13 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
   // (CR 725.2) unless someone else is low enough to finish.
   const lowest = [...opps].sort((a, b) => player(s, a).life - player(s, b).life)[0]!;
-  const reach = potentialAttackers(s, pid).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+  const reach = potentialAttackers(s, pid).reduce((n, o) => n + Math.max(0, combatDamageOf(s, o)), 0);
   const target = s.monarch !== undefined && opps.includes(s.monarch) && player(s, lowest).life > reach ? s.monarch : lowest;
   const theirBlockers = s.battlefield
     .map((id) => obj(s, id))
     .filter((o) => controllerOf(s, o) === target && !o.tapped && objIsType(s, o, "Creature"));
-  const biggestBlocker = Math.max(0, ...theirBlockers.map((o) => power(s, o)));
-  const ready = potentialAttackers(s, pid).filter((o) => power(s, o) > 0 && !attackProblem(s, o, target));
+  const biggestBlocker = Math.max(0, ...theirBlockers.map((o) => combatDamageOf(s, o)));
+  const ready = potentialAttackers(s, pid).filter((o) => combatDamageOf(s, o) > 0 && !attackProblem(s, o, target));
   // Swing with everything when we outnumber their untapped blockers; otherwise only with creatures that survive a block.
   const allIn = ready.length > theirBlockers.length;
   // Creatures that attack each combat if able have to (CR 508.1d), whatever their power, at whoever they can.
@@ -1687,7 +1719,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const used = new Set<string>();
   const blocks: { blocker: string; attacker: string }[] = [];
   // Only damage to us counts toward our life; attackers of our planeswalkers are blocked when that's a good trade.
-  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + power(s, a), 0);
+  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + combatDamageOf(s, a), 0);
   const desperate = totalIncoming >= me.life;
   // Requirements first (CR 509.1c): every creature able to block a lure blocks one, and a creature that
   // must be blocked if able gets our sturdiest blocker (two against menace).
@@ -1710,6 +1742,17 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
       blocks.push({ blocker: o.id, attacker: at.id });
     }
   }
+  // One that must block this turn blocks the attacker it fares best against (CR 509.1c).
+  for (const b of mine.filter((o) => characteristics(s, o).mustBlock && !used.has(o.id))) {
+    const able = incoming.filter((at) => !blockProblem(s, b, at) && mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).length >= blockersNeeded(s, at) - 1);
+    const at = able.find((a) => toughness(s, b) > power(s, a)) ?? able.find((a) => power(s, b) >= toughness(s, a)) ?? able[0];
+    if (!at) continue;
+    const helpers = mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x)).slice(0, blockersNeeded(s, at) - 1);
+    for (const o of [b, ...helpers]) {
+      used.add(o.id);
+      blocks.push({ blocker: o.id, attacker: at.id });
+    }
+  }
   for (const at of incoming.filter((a) => (characteristics(s, a).mustBeBlocked || characteristics(s, a).allMustBlock) && !blocks.some((b) => b.attacker === a.id))) {
     const able = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at)).sort((a, b) => toughness(s, b) - toughness(s, a));
     const n = blockersNeeded(s, at);
@@ -1723,8 +1766,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     if (blocks.some((b) => b.attacker === at.id)) continue;
     if (blockersNeeded(s, at) > 1 || characteristics(s, at).cantBeBlocked) continue;
     const canBlock = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
-    const good = canBlock.find((b) => toughness(s, b) > power(s, at) && !objHasKeyword(s, at, "Deathtouch"));
-    const trade = canBlock.find((b) => power(s, b) >= toughness(s, at));
+    const good = canBlock.find((b) => toughness(s, b) > combatDamageOf(s, at) && !objHasKeyword(s, at, "Deathtouch"));
+    const trade = canBlock.find((b) => combatDamageOf(s, b) >= toughness(s, at));
     const pick = good ?? trade ?? (desperate ? canBlock[0] : undefined);
     if (pick) {
       used.add(pick.id);

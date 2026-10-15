@@ -45,7 +45,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "takeFromHand", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
@@ -218,6 +218,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       else effects.push({ type: "if", cond, effects: fx.effects });
       continue;
     }
+    // "If this spell was foretold, scry 2", "... create X of those tokens instead" (CR 702.143c).
+    const foretold = ctx.spell ? /^If (?:this spell|~) was foretold, (.+)$/.exec(s) : null;
+    if (foretold) {
+      const fx = parseKicked(foretold[1]!, effects.slice(prevStart), ctx);
+      if (!fx) return null;
+      const cond: SpellCondition = { kind: "foretold" };
+      if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
+      else effects.push({ type: "if", cond, effects: fx.effects });
+      continue;
+    }
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     const where = /^(.+), where X is (.+)$/.exec(s);
@@ -317,7 +327,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
-      const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `);
+      const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `)
+        .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able");
       const inner = parseOne(rest, ctx);
       if (!inner) return null;
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.

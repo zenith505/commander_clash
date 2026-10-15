@@ -212,6 +212,25 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
       return;
     }
+    case "handToTop": {
+      // Brainstorm: with fewer cards in hand, all of them (rulings); the player picks the cards and their order.
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      let ids = sc.chosen?.[p.id];
+      if (!ids) {
+        const n = Math.min(amountNow(s, e.n, ctx), p.hand.length);
+        if (!n) return;
+        if (p.hand.length > 1) {
+          s.pending = { kind: "handToTop", player: p.id, count: n, source: src };
+          return "paused";
+        }
+        ids = [...p.hand];
+      }
+      const cards = ids.filter((id) => p.hand.includes(id));
+      for (const id of [...cards].reverse()) moveObject(s, id, "library", { top: true });
+      log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on top of their library.`);
+      return;
+    }
     case "shuffleIntoLibrary":
     case "shuffleSpell": {
       // The owners whose libraries are shuffled, whether or not the card is still there (CR 701.24c).

@@ -325,6 +325,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield" && host) add(o, controllerOf(s, o), (e) => e === "selfBecomesUnattached", undefined, undefined, host);
   } else if (ev.type === "dies") {
     const o = obj(s, ev.id);
+    // Earthbend's "when that land dies or is put into exile" (CR 701.66a): it triggers once, for that object only; gone
+    // anywhere else, it never will.
+    const was = ev.snapshot?.zoneChanges ?? 0;
+    for (const d of [...(s.delayed ?? [])]) {
+      if (d.when !== "leaves" || d.subject.id !== ev.id || d.subject.zc !== was) continue;
+      s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.to?.includes(ev.to)) s.triggerQueue.push({ sourceId: ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body });
+    }
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
     add(
       o,

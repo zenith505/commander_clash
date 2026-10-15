@@ -124,7 +124,12 @@ export interface GameObject {
    * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
    * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery.
    */
-  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot"; turn: number };
+  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot" | "foretell"; turn: number };
+  /**
+   * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
+   * spell it's cast as, for "if this spell was foretold".
+   */
+  foretold?: true;
   /** Attack/block bookkeeping, cleared at end of combat. */
   attacking?: PlayerId;
   /**
@@ -133,8 +138,11 @@ export interface GameObject {
    * but is still attacking (CR 506.4c).
    */
   attackingPermanent?: { id: ObjectId; zc: number };
-  /** Provoked: it must block this attacking creature this combat if able (CR 702.39a). Cleared at end of combat. */
-  provokedBy?: { id: ObjectId; zc: number };
+  /**
+   * Provoked: it must block this attacking creature this combat if able (CR 702.39a), cleared at end of combat; or,
+   * with `turn`, any combat of that turn ("target creature blocks ~ this turn if able").
+   */
+  provokedBy?: { id: ObjectId; zc: number; turn?: number };
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
   blocking?: ObjectId[];
   blockedBy?: ObjectId[];
@@ -340,7 +348,9 @@ export interface StackItem {
  * beginning of your next upkeep". It triggers once, about `subject` (the card as it was then).
  */
 export interface DelayedTrigger {
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat" | "nextCleanup";
+  /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat" | "nextCleanup" | "leaves";
+  to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };
@@ -459,6 +469,8 @@ export type PendingDecision =
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string }
+  /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order"; cards: ObjectId[]; source: string; owner?: PlayerId }
@@ -587,6 +599,8 @@ export interface GameState {
   lostLifeThisTurn?: PlayerId[];
   /** Revolt: the players a permanent left the battlefield under the control of this turn, tokens too (rulings). */
   permanentLeftThisTurn?: PlayerId[];
+  /** Players whose Assassin creature or commander dealt combat damage to a player this turn: they may pay freerunning costs (CR 702.173a). */
+  freerunningThisTurn?: PlayerId[];
   /** Void: a nonland permanent left the battlefield this turn, or a spell was warped this turn (CR 702.185c). */
   voidThisTurn?: boolean;
   /** Descend: the players a permanent card was put into the graveyard of this turn, from anywhere (CR 700.11). */
@@ -767,10 +781,14 @@ export type Action =
   | { type: "mulligan"; player: PlayerId; keep: boolean }
   /** Answer to bottomCards: these cards go on the bottom of the library, the first one lowest. */
   | { type: "bottomCards"; player: PlayerId; objectIds: ObjectId[] }
+  /** Answers "handToTop": the cards from the hand, the first one ending on top of the library. */
+  | { type: "handToTop"; player: PlayerId; objectIds: ObjectId[] }
   /** Exile a card from your hand with suspend, paying its suspend cost: a special action (CR 116.2f, 702.62a). */
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
   /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
   | { type: "plot"; player: PlayerId; objectId: ObjectId }
+  /** Foretell a card from your hand: pay {2} and exile it face down, a special action (CR 116.2h, 702.143a). */
+  | { type: "foretell"; player: PlayerId; objectId: ObjectId }
   /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */
   | { type: "assist"; player: PlayerId; n: number }
   /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */

@@ -367,6 +367,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "tap":
     case "untap":
     case "removeFromCombat":
+    case "earthbend":
     case "mustBlockSource":
     case "phaseOut":
     case "proliferate":
@@ -415,6 +416,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "clash":
     case "surveil":
     case "orderTop":
+    case "handToTop":
     case "shuffle":
     case "shuffleIntoLibrary":
     case "shuffleSpell":

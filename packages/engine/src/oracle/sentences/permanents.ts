@@ -41,6 +41,23 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "continuous", what, mods: [{ kind: "allMustBlock" }], duration: "endOfTurn" }] : null;
   }
+  // "Target creature blocks ~ this turn if able" (Matsu-Tribe Decoy), "target creature defending player controls blocks
+  // it this combat if able" in ~'s own attack trigger: a blocking requirement (CR 509.1c), like provoke's.
+  if ((m = /^((?:up to one )?target .+?) blocks (~|it) this (turn|combat) if able$/i.exec(s)) && (m[2] === "~" || ctx.selfIt)) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
+  }
+  // "Target creature blocks this turn if able": any attacking creature (CR 509.1c).
+  if ((m = /^(target .+?|it|that creature|each creature(?: your opponents control)?) blocks this turn if able$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "mustBlock" }], duration: "endOfTurn" }] : null;
+  }
+  // Earthbend N (CR 701.66a): "target land you control becomes a 0/0 land creature with haste ...". Each instance has its
+  // own target, which may be the same land (rulings).
+  if ((m = /^(?:you )?earthbend (\d+|X)$/i.exec(s))) {
+    const what = parseObject("target land you control", ctx);
+    return what?.ref === "target" ? [{ type: "earthbend", what, n: amt(m[1]!) }] : null;
+  }
   // Recruit (CR 701.70a): "recruit", "you recruit".
   if (/^(?:you )?recruit$/i.test(s)) return [{ type: "recruit" }];
   // "If that creature would die this turn, exile it instead" (CR 614.1a), for what an earlier sentence targeted
@@ -138,7 +155,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Continuous changes until end of turn: "X gets +2/+2 and gains flying", "X loses all abilities
   // and becomes a blue Frog with base power and toughness 1/1", "X has base power and toughness 0/1".
-  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?) .+) until (end of turn|your next turn)$/i.exec(s))) {
+  // "~ can attack this turn as though it didn't have defender" (CR 702.3b), "target creature you control assigns combat
+  // damage equal to its toughness rather than its power this turn"; "~ gets +3/+0 until end of turn and can attack this
+  // turn as though it didn't have defender" (Nivix Cyclops).
+  if ((m = /^(.+?) (?:((?:gets?|gains?) .+) until end of turn and )?(can attack this turn as though (?:it|they) didn't have defender|assigns combat damage equal to its toughness rather than its power this turn)$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    const mods = what && parseChanges([m[2], m[3]!.replace(/ this turn$/, "")].filter(Boolean).join(" and "));
+    return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
+  }
+  if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;

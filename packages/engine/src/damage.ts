@@ -134,6 +134,9 @@ export function dealDamage(
     if (src.id) fireEvent(s, { type: "damagedPlayer", source: src.id, player: p.id, amount: n, combat: !!opts.combat });
     if (opts.combat) {
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
+      // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its
+      // controller pay freerunning costs this turn.
+      if (src.types.includes("Creature") && (src.subtypes.includes("Assassin") || src.commanderId) && !(s.freerunningThisTurn ??= []).includes(src.controller)) s.freerunningThisTurn.push(src.controller);
       const toxic = toxicValue(src.keywords);
       if (toxic > 0) {
         p.poison = (p.poison ?? 0) + toxic;

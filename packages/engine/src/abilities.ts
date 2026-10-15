@@ -507,7 +507,8 @@ export type StaticCondition =
   | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
-  | { kind: "yourTurn" }
+  /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */
+  | { kind: "yourTurn"; not?: true }
   /**
    * "Activate only during your turn, before attackers are declared": your turn, before its declare attackers step
    * begins (rulings: before the first combat's declare attackers step; there's one combat a turn here).
@@ -530,16 +531,19 @@ export type StaticCondition =
   | { kind: "paired"; withKeyword?: string; not?: true }
   /** Morbid: "if a creature died this turn" (CR 700.4); `n`: "if two or more creatures died this turn"; `yours`: "under your control". */
   | { kind: "creatureDied"; n?: number; yours?: true }
-  /** "If no creatures are on the battlefield": how many permanents matching `filter` there are, under anyone's control. */
-  | { kind: "onBattlefield"; filter: TargetSpec; max: number }
+  /**
+   * "If no creatures are on the battlefield", "if four or more creatures are attacking" (Arrow Volley Trap), "if there are
+   * thirteen or more creatures on the battlefield": how many permanents matching `filter` there are, under anyone's control.
+   */
+  | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number }
   /** "If an opponent lost life this turn". */
   | { kind: "opponentLostLife" }
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
   | { kind: "attackedWith"; n: number }
-  /** "If you've drawn two or more cards this turn". */
-  | { kind: "drawn"; n: number }
+  /** "If you've drawn two or more cards this turn"; `opponent`: "if an opponent drew three or more cards this turn" (Runeflare Trap). */
+  | { kind: "drawn"; n: number; opponent?: true }
   /** "If you descended this turn": a permanent card was put into your graveyard this turn (CR 700.11). */
   | { kind: "descended" }
   /** Revolt: "if a permanent left the battlefield under your control this turn". */
@@ -1475,7 +1479,9 @@ export type AdditionalCost =
    */
   | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean }
   /** "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. */
-  | { kind: "reveal"; filter: TargetSpec; n: number };
+  | { kind: "reveal"; filter: TargetSpec; n: number }
+  /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */
+  | { kind: "exileFromHand"; filter?: TargetSpec; n: number };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,
@@ -1750,7 +1756,16 @@ export interface CompiledCard {
   /** Rebound (CR 702.88). */
   rebound?: boolean;
   /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
-  altCosts?: { kind: AltCostKind; mana: string; /** Paid along with it: a Borderpost's "return a basic land you control to its owner's hand". */ costs?: AdditionalCost[] }[];
+  altCosts?: {
+    kind: AltCostKind;
+    mana: string;
+    /** Paid along with it: a Borderpost's "return a basic land you control to its owner's hand", Fireblast's "sacrifice two Mountains". */
+    costs?: AdditionalCost[];
+    /** "If you control a Swamp, you may ...": it can be paid only while this is true, as the spell is cast (CR 601.2b). */
+    if?: StaticCondition;
+    /** What's paid, as the card says it: "pay 1 life and exile a blue card from your hand". */
+    text?: string;
+  }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;
   /** Suspend N—[cost] (CR 702.62a): exile it from your hand with N time counters, cast it free when the last is removed. */

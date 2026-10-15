@@ -178,7 +178,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // gets are chosen with the targets, at least 1 each (CR 601.2d); "any number of targets" is one to that many.
   // "X damage" ("X plus 1"): the spell's X, announced before the targets (CR 601.2b), so one to X targets.
   // "Damage equal to its power" (Orca, Siege Demon): worked out the same way, with what the ability knows then.
-  if ((m = /^~ deals (\d+|one|two|three|four|five|six|seven|eight|nine|ten|X|X plus 1|damage equal to .+?) (?:damage )?divided as you choose among (one or two|one, two, or three|any number of) (targets|target .+)$/i.exec(s))) {
+  // "Among up to X target creatures" with X damage (Ravenous Gigantotherium) is the same: at least 1 each. "8 damage
+  // divided as you choose among X target creatures" (Meteor Swarm): exactly the spell's X targets, so X is 8 at most.
+  if ((m = /^~ deals (\d+|one|two|three|four|five|six|seven|eight|nine|ten|X|X plus 1|damage equal to .+?) (?:damage )?divided as you choose among (one or two|one, two, or three|any number of|up to X|X) (targets|target .+)$/i.exec(s))) {
     const equal = /^damage equal to (.+)$/.exec(m[1]!);
     const counted = equal ? parseCount(equal[1]!, ctx) : null;
     if (equal && !counted) return null;
@@ -237,7 +239,13 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
   const counted = typeof amount !== "string";
   const isX = counted || amount.startsWith("X");
   // X is the spell's own, or defined by the text ("where X is ...", body.ts defineX).
-  if (isX && (among !== "any number of" || (!counted && !ctx.spell && !ctx.whereX) || (ctx.whereX && amount !== "X"))) return null;
+  // An ability's own X is checked with the ability (compile.ts checkX, activated.ts).
+  if (among === "up to X") {
+    if (amount !== "X") return null;
+    among = "any number of";
+  }
+  if (isX && (among !== "any number of" || (ctx.whereX && amount !== "X"))) return null;
+  if (among === "X" && (isX || !ctx.spell)) return null;
   const total = isX ? 0 : num(amount as string);
   const n = among === "one or two" ? 2 : among === "one, two, or three" ? 3 : total;
   let spec: TargetSpec | null = { kind: "any", text: "any target" };
@@ -249,6 +257,13 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
     spec = { ...spec, text: `target ${one}` };
   }
   const first = ctx.targets.length;
+  if (among === "X") {
+    if (ctx.targets.some((t) => t.many)) return null;
+    addTarget(ctx, { ...spec, divided: { first, n: 1, total }, many: "exactX" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return { index: first, n: 2, amount: total };
+  }
   if (isX) {
     if (ctx.targets.some((t) => t.many)) return null;
     const x: AmountExpr = counted ? amount : { count: { kind: "x" }, ...(amount === "X plus 1" ? { plus: 1 } : {}) };

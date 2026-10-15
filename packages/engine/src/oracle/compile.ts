@@ -1165,8 +1165,10 @@ function checkX(d: CardDef, out: CompiledCard) {
     bad("enters with X counters");
     delete out.entersWithCounters;
   }
+  // "Monstrosity X" (CR 701.37c): "when ~ becomes monstrous" abilities use the X it became monstrous with.
+  const monstrousX = out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "monstrosity" && usesX(e.n)));
   out.triggers = out.triggers.filter((tr) => {
-    if (!usesX(tr.body) || (tr.event === "selfEnters" && cardX)) return true;
+    if (!usesX(tr.body) || (tr.event === "selfEnters" && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX)) return true;
     bad(tr.body.text);
     return false;
   });

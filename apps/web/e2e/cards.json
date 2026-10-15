@@ -467,6 +467,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "70486bee-6ee7-41ea-b834-8caf4699302b",
+  "name": "Daze",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You may return an Island you control to its owner's hand rather than pay this spell's mana cost.\nCounter target spell unless its controller pays {1}.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "273b339c-964b-4a18-8eb5-ceb8abcdfd9e",
   "name": "Divination",
   "manaCost": "{2}{U}",
@@ -707,6 +733,32 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "956381ba-6d37-4a8a-846c-bad79222dbee",
+  "name": "Force of Will",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You may pay 1 life and exile a blue card from your hand rather than pay this spell's mana cost.\nCounter target spell.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmr",
+  "releasedAt": "2023-01-13",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "b34bb2dc-c1af-4d77-b0b3-a0fb342a5fc6",
@@ -1316,6 +1368,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3e7bd846-7295-4590-a419-c97cd2526bc1",
+  "name": "Meteor Swarm",
+  "manaCost": "{X}{R}{R}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Meteor Swarm deals 8 damage divided as you choose among X target creatures and/or planeswalkers.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c97361b5-af16-4a7b-af85-a429dbaf4ad2",
   "name": "Mind Stone",
   "manaCost": "{2}",
@@ -1515,6 +1593,32 @@
   "set": "sld",
   "releasedAt": "2025-07-25",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "61eacaab-625b-499c-8602-f37ad5dda138",
+  "name": "Orim's Cure",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "If you control a Plains, you may tap an untapped creature you control rather than pay this spell's mana cost.\nPrevent the next 4 damage that would be dealt to any target this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mmq",
+  "releasedAt": "1999-10-04",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

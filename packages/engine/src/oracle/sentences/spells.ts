@@ -113,6 +113,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const a = parseObject(m[1]!, ctx);
     return a && !isGroup(a) && !isSeveral(a) ? [{ type: "bite", a, b: a }] : null;
   }
+  // "Each of those creatures deals damage equal to its power to ~" (Polukranos, Living Inferno): each of the targets
+  // still legal (CR 608.2b), all at the same time, each as the source of its own damage.
+  if ((m = /^Each of (those creatures|them) deals damage equal to its power to (.+)$/i.exec(s))) {
+    const a = parseObject(m[1]!, ctx);
+    const b = a && parseObject(m[2]!, ctx);
+    return a?.ref === "target" && b && !isGroup(b) && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).

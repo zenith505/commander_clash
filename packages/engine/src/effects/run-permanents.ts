@@ -341,7 +341,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       o.monstrous = true;
       invalidateCharacteristics(s); // "as long as ~ is monstrous"
       log(s, `${characteristics(s, o).name} gets ${put} +1/+1 counter${put === 1 ? "" : "s"} and becomes monstrous.`);
-      fireEvent(s, { type: "becameMonstrous", id: o.id });
+      fireEvent(s, { type: "becameMonstrous", id: o.id, x: n });
       return;
     }
     case "evolve": {

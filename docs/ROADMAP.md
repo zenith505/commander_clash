@@ -1,6 +1,6 @@
 # Roadmap
 
-16,223 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,294 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -17,11 +17,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Haunt, Read ahead.
    Left from the filter lands/divided damage/X costs round:
-   - Divided damage still out: "each of those creatures deals damage equal to its power to ~" (Polukranos, Living
-     Inferno, Ravenous Gigantotherium), "age counters on it" (Magmatic Core), Impact Resonance, Ghired's Belligerence's
-     populate, Aurelia's Fury's riders, Arrow Volley Trap, Pollen Remedy, Meteor Swarm's "among X target"; "deals X
-     damage to each of X targets" (Firestorm, Meteor Blast). The divide panel says "divide the damage" for prevention
-     too (Remedy).
+   - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate, Aurelia's Fury's riders ("each
+     player dealt damage this way can't cast noncreature spells this turn", with the "can't cast spells this turn"
+     group: Silence, Orim's Chant, Xantid Swarm, Ranger-Captain of Eos, Render Silent, Permission Denied, Calamity's
+     Wake), Pollen Remedy (kicker that isn't mana). The divide panel says "divide the damage" for prevention too
+     (Remedy).
    - "Any number of target players" still out: Communal Brewing, Hollow Marauder, Kaboom!, Memory Vampire, Singularity
      Rupture, Curse of Surveillance, The Death of Gwen Stacy; Will of the Abzan (below).
    - X in additional costs still out: Bond of Agony and Necrologia (their effect lines), "each player sacrifices X
@@ -144,9 +144,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).
-- Alternative costs that aren't mana ("exile a green card from your hand", Pyrokinesis, Flameshot, Lashknife, Vine
-  Dryad), Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost". Bots never use Fist of Suns'
-  {W}{U}{B}{R}{G}.
+- Alternative costs still out: Traps whose condition needs "this turn" tracking (Archive Trap's search, Baloth Cage
+  Trap's artifact entering, Cobra, Inferno, Lavaball, Needlebite, Permafrost, Ravenous, Ricochet's spell color,
+  Whiplash), the Shoals' X, Foil's "an Island card and another card", "have an opponent / each other player gain
+  life" (Invigorate, Reverent Silence, Skyshroud Cutter), Land Grant's "reveal your hand", Security Rhox, Spinning
+  Darkness's "top three black cards of your graveyard", Mogg Salvage's "without paying its mana cost" condition,
+  Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost". Bots never use Fist of Suns'
+  {W}{U}{B}{R}{G}, and use the other alternative costs only when they can't pay the mana cost.
 - Elesh Norn, Mother of Machines' "triggers an additional time" (its other ability, Torpor Orb's for opponents, works).
   With Torpor Orb, "whenever counters are put on" still triggers for counters a creature enters with.
 - "Becomes the target": "deals 2 damage to that spell's controller", "an ability that targets only it" (Agrus Kos),
@@ -164,7 +168,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".
 - "Copy target activated or triggered ability" (Strionic Resonator). Changing the target of a spell with more than one
-  target; Misdirection's pitch cost; Mirrorshell Crab's channel ability.
+  target; Mirrorshell Crab's channel ability.
 - "Activate only during your turn, before attackers are declared" with additional combats: it's allowed in each
   combat's beginning of combat step but not in an added main phase; check the rulings before relying on it. Random
   discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with something else ("create a

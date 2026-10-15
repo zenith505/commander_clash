@@ -1,6 +1,6 @@
 import type { DamageRecipient, Effect } from "../abilities";
-import { defOf, objIsType, power, toughness } from "../cards";
-import { draw, gainLife, giveCitysBlessing, log, loseLife, obj, player } from "../game";
+import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
+import { draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses } from "../game";
 import { MONARCH } from "../oracle";
 import { invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
@@ -12,6 +12,25 @@ import { ringTempts } from "./run-ring";
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "extraTurn":
+      // CR 500.7: taken directly after this turn; the most recently created first.
+      for (const pid of players(s, e.who, ctx)) {
+        for (let i = 0; i < e.n; i++) {
+          // The delayed trigger's source: the spell (or the permanent whose ability this is).
+          const item = s.resolving?.item;
+          const id = ctx.sourceId ?? (item?.kind === "spell" ? item.objectId : undefined);
+          const card = id ? s.objects[id] : undefined;
+          (s.extraTurns ??= []).push({
+            player: pid,
+            ...(e.loseAtEnd && card ? { loseAtEnd: { controller: ctx.controller, sourceCardId: cardIdOf(card), subject: { id: card.id, zc: card.zoneChanges ?? 0 } } } : {}),
+          });
+        }
+        log(s, `${player(s, pid).name} will take ${e.n === 1 ? "an extra turn" : `${e.n} extra turns`} after this one.`);
+      }
+      return;
+    case "loseGame":
+      for (const pid of players(s, e.who, ctx)) playerLoses(s, pid, `${src}`);
+      return;
     case "ascend":
       giveCitysBlessing(s, ctx.controller, true); // CR 702.131a
       return;

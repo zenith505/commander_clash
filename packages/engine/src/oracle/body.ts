@@ -307,6 +307,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       last.drain = true;
       continue;
     }
+    // "Take an extra turn after this one. At the beginning of that turn's end step, you lose the game." (Final Fortune)
+    if (/^At the beginning of that turn's end step, you lose the game$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "extraTurn" || last.who.ref !== "you" || last.n !== 1) return null;
+      last.loseAtEnd = true;
+      continue;
+    }
     // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c).
     if (/^(It|They|The creature) can't be regenerated$/i.test(s)) {
       const last = effects[effects.length - 1];

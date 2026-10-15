@@ -13,6 +13,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // An instant or sorcery that exiles itself as it resolves, so it isn't put into the graveyard (CR 608.2n);
   // with suspend, it's suspended again (Arc Blade). If it doesn't resolve, it isn't exiled.
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
+  if (/^Exile ~$/i.test(s) && ctx.spell) return [{ type: "exileSpell" }];
 
   // Graveyards. Cards in a graveyard (CR 109.2a): returning them, reanimating them, exiling them.
   // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j) or "Whenever you

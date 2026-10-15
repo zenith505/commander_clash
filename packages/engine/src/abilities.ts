@@ -634,6 +634,13 @@ export type Effect =
   | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop" | "battlefield"; rest: "graveyard" | "bottom" | "shuffle"; reveal: boolean; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
+  /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
+  /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
+  | { type: "extraTurn"; who: PlayerRef; n: number; loseAtEnd?: true }
+  /** "You lose the game" (CR 104.3a). */
+  | { type: "loseGame"; who: PlayerRef }
+  /** "Exile ~" in an instant or sorcery: it goes to exile as it resolves instead of its owner's graveyard (CR 608.2n). */
+  | { type: "exileSpell" }
   /** "You take the initiative" (CR 726). */
   | { type: "takeInitiative"; who: PlayerRef }
   /**
@@ -755,6 +762,8 @@ export type TriggerEvent =
   | "selfExploits"
   /** "Whenever a creature you control exploits a nontoken creature": see TriggeredAbility.subjectFilter. */
   | "creatureYouControlExploits"
+  /** "Whenever a creature you control deals combat damage to a player": see TriggeredAbility.dealer; the creature is the subject. */
+  | "creatureYouControlDealsCombatDamageToPlayer"
   /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
@@ -786,6 +795,8 @@ export interface TriggeredAbility {
    * (rulings: cycling a card triggers it once).
    */
   discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
+  /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
+  dealer?: { filter: TargetSpec; other?: boolean };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
   /**

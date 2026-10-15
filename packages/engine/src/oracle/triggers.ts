@@ -237,6 +237,33 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 /**
+ * "Whenever a creature you control deals combat damage to a player, draw a card", "Whenever a Vampire you control deals
+ * combat damage to a player, put a +1/+1 counter on it": once for each such creature and player (CR 510.2, 603.2c).
+ * "It" and "that creature" are the creature, "that player" the player, "that much" the damage.
+ */
+function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
+  if (!m) return null;
+  const filter = parseTargetPhrase(m[2]!);
+  if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature"))) return "fail";
+  let text = m[4]!;
+  const thatMuch = /\bthat (?:much|many)\b/.test(text);
+  if (thatMuch) {
+    if (/\bX\b/.test(text)) return "fail";
+    text = text.replace(/\bthat (?:much|many)\b/g, "X");
+  }
+  let body = parseBody(text, { subjectIt: true, eventPlayer: true });
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
+  return {
+    event: "creatureYouControlDealsCombatDamageToPlayer",
+    dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}) },
+    body,
+    ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
+  };
+}
+
+/**
  * "Whenever you sacrifice another permanent", "Whenever you sacrifice a Food", "Whenever you sacrifice ~ or another
  * creature", "... a nontoken permanent during your turn": once for each permanent its controller sacrifices (CR 701.21a).
  * "It" and "that card" are the card where it went. "One or more" (once per batch) isn't modeled.
@@ -418,6 +445,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (draws) return draws;
   const dies = parseDiesTrigger(line);
   if (dies) return dies;
+  const dealer = parseDealerTrigger(line);
+  if (dealer) return dealer;
   const sacrifices = parseSacrificeTrigger(line);
   if (sacrifices) return sacrifices;
   const group = parseGroupTrigger(line);

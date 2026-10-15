@@ -22,6 +22,7 @@ import {
   type Action,
   type CardDef,
   type CostChoices,
+  type ExtraTurn,
   type FaceDownKind,
   type GameObject,
   type GameState,
@@ -1061,14 +1062,29 @@ function advanceStep(s: GameState): void {
 
 function startNextTurn(s: GameState) {
   const prev = s.activePlayer;
-  s.activePlayer = nextLivingAfter(s, s.activePlayer);
-  // "Until your next turn" ends as that turn begins, or when it would have begun for a player who left (CR 800.4m).
-  const order = s.turnOrder;
+  // An extra turn is taken directly after this one, the most recently created first (CR 500.7); one for a player who
+  // left the game isn't taken (CR 800.4a). After them, the normal order goes on from the last normal turn.
+  let extra: ExtraTurn | undefined;
+  while ((extra = s.extraTurns?.pop()) && player(s, extra.player).lost);
+  if (!s.extraTurns?.length) s.extraTurns = undefined;
   const began = new Set<PlayerId>();
-  for (let i = (order.indexOf(prev) + 1) % order.length; ; i = (i + 1) % order.length) {
-    began.add(order[i]!);
-    if (order[i] === s.activePlayer || began.size >= order.length) break;
+  if (extra) {
+    if (!s.extraTurn) s.rotation = prev;
+    s.activePlayer = extra.player;
+    began.add(extra.player);
+    log(s, `${player(s, extra.player).name} takes an extra turn.`);
+  } else {
+    const from = s.rotation !== undefined && s.extraTurn ? s.rotation : prev;
+    s.rotation = undefined;
+    s.activePlayer = nextLivingAfter(s, from);
+    // "Until your next turn" ends as that turn begins, or when it would have begun for a player who left (CR 800.4m).
+    const order = s.turnOrder;
+    for (let i = (order.indexOf(from) + 1) % order.length; ; i = (i + 1) % order.length) {
+      began.add(order[i]!);
+      if (order[i] === s.activePlayer || began.size >= order.length) break;
+    }
   }
+  s.extraTurn = extra;
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
   const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
   if (ending.length) {
@@ -1118,6 +1134,11 @@ function beginStep(s: GameState, step: Step): void {
       break;
     case "end":
       fireEvent(s, { type: "step", step: "end", active: ap });
+      // "At the beginning of that turn's end step, you lose the game" (Final Fortune): a delayed trigger (CR 603.7).
+      if (s.extraTurn?.loseAtEnd) {
+        const l = s.extraTurn.loseAtEnd;
+        s.triggerQueue.push({ sourceId: l.subject.id, sourceCardId: l.sourceCardId, controller: l.controller, index: -1, subject: l.subject, body: { targets: [], effects: [{ type: "loseGame", who: { ref: "you" } }], text: "At the beginning of that turn's end step, you lose the game." } });
+      }
       break;
     case "declareAttackers":
       if (potentialAttackers(s, ap).length === 0 || opponents(s, ap).length === 0) return beginStep(s, "endCombat");
@@ -3348,7 +3369,7 @@ function syncControl(s: GameState) {
   }
 }
 
-function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
+export function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
   const p = player(s, pid);
   if (p.lost) return false;
   p.lost = true;

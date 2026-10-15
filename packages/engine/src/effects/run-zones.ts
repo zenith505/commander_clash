@@ -261,6 +261,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${defOf(s, o).name} can't be cast; it stays in exile.`);
       return;
     }
+    case "exileSpell":
     case "exileSelfWithTime": {
       const item = s.resolving?.item;
       const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
@@ -269,6 +270,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       moveObject(s, o.id, "exile"); // a copy ceases to exist (CR 707.10a)
       const moved = s.objects[o.id];
       if (moved?.zone !== "exile") return;
+      if (e.type === "exileSpell") {
+        log(s, `${name} is exiled.`);
+        return;
+      }
       moved.counters.time = e.n;
       log(s, `${name} is exiled with ${e.n} time counter${e.n === 1 ? "" : "s"} on it.`);
       return;

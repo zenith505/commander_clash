@@ -328,7 +328,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
         if (COLOR_WORDS[rest]) notColors.push(COLOR_WORDS[rest]!);
         else if (TYPE_WORDS[rest]) notTypes.push(TYPE_WORDS[rest]!);
         else if (SUPERTYPE_WORDS[rest]) notSupertypes.push(SUPERTYPE_WORDS[rest]!);
-        else if (alts.length === 1 && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura"
+        else if (alts.length === 1 && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair"
         else return null;
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
       // "Nonlegendary attacking creature": attacking after a supertype.

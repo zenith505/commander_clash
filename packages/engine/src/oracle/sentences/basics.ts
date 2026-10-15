@@ -7,7 +7,7 @@ import { NUMX, amt, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseSearch } from "../search";
-import { parseDamageRecipient, parsePlayer, parseObject } from "../targets";
+import { parseDamageRecipient, parsePlayer, parseObject, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
 
@@ -44,6 +44,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const pay = parsePayCost(m[2]!);
     if (!pay || (pay.mana && !plainMana(pay.mana))) return null;
     return [{ type: "may", effects: [], pay, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} to keep ~` }];
+  }
+  // The Lairs: "sacrifice it unless you return a non-Lair land you control to its owner's hand". Returning one keeps it;
+  // with none to return, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you return (an? .+?) you control to its owner's hand$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(m[2]!.replace(/^an? /, ""));
+    if (!filter) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
   }
   // "That player draws an additional card" (Howling Mine): just another draw.
   if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);

@@ -36,6 +36,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (spec?.kind !== "object") return null;
     return { count: { kind: "greatestPower", filter: { ...spec, text: m[2]! }, ...(m[1] ? { other: true as const } : {}) } };
   }
+  // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
+  if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
+  // "The greatest power among creature cards exiled this way" (Szat's Will, after exiling graveyards).
+  if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   if (!each && (m = /^the greatest mana value among (.+?) you control$/i.exec(p))) {
     const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} you control`, { chosen: true });

@@ -1,5 +1,5 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
-import { abilitiesOf, defOf, isPermanentCard, isType, objIsType } from "../cards";
+import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { attackedName, attackedPlaneswalker, auraHostFor, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
@@ -565,7 +565,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const n = p.graveyard.length;
-        for (const id of [...p.graveyard]) moveObject(s, id, "exile");
+        for (const id of [...p.graveyard]) {
+          // "Creature cards exiled this way": their power as it was in the graveyard (rulings on Szat's Will).
+          const o = obj(s, id);
+          if (s.resolving && objIsType(s, o, "Creature")) (s.resolving.exiledPowers ??= []).push(power(s, o));
+          moveObject(s, id, "exile");
+        }
         log(s, `${src} exiles ${p.name}'s graveyard (${n} card${n === 1 ? "" : "s"}).`);
       }
       return;

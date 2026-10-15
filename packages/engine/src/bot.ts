@@ -1,4 +1,4 @@
-import { allEffects, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, refCovers, type AbilityBody, type ActivatedAbility, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
@@ -454,8 +454,10 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     }
     // The source's colors matter for protection (CR 702.16b): a spell's card, or the ability's source.
     // Bots never pick the same thing twice, which also keeps "another target" apart.
+    // "Remove all counters from", "move all counters from": only something with counters on it.
+    const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
     const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimate = allEffects(body.effects).some((e) => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));

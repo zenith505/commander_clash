@@ -89,10 +89,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (filter === null || mayBeAura(filter)) return null;
     return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}) }];
   }
-  if ((m = /^Exile (target player's|target opponent's|each opponent's|all) graveyards?$/i.exec(s))) {
+  if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all) graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =
-      w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s$/, ""), ctx);
+      w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" || w === "all opponents'" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
   if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|up to X (?:other )?)?target .+ graveyard)$/i.exec(s))) {

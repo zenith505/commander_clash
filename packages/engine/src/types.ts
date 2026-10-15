@@ -780,6 +780,10 @@ export interface Resolving {
   damagedThisWay?: ObjectId[];
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
   discarded?: Record<PlayerId, number>;
+  /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */
+  exiledPowers?: number[];
+  /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
+  countersRemoved?: number;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   /** The mana it added, for a mana ability: what the triggered mana abilities of tapping its source see (CR 106.12a). */

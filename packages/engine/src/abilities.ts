@@ -70,6 +70,10 @@ export type Count =
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   | { kind: "discardedThisWay"; greatest?: true }
+  /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
+  | { kind: "greatestPowerExiled" }
+  /** "For each counter removed this way" (Nexus Mentality). */
+  | { kind: "countersRemovedThisWay" }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
@@ -747,6 +751,10 @@ export type Effect =
    */
   | { type: "copySpell"; spell: "cause" | { target: number }; n: Amount | "storm" | "kicked"; newTargets: boolean }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
+  | { type: "removeAllCounters"; what: ObjRef }
+  /** "Move all counters from target creature onto another target creature" (CR 122.5): only if both are still legal targets (rulings on Fate Transfer). */
+  | { type: "moveAllCounters"; from: ObjRef; to: ObjRef }
   /** "Put its counters on target creature": as many of each kind (or of `only`) as the source had as it last existed. */
   | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */

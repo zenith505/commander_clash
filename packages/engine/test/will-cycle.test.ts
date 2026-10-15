@@ -1,12 +1,13 @@
 // The rest of the Will cycle (Commander Legends / Tarkir: Dragonstorm), and what their modes needed: "Add {R} for each
 // card in target opponent's hand" (a spell's mana, CR 605.5a), counts of what a target player controls, "the greatest
 // mana value among permanents you control" (CR 202.3), "mills twice X cards", "Return all land cards from your
-// graveyard to the battlefield tapped" (CR 110.2a), and "Each player may discard their hand and draw five cards"
-// (each decides in APNAP order, CR 101.4).
+// graveyard to the battlefield tapped" (CR 110.2a), "Each player may discard their hand and draw five cards"
+// (each decides in APNAP order, CR 101.4), "the greatest power among creature cards exiled this way" (Szat's Will), and
+// moving or removing all counters (CR 122.5, Nexus Mentality).
 
 import { describe, expect, it } from "vitest";
 import { act, card, putOnBattlefield, setup, target } from "./helpers";
-import { compileCard, isFullySupported, planCast, power, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
+import { compileCard, isFullySupported, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -36,6 +37,12 @@ const sultai = card("Will of the Sultai", "Sorcery", "{4}{G}", { oracleText: `${
 const temur = card("Will of the Temur", "Sorcery", "{5}{U}", { oracleText: `${WILL}• Create a token that's a copy of target permanent, except it's a 4/4 Dragon creature with flying in addition to its other types.\n• Target player draws cards equal to the greatest mana value among permanents you control.` });
 const drown = card("Drown in Dreams", "Instant", "{X}{2}{U}", { oracleText: `${WILL}• Target player draws X cards.\n• Target player mills twice X cards.` });
 const jeskai = card("Will of the Jeskai", "Sorcery", "{3}{R}", { oracleText: `${WILL}• Each player may discard their hand and draw five cards.\n• Each instant and sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to its mana cost.` });
+const szat = card("Szat's Will", "Instant", "{4}{B}", { oracleText: `${WILL}• Each opponent sacrifices a creature they control with the greatest power.\n• Exile all opponents' graveyards, then create X 0/1 black Thrull creature tokens, where X is the greatest power among creature cards exiled this way.` });
+const nexus = card("Nexus Mentality", "Instant", "{3}{U}", { oracleText: `${WILL}• Move all counters from target nonland permanent you control onto another target nonland permanent you control.\n• Remove all counters from target nonland permanent you control. Draw a card for each counter removed this way.` });
+const fateTransfer = card("Fate Transfer", "Instant", "{1}{U/B}", { oracleText: "Move all counters from target creature onto another target creature." });
+const hexmage = card("Vampire Hexmage", "Creature — Vampire Shaman", "{B}{B}", { power: "2", toughness: "1", keywords: ["First strike"], oracleText: "First strike\nSacrifice this creature: Remove all counters from target permanent." });
+const scales = card("Hardened Scales", "Enchantment", "{G}", { oracleText: "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead." });
+const walker = card("Test Walker", "Legendary Planeswalker — Test", "{3}", { loyalty: "4", oracleText: "+1: You gain 1 life." });
 const planarBirth = card("Planar Birth", "Sorcery", "{1}{W}", { oracleText: "Return all basic land cards from all graveyards to the battlefield tapped under their owners' control." });
 const gibbon = card("Towering Gibbon", "Creature — Ape", "{3}{G}", { power: "*", toughness: "4", oracleText: "Reach\nTowering Gibbon's power is equal to the greatest mana value among creatures you control." });
 const crypt = card("Crypt of Agadeem", "Land", "", { oracleText: "This land enters tapped.\n{T}: Add {B}.\n{2}, {T}: Add {B} for each black creature card in your graveyard." });
@@ -146,5 +153,101 @@ describe("returning all land cards, mana for each, greatest mana value", () => {
 
   it("an activated ability with no target that adds mana is a mana ability (CR 605.1a), not one that uses the stack", () => {
     expect(compileCard(crypt).activated.every((a) => a.mana)).toBe(true);
+  });
+});
+
+describe("Szat's Will", () => {
+  it("parses", () => supported(szat, nexus, fateTransfer, hexmage));
+
+  it("each opponent sacrifices their creature with the greatest power, each on their own (rulings)", () => {
+    const { s: s0, ap, opp, ids } = setup([szat]);
+    const other = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const [big, small] = [putOnBattlefield(s0, opp, titan), putOnBattlefield(s0, opp, giant)];
+    const theirs = putOnBattlefield(s0, other, giant);
+    const mine = putOnBattlefield(s0, ap, titan);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], [0])));
+    expect([big, small, theirs, mine].map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "battlefield", "graveyard", "battlefield"]);
+  });
+
+  it("exiles the opponents' graveyards and makes a Thrull for each power of the biggest creature card exiled", () => {
+    const { s: s0, ap, opp, ids } = setup([szat]);
+    const other = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const exiled = [toYard(s0, opp, giant), toYard(s0, other, titan), toYard(s0, other, forestCard)];
+    const kept = toYard(s0, ap, titan);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], [1])));
+    expect(exiled.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile"]);
+    expect(s.objects[kept]!.zone).toBe("graveyard");
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && name(s, id).includes("Thrull"))).toHaveLength(6);
+  });
+
+  it("with both modes, the creature sacrificed first is exiled and counted too (rulings)", () => {
+    const { s: s0, ap, opp, ids } = setup([szat]);
+    putOnBattlefield(s0, ap, giant, { commander: true });
+    const big = putOnBattlefield(s0, opp, titan);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], [0, 1])));
+    expect(s.objects[big]!.zone).toBe("exile");
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && name(s, id).includes("Thrull"))).toHaveLength(6);
+  });
+
+  it("with no creature cards exiled, X is 0", () => {
+    const { s: s0, ap, opp, ids } = setup([szat]);
+    toYard(s0, opp, forestCard);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], [1])));
+    expect(s.battlefield.filter((id) => name(s, id).includes("Thrull"))).toHaveLength(0);
+  });
+});
+
+describe("moving and removing all counters", () => {
+  it("Nexus Mentality: moves every kind of counter from one of your permanents onto another", () => {
+    const { s: s0, ap, ids } = setup([nexus]);
+    const [a, b] = [putOnBattlefield(s0, ap, giant), putOnBattlefield(s0, ap, giant)];
+    s0.objects[a]!.counters = { "+1/+1": 2, stun: 1 };
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(a), target(b)], [0])));
+    expect(Object.values(s.objects[a]!.counters).every((n) => !n)).toBe(true);
+    expect(s.objects[b]!.counters).toMatchObject({ "+1/+1": 2, stun: 1 });
+    expect(power(s, s.objects[b]!)).toBe(5);
+  });
+
+  it("moved counters are put on, so Hardened Scales adds one (Nexus Mentality rulings)", () => {
+    const { s: s0, ap, ids } = setup([nexus]);
+    putOnBattlefield(s0, ap, scales);
+    const [a, b] = [putOnBattlefield(s0, ap, giant), putOnBattlefield(s0, ap, giant)];
+    s0.objects[a]!.counters = { "+1/+1": 2 };
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(a), target(b)], [0])));
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(3);
+  });
+
+  it("Nexus Mentality: removes all counters and draws a card for each", () => {
+    const { s: s0, ap, ids } = setup([nexus]);
+    const a = putOnBattlefield(s0, ap, giant);
+    s0.objects[a]!.counters = { "+1/+1": 2, stun: 1 };
+    const hand = s0.players[ap]!.hand.length - 1;
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(a)], [1])));
+    expect(Object.values(s.objects[a]!.counters).every((n) => !n)).toBe(true);
+    expect(s.players[ap]!.hand.length).toBe(hand + 3);
+  });
+
+  it("Fate Transfer: if one target is gone, no counters move (CR 122.5, rulings)", () => {
+    const { s: s0, ap, opp, ids } = setup([fateTransfer]);
+    const [a, b] = [putOnBattlefield(s0, opp, giant), putOnBattlefield(s0, ap, giant)];
+    s0.objects[a]!.counters = { "-1/-1": 1 };
+    let s = run(s0, planCast(s0, ap, ids[0]!, [target(b), target(a)]));
+    // The second target leaves before it resolves.
+    s.battlefield.splice(s.battlefield.indexOf(a), 1);
+    s.objects[a]!.zone = "graveyard";
+    s.objects[a]!.zoneChanges = (s.objects[a]!.zoneChanges ?? 0) + 1;
+    s.players[opp]!.graveyard.push(a);
+    s = settle(s);
+    expect(s.objects[b]!.counters["-1/-1"] ?? 0).toBe(0);
+  });
+
+  it("Vampire Hexmage: removing a planeswalker's loyalty counters puts it into the graveyard (CR 704.5i)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const mage = putOnBattlefield(s0, ap, hexmage);
+    const pw = putOnBattlefield(s0, opp, walker);
+    s0.objects[pw]!.counters.loyalty = 4;
+    const s = settle(run(s0, planActivate(s0, ap, mage, 0, [target(pw)])));
+    expect(s.objects[pw]!.zone).toBe("graveyard");
+    expect(s.objects[mage]!.zone).toBe("graveyard");
   });
 });

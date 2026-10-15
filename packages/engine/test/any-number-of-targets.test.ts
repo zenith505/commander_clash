@@ -108,13 +108,13 @@ describe("any number of targets", () => {
 
   it("Gravepurge: the chosen creature cards from your graveyard go on top, then you draw one", () => {
     const { s: s0, ap, ids } = setup([gravepurge]);
-    const [a, b] = [0, 1].map(() => {
+    const [a, b] = [0, 1].map((): ObjectId => {
       const id = putOnBattlefield(s0, ap, bear());
       s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
       s0.objects[id]!.zone = "graveyard";
       s0.players[ap]!.graveyard.push(id);
       return id;
-    });
+    }) as [ObjectId, ObjectId];
     const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(a), target(b)])));
     const lib = s.players[ap]!.library;
     const drawn = [a, b].filter((id) => zone(s, id) === "hand");

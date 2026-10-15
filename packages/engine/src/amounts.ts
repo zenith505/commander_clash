@@ -94,6 +94,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
     case "cardsInLibrary":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.library.length, 0);
+    case "greatestPowerExiled":
+      return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
+    case "countersRemovedThisWay":
+      return s.resolving?.countersRemoved ?? 0;
     case "discardedThisWay": {
       const counts = Object.values(s.resolving?.discarded ?? {});
       return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
@@ -285,6 +289,10 @@ function describeCount(c: Count): string {
       return "#cards in library";
     case "discardedThisWay":
       return c.greatest ? "the most cards discarded" : "#cards discarded";
+    case "greatestPowerExiled":
+      return "the greatest power among creature cards exiled";
+    case "countersRemovedThisWay":
+      return "#counters removed";
     case "cardsInGraveyard":
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":

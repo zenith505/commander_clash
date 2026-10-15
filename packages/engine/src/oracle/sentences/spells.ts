@@ -130,6 +130,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!spec || unless === null) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
   }
+  // Deflection: "Change the target of target spell with a single target" (CR 115.7a). Not "spell or ability": the
+  // engine's stack targets are spells.
+  if ((m = /^Change the target of target spell with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s))) {
+    const unless = m[1] === undefined ? undefined : parseUnlessPays(m[1], ctx);
+    if (unless === null) return null;
+    const spec = { kind: "spell" as const, singleTarget: true, text: "target spell with a single target" };
+    return [{ type: "changeTarget", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
+  }
   // "Whenever a player casts a spell, counter it unless that player pays {1}."
   if (ctx.castSpell && (m = /^Counter (?:it|that spell) unless (?:that player|its controller) pays (.+)$/i.exec(s))) {
     const unless = parseUnlessPays(m[1]!, ctx);

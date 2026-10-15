@@ -20,6 +20,7 @@ import {
   describeTargets,
   describeCount,
   canChooseTarget,
+  sameTarget,
   divisionProblem,
   legalModes,
   spellModes,
@@ -173,7 +174,12 @@ type Targeting =
   | { mode: "activate"; objectId: string; index: number; specs: TargetSpec[]; chosen: TargetChoice[]; label: string; modes?: number[]; x?: number }
   | { mode: "trigger"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   /** New targets for a copy of a spell (CR 707.10c), or keep the old ones. */
-  | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string };
+  | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
+  /** The new target of a spell whose target a resolving spell changes (CR 115.7a): one of the pending options. */
+  | { mode: "change"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string };
+
+/** Targeting the engine is waiting on, which can't be cancelled. */
+const answering = (t: Targeting | null | undefined) => t?.mode === "trigger" || t?.mode === "copy" || t?.mode === "change";
 
 /** Targets chosen for damage "divided as you choose" (CR 601.2d): how much each gets, at least 1 each. */
 type Dividing = { targeting: Targeting; chosen: TargetChoice[] };
@@ -317,8 +323,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setTapPick(null);
     if (pending?.kind === "chooseTargets") setTargeting({ mode: "trigger", specs: pending.specs, chosen: [], label: pending.description });
     else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: [], label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
-    else setTargeting((t) => (t?.mode === "trigger" || t?.mode === "copy" ? null : t));
-  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : ""]);
+    else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
+    else setTargeting((t) => (answering(t) ? null : t));
+  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" ? pending.stackId : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
   // Opponents' planeswalkers, which can be attacked (CR 506.2).
@@ -345,7 +352,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setCostPick(null);
         setAim(null);
         setBlocker(null);
-        setTargeting((t) => (t?.mode === "trigger" || t?.mode === "copy" ? t : null));
+        setTargeting((t) => (answering(t) ? t : null));
         setDividing((d) => (d?.targeting.mode === "trigger" ? d : null));
       } else if (e.key === " " && k.s && !k.targeting && !k.modePick && !k.tapPick && !k.picking && !k.pending && waitingOn(k.s) === HUMAN) {
         e.preventDefault();
@@ -364,7 +371,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const nextSpec = targeting ? targeting.specs[targeting.chosen.length] : undefined;
   // "Another target creature" on a permanent's ability can't be that permanent.
   const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : undefined;
-  const canTarget = (c: TargetChoice) => !!s && !!targeting && !!nextSpec && canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, undefined, targetSource);
+  const canTarget = (c: TargetChoice) =>
+    !!s &&
+    !!targeting &&
+    !!nextSpec &&
+    (targeting.mode === "change" ? pending?.kind === "changeTarget" && pending.options.some((o) => sameTarget(o, c)) : canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, undefined, targetSource));
 
   function pickTarget(c: TargetChoice) {
     if (!s || !targeting || !nextSpec) return;
@@ -387,9 +398,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setTargeting(null);
     setDividing(null);
     // Then how a divided amount is split among them (CR 601.2d); a copy keeps the division it has.
-    if (!divided && tg.mode !== "copy" && tg.specs.some((x) => x.divided)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
+    if (!divided && tg.mode !== "copy" && tg.mode !== "change" && tg.specs.some((x) => x.divided)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
     if (tg.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
+    if (tg.mode === "change") return dispatch([{ type: "changeTarget", player: HUMAN, target: chosen[0]! }]);
     if (tg.mode === "cast") return continueCast({ ...tg.draft, targets: chosen });
     continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, targets: chosen });
   }
@@ -781,7 +793,17 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   {describeTargets(s, pending.current).replace(/^ targeting /, ": ")}
                 </button>
               )}
-              {targeting.mode !== "trigger" && targeting.mode !== "copy" && <button onClick={() => setTargeting(null)}>Cancel</button>}
+              {/* The spell doing the changing is still on the stack (CR 608.2n), though not shown there: a button for it. */}
+              {targeting.mode === "change" &&
+                pending?.kind === "changeTarget" &&
+                pending.options
+                  .filter((o) => o.kind === "stack" && !s.stack.some((x) => x.id === o.id))
+                  .map((o) => (
+                    <button key={o.kind === "stack" ? o.id : ""} onClick={() => pickTarget(o)}>
+                      {pending.source}
+                    </button>
+                  ))}
+              {!answering(targeting) && <button onClick={() => setTargeting(null)}>Cancel</button>}
             </div>
           )}
           {dividing && (
@@ -820,7 +842,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onSkip={nextSpec.optional ? skipTargets : undefined}
               onHover={setHover}
               onPick={(id) => pickTarget({ kind: "object", id })}
-              onCancel={targeting.mode === "trigger" || targeting.mode === "copy" ? undefined : () => setTargeting(null)}
+              onCancel={answering(targeting) ? undefined : () => setTargeting(null)}
             />
           )}
           {(modePick || pending?.kind === "chooseModes") && (
@@ -2769,7 +2791,7 @@ function Controls({
               pay <ManaCost cost={pending.cost} size="sm" />
             </>
           )}
-          {life ? ` and ${life} life` : ""} or {pending.what} is countered.
+          {life ? ` and ${life} life` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
         </span>
         <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>
           Pay
@@ -2921,7 +2943,7 @@ function targetingArrows(s: GameState, targeting: Targeting | null, intent: Retu
     intent.targets.forEach((t, i) => out.push({ key: `intent:${i}`, from, to: targetSelectors(t), color: playerColor(intent.player), aiming: true }));
   }
   if (targeting) {
-    const sourceId = targeting.mode === "trigger" ? (s.pending?.kind === "chooseTargets" ? s.pending.sourceId : undefined) : targeting.mode === "copy" ? undefined : targeting.mode === "cast" ? targeting.draft.objectId : targeting.objectId;
+    const sourceId = targeting.mode === "trigger" ? (s.pending?.kind === "chooseTargets" ? s.pending.sourceId : undefined) : targeting.mode === "copy" || targeting.mode === "change" ? undefined : targeting.mode === "cast" ? targeting.draft.objectId : targeting.objectId;
     const from = [...(sourceId ? [`[data-obj="${sourceId}"]`] : []), `[data-player="${HUMAN}"]`];
     const color = playerColor(HUMAN);
     targeting.chosen.forEach((t, i) => out.push({ key: `mine:${i}`, from, to: targetSelectors(t), color }));

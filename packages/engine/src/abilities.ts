@@ -170,6 +170,11 @@ export interface TargetSpec {
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
   chosen?: "type" | "notType" | "color" | "notColor";
+  /**
+   * "Target spell with a single target": a spell that targets exactly one thing once, whether or not that target is
+   * still legal (rulings on Deflection).
+   */
+  singleTarget?: boolean;
   /** Original text, for display. */
   text: string;
 }
@@ -607,6 +612,11 @@ export type Effect =
   | { type: "bite"; a: ObjRef; b: ObjRef } // a deals damage equal to its power to b
   /** Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead". */
   | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean }
+  /**
+   * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
+   * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
+   */
+  | { type: "changeTarget"; index: number; unless?: UnlessPays }
   /**
    * Counter the spell or ability that triggered this unless its controller pays: ward (CR 702.21a),
    * "Whenever a player casts a spell, counter it unless that player pays {1}".

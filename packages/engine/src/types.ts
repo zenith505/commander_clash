@@ -441,7 +441,7 @@ export type PendingDecision =
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
    */
-  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; source: string; what: string }
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
   /**
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
@@ -490,6 +490,8 @@ export type PendingDecision =
    * spell's description; `left` counts this copy and the ones after it.
    */
   | { kind: "copyTargets"; player: PlayerId; source: string; copyOf: string; specs: TargetSpec[]; current: TargetChoice[]; left: number }
+  /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
+  | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
   | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] };
 
@@ -658,6 +660,7 @@ export interface Resolving {
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     may?: boolean; // the answer to "you may ..."
     paid?: boolean; // the answer to "unless that player pays ..."
+    newTarget?: TargetChoice; // "change the target of target spell": the new one, chosen as this resolves (CR 115.7a)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
@@ -693,6 +696,8 @@ export type Action =
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */
   | { type: "copyTargets"; player: PlayerId; targets?: TargetChoice[] }
+  /** The new target for a spell whose target is being changed (see PendingDecision "changeTarget"). */
+  | { type: "changeTarget"; player: PlayerId; target: TargetChoice }
   /** `planeswalker`: it attacks that planeswalker, controlled by `defender`, instead of the player (CR 508.1b). */
   | { type: "declareAttackers"; player: PlayerId; attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[] }
   | { type: "declareBlockers"; player: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[] }

@@ -3,7 +3,7 @@ import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFr
 import { abilitiesOf, bestowedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem } from "./effects";
 import { describeCount, withModes } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -355,6 +355,9 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "chooseOption":
       chooseOption(s, p, action.choice);
+      break;
+    case "changeTarget":
+      chooseNewTarget(s, p, action.target);
       break;
     case "payUnless":
       payUnless(s, p, action.pay);
@@ -2111,7 +2114,7 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
   const names = targets.flatMap((t) =>
     t.kind === "none"
       ? []
-      : (t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : (s.stack.find((x) => x.id === t.id)?.description ?? "a spell")) +
+      : (t.kind === "player" ? player(s, t.id).name : t.kind === "object" ? nameOf(s, t.id) : ((s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined))?.description ?? "a spell")) +
         (t.kind !== "stack" && t.amount !== undefined ? ` (${t.amount})` : ""),
   );
   return names.length ? ` targeting ${names.join(", ")}` : "";
@@ -2294,6 +2297,18 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     targets = kept;
   }
   sc.targets = targets ?? pend.current;
+  s.pending = null;
+  continueResolution(s);
+}
+
+/** The new target of a spell whose target is being changed (CR 115.7a): one of the legal ones offered. */
+function chooseNewTarget(s: GameState, p: Player, target: TargetChoice) {
+  const pend = s.pending;
+  const sc = s.resolving?.scratch ?? (s.resolving ? (s.resolving.scratch = {}) : undefined);
+  if (pend?.kind !== "changeTarget" || pend.player !== p.id || !sc) throw new RulesError("no target to change");
+  const t = pend.options.find((o) => sameTarget(o, target));
+  if (!t) throw new RulesError("that isn't a legal new target");
+  sc.newTarget = t;
   s.pending = null;
   continueResolution(s);
 }

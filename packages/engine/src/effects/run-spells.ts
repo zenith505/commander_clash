@@ -1,11 +1,11 @@
-import type { AbilityBody, Effect, SpellCondition, TargetChoice, UnlessPays } from "../abilities";
+import type { AbilityBody, Effect, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
 import { manaValue, parseManaCost } from "../mana";
 import { cardIdOf, defOf, isType } from "../cards";
 import { shuffle } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, player } from "../game";
-import { compileCard } from "../oracle";
+import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { stampTargets } from "./targeting";
+import { isLegalTarget, legalTargets, sameTarget, sourceQuality, stampTargets } from "./targeting";
 import { ResolveCtx, objects, amountNow } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards } from "./run-library";
@@ -133,6 +133,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Ward (CR 702.21a) and "counter it unless that player pays": the spell or ability that triggered this.
       return counterOnStack(s, ctx, ctx.cause, e.ward ? `${src}'s ward` : src, e.unless);
     }
+    case "changeTarget": {
+      const t = ctx.targets[e.index];
+      if (!ctx.legal[e.index] || t?.kind !== "stack") return;
+      return changeTarget(s, ctx, t.id, src, e.unless);
+    }
     case "counterSpell": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
@@ -157,33 +162,94 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     return;
   }
   if (unless) {
-    const r = s.resolving!;
-    const sc = (r.scratch ??= {});
-    // "Ward—Discard a card": the cards they chose to discard (see payUnless).
-    if (sc.paid === undefined && unless.discard && sc.chosen?.[item.controller]) {
-      discardCards(s, item.controller, sc.chosen[item.controller]!);
-      sc.paid = true;
-    }
-    if (sc.paid === undefined) {
-      const p = player(s, item.controller);
-      // The amount is fixed as the choice is offered (CR 608.2h).
-      const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : amountNow(s, unless.generic, ctx));
-      // A player can't discard more cards than they have (CR 701.9b), so they can't pay that.
-      if (p.lost || (unless.discard && p.hand.length < unless.discard)) sc.paid = false;
-      else if (cost === "{0}" && !unless.life && !unless.discard) {
-        // Paying {0} is just saying so (CR 118.5); nobody would refuse.
-        log(s, `${p.name} pays {0} for ${by}.`);
-        sc.paid = true;
-      } else {
-        s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(unless.life ? { life: unless.life } : {}), ...(unless.discard ? { discard: unless.discard } : {}) };
-        return "paused";
-      }
-    }
-    if (sc.paid) return;
+    const paid = paidUnless(s, ctx, item.controller, unless, by, what);
+    if (paid === "paused") return paid;
+    if (paid) return;
   }
   s.stack.splice(i, 1);
   if (item.objectId) moveObject(s, item.objectId, exile ? "exile" : "graveyard");
   log(s, `${by} counters ${what}${exile && item.objectId ? " and exiles it" : ""}.`);
+}
+
+/**
+ * "Unless [payer] pays ...", as this resolves (CR 118.12): true if they paid, false if they didn't, "paused" while they
+ * choose. They may activate mana abilities to pay (CR 605.3a).
+ */
+function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unless: UnlessPays, by: string, what: string, otherwise?: string): boolean | "paused" {
+  const sc = (s.resolving!.scratch ??= {});
+  // "Ward—Discard a card": the cards they chose to discard (see payUnless).
+  if (sc.paid === undefined && unless.discard && sc.chosen?.[payer]) {
+    discardCards(s, payer, sc.chosen[payer]!);
+    sc.paid = true;
+  }
+  if (sc.paid === undefined) {
+    const p = player(s, payer);
+    // The amount is fixed as the choice is offered (CR 608.2h).
+    const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : amountNow(s, unless.generic, ctx));
+    // A player can't discard more cards than they have (CR 701.9b), so they can't pay that.
+    if (p.lost || (unless.discard && p.hand.length < unless.discard)) sc.paid = false;
+    else if (cost === "{0}" && !unless.life && !unless.discard) {
+      // Paying {0} is just saying so (CR 118.5); nobody would refuse.
+      log(s, `${p.name} pays {0} for ${by}.`);
+      sc.paid = true;
+    } else {
+      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(unless.life ? { life: unless.life } : {}), ...(unless.discard ? { discard: unless.discard } : {}) };
+      return "paused";
+    }
+  }
+  return sc.paid;
+}
+
+/**
+ * "Change the target of target spell with a single target" (CR 115.7a): the new target is chosen as this resolves, and
+ * must be another legal target for that spell, as if it were choosing now (this spell included: it's still on the
+ * stack, CR 608.2n; the spell itself isn't, CR 115.5). With none, the target stays as it is, legal or not. Its new
+ * target becomes a target of it ("becomes the target" triggers, ward).
+ */
+function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays): "paused" | void {
+  const item = s.stack.find((x) => x.id === stackId);
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  if (!item || item.kind !== "spell" || !o) return;
+  const j = (item.targets ?? []).findIndex((t) => t.kind !== "none");
+  const current = item.targets?.[j];
+  if (!current || current.kind === "none") return;
+  if (unless) {
+    const paid = paidUnless(s, ctx, item.controller, unless, by, item.description, `${by} changes its target`);
+    if (paid === "paused") return paid;
+    if (paid) return;
+  }
+  const sc = (s.resolving!.scratch ??= {});
+  const spec = (item.body?.targets ?? spellTargetSpecs(defOf(s, o), item.modes))[j];
+  if (!spec) return;
+  if (!sc.newTarget) {
+    const options = changeTargetOptions(s, item, spec, current);
+    if (!options.length) {
+      log(s, `${item.description} has no other legal target, so its target stays the same.`);
+      return;
+    }
+    if (options.length > 1) {
+      s.pending = { kind: "changeTarget", player: ctx.controller, source: by, spell: item.description, stackId: item.id, index: j, spec, current, options };
+      return "paused";
+    }
+    sc.newTarget = options[0]!;
+  }
+  // A divided amount stays with the one target (CR 601.2d).
+  const amount = current.kind === "object" || current.kind === "player" ? current.amount : undefined;
+  const t = sc.newTarget;
+  const next = amount !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount } : t;
+  item.targets = item.targets!.map((x, i) => (i === j ? stampTargets(s, [next])![0]! : x));
+  log(s, `${by} changes the target of ${item.description}${describeTargets(s, [next]).replace(/^ targeting/, " to")}.`);
+  fireEvent(s, { type: "targeted", stackId: item.id });
+}
+
+/** The legal new targets for a spell's one target (see changeTarget). */
+export function changeTargetOptions(s: GameState, item: StackItem, spec: TargetSpec, current: TargetChoice): TargetChoice[] {
+  const o = s.objects[item.objectId!]!;
+  const src = sourceQuality(s, undefined, cardIdOf(o));
+  const all: TargetChoice[] = legalTargets(s, spec, item.controller, item.id, src);
+  const self = s.resolving?.item;
+  if (spec.kind === "spell" && self && self.id !== item.id && isLegalTarget(s, spec, { kind: "stack", id: self.id }, item.controller, src)) all.push({ kind: "stack", id: self.id });
+  return all.filter((t) => !sameTarget(current, t));
 }
 
 /** "{1}{U}" plus 3 generic: "{4}{U}". */

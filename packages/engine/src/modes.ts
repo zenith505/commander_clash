@@ -13,8 +13,14 @@ export function modeCountProblem(body: AbilityBody, modes: number[]): string | n
   if (!m) return modes.length ? "this isn't modal" : null;
   if (modes.some((i) => !Number.isInteger(i) || i < 0 || i >= m.modes.length)) return "no such mode";
   if (new Set(modes).size !== modes.length) return "each mode can be chosen only once"; // CR 700.2d
-  if (modes.length < m.min || modes.length > m.max) return `choose ${describeCount(m.min, m.max)}`;
+  if (modes.length < m.min || (modes.length > m.max && !entwined(body, modes))) return `choose ${describeCount(m.min, m.max)}${m.entwine ? ", or all of them (entwine)" : ""}`;
   return null;
+}
+
+/** All the modes of a spell with entwine were chosen, so it costs its entwine cost more (CR 702.42a). */
+export function entwined(body: AbilityBody, modes: number[] | undefined): boolean {
+  const m = body.modal;
+  return !!m?.entwine && !!modes && modes.length === m.modes.length && modes.length > m.max;
 }
 
 export function describeCount(min: number, max: number): string {

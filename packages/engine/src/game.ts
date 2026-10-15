@@ -4,7 +4,7 @@ import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf,
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, beginResolution, continueResolution, targetProblem, enterAttacking } from "./effects";
-import { describeCount, withModes } from "./modes";
+import { describeCount, entwined, withModes } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -21,6 +21,7 @@ import {
   RulesError,
   type Action,
   type CardDef,
+  type ContinuousEffect,
   type CostChoices,
   type ExtraTurn,
   type FaceDownKind,
@@ -647,7 +648,8 @@ export function moveObject(
     // It's a new object now (CR 400.7): effects locked onto it end, and things attached to it
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
     for (const e of s.effects) e.affected = e.affected.filter((x) => x !== id);
-    s.effects = s.effects.filter((e) => e.affected.length);
+    // "For as long as ~ remains tapped": it isn't tapped anymore (rulings on Vedalken Shackles).
+    s.effects = s.effects.filter((e) => e.affected.length && e.whileTapped?.id !== id);
     for (const other of s.battlefield)
       if (s.objects[other]!.attachedTo === id) {
         s.objects[other]!.attachedTo = undefined;
@@ -992,6 +994,26 @@ export function untapPermanent(s: GameState, o: GameObject) {
     return;
   }
   o.tapped = false;
+  o.untaps = (o.untaps ?? 0) + 1;
+  endWhileTapped(s);
+}
+
+/**
+ * End "for as long as ~ remains tapped" effects (CR 611.2b) whose permanent untapped, left the battlefield (it's no
+ * longer tapped, rulings), phased out (CR 702.26f), or, with "for as long as you control ~", changed control.
+ */
+export function endWhileTapped(s: GameState): boolean {
+  const ended = s.effects.filter((e) => e.whileTapped && !whileTappedHolds(s, e.whileTapped));
+  if (!ended.length) return false;
+  s.effects = s.effects.filter((e) => !ended.includes(e));
+  invalidateCharacteristics(s);
+  return true;
+}
+
+export function whileTappedHolds(s: GameState, w: NonNullable<ContinuousEffect["whileTapped"]>): boolean {
+  const o = s.objects[w.id];
+  if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== w.zc || !o.tapped || (o.untaps ?? 0) !== w.untaps) return false;
+  return w.controller === undefined || controllerOf(s, o) === w.controller;
 }
 
 /**
@@ -1313,6 +1335,23 @@ function startNextTurn(s: GameState) {
   beginStep(s, "untap");
 }
 
+/** The untap step untaps the active player's permanents, except `keep` (CR 502.3), then ends (no priority, CR 502.4). */
+function untapStep(s: GameState, keep: ObjectId[]): void {
+  const ap = s.activePlayer;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== ap) {
+      // "Untap ~ during each other player's untap step": at the same time; what stops it untapping during its
+      // controller's own untap step doesn't apply (Seedborn Muse and Quest for Renewal rulings).
+      if (characteristics(s, o).untapsDuringOthers) untapPermanent(s, o);
+      continue;
+    }
+    if (o.skipNextUntap) o.skipNextUntap = undefined;
+    else if (!keep.includes(id) && !characteristics(s, o).doesntUntap) untapPermanent(s, o); // CR 502.3
+  }
+  return advanceStep(s);
+}
+
 /** Enter a step, perform its turn-based actions, and give the active player priority if the step has priority. */
 function beginStep(s: GameState, step: Step): void {
   s.step = step;
@@ -1320,20 +1359,19 @@ function beginStep(s: GameState, step: Step): void {
   s.priority = s.activePlayer;
   const ap = s.activePlayer;
   switch (step) {
-    case "untap":
+    case "untap": {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
-      for (const id of s.battlefield) {
+      // "You may choose not to untap ~": the active player decides which permanents will untap (CR 502.3).
+      const may = s.battlefield.filter((id) => {
         const o = obj(s, id);
-        if (controllerOf(s, o) !== ap) {
-          // "Untap ~ during each other player's untap step": at the same time; what stops it untapping during its
-          // controller's own untap step doesn't apply (Seedborn Muse and Quest for Renewal rulings).
-          if (characteristics(s, o).untapsDuringOthers) untapPermanent(s, o);
-          continue;
-        }
-        if (o.skipNextUntap) o.skipNextUntap = undefined;
-        else if (!characteristics(s, o).doesntUntap) untapPermanent(s, o); // CR 502.3
+        return o.tapped && controllerOf(s, o) === ap && !o.skipNextUntap && !characteristics(s, o).doesntUntap && abilitiesOf(s, o).mayNotUntap;
+      });
+      if (may.length) {
+        s.pending = { kind: "pickPermanents", player: ap, source: "Untap step", action: "keepTapped", what: "permanents to keep tapped", options: may, count: may.length, min: 0 };
+        return;
       }
-      return advanceStep(s); // no priority in untap (CR 502.4)
+      return untapStep(s, []);
+    }
     case "upkeep": {
       const p = player(s, ap);
       p.lastUpkeepTurn = p.upkeepTurn;
@@ -1940,7 +1978,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const kicker = compileCard(d).kicker;
   // So are spree's costs for the chosen modes (CR 702.172a), also when it's cast without paying its mana cost (rulings).
   const spree = compileCard(d).spell?.modal?.costs;
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "");
+  const spell = compileCard(d).spell;
+  const entwine = spell && entwined(spell, how.modes) ? spell.modal!.entwine! : "";
+  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine;
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
@@ -2711,6 +2751,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
+    ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
   });
   if (ab.cycling) log(s, `${p.name} cycles ${d.name} (${ab.text}).`);
   else if (ab.discardSelf) log(s, `${p.name} discards ${d.name} (${ab.text}).`);
@@ -2811,13 +2852,19 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
-  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
     throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
   if (pend.action === "exert") {
     exertChosen(s, ids);
+    return;
+  }
+  if (pend.action === "keepTapped") {
+    s.pending = null;
+    if (ids.length) log(s, `${p.name} keeps ${ids.map((id) => nameOf(s, id)).join(", ")} tapped.`);
+    untapStep(s, ids);
     return;
   }
   if (pend.action === "enlist") {
@@ -3791,6 +3838,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
     invalidateCharacteristics(s);
+    endWhileTapped(s);
     syncControl(s);
     checkPairs(s);
     checkAscend(s);

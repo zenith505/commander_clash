@@ -124,6 +124,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "band") return [{ type: "pickPermanents", player: pid, ids: [] }];
     // Exert (CR 701.43d): for its "when you do" bonus, while there's life to spare for it not untapping.
     if (pend.kind === "pickPermanents" && pend.action === "exert") return [{ type: "pickPermanents", player: pid, ids: chooseExert(s, pid, pend.options) }];
+    // "You may choose not to untap ~": keep it tapped while one of its "for as long as ~ remains tapped" effects lasts.
+    if (pend.kind === "pickPermanents" && pend.action === "keepTapped") return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id)) }];
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
@@ -418,7 +420,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, body: AbilityBody, fo
   for (let i = 0; i < body.targets.length; i++) {
     const spec = body.targets[i]!;
     if (spec.divided?.first === i) {
-      const picks = divideDamage(s, pid, body, i, out, forced, sourceId);
+      const picks = spec.divided.counter === "+1/+1" ? distributeCounters(s, pid, body, i, out, forced, sourceId) : divideDamage(s, pid, body, i, out, forced, sourceId);
       if (!picks) return null;
       out.push(...picks);
       i += spec.divided.n - 1;
@@ -477,6 +479,8 @@ function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: num
   const need = (t: ChosenTarget) => {
     if (t.kind !== "object") return Infinity;
     const o = obj(s, t.id);
+    // -1/-1 counters kill by toughness, whatever damage or indestructible (CR 704.5f).
+    if (spec.divided!.counter) return objIsType(s, o, "Creature") ? Math.max(1, toughness(s, o)) : Infinity;
     return objIsType(s, o, "Creature") ? Math.max(1, lethalDamage(s, o)) : objIsType(s, o, "Planeswalker") ? Math.max(1, o.counters.loyalty ?? 0) : Infinity;
   };
   const picks: { t: ChosenTarget; n: number }[] = [];
@@ -496,6 +500,19 @@ function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: num
   }
   if (!picks.length) return null;
   return Array.from({ length: n }, (_, k): TargetChoice => (picks[k] ? { ...picks[k]!.t, amount: picks[k]!.n } as TargetChoice : { kind: "none" }));
+}
+
+/** "Distribute +1/+1 counters among" targets (CR 601.2d): all of them on our best creature among the legal targets. */
+function distributeCounters(s: GameState, pid: PlayerId, body: AbilityBody, first: number, before: TargetChoice[], forced: boolean, sourceId?: string): TargetChoice[] | null {
+  const spec = body.targets[first]!;
+  const { n, total, upTo } = spec.divided!;
+  const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
+    (t) => !before.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
+  );
+  const mine = all.filter((t) => isMine(s, pid, t));
+  const pick = mine.length ? best(s, pid, mine, false, 0) : forced && !upTo && all.length ? worst(s, pid, all) : undefined;
+  if (!pick && !upTo) return null;
+  return Array.from({ length: n }, (_, k): TargetChoice => (k === 0 && pick ? ({ ...pick, amount: total } as TargetChoice) : { kind: "none" }));
 }
 
 /**
@@ -714,6 +731,11 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   const printed = castingBody(castDef(s, id, alt));
   const choice = printed?.modal ? chooseModes(s, pid, printed, false, id) : null;
   if (printed?.modal && !choice) return null;
+  // Entwine (CR 702.42a): every mode, when we can pay for it and they all have targets.
+  if (printed?.modal?.entwine && legalModes(s, printed, pid).every(Boolean)) {
+    const plan = castPlanWithModes(s, pid, id, free, x, via, alt, printed.modal.modes.map((_, i) => i));
+    if (plan) return plan;
+  }
   if (!printed?.modal?.costs) return castPlanWithModes(s, pid, id, free, x, via, alt, choice?.modes);
   // Spree (CR 702.172a): each mode costs more, so the most useful modes we can pay for.
   for (let n = choice!.ranked.length; n >= 1; n--) {

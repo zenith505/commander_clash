@@ -1,8 +1,9 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
 import type { Effect, ObjRef } from "../../abilities";
-import { NUMX, COUNTER, counterKind, amt, isGroup } from "../words";
-import { pickFilter, parseObject } from "../targets";
+import { NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
+import { pickFilter, parseObject, parseTargetPhrase } from "../targets";
+import { addTarget } from "../body";
 import { parseChanges } from "../sentence";
 import { parseExtraBlocks } from "../statics";
 import type { Ctx } from "../body";
@@ -123,6 +124,23 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = new RegExp(`^Put its (?:${COUNTER} )?counters on (.+)$`, "i").exec(s)) && ctx.selfCard) {
     const what = parseObject(m[2]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what, ...(m[1] ? { only: counterKind(m[1]) } : {}) }] : null;
+  }
+  // "Distribute three +1/+1 counters among one, two, or three target creatures you control": how many targets and how
+  // many each gets are chosen with the targets, at least one each (CR 601.2d), like divided damage.
+  if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]1\/[+-]1) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {
+    const total = num(m[1]!);
+    const upTo = /^up to /.test(m[3]!);
+    const n = m[3] === "one or two" ? 2 : m[3] === "one, two, or three" ? 3 : upTo ? num(m[3]!.slice(6)) : total;
+    const words = m[4]!.replace(/^(other )?target /, "$1").replace(/ and\/or /g, " or ");
+    const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bVehicles\b/g, "Vehicle").replace(/\bElves\b/g, "Elf");
+    const spec = one === words ? null : parseTargetPhrase(one);
+    if (spec?.kind !== "object") return null;
+    const first = ctx.targets.length;
+    const divided = { first, n, total, counter: counterKind(m[2]!), ...(upTo ? { upTo: true as const } : {}) };
+    for (let k = 0; k < n; k++)
+      addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    ctx.lastTargets = { index: first, n };
+    return [{ type: "counters", what: { ref: "target", index: first, n }, counter: counterKind(m[2]!), n: total, divided: true }];
   }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);

@@ -218,6 +218,24 @@ export function parseCostKeyword(
       },
     };
   }
+  if (line === "Job select") {
+    // CR 702.182a: "When this Equipment enters, create a 1/1 colorless Hero creature token, then attach this Equipment to it."
+    if (!d.subtypes.includes("Equipment")) return "fail";
+    const hero: TokenSpec = { name: "Hero", power: 1, toughness: 1, colors: [], types: ["Creature"], subtypes: ["Hero"], keywords: [] };
+    return {
+      trigger: {
+        event: "selfEnters",
+        body: {
+          targets: [],
+          effects: [
+            { type: "createToken", who: { ref: "you" }, n: 1, token: hero },
+            { type: "attach", what: { ref: "created" } },
+          ],
+          text: "Job select: when ~ enters, create a 1/1 colorless Hero creature token, then attach ~ to it.",
+        },
+      },
+    };
+  }
   // Embalm and eternalize (CR 702.128, 702.129): exile it from your graveyard to create a token copy of it.
   if ((m = /^(Embalm|Eternalize) ((?:\{[^}]+\})+)$/.exec(line))) {
     const cost = m[2]!;

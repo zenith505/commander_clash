@@ -320,6 +320,20 @@ export function parseExtraBlocks(text: string): Modification | null {
 /** "get +1/+1", "have flying and vigilance", "get +2/+0 and have first strike", "can't block". */
 function parseStaticMods(rest: string): Modification[] | null {
   let m: RegExpExecArray | null;
+  // The job select Equipment: "gets +1/+0 and is a Monk in addition to its other types", "gets +2/+2, has reach, and
+  // is a Bard ...", "is a Wizard in addition to its other types and has "..."", "gets +0/+2, is a Wizard in addition to
+  // its other types, and has "..."" (a creature type added in layer 4, CR 205.1b).
+  const typed = (t: string, others: string[]): Modification[] | null => {
+    if (!CREATURE_TYPES.has(t)) return null;
+    const more = others.map((o) => parseStaticMods(o));
+    return more.every(Boolean) ? [...more.flatMap((x) => x!), { kind: "addTypes", types: [], subtypes: [t] }] : null;
+  };
+  const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
+  if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
+  if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), ${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[4]!, [m[1]!, m[5]!]);
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}), ((?:has|have) .+?),? and ${IS}$`).exec(rest))) return typed(m[5]!, [m[1]!, m[4]!]);
+  if ((m = new RegExp(`^(.+?),? and ${IS}$`).exec(rest))) return typed(m[2]!, [m[1]!]);
   // "Gets +4/+4 and has first strike, and all creatures able to block it do so" (a blocking requirement, CR 509.1c).
   if ((m = /^(.+?),? and all creatures able to block it do so$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);
@@ -499,7 +513,7 @@ export function parseStatic(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

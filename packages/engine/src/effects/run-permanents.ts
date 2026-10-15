@@ -1,10 +1,10 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { cardIdOf, defOf, isType, objIsType, power, toughness } from "../cards";
-import { clearCombat, draw, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent } from "../game";
+import { clearCombat, draw, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
-import type { GameState, PlayerId } from "../types";
+import type { ContinuousEffect, GameState, PlayerId } from "../types";
 import { objectMatches } from "./targeting";
 import { ResolveCtx, objects, amountNow, fixMods } from "./resolve";
 import { createToken } from "./run-tokens";
@@ -183,6 +183,19 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
       return;
     case "counters": {
+      // Distributed (CR 601.2d): each target gets its part; a part for an illegal target isn't put anywhere (CR 608.2b).
+      if (e.divided && e.what.ref === "target") {
+        for (let k = 0; k < (e.what.n ?? 1); k++) {
+          const t = ctx.targets[e.what.index + k];
+          const part = t?.kind === "object" ? (t.amount ?? 0) : 0;
+          for (const o of part > 0 ? objects(s, { ref: "target", index: e.what.index + k }, ctx) : []) {
+            invalidateCharacteristics(s);
+            const put = putCounters(s, o, e.counter, part);
+            log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
+          }
+        }
+        return;
+      }
       const base = amountNow(s, e.n, ctx);
       const n = e.perLastKnownCounter ? base * (ctx.lki?.counters?.[e.perLastKnownCounter] ?? 0) : base;
       if (n <= 0) return;
@@ -351,6 +364,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const affected = objects(s, e.what, ctx).map((o) => o.id).filter((id) => !(e.notSource && id === ctx.sourceId));
       if (!affected.length) return;
       const mods = fixMods(s, e.mods, ctx);
+      // "For as long as ~ remains tapped" (CR 611.2b): if that's already over, the effect does nothing. An activated
+      // ability's source must not have untapped since it was activated (rulings on Rubinia Soulsinger, Preacher).
+      let whileTapped: ContinuousEffect["whileTapped"];
+      if (e.duration === "whileTapped") {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        whileTapped = me && { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0, untaps: ctx.sourceUntaps ?? me.untaps ?? 0, ...(e.whileControlled ? { controller: ctx.controller } : {}) };
+        if (!whileTapped || !whileTappedHolds(s, whileTapped)) {
+          log(s, `${src}'s effect does nothing: ${e.whileControlled ? "its controller lost control of it or it" : "it"} didn't remain tapped.`);
+          return;
+        }
+      }
       s.effects.push({
         id: `e${s.nextId++}`,
         timestamp: s.nextTimestamp++, // CR 613.7b
@@ -359,11 +383,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sourceId: ctx.sourceId,
         duration: e.duration,
         ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}),
+        ...(whileTapped ? { whileTapped } : {}),
         affected,
         mods,
       });
       const names = affected.map((id) => defOf(s, obj(s, id)).name);
-      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : ""}.`);
+      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : ""}.`);
       return;
     }
     case "attach": {

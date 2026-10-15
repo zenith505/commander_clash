@@ -242,9 +242,13 @@ export function compile(d: CardDef): CompiledCard {
   // Spree (CR 702.172a): "Choose one or more modes. As an additional cost to cast this spell, pay the costs associated
   // with those modes." Each mode is a "+ [cost] — [effect]" line.
   let spree: { costs: string[]; texts: string[]; lines: string[] } | undefined;
+  // Entwine (CR 702.42a): "You may choose all modes of this spell instead of just the number specified. If you do, you
+  // pay an additional [cost]." Mana costs only.
+  let entwine: { cost: string; raw: string } | undefined;
   for (const [li, raw] of lines.entries()) {
-    // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own.
-    const line = raw.trim().replace(/^Converge — /, "");
+    // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
+    // Bolg — Equip {4}" (CR 207.2d).
+    const line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
     if (!line) continue;
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
@@ -255,6 +259,11 @@ export function compile(d: CardDef): CompiledCard {
       spree.costs.push(spreeMode[1]!);
       spree.texts.push(spreeMode[2]!);
       spree.lines.push(raw);
+      continue;
+    }
+    const ent = isSpell && /^Entwine ((?:\{[0-9WUBRGC]+\})+)$/.exec(line);
+    if (ent && !entwine && parseManaCost(ent[1]!).supported) {
+      entwine = { cost: ent[1]!, raw };
       continue;
     }
     // Deck construction, not play: the deck checker reads it (deckLimit).
@@ -729,6 +738,10 @@ export function compile(d: CardDef): CompiledCard {
       out.skipDrawStep = true;
       continue;
     }
+    if (line === "You may choose not to untap ~ during your untap step.") {
+      out.mayNotUntap = true; // CR 502.3
+      continue;
+    }
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
     if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
       out.phantom = true;
@@ -922,6 +935,11 @@ export function compile(d: CardDef): CompiledCard {
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
+  }
+  if (entwine) {
+    const modal = out.spell?.modal;
+    if (modal && !modal.costs && modal.max < modal.modes.length) modal.entwine = entwine.cost;
+    else out.unsupported.push(entwine.raw);
   }
   if (striated && striated !== "fail") {
     const empty = compile({ ...d, oracleText: "", keywords: [] });

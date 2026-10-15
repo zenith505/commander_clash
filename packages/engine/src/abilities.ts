@@ -404,7 +404,7 @@ export type Effect =
    * control to its owner's hand": each player picks n of their own permanents that match, in APNAP order,
    * then they're all sacrificed or returned at once (CR 101.4, 701.21). Not targeted.
    */
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount } }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness" }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   | { type: "putOntoBattlefield"; what: ObjRef; tapped?: boolean; /** "Under its owner's control" rather than yours. */ owner?: boolean }

@@ -63,6 +63,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m[3]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: counterKind(m[2]!), n: amt(m[1]!) } }];
   }
+  // Bolster N (CR 701.39a): "Choose a creature you control with the least toughness or tied for least toughness among
+  // creatures you control. Put N +1/+1 counters on that creature." Chosen as it resolves, not targeted (rulings).
+  if ((m = /^Bolster (\d+|X)$/i.exec(s))) {
+    const filter = pickFilter("creature")!;
+    return [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1]!) }, least: "toughness" }];
+  }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;

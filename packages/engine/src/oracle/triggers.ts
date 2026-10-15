@@ -560,6 +560,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (exploits) return exploits;
   const discards = parseDiscardTrigger(line);
   if (discards) return discards;
+  // "When ~ is put into a graveyard from anywhere, shuffle it into its owner's library" (CR 603.6c): "it" is the card in
+  // the graveyard, and its owner controls the ability there (CR 603.3a), so "its owner" is "you".
+  const anywhere = /^When ~ is put into (?:a|your) graveyard from anywhere, (.+)$/.exec(line);
+  if (anywhere) {
+    const body = parseBody(anywhere[1]!.replace(/^its owner shuffles their graveyard into their library/, "shuffle your graveyard into your library"), { selfCard: true });
+    return body ? { event: "selfToGraveyardAnywhere", body } : "fail";
+  }
   // "When you cycle ~" (CR 702.29c): "it" is the card, wherever it went.
   const cycled = /^When you cycle ~, (.+)$/.exec(line);
   if (cycled) {

@@ -6,6 +6,7 @@ import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOpt
 import { withModes } from "./modes";
 import {
   abilityProblem,
+  faceUpWays,
   assistedRemaining,
   returnCandidates,
   attackProblem,
@@ -109,6 +110,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // From an opponent's revealed hand: take their most expensive card.
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
@@ -222,8 +224,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (!o.faceDown || controllerOf(s, o) !== pid) continue;
-      const plan = planTurnFaceUp(s, pid, id);
-      if (plan) return plan;
+      // A manifested card with morph has two ways (CR 701.40c): the cheaper first.
+      const ways = faceUpWays(s, o).map((w, i) => ({ i, v: manaValue(parseManaCost(w.cost)) })).sort((a, b) => a.v - b.v);
+      for (const w of ways) {
+        const plan = planTurnFaceUp(s, pid, id, w.i);
+        if (plan) return plan;
+      }
     }
     const p = player(s, pid);
     const fromYard = p.graveyard.filter((id) => graveyardWays(s, obj(s, id)).length);
@@ -1088,6 +1094,9 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "exileGraveyard":
         v += 2;
         break;
+      case "shuffleIntoLibrary":
+        v += e.what.ref === "target" ? 8 : 0;
+        break;
       case "may":
         v += Math.max(0, modeValue(s, pid, { ...body, effects: e.effects }, targets));
         break;
@@ -1506,6 +1515,20 @@ function chooseSearch(s: GameState, pid: PlayerId, cards: string[], max: number)
     out.push(pool.reduce((a, b) => (score(b, out) > score(a, out) ? b : a)));
   }
   return out;
+}
+
+/**
+ * Manifest dread: a creature card we can turn face up soon is worth the most (CR 701.40b); anything else stays a 2/2.
+ */
+function chooseManifest(s: GameState, pid: PlayerId, cards: string[], max: number): string[] {
+  const lands = s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
+  const score = (id: string) => {
+    const d = defOf(s, obj(s, id));
+    if (!isType(d, "Creature") || !d.manaCost) return 0;
+    const v = mv(s, id);
+    return v <= lands + 2 ? 50 + v : 20 - v;
+  };
+  return [...cards].sort((a, b) => score(b) - score(a)).slice(0, max);
 }
 
 /** Cycle (CR 702.29a) lands we don't need and spells we're far from casting. */

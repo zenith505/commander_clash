@@ -370,7 +370,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "turnFaceUp":
       requireNoPending(s);
-      turnFaceUp(s, p, action.objectId);
+      turnFaceUp(s, p, action.objectId, action.way);
       break;
     case "suspend":
       requireNoPending(s);
@@ -494,6 +494,8 @@ export function moveObject(
     sacrificed?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
     becomes?: { types: string[]; subtypes: string[] };
+    /** Manifested or cloaked: turned face down, then put onto the battlefield (CR 701.40a, 701.58a). */
+    faceDown?: FaceDownKind;
   } = {},
 ) {
   const o = obj(s, id);
@@ -610,6 +612,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
+  o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   o.counters = {};
@@ -634,6 +637,7 @@ export function moveObject(
       }
   }
   if (to === "battlefield") o.controlledSinceTurn = s.turn;
+  if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
   invalidateCharacteristics(s);
@@ -665,6 +669,9 @@ export function moveObject(
   if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o)) && !(s.descendedThisTurn ??= []).includes(o.owner)) s.descendedThisTurn.push(o.owner);
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
+  // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
+  // abilities (face down, Humility) (CR 603.10a).
+  if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id });
   if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
@@ -1724,7 +1731,7 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || flashGranted(s, pid, d);
+  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d);
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
@@ -1801,11 +1808,15 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
   for (const c of compileCard(d).costLessIf ?? []) if (staticConditionNow(s, c.cond, o.id, pid)) less += c.n;
+  // "You may cast ~ as though it had flash if you pay {2} more to cast it": cast when a sorcery couldn't be, it costs more
+  // (CR 601.2f). Not when something else lets it be cast then: a resolving madness trigger, or Flash from elsewhere.
+  const flashCost = compileCard(d).flashCost;
+  const more = flashCost && !madness && !isType(d, "Instant") && !d.keywords.includes("Flash") && !flashGranted(s, pid, d) && !canActAtSorcerySpeed(s, pid) ? flashCost : 0;
   // "Costs {3} less to cast if it targets a tapped creature": the targets are chosen before the cost is (CR 601.2c, 601.2f).
   for (const c of compileCard(d).costLessIfTargets ?? [])
     if (how.targets?.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false))) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
-  return { cost: total.cost, extra: Math.max(0, total.extra + mods.more - less) };
+  return { cost: total.cost, extra: Math.max(0, total.extra + mods.more + more - less) };
 }
 
 /**
@@ -2109,6 +2120,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
 function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
+    // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
+    if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
+      return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
       if (l.filter && !printedMatches(l.filter, d)) continue;
@@ -4009,36 +4023,56 @@ function plotCard(s: GameState, p: Player, id: ObjectId) {
 }
 
 /**
- * Why `pid` can't turn this permanent face up right now, or null (with the mana in their pool). It's
- * a special action, any time they have priority (CR 116.2b), paying the morph or disguise cost the
- * card would have face up (CR 702.37e, 702.168d).
+ * The ways to turn a face-down permanent face up: the morph or disguise cost the card would have face up (CR 702.37e,
+ * 702.168d), and for a manifested or cloaked creature card, its mana cost too (CR 701.40b-d, 701.58b-d). That's the
+ * card's own types and cost, whatever copy or type-changing effects say, and works even if it would lose its
+ * abilities (rulings). A manifested instant or sorcery stays face down (CR 701.40g). An {X} in the mana cost is 0:
+ * its controller chooses X (CR 107.3d), and it would mean nothing on the battlefield (CR 107.3g).
  */
-export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+export function faceUpWays(s: GameState, o: GameObject): { kind: FaceDownKind; cost: string }[] {
+  if (!o.faceDown) return [];
+  const ways: { kind: FaceDownKind; cost: string }[] = [];
+  const fd = compileCard(faceUpDefOf(s, o)).faceDownCast;
+  if (fd) ways.push(fd);
+  if (o.faceDown === "manifest" || o.faceDown === "cloak") {
+    const card = realDefOf(s, o);
+    if (isType(card, "Creature") && card.manaCost) ways.push({ kind: o.faceDown, cost: card.manaCost.replace(/\{X\}/g, "") || "{0}" });
+  }
+  return ways;
+}
+
+/**
+ * Why `pid` can't turn this permanent face up right now (the `way`-th of faceUpWays), or null (with the mana in
+ * their pool). It's a special action, any time they have priority (CR 116.2b).
+ */
+export function turnFaceUpProblem(s: GameState, pid: PlayerId, id: ObjectId, way = 0): string | null {
   const o = s.objects[id];
   if (!o || o.zone !== "battlefield" || !o.faceDown) return "that isn't a face-down permanent";
   if (controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (s.priority !== pid || s.pending) return "you don't have priority";
-  const fd = compileCard(faceUpDefOf(s, o)).faceDownCast;
-  if (!fd) return "it has no morph or disguise cost"; // CR 702.37e
+  const ways = faceUpWays(s, o);
+  if (!ways.length) return o.faceDown === "manifest" || o.faceDown === "cloak" ? "it isn't a creature card with a mana cost" : "it has no morph or disguise cost"; // CR 702.37e, 701.40b
+  const fd = ways[way];
+  if (!fd) return "it can't be turned face up that way";
   if (!canPayFromPool(s, pid, parseManaCost(fd.cost), "other")) return `not enough mana to turn it face up (${fd.cost})`;
   return null;
 }
 
-/** The cost of turning a face-down permanent face up, if it has one. */
-export const faceUpCost = (s: GameState, o: GameObject) => (o.faceDown ? compileCard(faceUpDefOf(s, o)).faceDownCast : undefined);
+/** The cost of turning a face-down permanent face up the `way`-th way, if it has one. */
+export const faceUpCost = (s: GameState, o: GameObject, way = 0) => faceUpWays(s, o)[way];
 
-function turnFaceUp(s: GameState, p: Player, id: ObjectId) {
-  const problem = turnFaceUpProblem(s, p.id, id);
+function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0) {
+  const problem = turnFaceUpProblem(s, p.id, id, way);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
-  const fd = compileCard(faceUpDefOf(s, o)).faceDownCast!;
+  const fd = faceUpWays(s, o)[way]!;
   spendFromPool(s, p.id, parseManaCost(fd.cost), "other");
   // Its copiable values go back to the card's, or what a copy effect made it (CR 708.8, 707.3); it's the same
   // permanent, so nothing "enters".
   o.faceDown = undefined;
   invalidateCharacteristics(s);
   const d = defOf(s, o);
-  log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${describeVia(fd.kind)} ${fd.cost}).`);
+  log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}).`);
   // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
   if (fd.kind === "megamorph") putCounters(s, o, "+1/+1", 1);
   fireEvent(s, { type: "turnedFaceUp", id });

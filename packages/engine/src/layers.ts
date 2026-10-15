@@ -355,6 +355,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
+    case "castAnother": // checked before the spell counts itself (CR 601.2f, 601.2i)
+      return (s.castThisTurn ?? []).some((c) => c.player === you);
     case "creatureDied":
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
     case "onBattlefield": {
@@ -397,6 +399,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "tapped" || cond.is === "untapped") return src.tapped === (cond.is === "tapped");
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;
       if (cond.is === "monstrous") return !!src.monstrous; // CR 701.37b
+      if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");

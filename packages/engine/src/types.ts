@@ -52,7 +52,8 @@ export interface CardDef {
 }
 
 /** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */
-export type FaceDownKind = "morph" | "megamorph" | "disguise";
+/** How it became face down: cast with morph, megamorph or disguise, or put onto the battlefield manifested or cloaked (CR 701.40, 701.58). */
+export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak";
 
 export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command" | "phasedOut";
 
@@ -105,6 +106,8 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
+  escaped?: boolean;
   /** "~ doesn't untap during your next untap step" (from a mana ability like Cinder Marsh's). */
   skipNextUntap?: boolean;
   /** The permanents that dealt it damage this turn, for "whenever a creature dealt damage by ~ this turn dies". */
@@ -775,7 +778,7 @@ export type Action =
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
-  | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId }
+  | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */
   | { type: "payUnless"; player: PlayerId; pay: boolean }
   | { type: "concede"; player: PlayerId };

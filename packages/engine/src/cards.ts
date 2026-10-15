@@ -48,11 +48,13 @@ export const FACE_DOWN_WARD = faceDownCard("face-down-ward", true);
 const copiedId = (o: GameObject): string => o.copyEffects?.[o.copyEffects.length - 1]?.key ?? o.copyOf ?? o.cardId;
 
 /** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
-export const cardIdOf = (o: GameObject): string => (o.faceDown ? (o.faceDown === "disguise" ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : copiedId(o));
+/** Disguised and cloaked permanents have ward {2} (CR 702.168a, 701.58a). */
+const withWard = (o: GameObject) => o.faceDown === "disguise" || o.faceDown === "cloak";
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? (withWard(o) ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : copiedId(o));
 
 /** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
-  if (o.faceDown) return o.faceDown === "disguise" ? FACE_DOWN_WARD : FACE_DOWN;
+  if (o.faceDown) return withWard(o) ? FACE_DOWN_WARD : FACE_DOWN;
   const d = s.cards[copiedId(o)];
   if (!d) throw new Error(`missing card def ${copiedId(o)}`);
   return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : d;

@@ -101,7 +101,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
-    .flatMap((x) => (/^If you do, /.test(x) || WHEEL.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
+    .flatMap((x) => (/^If you do, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .filter(Boolean);
@@ -180,7 +180,22 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (payFirst) {
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
-      const inner = parseOne(then[1]!.charAt(0).toUpperCase() + then[1]!.slice(1), ctx);
+      const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      // "If you do, create a 2/2 black Zombie Berserker creature token, then attach ~ to it": both parts depend
+      // on the payment, in order.
+      const inner =
+        attempt(ctx, () => parseOne(cap(then[1]!), ctx)) ??
+        attempt(ctx, () => {
+          const parts = then[1]!.split(/, then (?!shuffle)/);
+          if (parts.length < 2) return null;
+          const all: Effect[] = [];
+          for (const p of parts) {
+            const fx = parseOne(cap(p), ctx);
+            if (!fx) return null;
+            all.push(...fx);
+          }
+          return all;
+        });
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` });
       payFirst = null;
@@ -447,8 +462,10 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
   if (fx) {
-    ctx.lastCreated = (last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1;
-    ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy";
+    // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
+    const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
+    ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1);
+    ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
   }
   return fx;
 }

@@ -212,6 +212,47 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
       return;
     }
+    case "shuffleIntoLibrary":
+    case "shuffleSpell": {
+      // The owners whose libraries are shuffled, whether or not the card is still there (CR 701.24c).
+      const owners = new Set<PlayerId>();
+      if (e.type === "shuffleSpell") {
+        const item = s.resolving?.item;
+        const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        if (!o) return;
+        owners.add(o.owner);
+        if (o.zone === "stack") {
+          log(s, `${defOf(s, o).name} is shuffled into its owner's library.`);
+          moveObject(s, o.id, "library"); // instead of its owner's graveyard (CR 608.2n); a copy ceases to exist (707.10a)
+        }
+      } else {
+        if (e.what.ref === "self" || e.what.ref === "selfCard") {
+          const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (me) owners.add(me.owner);
+        }
+        for (const o of objects(s, e.what, ctx)) {
+          owners.add(o.owner);
+          log(s, `${src} shuffles ${defOf(s, o).name} into its owner's library.`);
+          moveObject(s, o.id, "library");
+        }
+      }
+      for (const pid of apnap(s, [...owners])) {
+        const p = player(s, pid);
+        if (p.lost) continue;
+        shuffle(s, p.library);
+        log(s, `${p.name} shuffles their library.`);
+      }
+      return;
+    }
+    case "shuffleZones":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])];
+        for (const id of ids) moveObject(s, id, "library");
+        shuffle(s, p.library);
+        log(s, `${p.name} shuffles their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"} into their library.`);
+      }
+      return;
     case "shuffle":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
@@ -264,7 +305,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
     case "dig": {
-      const p = player(s, ctx.controller);
+      const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (pid === undefined || player(s, pid).lost) return;
+      const p = player(s, pid);
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       if (!sc.looked) {
@@ -278,7 +321,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const kind = (e.filter?.text ?? "card").replace(/~/g, src);
           // "Take none" says it's optional; "up to" only reads well with a number.
           const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.into === "hand" ? "into your hand" : e.into === "battlefield" ? "onto the battlefield" : "back on top of your library";
+          const to = e.into === "hand" ? "into your hand" : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
           const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
           return "paused";
@@ -289,10 +332,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const found = (sc.found ?? []).filter((id) => looked.includes(id));
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
-      if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
-      if (e.into === "battlefield") r.created = [];
+      const faceDown = e.into === "manifest" || e.into === "cloak" ? e.into : undefined;
+      if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
+      else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
+      if (e.into === "battlefield" || faceDown) r.created = [];
       for (const id of found) {
         if (e.into === "hand") moveObject(s, id, "hand");
+        else if (faceDown) {
+          // One at a time (CR 701.40e, 701.58e), each a 2/2 face-down creature; "it" in what follows.
+          moveObject(s, id, "battlefield", { controller: p.id, faceDown });
+          if (obj(s, id).zone === "battlefield") r.created!.push(id);
+        }
         else if (e.into === "battlefield") {
           moveObject(s, id, "battlefield", { controller: p.id, ...(e.counters ? { counters: { [e.counters.counter]: e.counters.n } } : {}) });
           if (obj(s, id).zone === "battlefield") r.created!.push(id); // "it" in what follows

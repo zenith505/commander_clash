@@ -198,6 +198,11 @@ export interface TargetSpec {
    */
   stackAbilities?: "activated" | "triggered" | "both";
   noSpells?: true;
+  /**
+   * "Target spell that targets a permanent you control", "... that targets you": a spell with at least one target that's
+   * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
+   */
+  targetsWhat?: TargetSpec | "you";
   /** Original text, for display. */
   text: string;
 }
@@ -424,7 +429,7 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   | { kind: "yourTurn" }
@@ -473,6 +478,8 @@ export type StaticCondition =
   | { kind: "opponentPoison"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
+  /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
+  | { kind: "castAnother" }
   /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
   | { kind: "increment" }
   /** "If that player has two or fewer cards in hand": the trigger's player (whose upkeep it is), checked as it triggers and resolves (CR 603.4). */
@@ -612,7 +619,7 @@ export type Effect =
    * `each`: about each token just created, or about the object the trigger was about ("destroy that creature at end
    * of combat"), instead of the source.
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup"; effects: Effect[]; text: string; each?: "created" | "subject" }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -711,6 +718,14 @@ export type Effect =
   | { type: "cantBlockRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
   | { type: "shuffle"; who: PlayerRef }
+  /**
+   * "Shuffle it into its owner's library"; `shuffleSpell`: "Shuffle ~ into its owner's library", the resolving spell itself,
+   * instead of its owner's graveyard (CR 608.2n). The owner's library is shuffled even if the card is gone (CR 701.24c).
+   */
+  | { type: "shuffleIntoLibrary"; what: ObjRef }
+  | { type: "shuffleSpell" }
+  /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
+  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   | { type: "bite"; a: ObjRef; b: ObjRef } // a deals damage equal to its power to b
   /**
@@ -789,7 +804,7 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; into: "hand" | "libraryTop" | "battlefield"; rest: "graveyard" | "bottom" | "shuffle"; reveal: boolean; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak"; rest: "graveyard" | "bottom" | "shuffle"; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
@@ -933,6 +948,11 @@ export type TriggerEvent =
   | "playerDiscards"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
   | "selfCycled"
+  /**
+   * "When ~ is put into a graveyard from anywhere" (Serra Avatar): it triggers from the graveyard, under its owner's control
+   * (CR 603.3a), never as a leaves-the-battlefield ability (CR 603.6c).
+   */
+  | "selfToGraveyardAnywhere"
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */
@@ -1361,6 +1381,18 @@ export interface CompiledCard {
   phantom?: boolean;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
+  /**
+   * "Creature spells you control can't be countered", "Creature spells can't be countered", "Spells you control can't be
+   * countered": spells matching `filter`, controlled by this permanent's controller unless `anyone` (CR 101.2).
+   */
+  uncounterable?: { filter: TargetSpec; anyone?: true }[];
+  /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
+  opponentsCantCastYourTurn?: true;
+  /**
+   * "You may cast ~ as though it had flash if you pay {2} more to cast it.": cast any time a sorcery couldn't have been,
+   * its total cost is this much more (CR 601.2f).
+   */
+  flashCost?: number;
   /** "Cast this spell only if you've cast another spell this turn." (Illusory Angel; CR 601.3) */
   castOnlyAfterAnother?: boolean;
   /**

@@ -602,6 +602,7 @@ export function moveObject(
     o.kicked = undefined;
     o.colorsSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
+    o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.sneak = undefined;
     o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
     o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
@@ -1956,7 +1957,7 @@ export function castProblem(
   if (via && x && via.mana && !parseManaCost(via.mana).hasX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
@@ -1971,7 +1972,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -1983,6 +1984,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine;
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
   const mods = costModsFor(s, pid, o, d, x);
+  // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
+  if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];
@@ -2311,6 +2314,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     moveObject(s, choices.casualty, "graveyard", { sacrificed: true });
     item.casualty = true;
   }
+  // Bargain: "you may sacrifice an artifact, enchantment, or token" (CR 702.166a).
+  if (choices.bargain) {
+    log(s, `${p.name} sacrifices ${nameOf(s, choices.bargain)} (bargain).`);
+    moveObject(s, choices.bargain, "graveyard", { sacrificed: true });
+    o.bargained = true;
+  }
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
@@ -2391,6 +2400,24 @@ export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): Obj
     const o = obj(s, id);
     return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n;
   });
+}
+
+/** What `pid` could sacrifice for this card's bargain: an artifact, enchantment, or token they control (CR 702.166a). */
+export function bargainCandidates(s: GameState, pid: PlayerId, spell: ObjectId): ObjectId[] {
+  if (!compileCard(defOf(s, obj(s, spell))).bargain) return [];
+  return s.battlefield.filter((id) => {
+    const o = obj(s, id);
+    return id !== spell && controllerOf(s, o) === pid && (o.isToken || objIsType(s, o, "Artifact") || objIsType(s, o, "Enchantment"));
+  });
+}
+
+function bargainProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDef, choices?: CostChoices): string | null {
+  const id = choices?.bargain;
+  if (id === undefined) return null;
+  if (!compileCard(d).bargain) return `${d.name} doesn't have bargain`;
+  if (!bargainCandidates(s, pid, spell).includes(id)) return "bargain sacrifices an artifact, enchantment, or token you control";
+  if (choices?.sacrifice?.includes(id) || choices?.casualty === id) return `${nameOf(s, id)} is already being sacrificed`;
+  return null;
 }
 
 function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {

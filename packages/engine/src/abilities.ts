@@ -900,6 +900,8 @@ export type SpellCondition =
   | { kind: "wonClash" }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
+  /** "If ~ was bargained" (CR 702.166b). */
+  | { kind: "bargained" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition };
 
@@ -1126,6 +1128,8 @@ export interface TriggeredAbility {
   ifX?: number;
   /** Casualty's "if a casualty cost was paid for it" (CR 702.153a). */
   ifCasualty?: boolean;
+  /** "When ~ enters, if it was bargained, ..." (CR 702.166b). */
+  ifBargained?: boolean;
   /** Echo's "if this permanent came under your control since the beginning of your last upkeep" (CR 702.30a). */
   ifEcho?: boolean;
   /** Soulbond's "if you control both ... and both are unpaired" (CR 702.95a, an intervening if). */
@@ -1626,6 +1630,10 @@ export interface CompiledCard {
   dredge?: number;
   /** Casualty N (CR 702.153a): you may sacrifice a creature with power N or greater as you cast it, to copy it. */
   casualty?: number;
+  /** Bargain (CR 702.166a): you may sacrifice an artifact, enchantment, or token as you cast it. */
+  bargain?: true;
+  /** "~ costs {2} less to cast if it's bargained." */
+  bargainReduction?: number;
   /** Delve (CR 702.66): each card exiled from your graveyard while casting it pays for {1}. */
   delve?: boolean;
   /** Assist (CR 702.132a): another player may pay for generic mana in its total cost. */

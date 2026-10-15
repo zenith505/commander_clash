@@ -227,6 +227,18 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       else effects.push({ type: "if", cond, effects: fx.effects });
       continue;
     }
+    // "If ~ was bargained, that creature also gains flying", "... it deals twice X damage to that permanent instead"
+    // (CR 702.166b). Targets only the bargained part would need aren't modeled (CR 702.166d), so none may be added.
+    const bargained = ctx.spell ? /^If ~ was bargained, (.+)$/.exec(s) : null;
+    if (bargained) {
+      const before = ctx.targets.length;
+      const fx = parseKicked(bargained[1]!, effects.slice(prevStart), ctx);
+      if (!fx || ctx.targets.length !== before) return null;
+      const cond: SpellCondition = { kind: "bargained" };
+      if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
+      else effects.push({ type: "if", cond, effects: fx.effects });
+      continue;
+    }
     // "If this spell was foretold, scry 2", "... create X of those tokens instead" (CR 702.143c).
     const foretold = ctx.spell ? /^If (?:this spell|~) was foretold, (.+)$/.exec(s) : null;
     if (foretold) {
@@ -456,6 +468,8 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx): { effects: Eff
   const instead = /^instead,? /i.test(t) || / instead$/i.test(t);
   t = t.replace(/^instead,? /i, "").replace(/ instead$/i, "");
   t = t.charAt(0).toUpperCase() + t.slice(1);
+  // "That creature also gains flying": in addition to what the sentence before did.
+  if (!instead) t = t.replace(/^(That creature|That player|It) also /, "$1 ");
   if (instead && !previous.length) return null;
   // "~ deals 2 damage to any target. If ~ was kicked, it deals 5 damage instead": the same damage, more of it.
   const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|it))?$/.exec(t);

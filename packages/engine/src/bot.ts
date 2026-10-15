@@ -41,6 +41,7 @@ import {
   topPlayable,
   castDef,
   casualtyCandidates,
+  bargainCandidates,
   castExtraCosts,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
@@ -774,6 +775,12 @@ function castPlanWithModes(s: GameState, pid: PlayerId, id: string, free: boolea
       .filter((o) => o.isToken || worth(s, pid, o) <= 3)
       .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
     if (victim) extra.casualty = victim.id;
+    // Bargain (CR 702.166a): a spare token for what being bargained adds.
+    const spare = bargainCandidates(s, pid, id)
+      .map((x) => obj(s, x))
+      .filter((o) => o.isToken && o.id !== victim?.id && !extra.sacrifice?.includes(o.id) && !(targets ?? []).some((t) => t.kind === "object" && t.id === o.id) && worth(s, pid, o) <= 2)
+      .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+    if (spare) extra.bargain = spare.id;
   }
   if (!extra) return null;
   if (alt) extra.alt = alt;

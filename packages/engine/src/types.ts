@@ -192,6 +192,8 @@ export interface GameObject {
   castAlt?: AltCostKind;
   /** A spell cast for its sneak cost: whom the creature returned to pay it was attacking (CR 702.190b). */
   sneak?: LastKnown;
+  /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
+  bargained?: true;
   /**
    * Face down (CR 708): a 2/2 creature with no name, text, subtypes or mana cost (with ward {2} for
    * disguise). Only its controller may look at it (CR 708.5).
@@ -452,6 +454,8 @@ export interface CostChoices {
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
   casualty?: ObjectId;
+  /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
+  bargain?: ObjectId;
   /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
   assist?: PlayerId;
   /** How much of that generic mana they pay, from their mana pool: set by the game once they've chosen. */

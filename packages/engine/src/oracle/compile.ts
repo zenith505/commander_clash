@@ -738,6 +738,15 @@ export function compile(d: CardDef): CompiledCard {
       out.skipDrawStep = true;
       continue;
     }
+    if (line === "Bargain") {
+      out.bargain = true; // CR 702.166a
+      continue;
+    }
+    const cheaper = /^~ costs \{(\d+)\} less to cast if it's bargained\.$/.exec(line);
+    if (cheaper && /(?:^|\n)Bargain(?: \(|$|\n)/m.test(d.oracleText ?? "")) {
+      out.bargainReduction = Number(cheaper[1]);
+      continue;
+    }
     if (line === "You may choose not to untap ~ during your untap step.") {
       out.mayNotUntap = true; // CR 502.3
       continue;

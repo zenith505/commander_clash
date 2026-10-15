@@ -65,6 +65,7 @@ import {
   autoConvoke,
   autoCrew,
   casualtyCandidates,
+  bargainCandidates,
   dredgeOptions,
   madnessCastOf,
   planSuspend,
@@ -254,6 +255,8 @@ type CastDraft = {
   delve?: string[];
   /** The creature sacrificed for casualty, or none (CR 702.153a). */
   casualty?: string[];
+  /** The artifact, enchantment, or token sacrificed for bargain, or none (CR 702.166a). */
+  bargain?: string[];
   /** Assist (CR 702.132a): the player asked to help pay its generic mana. */
   assist?: PlayerId;
   /** Cards revealed from your hand for a cost ("reveal a Pirate card from your hand"). */
@@ -276,7 +279,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "tap" | "reveal";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal";
   label: string;
   what: string;
   n: number;
@@ -560,9 +563,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (candidates.length)
         return setCostPick({ draft: d, kind: "casualty", label: card.name, what: `casualty ${compiled.casualty}: you may sacrifice a creature with power ${compiled.casualty} or greater to copy it`, n: 1, candidates, chosen: [] });
     }
+    // Bargain: you may sacrifice an artifact, enchantment, or token as you cast it (CR 702.166a).
+    if (d.bargain === undefined && compiled.bargain) {
+      const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.sacrifice?.includes(id) && !d.casualty?.includes(id));
+      if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
+    }
     const choices = {
       ...kicks,
       ...(d.casualty?.length ? { casualty: d.casualty[0]! } : {}),
+      ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
       ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}),
       ...(d.discard?.length ? { discard: d.discard } : {}),
       ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}),
@@ -1052,11 +1061,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setKickPick(null)}
             />
           )}
-          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "tap") && (
+          {costPick && (costPick.kind === "sacrifice" || costPick.kind === "returnToHand" || costPick.kind === "casualty" || costPick.kind === "bargain" || costPick.kind === "tap") && (
             <CostPickBar
               pick={costPick}
               onDone={() => finishCostPick(costPick)}
-              onSkip={costPick.kind === "casualty" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
+              onSkip={costPick.kind === "casualty" || costPick.kind === "bargain" ? () => finishCostPick({ ...costPick, chosen: [] }) : undefined}
               onCancel={() => setCostPick(null)}
             />
           )}
@@ -1079,7 +1088,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
-          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && (
+          {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && (
             <CardChoice
               s={s}
               title={`${costPick.label}: ${costPick.what}`}

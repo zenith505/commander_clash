@@ -1,6 +1,6 @@
 # Roadmap
 
-13,226 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+13,540 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -14,15 +14,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. By `npm run blockers`: the en-Kor "next N damage that would be dealt to ~ this turn is dealt to target creature you
-   control instead" (when several sources deal damage at once, its controller chooses which is redirected, CR 615.7;
-   the "prevent the next N damage" shields don't ask yet either), "when ~ enters, empower Jace N", "whenever you cast
-   a multicolored spell, you may return ~ from your graveyard to your hand" (the Eidolons), Dragon Breath's "return ~
-   from your graveyard to the battlefield attached to that creature", the Onna's "return ~ to its owner's hand",
-   Darksteel Colossus's "shuffle it into its owner's library instead", "whenever ~ becomes tapped", "{T}: You may put
-   a land card from your hand onto the battlefield", Fellwar Stone's "mana of any color that a land an opponent
-   controls could produce", "if a creature dealt damage by ~ this turn would die, exile it instead", learn, the
-   Gustcloaks' "untap it and remove it from combat".
+1. By `npm run blockers`: the Myojin's "enters with a divinity counter on it if you cast it from your hand", "whenever
+   you cycle or discard a card, ~ gets +N/+N", the Laccoliths' "you may have it deal damage equal to its power to
+   target creature. If you do, ~ assigns no combat damage this turn", "when ~ enters or dies, surveil N", "look at
+   target opponent's hand", the Leylines' "if ~ is in your opening hand, you may begin the game with it on the
+   battlefield", "you have hexproof", "Enchant creature or Vehicle", "Ward—Discard a card", increment, transmute,
+   "if you would gain life, you gain twice that much life instead", Lander tokens.
 
 ## Known gaps (from earlier rounds)
 
@@ -98,6 +95,31 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   Outpace Oblivion.
 - "As though it weren't blocked" from an effect rather than an ability (Predatory Focus, Outmaneuver), Ruxa,
   Gurzigost. "At the beginning of the next cleanup step" for counters (Bounty of the Hunt), Cunning, Necromancy.
+- Damage shields: outside combat damage the choices of which damage a prevention or redirection shield takes, and
+  which shield applies first (CR 615.7, 616.1), are made for the player (bots' heuristic); a shield that redirects to
+  the creature it protects, and chains of redirection, are untested. Hazduhr (named by its short name), Captain's
+  Maneuver ("creature, planeswalker, or player"), Personal Incarnation.
+- Planeswalkers: emblems (CR 114), "+X" loyalty abilities, compleated, "X" loyalty, "add mana" loyalty abilities,
+  "activate loyalty abilities any time you could cast an instant" (Jace's Machinations), "aren't put into graveyards
+  for having 0 loyalty" (Sanctum Lurker), "whenever you activate a loyalty ability", "whenever you put loyalty
+  counters on a planeswalker"; copying planeswalkers; myriad and tokens "entering attacking" always attack the
+  player, not a planeswalker; bots defend their planeswalkers only through their usual blocks. Behold.
+- Triggers from the graveyard work for spells cast, permanents entering, upkeeps and other steps, and "one or more
+  creatures attack / deal combat damage"; "while ~ is in your graveyard" (Furious Forebear, Boneyard Scourge), "when
+  you discard ~" and other zones (exile) aren't modeled.
+- Zone-change replacements: when an "exile it instead" effect and Darksteel Colossus's "shuffle it into its owner's
+  library instead" both apply, its owner would choose the order (CR 616.1); it's exiled. Rest in Peace, Leyline of
+  the Void and Dryad Militant ("if a card would be put into a graveyard from anywhere, exile it instead").
+- "A creature dealt damage by ~ this turn" counts damage from an earlier object with the same card if it left the
+  battlefield and came back the same turn (should be a new object, CR 400.7); Krovikan Vampire, Runesword.
+- "Becomes tapped": "another ... becomes tapped", "during your turn", "for the first time each turn", "while it has a
+  -1/-1 counter", granted ("Elves you control have \"Whenever this creature becomes tapped ...\""); filters with
+  colors in only some alternatives (Royal Decree's "a Swamp, Mountain, black permanent, or red permanent").
+- Learn: nobody has a sideboard, so it's always "you may discard a card; if you do, draw a card". Retriever Phoenix.
+- "Mana a land could produce" for Gates (Gond Gate, Plaza of Harmony), "basic land" (Star Compass), "that land"
+  (Benthic Explorers, Squandered Resources), Incubation Druid's "three mana of that type instead".
+- "Multicolored creatures you control have ..." and other statics on multicolored or colorless permanents (Maze
+  Glider, Glass of the Guildpact), "hexproof from monocolored", "for each of that spell's colors".
 - Life: "whenever you lose life", "whenever a player loses life", "whenever you gain life for the first time each
   turn", "draw that many cards"; "players can't gain life" and life-gain replacement effects.
 

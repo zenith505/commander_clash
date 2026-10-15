@@ -617,6 +617,27 @@ export function compile(d: CardDef): CompiledCard {
       out.beginOnBattlefield = true;
       continue;
     }
+    // Torpor Orb, Hushwing Gryff, Doorkeeper Thrull, Elesh Norn, Mother of Machines.
+    const lock = /^(Creatures|Artifacts and creatures|Permanents) entering(?: the battlefield)? don't cause abilities( of permanents your opponents control)? to trigger\.$/.exec(line);
+    if (lock) {
+      out.enterLock = { ...(lock[1] === "Creatures" ? { types: ["Creature"] } : lock[1] === "Artifacts and creatures" ? { types: ["Artifact", "Creature"] } : {}), ...(lock[2] ? { opponents: true as const } : {}) };
+      continue;
+    }
+    if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
+      out.payWUBRG = true;
+      continue;
+    }
+    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~)? cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (equipLess) {
+      (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
+      continue;
+    }
+    const lockEnd = /^You can't (lose|win) the game and your opponents can't (win|lose) the game\.$/.exec(line);
+    if (lockEnd && lockEnd[1] !== lockEnd[2]) {
+      if (lockEnd[1] === "lose") [out.cantLose, out.cantWin] = ["you", "opponents"];
+      else [out.cantWin, out.cantLose] = ["you", "opponents"];
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;
@@ -656,7 +677,7 @@ export function compile(d: CardDef): CompiledCard {
       out.cantBeCountered = true;
       continue;
     }
-    const ewc = new RegExp(`^(?:(?:Raid|Morbid) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
+    const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
       // "~ enters tapped with three stun counters on it." "... if you attacked this turn" (raid), "... if a creature
@@ -691,6 +712,7 @@ export function compile(d: CardDef): CompiledCard {
         sorcerySpeed: true,
         body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
         text: line,
+        equip: true,
       });
       continue;
     }

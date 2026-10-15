@@ -134,6 +134,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Ward (CR 702.21a) and "counter it unless that player pays": the spell or ability that triggered this.
       return counterOnStack(s, ctx, ctx.cause, e.ward ? `${src}'s ward` : src, e.unless);
     }
+    case "counterCause":
+      return counterOnStack(s, ctx, ctx.cause, src);
     case "changeTarget": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
@@ -176,7 +178,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
  * "Unless [payer] pays ...", as this resolves (CR 118.12): true if they paid, false if they didn't, "paused" while they
  * choose. They may activate mana abilities to pay (CR 605.3a).
  */
-function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unless: UnlessPays, by: string, what: string, otherwise?: string): boolean | "paused" {
+export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unless: UnlessPays, by: string, what: string, otherwise?: string): boolean | "paused" {
   const sc = (s.resolving!.scratch ??= {});
   // "Ward—Discard a card": the cards they chose to discard (see payUnless).
   if (sc.paid === undefined && unless.discard && sc.chosen?.[payer]) {

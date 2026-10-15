@@ -157,7 +157,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "draw", who, n: amt(m[2]!) }] : null;
   }
-  // Life
+  // Life. "You may gain 1 life" leaves "Gain 1 life": yours.
+  if ((m = new RegExp(`^Gain ${NUMX} life$`).exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: amt(m[1]!) }];
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;

@@ -328,6 +328,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "bite":
     case "extraTurn":
     case "loseGame":
+    case "winGame":
       return runBasicsEffect(s, e, ctx, src);
     case "returnToBattlefield":
     case "unearth":
@@ -401,6 +402,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "nextCast":
     case "cascade":
     case "counterUnlessPays":
+    case "counterCause":
     case "counterSpell":
     case "changeTarget":
       return runSpellsEffect(s, e, ctx, src);

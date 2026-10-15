@@ -17,6 +17,9 @@ export interface RedirectShield {
   source: string;
 }
 
+/** Each player's starting life total in Commander (CR 903.7). */
+export const STARTING_LIFE = 40;
+
 export type Color = "W" | "U" | "B" | "R" | "G";
 export const COLORS: readonly Color[] = ["W", "U", "B", "R", "G"];
 export type ManaType = Color | "C";
@@ -96,6 +99,8 @@ export interface GameObject {
   redirectNext?: RedirectShield[];
   /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
+  /** The players whose spells and abilities targeted it this turn, each once ("for the first time each turn"). */
+  targetedThisTurn?: { turn: number; by: PlayerId[] };
   /** Renown's designation (CR 702.112b), until it leaves the battlefield. */
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
@@ -577,6 +582,12 @@ export interface GameState {
   noPreventionTurn?: number;
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
   lostLifeThisTurn?: PlayerId[];
+  /** Revolt: the players a permanent left the battlefield under the control of this turn, tokens too (rulings). */
+  permanentLeftThisTurn?: PlayerId[];
+  /** Void: a nonland permanent left the battlefield this turn, or a spell was warped this turn (CR 702.185c). */
+  voidThisTurn?: boolean;
+  /** Descend: the players a permanent card was put into the graveyard of this turn, from anywhere (CR 700.11). */
+  descendedThisTurn?: PlayerId[];
   /** Players dealt damage this turn, for bloodthirst (CR 702.54a). */
   damagedThisTurn?: PlayerId[];
   /**
@@ -695,6 +706,8 @@ export interface Resolving {
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     may?: boolean; // the answer to "you may ..."
     paid?: boolean; // the answer to "unless that player pays ..."
+    payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
+    paidBy?: PlayerId[]; // and those who paid
     newTarget?: TargetChoice; // "change the target of target spell": the new one, chosen as this resolves (CR 115.7a)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast

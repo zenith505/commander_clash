@@ -346,8 +346,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const enchant = compileCard(defOf(s, me)).enchant;
       const meChars = characteristics(s, me);
       if (meChars.subtypes.includes("Aura") ? !enchant || !objectMatches(s, enchant, host, ctx.controller, false, meChars) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, ctx.controller, false, meChars)) return;
+      const was = me.attachedTo;
       me.attachedTo = host.id;
       me.timestamp = s.nextTimestamp++;
+      if (was) fireEvent(s, { type: "unattached", id: me.id, host: was });
       invalidateCharacteristics(s); // reconfigure: it stops being a creature (CR 702.151b)
       log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
       return;
@@ -370,6 +372,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !me.attachedTo) return;
       log(s, `${defOf(s, me).name} is unattached from ${defOf(s, obj(s, me.attachedTo)).name}.`);
+      fireEvent(s, { type: "unattached", id: me.id, host: me.attachedTo });
       me.attachedTo = undefined;
       invalidateCharacteristics(s);
       return;

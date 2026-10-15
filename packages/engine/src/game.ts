@@ -1,5 +1,5 @@
 import { kickerName } from "./abilities";
-import type { AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { ActivatedAbility, AdditionalCost, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
@@ -33,9 +33,9 @@ import {
   type PlayerId,
   type Step,
   type ZoneName,
+  STARTING_LIFE,
 } from "./types";
 
-export const STARTING_LIFE = 40; // CR 903.7
 export const COMMANDER_DAMAGE_LIMIT = 21; // CR 903.10a
 export const MAX_HAND_SIZE = 7; // CR 402.2
 
@@ -270,7 +270,7 @@ export function applyInPlace(s: GameState, action: Action): void {
   invalidateCharacteristics(s); // a fresh copy would start with nothing cached
   const p = player(s, action.player);
   if (action.type === "concede") {
-    playerLoses(s, p.id, "conceded");
+    playerLoses(s, p.id, "conceded", true);
     afterAction(s);
     return;
   }
@@ -606,6 +606,7 @@ export function moveObject(
   o.preventNext = undefined;
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
+  o.targetedThisTurn = undefined;
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
@@ -656,6 +657,12 @@ export function moveObject(
   // triggers say "put into a graveyard" or "leaves the battlefield".
   // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
+  if (fromZone === "battlefield") {
+    if (!(s.permanentLeftThisTurn ??= []).includes(lastController)) s.permanentLeftThisTurn.push(lastController); // revolt
+    if (!last.types.includes("Land")) s.voidThisTurn = true;
+  }
+  // Descend: a permanent card (not a token, CR 700.11) put into its owner's graveyard from anywhere.
+  if (to === "graveyard" && !o.isToken && !o.spellCopy && isPermanentCard(defOf(s, o)) && !(s.descendedThisTurn ??= []).includes(o.owner)) s.descendedThisTurn.push(o.owner);
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
   if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
@@ -1214,6 +1221,9 @@ function startNextTurn(s: GameState) {
   s.diedThisTurn = undefined;
   s.attackersThisTurn = undefined;
   s.lostLifeThisTurn = undefined;
+  s.permanentLeftThisTurn = undefined;
+  s.voidThisTurn = undefined;
+  s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
@@ -1696,7 +1706,9 @@ export function castProblem(
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
-    if (!altCost(d, choices.alt)) return `${d.name} doesn't have ${choices.alt}`;
+    if (!altCost(d, choices.alt, s, pid)) return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : `${d.name} doesn't have ${choices.alt}`;
+    // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
+    if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
     // Only one alternative cost can be applied to a spell (CR 118.9a).
     if (via || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
     if (choices.alt === "warp" && o.zone !== "hand") return "warp works only from your hand"; // CR 702.185a
@@ -1783,7 +1795,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
   // So do evoke, dash, bestow and madness (CR 702.74a, 702.109a, 702.103a, 702.35a).
-  const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt)?.mana ?? d.manaCost);
+  const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt, s, pid)?.mana ?? d.manaCost);
   const mana = parseManaCost(base + kickCost);
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
@@ -1817,6 +1829,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       const { manaValue: range, ...rest } = m.filter;
       if (!printedMatches(rest, d)) continue;
       if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
+      // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
+      if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
       if (m.n > 0) more += m.n;
       else less -= m.n;
     }
@@ -1889,9 +1903,24 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
   return Math.min(generic, pool);
 }
 
-/** The card's evoke or dash cost, if it has that one. */
-export function altCost(d: CardDef, alt?: AltCostKind) {
+/** A card's own alternative cost of that kind; with `s` and the caster, Fist of Suns' {W}{U}{B}{R}{G} too (CR 118.9). */
+export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): { kind: AltCostKind; mana: string; costs?: AdditionalCost[] } | undefined {
+  if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
+}
+
+const controlsPayWUBRG = (s: GameState, pid: PlayerId) =>
+  s.battlefield.some((id) => {
+    const o = obj(s, id);
+    if (!compileCard(defOf(s, o)).payWUBRG) return false;
+    const c = characteristics(s, o);
+    return c.controller === pid && c.hasPrintedAbilities;
+  });
+
+/** The alternative costs `pid` could cast this card for: its own, and Fist of Suns' (CR 118.9). */
+export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): { kind: AltCostKind; mana: string }[] {
+  const own = compileCard(defOf(s, o)).altCosts ?? [];
+  return controlsPayWUBRG(s, pid) && !isType(defOf(s, o), "Land") ? [...own, { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" }] : own;
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -2006,6 +2035,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
   o.castAlt = madness ? "madness" : choices.alt;
+  if (choices.alt === "warp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
   if (via?.exile) o.exileIfLeaves = "stack"; // CR 702.34a, 702.133a
@@ -2047,7 +2077,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
@@ -2360,11 +2390,39 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const cp = extraCostProblem(s, pid, o, ab.costs ?? [], costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
-  const cost = parseManaCost(ab.manaCost);
+  const cost = activationCost(s, pid, o, ab, targets);
   const xp = ab.loyaltyX ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : null) : xProblem(cost, x);
   if (xp) return xp;
   if (!canPayFromPool(s, pid, cost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
+}
+
+/**
+ * An activated ability's mana cost as `pid` activates it, after "Equip abilities you activate cost {1} less to activate"
+ * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
+ */
+export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
+  const cost = parseManaCost(ab.manaCost);
+  if (!ab.equip) return cost;
+  let less = 0;
+  const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    const mods = compileCard(defOf(s, src)).equipLess;
+    if (!mods) continue;
+    const c = characteristics(s, src);
+    if (!c.hasPrintedAbilities || c.controller !== pid) continue;
+    for (const m of mods) {
+      if (m.otherEquipment && src.id === o.id) continue;
+      // "That target ~": it's a creature you control, so it could be the target (CR 702.6a).
+      if (m.targetSelf && (targets ? target !== src.id : !c.types.includes("Creature"))) continue;
+      less += m.n;
+    }
+  }
+  if (!less) return cost;
+  const g = splitGeneric(cost, 0);
+  const left = Math.max(0, g.extra - less);
+  return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...g.cost.symbols] };
 }
 
 /** Creatures that could crew this Vehicle: other untapped creatures you control (CR 702.122a). */
@@ -2402,7 +2460,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
-  const abCost = parseManaCost(ab.manaCost);
+  const abCost = activationCost(s, p.id, o, ab, targets);
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
@@ -2712,7 +2770,7 @@ function devourChosen(s: GameState, o: GameObject, ids: ObjectId[], enters?: { x
 }
 
 /** The creature types an object has: "all" with changeling (CR 702.73a). On the battlefield, as the layers make it. */
-function creatureTypesOf(s: GameState, o: GameObject): Set<string> | "all" {
+export function creatureTypesOf(s: GameState, o: GameObject): Set<string> | "all" {
   if (o.zone === "battlefield") {
     const c = characteristics(s, o);
     return c.allCreatureTypes ? "all" : new Set(c.subtypes.filter((t) => CREATURE_TYPES.has(t)));
@@ -2720,7 +2778,7 @@ function creatureTypesOf(s: GameState, o: GameObject): Set<string> | "all" {
   const d = defOf(s, o);
   return d.keywords.includes("Changeling") ? "all" : new Set(d.subtypes.filter((t) => CREATURE_TYPES.has(t)));
 }
-const shareCreatureType = (a: Set<string> | "all", b: Set<string> | "all") =>
+export const shareCreatureType = (a: Set<string> | "all", b: Set<string> | "all") =>
   a === "all" ? b === "all" || b.size > 0 : b === "all" ? a.size > 0 : [...a].some((t) => b.has(t));
 
 /** Amplify's choice (CR 702.38a): cards in its controller's hand that share a creature type with it. */
@@ -3504,6 +3562,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         const fatal = Object.entries(p.commanderDamage).find(([, n]) => n >= COMMANDER_DAMAGE_LIMIT);
         if (fatal) changed = playerLoses(s, p.id, `took 21 combat damage from ${nameOf(s, fatal[0])}`) || changed; // 704.5u
       }
+      // 704.5b is about draws since state-based actions were last checked: one that didn't lose (Platinum Angel) is past.
+      if (!p.lost) p.drewFromEmptyLibrary = false;
     }
     // Start your engines!: a player with no speed who controls a permanent with it gets speed 1 (704.5aa).
     for (const p of s.players)
@@ -3624,6 +3684,7 @@ function attachmentSBAs(s: GameState): boolean {
       // Unattached from anything but a creature, and when it becomes a creature itself (CR 301.5c, 704.5n, 704.5p).
       // Also when the creature has protection from the Equipment's color (CR 702.16d).
       if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, c)) {
+        if (host) fireEvent(s, { type: "unattached", id: o.id, host: host.id });
         o.attachedTo = undefined;
         invalidateCharacteristics(s);
         log(s, `${c.name} becomes unattached.`);
@@ -3673,9 +3734,44 @@ function syncControl(s: GameState) {
   }
 }
 
-export function playerLoses(s: GameState, pid: PlayerId, reason: string): boolean {
+/**
+ * "You can't lose the game and your opponents can't win the game" (Platinum Angel), "You can't win the game and your
+ * opponents can't lose the game" (Abyssal Persecutor): does a permanent on the battlefield stop `pid` from losing
+ * (`what` "lose") or winning? Only conceding gets past it (rulings).
+ */
+export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    const a = abilitiesOf(s, o);
+    const rule = what === "lose" ? a.cantLose : a.cantWin;
+    if (!rule) return false;
+    const you = controllerOf(s, o);
+    return rule === "you" ? you === pid : you !== pid;
+  });
+}
+
+/**
+ * "You win the game" (CR 104.2b): the game ends at once (CR 104.1) with that player the winner, unless something says
+ * they can't win (Platinum Angel's "your opponents can't win the game").
+ */
+export function winGame(s: GameState, pid: PlayerId, reason: string) {
+  const p = player(s, pid);
+  if (p.lost || s.over) return;
+  if (gameEndBlocked(s, pid, "win")) {
+    log(s, `${p.name} can't win the game.`);
+    return;
+  }
+  s.over = true;
+  s.winner = pid;
+  s.pending = null;
+  log(s, `${p.name} wins the game (${reason}).`);
+}
+
+/** `conceded`: leaving the game this way can't be stopped (CR 104.3a; rulings on Platinum Angel). */
+export function playerLoses(s: GameState, pid: PlayerId, reason: string, conceded = false): boolean {
   const p = player(s, pid);
   if (p.lost) return false;
+  if (!conceded && gameEndBlocked(s, pid, "lose")) return false;
   p.lost = true;
   p.lossReason = reason;
   log(s, `${p.name} loses the game (${reason}).`);

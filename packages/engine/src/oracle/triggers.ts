@@ -171,14 +171,46 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
 const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|a player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
 const CAST_BY = { you: "you", "an opponent": "opponent", "a player": "any" } as const;
 
+/**
+ * "When ~ becomes the target of a spell, sacrifice it", "Whenever ~ becomes the target of a spell or ability for the first
+ * time each turn, counter that spell or ability" (Glyph Keeper), valiant's "... a spell or ability you control for the
+ * first time each turn", "Whenever a permanent you control becomes the target of a spell or ability an opponent controls".
+ * "That player" is the controller of the spell or ability; "that spell or ability" is it.
+ */
+function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^When(?:ever)? (~|an?(?:other)? .+?) becomes the target of a spell( or ability)?( you control| an opponent controls)?( for the first time each turn)?, (.+)$/.exec(line);
+  if (!m) return null;
+  const targeted = { ...(m[2] ? {} : { spell: true as const }), ...(m[3] ? { by: m[3] === " you control" ? ("you" as const) : ("opponent" as const) } : {}), ...(m[4] ? { first: true as const } : {}) };
+  const counter = /^counter that spell or ability\.?$/.exec(m[5]!) && m[2];
+  if (m[1] === "~") {
+    const text = m[5]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ");
+    const body = counter ? { targets: [], effects: [{ type: "counterCause" as const }], text: "Counter that spell or ability." } : parseBody(text, { selfIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
+    return body ? { event: "selfBecomesTarget", targeted, body } : "fail";
+  }
+  // "A permanent you control", "another creature you control": the subject, which "that permanent" or "it" is.
+  const other = /^another /.test(m[1]!);
+  const what = m[1]!.replace(/^an? |^another /, "");
+  const filter = parseTargetPhrase(what);
+  if (!filter || filter.kind !== "object" || counter) return "fail";
+  const body = parseBody(m[5]!.replace(/\bthat (?:permanent|creature)\b/g, "it"), { subjectIt: true, ...(m[3] !== " you control" ? { eventPlayer: true } : {}) });
+  return body ? { event: "permanentBecomesTarget", targeted: { ...targeted, ...(other ? { other } : {}) }, subjectFilter: { ...filter, text: what }, body } : "fail";
+}
+
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn".
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) second spell each turn, (.+)$/.exec(line);
+  if (nth) {
+    const body = parseBody(nth[2]!, { castSpell: true, eventPlayer: true });
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: { kind: "spell", text: "spell" }, nth: 2 }, body } : "fail";
+  }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
   const what = m[3]!.replace(/^an? /, "");
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   const spell = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
   if (!spell || spell.kind !== "spell") return "fail";
-  const body = parseBody(m[4]!, { castSpell: true });
+  // "That player" is the one who cast it.
+  const body = parseBody(m[4]!, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}) }, body };
 }
@@ -471,6 +503,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ~ deals damage to a player, ${toOpp[1]}`);
     return t && t !== "fail" ? { ...t, toOpponent: true } : "fail";
   }
+  // "Whenever this Equipment becomes unattached from a permanent, sacrifice that permanent" (Grafted Wargear).
+  const unattached = /^Whenever ~ becomes unattached from a permanent, (.+)$/.exec(line);
+  if (unattached) {
+    const body = parseBody(unattached[1]!.replace(/\bthat permanent\b/g, "it"), { subjectIt: true });
+    return body ? { event: "selfBecomesUnattached", body } : "fail";
+  }
+  const targetedBy = parseTargetedTrigger(line);
+  if (targetedBy) return targetedBy;
   const cast = parseCastTrigger(line);
   if (cast) return cast;
   // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with

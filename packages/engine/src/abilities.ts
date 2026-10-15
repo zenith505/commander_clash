@@ -165,6 +165,10 @@ export interface TargetSpec {
    * or the earlier ones for "another target".
    */
   distinctFrom?: number[];
+  /** "Up to three target cards from a single graveyard": in the same graveyard as these targets of the group, if chosen. */
+  sameGraveyardAs?: number[];
+  /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
+  sharesCreatureTypeWith?: number[];
   /** true: tapped; false: untapped. */
   tapped?: boolean;
   /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
@@ -450,6 +454,19 @@ export type StaticCondition =
   | { kind: "onBattlefield"; filter: TargetSpec; max: number }
   /** "If an opponent lost life this turn". */
   | { kind: "opponentLostLife" }
+  /** "If you've drawn two or more cards this turn". */
+  | { kind: "drawn"; n: number }
+  /** "If you descended this turn": a permanent card was put into your graveyard this turn (CR 700.11). */
+  | { kind: "descended" }
+  /** Revolt: "if a permanent left the battlefield under your control this turn". */
+  | { kind: "revolt" }
+  /** Void: "if a nonland permanent left the battlefield this turn or a spell was warped this turn". */
+  | { kind: "void" }
+  /**
+   * "As long as you have 25 or more life", fateful hour's "5 or less life", "at least 7 life more than your starting life
+   * total", "your life total is greater than or equal to your starting life total" (CR 903.7: 40): your life total now.
+   */
+  | { kind: "life"; min?: number; max?: number }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
@@ -501,7 +518,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness" }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
@@ -711,6 +728,8 @@ export type Effect =
    * "Whenever a player casts a spell, counter it unless that player pays {1}".
    */
   | { type: "counterUnlessPays"; unless: UnlessPays; ward?: boolean }
+  /** "Counter that spell or ability": the one that made this trigger (Glyph Keeper's "becomes the target"). */
+  | { type: "counterCause" }
   /**
    * "You may [do something]": the controller chooses as it resolves whether to do it
    * (CR 608.2d). Its targets were still chosen when it was put on the stack (CR 603.3d).
@@ -776,8 +795,10 @@ export type Effect =
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
   /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
   | { type: "extraTurn"; who: PlayerRef; n: number; loseAtEnd?: true }
-  /** "You lose the game" (CR 104.3a). */
+  /** "You lose the game" (CR 104.3e). */
   | { type: "loseGame"; who: PlayerRef }
+  /** "You win the game" (CR 104.2b): the game ends. */
+  | { type: "winGame"; who: PlayerRef }
   /** "Exile ~" in an instant or sorcery: it goes to exile as it resolves instead of its owner's graveyard (CR 608.2n). */
   | { type: "exileSpell" }
   /** "You take the initiative" (CR 726). */
@@ -846,7 +867,11 @@ export type TriggerEvent =
   | "permanentEnters"
   /** "Whenever another creature dies", "a creature you control", "equipped creature": see TriggeredAbility.dies. */
   | "permanentDies"
-  | "selfBecomesTarget" // "When this becomes the target of a spell or ability"
+  /** "Whenever ~ becomes unattached from a permanent" (it leaving too, CR 603.10a): the subject is that permanent. */
+  | "selfBecomesUnattached"
+  | "selfBecomesTarget" // "When this becomes the target of a spell or ability" (see TriggeredAbility.targeted)
+  /** "Whenever a permanent you control becomes the target of a spell or ability an opponent controls": see `subjectFilter`. */
+  | "permanentBecomesTarget"
   | "selfAttacks" // Whenever this attacks
   /** Enlist's trigger (CR 702.154a), "Whenever ~ enlists a creature": the subject is the enlisted creature. */
   | "selfEnlists"
@@ -925,6 +950,11 @@ export type TriggerEvent =
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /**
+   * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
+   * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
+   */
+  targeted?: { spell?: true; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean };
   /** For "permanentBecomesTapped": which permanent ("a Dwarf you control"); it's the subject ("put a wind counter on it"). */
   tappedFilter?: TargetSpec;
   /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */
@@ -938,7 +968,8 @@ export interface TriggeredAbility {
   state?: StaticCondition;
   /** For "castSpell": who casts it, and what kind of spell ("noncreature spell", "instant or sorcery spell"). */
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
-  cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec; orCopy?: boolean };
+  /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
+  cast?: { by: "you" | "opponent" | "any"; spell: TargetSpec; orCopy?: boolean; nth?: number };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
@@ -1031,6 +1062,8 @@ export interface ActivatedAbility {
   sorcerySpeed: boolean;
   body: AbilityBody;
   text: string;
+  /** An equip ability (CR 702.6a), for "Equip abilities you activate cost {1} less to activate". */
+  equip?: true;
   /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a). Otherwise on the battlefield. */
   zone?: "hand" | "graveyard";
   /** "Discard this card" is part of the cost (cycling, transmute). */
@@ -1187,6 +1220,8 @@ export interface CostMod {
   turn?: "yours" | "notYours";
   /** "Spells you cast from your graveyard". */
   fromGraveyard?: boolean;
+  /** "The first creature spell you cast each turn", "the second spell you cast each turn": only the nth matching spell. */
+  nth?: number;
   text: string;
 }
 
@@ -1227,7 +1262,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
  */
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype";
+/** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
+export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
@@ -1348,8 +1384,26 @@ export interface CompiledCard {
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
   youHave?: "hexproof" | "shroud";
+  /**
+   * Platinum Angel: "You can't lose the game and your opponents can't win the game" (`cantLose` "you", `cantWin`
+   * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).
+   */
+  cantLose?: "you" | "opponents";
+  cantWin?: "you" | "opponents";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /**
+   * "Equip abilities you activate cost {1} less to activate" (CR 602.2b, 601.2f); `targetSelf`: "that target ~";
+   * `otherEquipment`: "of other Equipment".
+   */
+  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true }[];
+  /**
+   * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the
+   * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).
+   */
+  enterLock?: { types?: string[]; opponents?: true };
+  /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
+  payWUBRG?: true;
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).

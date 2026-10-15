@@ -379,6 +379,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTop":
     case "discard":
     case "scry":
+    case "clash":
     case "surveil":
     case "orderTop":
     case "shuffle":

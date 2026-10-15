@@ -2237,6 +2237,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   const r = s.resolving;
   if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
+  if (pend.what === "clash") {
+    (r.scratch ??= {}).clash = { ...r.scratch?.clash, opp: Number(choice) as PlayerId }; // the opponent to clash with (CR 701.30b)
+    log(s, `${p.name} clashes with ${player(s, Number(choice) as PlayerId).name}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "venture") {
     (r.scratch ??= {}).venture = choice; // which dungeon, or which room the arrows lead to (CR 701.49a-b)
     continueResolution(s);
@@ -2382,6 +2388,12 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     loseLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     p.energy = (p.energy ?? 0) - energy;
     log(s, `${p.name} pays ${describePay(pend.pay)} for ${pend.source}.`);
+  }
+  if (pend.clash) {
+    (r.scratch ??= {}).clash = { ...r.scratch?.clash, answer: yes };
+    s.pending = null;
+    continueResolution(s);
+    return;
   }
   (r.scratch ??= {}).may = yes;
   if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "")}.`);

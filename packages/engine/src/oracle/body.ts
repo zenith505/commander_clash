@@ -44,7 +44,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick", "clash"]);
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
@@ -203,6 +203,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev;
       if (copy?.type !== "copySpell") return null;
       copy.newTargets = true;
+      continue;
+    }
+    // "Clash with an opponent. If you win, ... Otherwise, ...": decided by that clash (CR 701.30d).
+    const ifWin = /^If you win, (.+)$/.exec(s);
+    if (ifWin) {
+      const clashed = (es: Effect[]): boolean => es.some((e) => e.type === "clash" || (e.type === "may" && clashed(e.effects)));
+      const inner = clashed(effects) && parseOne(ifWin[1]!.charAt(0).toUpperCase() + ifWin[1]!.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      effects.push({ type: "if", cond: { kind: "wonClash" }, effects: inner });
+      continue;
+    }
+    const otherwise = /^Otherwise, (.+)$/.exec(s);
+    if (otherwise) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "if" || prev.cond.kind !== "wonClash" || prev.otherwise) return null;
+      const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => PAUSING.has(e.type)))) return null;
+      prev.otherwise = inner;
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);

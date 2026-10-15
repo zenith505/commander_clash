@@ -281,12 +281,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "pick":
       return pickPermanents(s, e, ctx, src);
-    case "bounce":
+    case "bounce": {
+      // "If you win, return ~ to its owner's hand": a resolving spell goes from the stack to its owner's hand as part of
+      // its resolution, never to the graveyard (Release the Ants rulings, CR 608.2n).
+      const spell = e.what.ref === "self" && s.resolving?.item.kind === "spell" ? s.objects[s.resolving.item.objectId ?? ""] : undefined;
+      if (spell?.zone === "stack") {
+        log(s, `${src} returns to its owner's hand.`);
+        moveObject(s, spell.id, "hand");
+        return;
+      }
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
         moveObject(s, o.id, "hand");
       }
       return;
+    }
     case "putOntoBattlefield":
       for (const o of objects(s, e.what, ctx)) {
         const d = defOf(s, o);

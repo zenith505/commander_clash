@@ -2237,6 +2237,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   const r = s.resolving;
   if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy") throw new RulesError("nothing to choose");
+  if (pend.what === "endure") {
+    (r.scratch ??= {}).endure = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "clash") {
     (r.scratch ??= {}).clash = { ...r.scratch?.clash, opp: Number(choice) as PlayerId }; // the opponent to clash with (CR 701.30b)
     log(s, `${p.name} clashes with ${player(s, Number(choice) as PlayerId).name}.`);

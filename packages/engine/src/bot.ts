@@ -129,6 +129,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const taps = rest && planMana(s, pid, rest.cost, rest.extra);
       return taps ? [...taps, { type: "finishAssistedCast", player: pid }] : [{ type: "finishAssistedCast", player: pid, cancel: true }];
     }
+    // Endure (CR 701.63a): every card that endures is a creature, so grow it rather than make a separate Spirit.
+    if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];

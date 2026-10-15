@@ -2560,6 +2560,19 @@ function Controls({
       </div>
     );
   }
+  if (pending?.kind === "chooseOption" && pending.what === "endure" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> endure with
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} className={i === 0 ? "" : "ghost"} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "clash" && pending.player === HUMAN)
     return (
       <div className="controls">

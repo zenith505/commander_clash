@@ -44,7 +44,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick", "clash"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "scry", "surveil", "orderTop", "may", "explore", "search", "choose", "connive", "pick", "clash", "endure"]);
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>

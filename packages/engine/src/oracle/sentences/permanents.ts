@@ -44,6 +44,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.replace(/^(he|she)$/i, "it"), ctx);
     return what ? [{ type: "phaseOut", what }] : null;
   }
+  // Endure N (CR 701.63a): "~ endures 2", "it endures X, where X is ...".
+  if ((m = /^(~|it|that creature) endures (\d+|X)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "endure", what, n: amt(m[2]!) }] : null;
+  }
   // Regeneration (CR 701.19a)
   if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

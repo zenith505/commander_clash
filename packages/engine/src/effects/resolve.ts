@@ -351,6 +351,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "connive":
     case "skipUntap":
     case "counters":
+    case "endure":
     case "moveCounter":
     case "removeCounters":
     case "removeSelfCounter":

@@ -440,7 +440,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash"; options: string[]; labels?: string[]; objectId?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure"; options: string[]; labels?: string[]; objectId?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -608,6 +608,7 @@ export interface Resolving {
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
     copies?: { of: string; left: number; targets?: TargetChoice[] }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
+    endure?: string; // "counters" or "token" (CR 701.63a)
     clash?: { opp?: PlayerId; revealed?: Record<string, ObjectId | null>; queue?: PlayerId[]; bottom?: PlayerId[]; answer?: boolean };
   };
 }

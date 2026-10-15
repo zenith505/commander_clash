@@ -143,6 +143,31 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "endure": {
+      // CR 701.63a: "that permanent's controller creates an N/N white Spirit creature token unless they put N +1/+1
+      // counters on that permanent", chosen as it resolves. Gone from the battlefield: just the token (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      const n = (sc.n ??= amountNow(s, e.n, ctx));
+      if (n <= 0) return; // CR 701.63b
+      const o = objects(s, e.what, ctx)[0];
+      const who = o ? controllerOf(s, o) : ctx.controller;
+      if (o && sc.endure === undefined) {
+        const name = defOf(s, o).name;
+        s.pending = { kind: "chooseOption", player: who, source: src, what: "endure", options: ["counters", "token"], labels: [`${n} +1/+1 counter${n > 1 ? "s" : ""} on ${name}`, `a ${n}/${n} Spirit token`] };
+        return "paused";
+      }
+      if (o && sc.endure === "counters") {
+        invalidateCharacteristics(s);
+        const put = putCounters(s, o, "+1/+1", n);
+        log(s, `${defOf(s, o).name} endures ${n}: it gets ${put} +1/+1 counter${put > 1 ? "s" : ""}.`);
+        return;
+      }
+      const spirit: TokenSpec = { name: "Spirit", power: n, toughness: n, colors: ["W"], types: ["Creature"], subtypes: ["Spirit"], keywords: [] };
+      if (s.resolving) s.resolving.created = [];
+      for (let i = tokensToCreate(s, who, spirit, 1); i > 0; i--) createToken(s, who, spirit);
+      log(s, `${src} endures ${n}: ${player(s, who).name} creates a ${n}/${n} Spirit token.`);
+      return;
+    }
     case "moveCounter": {
       // Remove it from the first and put it on the second; if either can't happen, neither does (CR 122.5).
       const from = objects(s, e.from, ctx)[0];

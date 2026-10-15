@@ -520,6 +520,8 @@ export type Effect =
   | { type: "exileTop"; who: PlayerRef; n: Amount }
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
+  /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
+  | { type: "endure"; what: ObjRef; n: Amount }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
   | { type: "surveil"; n: Amount } // CR 701.25

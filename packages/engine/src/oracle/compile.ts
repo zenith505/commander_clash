@@ -921,6 +921,11 @@ export function compile(d: CardDef): CompiledCard {
       else [out.cantWin, out.cantLose] = ["you", "opponents"];
       continue;
     }
+    // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
+    if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
+      out.splitSecondIfArtifactMana = true;
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;

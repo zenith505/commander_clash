@@ -1947,7 +1947,14 @@ export function canActAtSorcerySpeed(s: GameState, pid: PlayerId) {
  * and triggered abilities still work; so does a spell's split second only while it's on the stack.
  */
 export function splitSecondOnStack(s: GameState): boolean {
-  return s.stack.some((x) => x.kind === "spell" && !!x.objectId && !!s.objects[x.objectId] && objHasKeyword(s, s.objects[x.objectId]!, "Split second"));
+  return s.stack.some((x) => x.kind === "spell" && !!x.objectId && !!s.objects[x.objectId] && hasSplitSecond(s, s.objects[x.objectId]!, x.controller));
+}
+
+/** A spell's split second: its own, or Shadow the Hedgehog's for its controller's spells cast with mana from an artifact. */
+function hasSplitSecond(s: GameState, o: GameObject, controller: PlayerId): boolean {
+  if (objHasKeyword(s, o, "Split second")) return true;
+  if (!o.spent?.from?.artifact) return false;
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === controller && !!abilitiesOf(s, obj(s, id)).splitSecondIfArtifactMana);
 }
 
 /**

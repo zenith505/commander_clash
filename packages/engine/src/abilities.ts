@@ -2275,6 +2275,11 @@ export interface CompiledCard {
    * of damage is prevented, and one counter removed per damage event, even when there's none left to remove.
    */
   phantom?: boolean;
+  /**
+   * Khârn the Betrayer: "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control
+   * of it" (CR 615.5): the control change happens right away, also when the damage can't be prevented (615.12).
+   */
+  betrayer?: true;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /**

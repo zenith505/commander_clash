@@ -1079,6 +1079,10 @@ export function compile(d: CardDef): CompiledCard {
       out.phantom = true;
       continue;
     }
+    if (line === "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control of it.") {
+      out.betrayer = true;
+      continue;
+    }
     if (line === "Cast ~ only if you've cast another spell this turn.") {
       out.castOnlyAfterAnother = true;
       continue;

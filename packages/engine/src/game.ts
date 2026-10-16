@@ -5119,7 +5119,7 @@ function roleSBAs(s: GameState): boolean {
  * Notice permanents whose controller changed. The new controller hasn't controlled it
  * continuously since their turn began (CR 302.6), and it leaves combat (CR 506.4), as does one that stopped being a creature.
  */
-function syncControl(s: GameState) {
+export function syncControl(s: GameState) {
   for (const id of s.battlefield) {
     const o = obj(s, id);
     const now = controllerOf(s, o);

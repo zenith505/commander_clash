@@ -155,6 +155,8 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /** A Class's level (CR 716.2a-b), a designation it keeps until it leaves the battlefield; unset is level 1 (716.2d). */
+  classLevel?: number;
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
   saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */

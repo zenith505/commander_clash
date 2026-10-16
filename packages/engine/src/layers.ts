@@ -383,6 +383,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = src.counters[cond.counter] ?? 0;
       return n >= cond.min && (cond.max === undefined || n <= cond.max);
     }
+    case "classLevel": {
+      const n = src.classLevel ?? 1; // CR 716.2d
+      return n >= cond.min && (cond.max === undefined || n <= cond.max);
+    }
     case "selfPT": {
       // Only in a trigger's intervening if, so the layers are all applied by now; gone from the battlefield, it's false.
       const c = chars.get(sourceId);

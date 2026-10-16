@@ -261,7 +261,6 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           sc.paid = undefined;
         }
         made.push(pu.picked[pid]!);
-        pu.picked[pid] = undefined as unknown as string;
         delete pu.picked[pid];
       }
       // Which cards and permanents: a card to be discarded isn't revealed until it's discarded (rulings).

@@ -1,6 +1,6 @@
 # Roadmap
 
-17,274 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,316 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -27,21 +27,29 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      cost that sacrifices a creature (Demonmail Hauberk), only the human player does.
    - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
      them" and several cards don't.
-   Left from the dungeons and punishers round (venture into the dungeon, completed dungeons, punishers, "X unless
-   [condition]", named legendary tokens):
-   - Venture still out on other lines: Sefris and Varis ("this ability triggers only once each turn"), Wandering
-     Troubadour, Immovable Rod ("becomes untapped"), Intrepid Outlander (pack tactics), Radiant Solar (discard ~ from
-     hand as a cost), Ranger's Hawk, Fifty Feet of Rope. Dungeon Delver (granting Hama Pashar's ability to commanders),
-     Keen-Eared Sentry, Dungeon Crawler, Ellywick's "differently named dungeon" count. Dungeoneer's Pack's four-part
-     sentence ("You take the initiative, gain 3 life, draw a card, and create a Treasure token").
-   - "If you've completed a dungeon" inside an effect (Imoen, Safana, Caves of Chaos Adventurer, Rilsa Rael, White
-     Plume Adventurer, Undermountain Adventurer, Tomb of Horrors Adventurer); as a static condition it works.
-   - Punishers still out: per-opponent ones ("for each opponent, you create ... unless that player sacrifices",
-     Acererak), "unless they discard a nonland card" (Bandit's Talent, Compulsive Research, Wrench Mind), "sacrifices
-     a permanent unless they discard" (Possessed Portal), damage instead of life loss (Demanding Dragon, Mogis, Curse
-     Artifact, Indoraptor), "another nonland permanent" (Torment of Venom), "that many permanents" (Archfiend of
-     Spite), a count of blight counters (Rottenmouth Viper), "any number of times" (Forbidden Ritual). Bots choose a
-     punisher option by simple rules (a spare token, then a spare card, else the life).
+   Left from the dungeons, punishers, once-each-turn and Classes rounds:
+   - Batch triggers "whenever one or more ... ": "cards leave your graveyard" (Garrison Excavator, Quintorius, Soul
+     Enervation, Spirit Mascot, Willow Geist, Fuming Effigy, Amzu, Attuned Hunter, Chalk Outline), "tokens / creatures
+     / noncreature, nonland permanents you control enter" (Caretaker's, Builder's and Scavenger's Talent, Baron Bertram
+     Graywater, Enduring Innocence, Welcoming Vampire), "creature cards are put into your graveyard from anywhere"
+     (Sefris). One event can move many cards, and the ability triggers once for it (CR 603.2c).
+   - Venture still out on other lines: Wandering Troubadour ("if you had a land enter this turn"), Ranger's Hawk ("tap
+     another untapped creature you control" as a cost), Immovable Rod, Intrepid Outlander (pack tactics), Radiant
+     Solar, Fifty Feet of Rope, Dungeon Delver (granting Hama Pashar's ability to commanders), Keen-Eared Sentry,
+     Dungeon Crawler, Ellywick's "differently named dungeon" count.
+   - "If you've completed a dungeon" inside an effect still out: Caves of Chaos Adventurer (a free play of the exiled
+     card), White Plume Adventurer ("untap a creature you control").
+   - Punishers still out: "unless they discard a nonland card" (Bandit's Talent, Compulsive Research, Wrench Mind),
+     "sacrifices a permanent unless they discard" (Possessed Portal), "another nonland permanent" (Torment of Venom),
+     "that many permanents" (Archfiend of Spite), "any number of times" (Forbidden Ritual). Rottenmouth Viper's
+     trigger works; its "sacrifice any number of nonland permanents, costs {1} less for each" additional cost doesn't
+     (it needs a picker when casting). The same "sacrifice any number of X, then that many" shape blocks Pitiless
+     Carnage, Renounce, Reprocess, Scapeshift, Malevolent Witchkite, Mana Seism and Lich-Knights' Conquest.
+   - Classes (CR 716) still out on other lines: Cleric Class's level 3 ("you gain life equal to that creature's
+     toughness"), Warlock Class ("the life they lost this turn"), Paladin Class ("during your turn" cost increase),
+     Fighter Class ("blocks it this combat if able"), Leader's Talent ("if it had a counter on it"), Gourmand's Talent
+     ("for the first time each turn"), Bandit's Talent, the Stormchaser Otter token ("blue and red ... with prowess").
+     Copying a Class doesn't copy its level (716.2b); no supported card copies one yet.
    - "Unless" conditions still out: "an opponent has 10 or less life" (Vampire Lacerator) and other conditions the
      static parser doesn't read.
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,

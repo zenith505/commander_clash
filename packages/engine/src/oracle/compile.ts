@@ -133,7 +133,7 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Class", "Case", "Room", "Siege"];
+const UNSUPPORTED_SUBTYPES = ["Case", "Room", "Siege"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
@@ -213,7 +213,7 @@ export function normalizeSelf(d: CardDef): string {
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class)\b/g, "~");
   return t;
 }
 

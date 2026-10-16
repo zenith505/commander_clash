@@ -495,6 +495,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // "When this Class becomes level 2, draw two cards" (CR 716.2a).
+  const level = /^When ~ becomes level (\d+), (.+)$/.exec(line);
+  if (level) {
+    const body = parseBody(level[2]!, { selfIt: true });
+    return body ? { event: "selfBecomesLevel", level: Number(level[1]), body } : "fail";
+  }
   // "This ability triggers only once each turn": once it has triggered this turn, it doesn't again (the object's own
   // count; a new object starts over, CR 400.7).
   const once = /^(.+?) This ability triggers only once each turn\.?$/.exec(line);

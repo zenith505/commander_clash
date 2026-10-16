@@ -88,6 +88,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, choice === "neither" ? `${src}: ${defOf(s, o).name} is neither tapped nor untapped.` : `${src} ${choice}s ${defOf(s, o).name}.`);
       return;
     }
+    case "classLevel": {
+      // "This Class's level becomes N" (CR 716.2a): the same object only (CR 400.7).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o || o.zone !== "battlefield" || (ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      o.classLevel = e.n;
+      invalidateCharacteristics(s); // its abilities at that level
+      log(s, `${defOf(s, o).name} becomes level ${e.n}.`);
+      fireEvent(s, { type: "becameLevel", id: o.id, level: e.n });
+      return;
+    }
     case "becomeSaddled":
       // Only permanents can become saddled (CR 702.171b).
       for (const o of objects(s, e.what, ctx)) {

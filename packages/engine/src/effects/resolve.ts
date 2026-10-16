@@ -495,6 +495,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "untap":
     case "tapOrUntap":
     case "becomeSaddled":
+    case "classLevel":
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":

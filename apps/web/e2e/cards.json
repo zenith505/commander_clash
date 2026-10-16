@@ -4032,6 +4032,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "36f68aa3-9955-46f1-bc87-497f16ef5222",
+  "name": "Wizard Class",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Class",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Class"
+  ],
+  "oracleText": "(Gain the next level as a sorcery to add its ability.)\nYou have no maximum hand size.\n{2}{U}: Level 2\nWhen this Class becomes level 2, draw two cards.\n{4}{U}: Level 3\nWhenever you draw a card, put a +1/+1 counter on target creature you control.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "uncommon",
+  "layout": "class",
+  "gameChanger": false
+ },
+ {
   "oracleId": "34515b16-c9a4-4f98-8c77-416a7a523407",
   "name": "Wrath of God",
   "manaCost": "{2}{W}{W}",

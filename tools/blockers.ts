@@ -16,7 +16,8 @@ const re = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
 const fams = new Map<string, { n: number; single: number; ex: string[] }>();
 for (const c of unsupported) {
   const u = compileCard(c).unsupported;
-  const real = u.length === 1 ? u : u.filter((l) => compileCard({ ...c, oracleText: l }).unsupported.length > 0);
+  // Each line alone, as a card of its own: compileCard caches by oracleId, so the copy needs an id of its own.
+  const real = u.length === 1 ? u : u.filter((l, i) => compileCard({ ...c, oracleId: `${c.oracleId}#${i}`, oracleText: l }).unsupported.length > 0);
   const fails = real.length ? real : u;
   for (const l of fails) {
     const k = l.replaceAll(c.name, "~").replace(/\d+/g, "N");

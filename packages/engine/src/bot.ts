@@ -1,4 +1,4 @@
-import { allEffects, refCovers, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
@@ -58,7 +58,7 @@ import {
   auraHostKey,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
-import { characteristics, controllerOf } from "./layers";
+import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
 import { evalAmount } from "./amounts";
@@ -278,7 +278,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -302,7 +302,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Damage prevention waits for damage coming (chooseDamageShield).
       .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -710,7 +710,7 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
   for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence")]) {
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
-    if (a.kind === "bestow") continue; // tried first, see bestowPlan
+    if (a.kind === "bestow" || a.kind === "overload") continue; // tried first, see bestowPlan and overloadPlan
     const plan = castPlan(s, pid, id, false, undefined, a.kind);
     if (plan) return plan;
   }
@@ -735,6 +735,32 @@ function freerunPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   const o = obj(s, id);
   if (o.zone !== "hand" || !altCost(defOf(s, o), "freerunning") || !(s.freerunningThisTurn ?? []).includes(pid)) return null;
   return castPlan(s, pid, id, false, undefined, "freerunning");
+}
+
+/**
+ * Overload (CR 702.96a) when hitting each of them is worth clearly more than the best single permanent there is to target:
+ * what the "each" spell does to everyone's permanents, for us (groupValue).
+ */
+function overloadPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "hand" || !altCost(defOf(s, o), "overload")) return null;
+  const body = castingBody(castDef(s, id, "overload"));
+  const v = body ? groupValue(s, pid, body, defOf(s, o), id) : null;
+  const best = Math.max(1, ...s.battlefield.map((x) => worth(s, pid, obj(s, x))));
+  if (v === null || v <= 1.5 * best) return null;
+  return castPlan(s, pid, id, false, undefined, "overload");
+}
+
+/** Surge and spectacle (CR 702.117a, 702.137a) whenever they're allowed: no more than the mana cost, and maybe a bonus. */
+function cheaperAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "hand") return null;
+  for (const kind of ["surge", "spectacle"] as const) {
+    if (!altCost(defOf(s, o), kind)) continue;
+    const plan = castPlan(s, pid, id, false, undefined, kind);
+    if (plan) return plan;
+  }
+  return null;
 }
 
 /** Bestow it on one of our creatures when we can afford to (CR 702.103a): the bonus now, and a creature later. */
@@ -1665,13 +1691,14 @@ function best(s: GameState, pid: PlayerId, pool: ChosenTarget[], harmful: boolea
 /** How many times a bot activates one ability in a turn at most, so it can't go round a loop forever. */
 const BOT_LOOP_LIMIT = 8;
 
-function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
+function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility) => boolean): Action[] | null {
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid) continue;
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
+      if (only && !only(ab)) continue;
       // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
       if (ab.mana) continue;
       // Keep our permanents (but cash in Food and Clues), and avoid free loops.
@@ -1723,6 +1750,28 @@ function chooseActivation(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 /**
+ * Spells and abilities usable only at certain times (CR 506.8, 601.3, 602.5b), once that time has come and the stack is
+ * empty: "only during your upkeep", "only during combat", "only if you've been attacked this step". Not at the beginning
+ * of combat, before anyone attacks; damage prevention (Heavy Fog) only when enough damage is attacking us.
+ */
+function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.stack.length || s.step === "beginCombat") return null;
+  for (const id of player(s, pid).hand) {
+    const c = compileCard(defOf(s, obj(s, id)));
+    if (!c.castOnly || !timedCondition(c.castOnly) || !staticConditionNow(s, c.castOnly, id, pid)) continue;
+    if (c.spell && doesNothingNow(s, id, c.spell)) continue;
+    if (shieldBody(c.spell)) {
+      const coming = s.battlefield.map((x) => obj(s, x)).filter((o) => o.attacking === pid && !o.attackingPermanent).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+      if (coming < Math.min(4, player(s, pid).life)) continue;
+    }
+    const plan = castPlan(s, pid, id, false);
+    if (plan) return plan;
+  }
+  const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf);
+  return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
+}
+
+/**
  * Ninjutsu (CR 702.49a) once blockers are declared: swap the least valuable unblocked attacker (a token, or
  * anything smaller than the ninja) for the ninja, when the stack is empty.
  */
@@ -1769,12 +1818,12 @@ function chooseSneak(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
-function chooseUnearth(s: GameState, pid: PlayerId): Action[] | null {
+function chooseUnearth(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility) => boolean): Action[] | null {
   for (const id of player(s, pid).graveyard) {
     const abilities = abilitiesOf(s, obj(s, id)).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      if (ab.zone !== "graveyard") continue;
+      if (ab.zone !== "graveyard" || (only && !only(ab))) continue;
       // Scavenge needs a creature to grow (CR 702.97a).
       const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
       if (ab.body.targets.length && !targets) continue;

@@ -77,6 +77,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "34e05dc1-35af-402d-96ae-e249b3738493",
+  "name": "Augur il-Vec",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "Shadow (This creature can block or be blocked by only creatures with shadow.)\nSacrifice this creature: You gain 4 life. Activate only during your upkeep.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Shadow"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ee05fc58-1356-4b2f-b9ce-bda8cc716aee",
   "name": "Augury Raven",
   "manaCost": "{3}{U}",
@@ -731,6 +764,34 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "d75b9c82-1b49-4c3e-a1b5-aeef57d6644b",
+  "name": "Cyclonic Rift",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target nonland permanent you don't control to its owner's hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Overload"
+  ],
+  "commanderLegal": "legal",
+  "set": "rvr",
+  "releasedAt": "2024-01-12",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "1e6f2997-a84b-4302-9d8b-ca4928961d24",
@@ -2802,6 +2863,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4fb83127-00cf-4ce7-aedf-cb0b2740c66f",
+  "name": "Reckless Bushwhacker",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Goblin Warrior Ally",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warrior",
+   "Ally"
+  ],
+  "oracleText": "Surge {1}{R} (You may cast this spell for its surge cost if you or a teammate has cast another spell this turn.)\nHaste\nWhen this creature enters, if its surge cost was paid, other creatures you control get +1/+0 and gain haste until end of turn.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Haste",
+   "Surge"
+  ],
+  "commanderLegal": "legal",
+  "set": "ogw",
+  "releasedAt": "2016-01-22",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "523ae937-5535-490d-96ea-07f331b5e5ad",
   "name": "Replenish",
   "manaCost": "{3}{W}",
@@ -3020,6 +3116,68 @@
   "commanderLegal": "legal",
   "set": "tor",
   "releasedAt": "2002-02-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c43b616e-ef87-4c12-810b-a1a3260168fa",
+  "name": "Skewer the Critics",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Spectacle {R} (You may cast this spell for its spectacle cost rather than its mana cost if an opponent lost life this turn.)\nSkewer the Critics deals 3 damage to any target.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Spectacle"
+  ],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f64878c1-1fba-44f7-a24f-d24bef2e03ae",
+  "name": "Slippery Bogle",
+  "manaCost": "{G/U}",
+  "cmc": 1,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "Hexproof (This creature can't be the target of spells or abilities your opponents control.)",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [
+   "Hexproof"
+  ],
+  "commanderLegal": "legal",
+  "set": "uma",
+  "releasedAt": "2018-12-07",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false

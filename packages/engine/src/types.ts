@@ -270,6 +270,8 @@ export interface GameObject {
   exiledUntilLeaves?: { id: ObjectId; zc: number; hand?: true }[];
   /** Cast as a prototyped spell (CR 718.3): its alternative mana cost, color, power and toughness, on the stack and the battlefield. */
   prototyped?: boolean;
+  /** A spell cast for its overload cost (CR 702.96a): "target" in its text is "each" while it's on the stack. */
+  overloaded?: true;
   /**
    * The card this champion exiled (CR 702.72a), as it is in exile, and the champion's zoneChanges on the battlefield
    * then: its leaves-the-battlefield trigger returns it only if that's the permanent that left (CR 607.2a).
@@ -760,6 +762,11 @@ export interface GameState {
   /** Combat phases begun this turn: "if it's the first combat phase of the turn" (CR 506.1, 500.8). */
   combatsThisTurn?: number;
   /**
+   * The combat phase whose declare blockers step began (the turn and which combat of it): "only during combat after
+   * blockers are declared" can't be used in a combat that skipped that step (CR 506.8f).
+   */
+  blockersStep?: { turn: number; combat: number };
+  /**
    * Phases added to this turn that come directly after the current phase, in order: the most recently created first
    * (CR 500.8). An additional main phase is a postcombat main phase (CR 505.1a), so it's run as "main2".
    */
@@ -885,6 +892,8 @@ export interface TriggerEventInfo {
   evidence?: true;
   /** A permanent's enters trigger, or a cast trigger: how much mana from Treasures was spent to cast that spell (CR 106.3). */
   treasureSpent?: number;
+  /** A permanent's enters trigger: its spell's surge or spectacle cost was paid (CR 702.117a, 702.137a). */
+  castAlt?: "surge" | "spectacle";
 }
 
 export interface Resolving {

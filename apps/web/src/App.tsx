@@ -1446,7 +1446,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak" };
+const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1462,6 +1462,9 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   freerunning: "only if a player was dealt combat damage this turn by an Assassin or a commander you controlled",
   foretell: "a foretold card is cast for its foretell cost",
   sneak: "during your declare blockers step: return an unblocked attacker to your hand; a creature enters tapped and attacking",
+  surge: "only if you've cast another spell this turn",
+  spectacle: "only if an opponent lost life this turn",
+  overload: "\"target\" in its text becomes \"each\": no targets, it affects all of them",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };

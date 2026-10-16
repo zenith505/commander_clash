@@ -17,7 +17,7 @@
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
 import { creatureCardAbove } from "./graveyard";
-import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec } from "./abilities";
+import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
@@ -331,6 +331,26 @@ const PERMANENT_CARD_TYPES = ["Artifact", "Battle", "Creature", "Enchantment", "
  * Is an "as long as" condition true? Whatever it looks at on the battlefield is seen as the layers
  * applied so far have left it, so an effect that changes that waits for it (CR 613.8a).
  */
+/** Whether the game is in this part of the turn (CR 506.8): see TimingWindow. */
+function inWindow(s: GameState, w: TimingWindow): boolean {
+  switch (w) {
+    case "upkeep":
+    case "end":
+    case "declareAttackers":
+    case "declareBlockers":
+    case "endCombat":
+      return s.step === w;
+    case "afterUpkeep":
+      return s.step !== "untap" && s.step !== "upkeep";
+    case "combat": // any combat phase of the turn (CR 506.8c)
+      return ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
+    case "combatBeforeBlocks": // before the declare blockers step begins (CR 506.8b)
+      return s.step === "beginCombat" || s.step === "declareAttackers";
+    case "combatAfterBlocks": // not in a combat whose declare blockers step was skipped (CR 506.8f)
+      return ["declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step) && s.blockersStep?.turn === s.turn && s.blockersStep.combat === (s.combatsThisTurn ?? 0);
+  }
+}
+
 function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
@@ -362,6 +382,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount));
     case "beforeAttackers":
       return s.activePlayer === you && ["untap", "upkeep", "draw", "main1", "beginCombat"].includes(s.step);
+    case "during": // CR 506.8, 601.3, 602.5b
+      return (!cond.turn || (s.activePlayer === you) === (cond.turn === "you")) && inWindow(s, cond.window);
+    case "attackedThisStep": {
+      // Attackers are declared as the declare attackers step begins (CR 508.1); attacking only planeswalkers doesn't count.
+      const ap = s.players[s.activePlayer];
+      return s.step === "declareAttackers" && ap?.attackedPlayers?.turn === s.turn && ap.attackedPlayers.players.includes(you);
+    }
     case "monarch":
       return s.monarch === you;
     case "fullParty":

@@ -173,6 +173,52 @@ export function parseActivateCondition(text: string): StaticCondition | null {
   return parseStaticCondition(text, self);
 }
 
+/**
+ * The part of the turn after "only during" (CR 506.8, 602.5b): "your upkeep", "any upkeep step", "an opponent's turn",
+ * "combat on your turn before blockers are declared", "the declare attackers step", "the end of combat step".
+ */
+export function parseDuring(text: string): StaticCondition | null {
+  const whose = (w: string | undefined): { turn?: "you" | "opponent" } => (!w ? {} : /your/.test(w) ? { turn: "you" } : { turn: "opponent" });
+  let m: RegExpExecArray | null;
+  if (text === "your turn") return { kind: "yourTurn" };
+  if (text === "an opponent's turn") return { kind: "yourTurn", not: true };
+  if (text === "your turn, before attackers are declared") return { kind: "beforeAttackers" };
+  if (text === "an opponent's turn after their upkeep step") return { kind: "during", window: "afterUpkeep", turn: "opponent" };
+  if ((m = /^combat( on your turn| on an opponent's turn)?( before blockers are declared| after blockers are declared)?$/.exec(text)))
+    return { kind: "during", window: !m[2] ? "combat" : /before/.test(m[2]) ? "combatBeforeBlocks" : "combatAfterBlocks", ...whose(m[1]) };
+  if ((m = /^(your|an opponent's|any|each) upkeep(?: step)?$/.exec(text))) return { kind: "during", window: "upkeep", ...whose(m[1] === "any" || m[1] === "each" ? undefined : m[1]) };
+  if ((m = /^(your|an opponent's) end step$/.exec(text))) return { kind: "during", window: "end", ...whose(m[1]) };
+  if ((m = /^(?:the|(your)) declare (attackers|blockers) step( on your turn| on an opponent's turn)?$/.exec(text)))
+    return { kind: "during", window: m[2] === "attackers" ? "declareAttackers" : "declareBlockers", ...whose(m[1] ?? m[3]) };
+  if (text === "the end of combat step") return { kind: "during", window: "endCombat" };
+  return null;
+}
+
+/**
+ * The clauses after "Activate only" or "Cast ~ only" (CR 602.5b, 601.3), joined by ", only" or "and only": "during
+ * your upkeep", "if you control a Swamp", "once each turn", "as a sorcery". Null when one isn't understood.
+ */
+export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?: true; sorcery?: true } | null {
+  const conds: StaticCondition[] = [];
+  const out: { cond?: StaticCondition; once?: true; sorcery?: true } = {};
+  for (const clause of text.split(/,? and only |, only /)) {
+    let c: StaticCondition | null = null;
+    if (clause === "once each turn") out.once = true;
+    else if (clause === "as a sorcery") out.sorcery = true;
+    else if (clause.startsWith("during ") && (c = parseDuring(clause.slice(7)))) conds.push(c);
+    else if (clause === "if you've been attacked this step") conds.push({ kind: "attackedThisStep" });
+    else if (clause.startsWith("if ") && (c = parseActivateCondition(clause.slice(3)))) conds.push(c);
+    else return null;
+  }
+  // "If you've been attacked this step" means the declare attackers step it names (CR 508.1).
+  if (conds.some((c) => c.kind === "attackedThisStep") && !conds.some((c) => c.kind === "during" && c.window === "declareAttackers")) return null;
+  // "During combat and only if defending player controls a snow land" (Arcum's Sleigh): the defending player of a
+  // combat the source isn't in, which a multiplayer game can have several of; not modeled.
+  if (conds.some((c) => c.kind === "during") && conds.some((c) => c.kind === "control" && c.who === "defending")) return null;
+  if (conds.length) out.cond = conds.length === 1 ? conds[0]! : { kind: "allOf", conds };
+  return out;
+}
+
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };

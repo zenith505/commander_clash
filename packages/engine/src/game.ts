@@ -1,6 +1,6 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
+import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
@@ -634,6 +634,7 @@ export function moveObject(
     o.sneak = undefined;
     o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
     o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
+    o.overloaded = undefined; // the text change lasts while it's a spell (CR 702.96a)
     o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
     // A face-down spell becomes a face-down permanent (CR 708.4); anywhere else, it's revealed (CR 708.9).
     if (o.faceDown) {
@@ -1442,6 +1443,7 @@ function startNextTurn(s: GameState) {
   s.diedThisTurn = undefined;
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
+  s.blockersStep = undefined;
   s.addedPhases = undefined;
   s.resumeStep = undefined;
   s.lostLifeThisTurn = undefined;
@@ -1528,6 +1530,7 @@ function beginStep(s: GameState, step: Step): void {
       s.pending = { kind: "declareAttackers", player: ap };
       return;
     case "declareBlockers": {
+      s.blockersStep = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
       const attacked = livingPlayers(s).filter((pid) => attackers(s).some((a) => a.attacking === pid));
       const order = turnOrderFrom(s, ap).filter((pid) => attacked.includes(pid));
       if (order.length) {
@@ -2043,6 +2046,16 @@ export function castProblem(
       o.prototyped = undefined;
     }
   }
+  if (choices?.alt === "overload" && !o.overloaded) {
+    // Cast overloaded, its text says "each" instead of "target" from the moment it's proposed (CR 702.96a, 601.2b).
+    if (!altCost(defOf(s, o), "overload")) return `${defOf(s, o).name} doesn't have overload`;
+    o.overloaded = true;
+    try {
+      return castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices);
+    } finally {
+      o.overloaded = undefined;
+    }
+  }
   if (choices?.alt === "bestow" && !o.bestowed) {
     // Cast bestowed, only its characteristics as an Aura spell are looked at (CR 702.103d).
     if (!altCost(defOf(s, o), "bestow")) return `${defOf(s, o).name} doesn't have bestow`;
@@ -2100,6 +2113,9 @@ export function castProblem(
   // "Cast this spell only if you've cast another spell this turn" (Illusory Angel), checked as it's proposed, before it
   // counts itself (CR 601.3); the other spell needn't have resolved (rulings). Face down it has no abilities (CR 708.2).
   if (compileCard(d).castOnlyAfterAnother && !choices?.faceDown && !(s.castThisTurn ?? []).some((c) => c.player === pid)) return `${d.name} can be cast only if you've cast another spell this turn`;
+  // "Cast this spell only during combat" (CR 506.8, 601.3): also when it's cast during another's resolution (rulings).
+  const only = compileCard(d).castOnly;
+  if (only && !choices?.faceDown && !staticConditionNow(s, only, id, pid)) return `${d.name} can be cast only ${/Cast (?:this spell|~) only ([^.\n]+)\./.exec(d.oracleText ?? "")?.[1] ?? "at certain times"}`;
   // A card with no mana cost can't be cast by paying it (CR 118.6, 202.1b): only for an alternative cost or free.
   if (!d.manaCost && !free && !plotted && !choices?.alt && !choices?.faceDown && !via?.mana) return `${d.name} has no mana cost and can't be cast this way`;
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
@@ -2402,9 +2418,12 @@ const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets
 /** Every optional cost paid (each kicker cost too): the most targets a spell can have. */
 const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true };
 
-/** What casting this card puts on the stack: the card, or for a bestowed cast, the Aura it is then (CR 702.103b, d). */
+/**
+ * What casting this card puts on the stack: the card, or for a bestowed cast, the Aura it is then (CR 702.103b, d); for
+ * an overloaded cast, its "each" text (702.96a).
+ */
 export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
-  alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
+  alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : alt === "overload" && !obj(s, id).overloaded ? overloadedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
 
 /**
  * "You may cast sorcery spells as though they had flash" (Hypersonic Dragon), "... spells ..." (Vedalken Orrery): a
@@ -2432,6 +2451,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
     o.prototyped = true; // a prototyped spell from the moment it's cast (CR 718.3b)
+  }
+  if (choices.alt === "overload" && !o.overloaded) {
+    const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
+    if (problem) throw new RulesError(problem);
+    o.overloaded = true; // CR 702.96a
   }
   if (choices.alt === "bestow" && !o.bestowed) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);

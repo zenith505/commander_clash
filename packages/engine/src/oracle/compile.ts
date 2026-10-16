@@ -9,7 +9,7 @@ import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
-import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition } from "./statics";
+import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
 import { parseTrigger } from "./triggers";
 import { parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
@@ -22,6 +22,13 @@ import { parseSearchFilter } from "./search";
 import { addStriation, simpleKeywords, striations } from "./striations";
 
 const cache = new Map<string, CompiledCard>();
+
+/** An overloaded spell's text (CR 702.96a): every instance of the word "target" is "each", except in the overload line. */
+export const overloadedText = (text: string): string =>
+  text
+    .split("\n")
+    .map((l) => (/^Overload\b/.test(l) ? l : l.replace(/\btarget\b/g, "each").replace(/\bTarget\b/g, "Each")))
+    .join("\n");
 
 export function compileCard(d: CardDef): CompiledCard {
   const hit = cache.get(d.oracleId);
@@ -925,6 +932,15 @@ export function compile(d: CardDef): CompiledCard {
       out.castOnlyAfterAnother = true;
       continue;
     }
+    // "Cast this spell only during combat", "... only during your end step", "... only during the declare attackers step
+    // and only if you've been attacked this step" (CR 506.8, 601.3).
+    const castOnly = /^Cast ~ only ((?:during|if) [^.]+)\.$/.exec(line);
+    if (castOnly) {
+      const clauses = parseOnlyClauses(castOnly[1]!);
+      if (!clauses?.cond || clauses.once || clauses.sorcery || out.castOnly) out.unsupported.push(raw);
+      else out.castOnly = clauses.cond;
+      continue;
+    }
     if (/^~ can't be countered\.$/.test(line)) {
       out.cantBeCountered = true;
       continue;
@@ -1202,6 +1218,13 @@ export function compile(d: CardDef): CompiledCard {
   if (out.fromGraveyard?.some((g) => kinds(g.costs).some((k) => kinds(out.additionalCosts).includes(k)))) out.unsupported.push("graveyard cast with a cost like its additional cost");
   if (out.escapesWith && !out.fromGraveyard?.some((g) => g.kind === "escape")) out.unsupported.push("escapes with counters");
   checkCastingLinks(out);
+  // Overload (CR 702.96a-b): cast for that cost, the spell's text says "each" for "target", and it has no targets.
+  const overload = out.altCosts?.find((a) => a.kind === "overload");
+  if (overload && !d.oracleId.endsWith("|overloaded")) {
+    const v = compileCard({ ...d, oracleId: `${d.oracleId}|overloaded`, oracleText: overloadedText(d.oracleText) });
+    const targets = (b?: AbilityBody) => !!b && (b.targets.length > 0 || !!b.modal?.modes.some((m) => m.targets.length));
+    if (!out.spell || v.unsupported.length || !v.spell || targets(v.spell)) out.unsupported.push(`Overload ${overload.mana}`);
+  }
   linkExile(out);
   // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled.
   if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield"))) out.unsupported.push("(an Aura returning itself to the battlefield)");
@@ -1292,6 +1315,14 @@ function checkCastingLinks(out: CompiledCard) {
   const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');
   if ((evidenceIn(out.spell) || out.triggers.some((t) => t.ifEvidence || evidenceIn(t.body))) && out.evidence === undefined) bad = true;
   if (out.triggers.some((t) => t.event !== "selfEnters" && evidenceIn(t.body)) || evidenceIn(out.activated) || evidenceIn(out.statics)) bad = true;
+  // "If this spell's surge cost was paid" needs that alternative cost (CR 702.117a, 702.137a): in the spell, or its
+  // permanent's enters trigger.
+  for (const alt of ["surge", "spectacle"] as const) {
+    const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
+    const linked = !!out.altCosts?.some((a) => a.kind === alt);
+    if ((altIn(out.spell) || out.triggers.some((t) => t.ifAlt === alt || altIn(t.body))) && !linked) bad = true;
+    if (out.triggers.some((t) => t.event !== "selfEnters" && altIn(t.body)) || altIn(out.activated) || altIn(out.statics)) bad = true;
+  }
   // Mana from Treasures spent (CR 106.3) is known for a spell, its permanent's enters trigger, and an activated ability.
   const treasureIn = (v: unknown) => /"kind":"treasure(?:Spent)?"/.test(JSON.stringify(v ?? null));
   if (out.triggers.some((t) => t.event !== "selfEnters" && treasureIn(t.body)) || treasureIn(out.statics) || JSON.stringify(out.activated ?? null).includes('"kind":"treasureSpent"')) bad = true;

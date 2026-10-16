@@ -1,4 +1,5 @@
-import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Range, TargetChoice, TargetSpec } from "../abilities";
+import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, Range, TargetChoice, TargetSpec } from "../abilities";
+import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
@@ -166,6 +167,36 @@ export function spellManaValue(s: GameState, item: StackItem): number {
   if (!o || o.faceDown) return 0;
   const cost = parseManaCost(defOf(s, o).manaCost);
   return manaValue(cost) + (cost.hasX ? (item.x ?? 0) * xCount(cost) : 0);
+}
+
+/**
+ * Does a spell on the stack match `spec` (cast triggers: "a creature spell with power 5 or greater", "a spell with mana
+ * value 4 or greater")? Its mana value counts the X chosen for it (CR 202.3e). A power or toughness of "*" comes from
+ * its characteristic-defining ability, which works on the stack too (CR 604.3); nothing else changes a spell's power.
+ */
+export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): boolean {
+  const o = item.objectId ? s.objects[item.objectId] : undefined;
+  if (!o) return false;
+  const d = defOf(s, o);
+  const { manaValue: mv, power: pw, toughness: tg, ...rest } = spec;
+  if (!printedMatches(rest, d)) return false;
+  if (mv && !inRange(spellManaValue(s, item), mv)) return false;
+  for (const [key, range] of [["power", pw], ["toughness", tg]] as const) {
+    if (!range) continue;
+    // Only creature spells have power and toughness (CR 208.3).
+    if (!d.types.includes("Creature")) return false;
+    const printed = d[key] ?? "0";
+    let n = Number.parseInt(printed, 10);
+    if (!/^\d+$/.test(printed)) {
+      const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT"));
+      const def = cda?.mods.find((m) => m.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
+      const amount = def?.[key];
+      if (amount === undefined) return false;
+      n = evalAmount(s, amount, { controller: item.controller, sourceId: o.id });
+    }
+    if (!inRange(n, range)) return false;
+  }
+  return true;
 }
 
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);

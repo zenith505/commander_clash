@@ -326,6 +326,8 @@ export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
   | { ref: "target"; index: number; n?: number }
   | { ref: "self" } // the source permanent ("this creature")
+  /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
+  | { ref: "castSpell" }
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */

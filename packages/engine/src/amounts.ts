@@ -6,7 +6,7 @@
 
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { defOf } from "./cards";
-import { bindChosen, objectMatches, printedMatches } from "./effects";
+import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./effects";
 import { characteristics, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
@@ -34,6 +34,8 @@ export interface AmountCtx {
   chosen?: Chosen;
   /** For a triggered ability, what its event was about ("that much"). */
   event?: TriggerEventInfo;
+  /** The stack item that triggered it: for a cast trigger, the spell cast. */
+  cause?: string;
   /** How the resolving ability finds the objects and players it names. Static abilities only name themselves and "you". */
   objects?: (ref: ObjRef) => GameObject[];
   players?: (ref: PlayerRef) => PlayerId[];
@@ -166,6 +168,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "power":
     case "toughness":
     case "manaValue": {
+      // "That spell's mana value" in a cast trigger: as it was cast, X included (CR 202.3e), even if it has left the stack.
+      if (c.of.ref === "castSpell") {
+        const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+        return item && c.kind === "manaValue" ? spellManaValue(s, item) : 0;
+      }
       if (c.of.ref === "sacrificed") return Math.max(0, ctx.sacrificed?.[0]?.[c.kind] ?? 0);
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) {

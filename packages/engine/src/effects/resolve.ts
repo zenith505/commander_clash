@@ -204,6 +204,7 @@ export function apnap(s: GameState, pids: PlayerId[]): PlayerId[] {
 }
 
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
+  if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "self") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // If it left the battlefield (even if it came back), it's a different object now (CR 400.7).
@@ -366,6 +367,7 @@ const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   sourceZc: ctx.sourceZc,
   x: ctx.x,
   event: ctx.event,
+  ...(ctx.cause !== undefined ? { cause: ctx.cause } : {}),
   lki: ctx.lki,
   kicked: ctx.kicked,
   colorsSpent: ctx.colorsSpent,

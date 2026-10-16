@@ -12,6 +12,10 @@ import type { Ctx } from "../body";
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "That creature enters with an additional +1/+1 counter on it" about a creature spell a cast trigger is about (Boreal
+  // Outrider): the spell, as it resolves (CR 614.1c).
+  if ((m = new RegExp(`^[Tt]hat creature enters with (an|${NUMX}) additional ${COUNTER} counters? on it$`).exec(s)))
+    return ctx.castSpell && m[1] !== "X" ? [{ type: "spellEntersWith", counter: counterKind(m[m.length - 1]!), n: m[1] === "an" ? 1 : amt(m[1]!) }] : null;
   // A class level bar's activated ability (CR 716.2a; see striations.ts): only in an activated ability of its own.
   if ((m = /^~'s level becomes (\d+)$/.exec(s))) return ctx.activated ? [{ type: "classLevel", n: Number(m[1]) }] : null;
   // A Case's "To solve" trigger (CR 719.3a; see compile.ts): "this Case becomes solved".

@@ -33,6 +33,7 @@ import {
   type LastKnown,
   type StackItem,
   type ManaType,
+  type SpentMana,
   type ObjectId,
   type Player,
   type PlayerId,
@@ -667,6 +668,7 @@ export function moveObject(
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
+    o.extraCounters = undefined; // and the counters a spell will enter with
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -763,7 +765,11 @@ export function moveObject(
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
-    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
+    const counters = { ...opts.counters };
+    for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
+    o.extraCounters = undefined;
+    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1437,11 +1443,23 @@ function advanceStep(s: GameState): void {
     // spent is spent from the rest first, so what's kept is the red left, up to firebending's.
     const restrictedRed = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === "R" ? r.n : 0), 0);
     const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R - restrictedRed) : 0;
+    // Mana kept "until end of turn" is lost as the cleanup step ends (CR 514.2, 500.4); other mana is spent first, so
+    // what's kept is what's left of each type, up to how much is kept (snow mana stays snow mana, kept first).
+    const kept = emptyPool();
+    if (p.keptMana?.turn === s.turn && s.step !== "cleanup")
+      for (const m of Object.keys(kept) as ManaType[]) {
+        const restricted = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === m ? r.n : 0), 0);
+        kept[m] = Math.max(0, Math.min(p.keptMana.mana[m] ?? 0, p.manaPool[m] - restricted - (m === "R" ? keep : 0)));
+      }
+    const keptSnow = Object.fromEntries((Object.keys(kept) as ManaType[]).map((m) => [m, Math.min(kept[m], p.snowMana?.[m] ?? 0)]).filter(([, n]) => n));
     p.manaPool = emptyPool();
     p.restrictedMana = undefined;
     p.treasureMana = undefined;
+    p.snowMana = Object.keys(keptSnow).length ? keptSnow : undefined;
     p.manaPool.R = keep;
     p.combatMana = keep || undefined;
+    for (const m of Object.keys(kept) as ManaType[]) p.manaPool[m] += kept[m];
+    p.keptMana = Object.values(kept).some((n) => n) ? { turn: s.turn, mana: Object.fromEntries(Object.entries(kept).filter(([, n]) => n)) } : undefined;
   }
   if (s.step === "cleanup" && s.cleanupAgain) {
     s.cleanupAgain = undefined;
@@ -2120,6 +2138,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const src = objectSource(s, o);
   // Mana from a Treasure (CR 106.3): what its source was as it was activated, before it's sacrificed.
   const treasure = isTreasure(s, o);
+  const snow = isSnowSource(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
   if (ab.tap) tapPermanent(s, o);
@@ -2133,7 +2152,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
-  addMana(s, p.id, adds, ab.spendOnly, treasure);
+  addMana(s, p.id, adds, ab.spendOnly, treasure, snow);
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addMana(s, p.id, picked.adds);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -2145,6 +2164,8 @@ export const spellUse = (d: CardDef, alt?: AltCostKind): ManaUse => (altCost(d, 
 
 /** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
+/** A snow permanent: the mana its abilities make is snow mana, for {S} (CR 107.4h, 205.4g). */
+export const isSnowSource = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).supertypes.includes("Snow");
 
 export function commanderTax(p: Player, o: GameObject) {
   return 2 * (p.commanderCasts[o.id] ?? 0); // CR 903.8
@@ -2654,7 +2675,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
   const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst, ...hopes })!;
+  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -2671,7 +2692,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
   o.manaSpent = manaSpent || undefined;
   // What was spent, by type, for "if {U} was spent to cast ~" and adamant (CR 601.2h).
-  const spent = Object.fromEntries(Object.entries(paid.spent).filter(([, n]) => n > 0)) as Partial<Record<ManaType, number>>;
+  const spent: SpentMana = Object.fromEntries(Object.entries(paid.spent).filter(([, n]) => n > 0));
+  // How much of it snow sources made: "if {S} was spent", "for each {S} spent" (CR 107.4h).
+  const snow = Object.fromEntries(Object.entries(paid.snow).filter(([, n]) => n > 0));
+  if (Object.keys(snow).length) spent.snow = snow;
   o.spent = Object.keys(spent).length ? spent : undefined;
   o.treasureSpent = paid.treasure || undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
@@ -3445,6 +3469,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const treasure = !!manaPick && isTreasure(s, o);
+  const snow = !!manaPick && isSnowSource(s, o);
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
@@ -3498,7 +3523,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
-    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(treasure ? { treasure: true as const } : {}) } } : {}),
+    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(treasure ? { treasure: true as const } : {}), ...(snow ? { snow: true as const } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
   };
   if (manaPick) {

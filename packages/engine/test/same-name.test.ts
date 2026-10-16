@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, addEffect, bear, card, cast, pt, putOnBattlefield, setup, target } from "./helpers";
-import { isFullySupported, objHasKeyword, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { chooseTargets, compileCard, invalidateCharacteristics, isFullySupported, objHasKeyword, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState) => {
@@ -124,5 +124,31 @@ describe("same name as that permanent", () => {
     expect(s.battlefield).not.toContain(tok);
     expect(s.objects[b]!.zone).toBe("battlefield");
     expect(s.battlefield).toContain(myTok);
+  });
+
+  it("bots count their own permanents with the same name against the target", () => {
+    const { s, ap, opp, ids } = setup([pulse, homing]);
+    const theirs = putOnBattlefield(s, opp, giant);
+    const bearOf = putOnBattlefield(s, opp, bear());
+    const body = compileCard(pulse).spell!;
+    // Alone, their Hill Giant is the best target.
+    expect(chooseTargets(s, ap, body, false, ids[0])).toEqual([target(theirs)]);
+    // With a Hill Giant of ours, that would cost us as much: their Grizzly Bears instead.
+    const ours = putOnBattlefield(s, ap, giant);
+    expect(chooseTargets(s, ap, body, false, ids[0])).toEqual([target(bearOf)]);
+    // A second one of theirs makes the Giant worth it again (two of theirs for one of ours).
+    const theirs2 = putOnBattlefield(s, opp, giant);
+    expect([[target(theirs)], [target(theirs2)]]).toContainEqual(chooseTargets(s, ap, body, false, ids[0]));
+    // Only things that cost us more than they gain: not cast.
+    const { s: s2, ap: ap2, opp: opp2, ids: ids2 } = setup([pulse]);
+    putOnBattlefield(s2, opp2, bear());
+    putOnBattlefield(s2, ap2, bear());
+    putOnBattlefield(s2, ap2, bear());
+    expect(chooseTargets(s2, ap2, body, false, ids2[0])).toBeNull();
+    // Damage that won't kill ours costs nothing: Homing Lightning still takes their Giant next to our 6/6 one.
+    s.objects[ours]!.counters["+1/+1"] = 3;
+    invalidateCharacteristics(s);
+    expect(pt(s, ours)).toBe("6/6");
+    expect([[target(theirs)], [target(theirs2)]]).toContainEqual(chooseTargets(s, ap, compileCard(homing).spell!, false, ids[1]));
   });
 });

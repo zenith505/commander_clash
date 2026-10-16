@@ -128,6 +128,8 @@ export type Count =
   | { kind: "greatestDrawn" }
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
   | { kind: "treasureSpent" }
+  /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
+  | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
@@ -1175,7 +1177,7 @@ export type Effect =
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
    * stack (CR 605.1, 605.5a). `chosen` adds that much mana of the color chosen just before (a "choose" effect). */
   /** `times`: "Add {R} for each card in target opponent's hand" (Jeska's Will). */
-  | { type: "addMana"; mana?: string; chosen?: number; times?: Amount }
+  | { type: "addMana"; mana?: string; chosen?: number; times?: Amount; /** "Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4). */ keep?: "turn" }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec }
@@ -1199,6 +1201,11 @@ export type Effect =
    */
   /** "Counter each spell you don't control" (overloaded Counterflux): every spell on the stack matching it, not abilities. */
   | { type: "counterEach"; filter: TargetSpec }
+  /**
+   * "That creature enters with an additional +1/+1 counter on it" in a cast trigger (Boreal Outrider): the spell it was
+   * about, if it's still on the stack, enters with these too (CR 614.1c).
+   */
+  | { type: "spellEntersWith"; counter: CounterKind; n: Amount }
   | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean; /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */ ifMvX?: true }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
@@ -1368,6 +1375,14 @@ export interface SpentReq {
   total?: number;
   /** "No mana was spent", "no colored mana was spent". */
   none?: "mana" | "colored";
+  /** "Unless two or more colors of mana were spent" (Steel Exemplar): at most this many colors spent. */
+  maxColors?: number;
+  /** "If at least three colorless mana was spent" (Desecrate Reality): {C} spent. */
+  colorless?: number;
+  /** "If {S} was spent": at least this much mana from snow sources (CR 107.4h). */
+  snow?: number;
+  /** "If {S} of any of that spell's colors was spent to cast it" (Boreal Outrider). */
+  snowOfColors?: true;
 }
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
@@ -2104,6 +2119,8 @@ export interface CompiledCard {
   countsColors?: boolean;
   /** Mana its text hopes was spent to cast it ("if {U} was spent to cast ~", adamant): paying spends those colors if it can. */
   wantSpent?: SpentReq[];
+  /** Its text counts or hopes for mana from snow sources spent to cast it ("if {S} was spent"): paying spends snow mana first. */
+  wantSnow?: true;
   /**
    * "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller
    * of the permanent it becomes sacrifices it at the beginning of the next cleanup step."

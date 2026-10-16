@@ -1,4 +1,4 @@
-import { COLORS, type Color, type ManaType } from "./types";
+import { COLORS, type Color, type ManaType, type SpentMana } from "./types";
 
 /** One symbol of a mana cost, normalized. CR 107.4 */
 export type CostSymbol =
@@ -8,6 +8,8 @@ export type CostSymbol =
   | { kind: "twoHybrid"; color: Color } // {2/W}
   | { kind: "phyrexian"; color: Color } // {W/P}
   | { kind: "x" }
+  /** {S}: one mana of any type produced by a snow source (CR 107.4h). Not generic for cost reductions (118.7g). */
+  | { kind: "snow" }
   | { kind: "unsupported"; raw: string };
 
 export interface ParsedCost {
@@ -25,6 +27,7 @@ export function parseManaCost(cost: string): ParsedCost {
     const parts = raw.split("/");
     if (/^\d+$/.test(raw)) symbols.push({ kind: "generic", amount: Number(raw) });
     else if (raw === "X") symbols.push({ kind: "x" });
+    else if (raw === "S") symbols.push({ kind: "snow" });
     else if (raw === "C" || isColor(raw)) symbols.push({ kind: "colored", color: raw as ManaType });
     else if (parts.length === 2 && parts[1] === "P" && isColor(parts[0]!)) symbols.push({ kind: "phyrexian", color: parts[0] });
     else if (parts.length === 2 && parts[0] === "2" && isColor(parts[1]!)) symbols.push({ kind: "twoHybrid", color: parts[1] });
@@ -45,6 +48,8 @@ export const poolTotal = (p: ManaPool) => Object.values(p).reduce((a, b) => a + 
 export interface Payment {
   pool: ManaPool; // pool after paying
   lifePaid: number;
+  /** The mana from snow sources it spent, by type (CR 107.4h). */
+  snow: ManaPool;
 }
 
 /**
@@ -53,12 +58,22 @@ export interface Payment {
  * symbols first so a greedy pass doesn't spend mana a later symbol needed.
  * Phyrexian symbols fall back to 2 life when `life` allows.
  */
-export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>> } = {}): Payment | null {
+export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; snow?: ManaPool; wantSnow?: boolean } = {}): Payment | null {
   if (!cost.supported) return null;
   const p = { ...pool };
   // `prefer`: mana to spend before the rest where there's a choice (mana that can only be spent on this, CR 106.6).
   const pref = { ...(opts.prefer ?? emptyPool()) };
+  // `snow`: how much of the pool a snow source made (CR 107.4h). Other symbols spend other mana first, unless the
+  // caster hopes to spend snow mana on it (`wantSnow`: "if {S} was spent", "the amount of {S} spent").
+  const sn = emptyPool();
+  for (const m of Object.keys(sn) as ManaType[]) sn[m] = Math.max(0, Math.min(opts.snow?.[m] ?? 0, p[m]));
+  const snowUsed = emptyPool();
+  const takeSnow = (c: ManaType) => {
+    sn[c]--;
+    snowUsed[c]++;
+  };
   const spend = (c: ManaType) => {
+    if (sn[c] > 0 && (opts.wantSnow || p[c] <= sn[c])) takeSnow(c);
     p[c]--;
     if (pref[c] > 0) pref[c]--;
   };
@@ -67,6 +82,17 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   const hybrids: Color[][] = [];
   const twoHybrids: Color[] = [];
   const phyrexian: Color[] = [];
+  // {S} first, each from the snow mana the rest of the cost needs least: {C}, then the color there's most of to spare.
+  const named = emptyPool();
+  for (const sym of cost.symbols) if (sym.kind === "colored" || sym.kind === "phyrexian") named[sym.color]++;
+  for (const sym of cost.symbols) {
+    if (sym.kind !== "snow") continue;
+    const from = (["C", ...COLORS] as ManaType[]).filter((c) => sn[c] > 0).sort((a, b) => Number(b === "C") - Number(a === "C") || p[b] - named[b] - (p[a] - named[a]))[0];
+    if (!from) return null;
+    takeSnow(from);
+    p[from]--;
+    if (pref[from] > 0) pref[from]--;
+  }
   for (const s of cost.symbols) {
     if (s.kind === "generic") generic += s.amount;
     else if (s.kind === "colored") {
@@ -99,18 +125,20 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   }
   // Generic: spend colorless first, then whichever color we have most of. With `spreadColors` (sunburst, which counts
   // the colors spent, CR 702.44a), a color not spent yet comes first: the caster chooses what pays for it (CR 601.2h).
+  // Hoping for snow mana, snow mana comes first of all.
   const spent = (c: ManaType) => p[c] < pool[c];
   const kinds: ManaType[] = ["C", ...COLORS];
   while (generic > 0) {
+    const snowy = opts.wantSnow ? kinds.filter((c) => sn[c] > 0).sort((a, b) => harm(a) - harm(b) || sn[b] - sn[a])[0] : undefined;
     const fresh = COLORS.find((c) => p[c] > 0 && wanting(c)) ?? (opts.spreadColors ? COLORS.filter((c) => p[c] > 0 && !spent(c))[0] : undefined);
     const preferred = kinds.filter((c) => pref[c] > 0 && p[c] > 0).sort((a, b) => pref[b] - pref[a])[0];
     const from: ManaType | undefined =
-      fresh ?? preferred ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => harm(a) - harm(b) || p[b] - p[a])[0] as ManaType | undefined));
+      fresh ?? snowy ?? preferred ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => harm(a) - harm(b) || p[b] - p[a])[0] as ManaType | undefined));
     if (!from) return null;
     spend(from);
     generic--;
   }
-  return { pool: p, lifePaid };
+  return { pool: p, lifePaid, snow: snowUsed };
 }
 
 /** How many {X} a cost has: {X}{X} means paying X twice (CR 107.3). */
@@ -190,17 +218,27 @@ export function payGenericWith(cost: ParsedCost, extra: number, n: number): { co
   return n > g.extra ? null : { cost: g.cost, extra: g.extra - n };
 }
 
-/** The mana spent to cast a spell, by type (CR 601.2h); nothing at all for a copy or a spell cast without paying mana. */
-export type ManaSpent = Partial<Record<ManaType, number>>;
+/**
+ * The mana spent to cast a spell, by type (CR 601.2h), and how much of it a snow source made (`snow`, CR 107.4h); nothing
+ * at all for a copy or a spell cast without paying mana.
+ */
+export type ManaSpent = SpentMana;
 
-/** Does the mana spent to cast a spell meet "if {U} was spent", adamant's "at least three ...", "no mana was spent"? */
-export function spentMeets(spent: ManaSpent | undefined, req: import("./abilities").SpentReq): boolean {
+/** Does the mana spent to cast a spell meet "if {U} was spent", adamant's "at least three ...", "no mana was spent", "if {S} was spent"? */
+export function spentMeets(spent: ManaSpent | undefined, req: import("./abilities").SpentReq, spellColors?: readonly Color[]): boolean {
   const of = (m: ManaType) => spent?.[m] ?? 0;
   const colored = COLORS.reduce((n, c) => n + of(c), 0);
   const total = colored + of("C");
   if (req.none) return (req.none === "colored" ? colored : total) === 0;
   if (req.colors && Object.entries(req.colors).some(([c, n]) => of(c as Color) < (n ?? 1))) return false;
   if (req.sameColor && !COLORS.some((c) => of(c) >= req.sameColor!)) return false;
+  if (req.colorless && of("C") < req.colorless) return false;
+  if (req.maxColors !== undefined && COLORS.filter((c) => of(c) > 0).length > req.maxColors) return false;
+  if (req.snow && snowSpent(spent) < req.snow) return false;
+  // "If {S} of any of that spell's colors was spent to cast it" (Boreal Outrider).
+  if (req.snowOfColors && !(spellColors ?? []).some((c) => (spent?.snow?.[c] ?? 0) > 0)) return false;
   return !req.total || total >= req.total;
 }
 
+/** "The amount of {S} spent to cast ~": the mana from snow sources spent on it (CR 107.4h). */
+export const snowSpent = (spent: ManaSpent | undefined): number => Object.values(spent?.snow ?? {}).reduce((a, b) => a + (b ?? 0), 0);

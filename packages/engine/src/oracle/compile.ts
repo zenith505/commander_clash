@@ -691,6 +691,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: spentCounters[3] === "-1/-1" ? "-1/-1" : "+1/+1", n: { count: { kind: "spentWas", req: spentReq }, times: num(spentCounters[2]!) } };
       continue;
     }
+    // "~ enters with two +1/+1 counters on it if it wasn't cast or no mana was spent to cast it" (Freestrider Commando),
+    // "... unless two or more colors of mana were spent to cast it" (Steel Exemplar): what was spent on its total cost
+    // (CR 601.2h, rulings); nothing if it wasn't cast.
+    const spentUnless = new RegExp(`^~ enters(?: the battlefield)? with ${NUM} ([+-]1/[+-]1) counters? on it (if it wasn't cast or no mana was spent to cast it|unless two or more colors of mana were spent to cast it)\\.$`).exec(line);
+    if (spentUnless) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: spentUnless[2] === "-1/-1" ? "-1/-1" : "+1/+1", n: { count: { kind: "spentWas", req: spentUnless[3]!.startsWith("if") ? { none: "mana" } : { maxColors: 1 } }, times: num(spentUnless[1]!) } };
+      continue;
+    }
     // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a), maybe with "This spell costs
     // {2} less to cast if evidence was collected" in the same paragraph.
     const evidence = !d.types.includes("Land") ? /^As an additional cost to cast ~, you may collect evidence (\d+)\.(?: ~ costs \{(\d+)\} less to cast if evidence was collected\.)?$/.exec(line) : null;
@@ -1362,6 +1371,7 @@ export function compile(d: CardDef): CompiledCard {
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;
   const wanted = wantedSpent(out);
   if (wanted.length) out.wantSpent = wanted;
+  if (/"kind":"snowSpent"|"snow(?:OfColors)?":/.test(JSON.stringify([out.spell, out.entersWithCounters, out.triggers.filter((t) => t.event === "selfEnters")]))) out.wantSnow = true;
   return out;
 }
 
@@ -1485,6 +1495,11 @@ function checkCastingLinks(out: CompiledCard) {
   // Mana from Treasures spent (CR 106.3) is known for a spell, its permanent's enters trigger, and an activated ability.
   const treasureIn = (v: unknown) => /"kind":"treasure(?:Spent)?"/.test(JSON.stringify(v ?? null));
   if (out.triggers.some((t) => t.event !== "selfEnters" && treasureIn(t.body)) || treasureIn(out.statics) || JSON.stringify(out.activated ?? null).includes('"kind":"treasureSpent"')) bad = true;
+  // Mana from snow sources spent (CR 107.4h): a spell's or its permanent's enters trigger's; Boreal Outrider's "of that
+  // spell's colors" only in a cast trigger's condition.
+  const snowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"snowSpent"');
+  if (out.triggers.some((t) => t.event !== "selfEnters" && snowIn(t.body)) || snowIn(out.statics) || snowIn(out.activated)) bad = true;
+  if (JSON.stringify([out.spell, out.triggers.map((t) => ({ ...t, cast: undefined })), out.statics, out.activated, out.entersWithCounters]).includes('"snowOfColors"')) bad = true;
   // "Enters with a counter for each creature of the chosen type" would be counted before the choice is made.
   needs.clear();
   visit(out.entersWithCounters);

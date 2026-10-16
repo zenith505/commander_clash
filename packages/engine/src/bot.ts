@@ -3,7 +3,7 @@ import { topGraveyardCards } from "./graveyard";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   livingPlayers,
@@ -555,6 +555,16 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     if (!pool.length) {
       if (!spec.optional) return null;
       out.push({ kind: "none" });
+      continue;
+    }
+    const group = harm[i] ? sameNameGroup(body, i) : undefined;
+    if (group) {
+      // "And all other permanents with the same name" (Maelstrom Pulse): what else it hits counts, ours against it.
+      const pick = bestGroupTarget(s, pid, pool, group, damageTo(body, i, x), forced);
+      if (!pick) {
+        if (!spec.optional) return null;
+        out.push({ kind: "none" });
+      } else out.push(pick);
       continue;
     }
     out.push(copying ? worst(s, pid, pool) : best(s, pid, pool, harm[i]!, damageTo(body, i, x) + fightDamage(i)));
@@ -1753,6 +1763,41 @@ function targetWorth(s: GameState, pid: PlayerId, t: ChosenTarget, harmful: bool
 function best(s: GameState, pid: PlayerId, pool: ChosenTarget[], harmful: boolean, damage: number): ChosenTarget {
   // Burn goes face only when it can't kill anything worthwhile.
   return [...pool].sort((a, b) => targetWorth(s, pid, b, harmful, damage) - targetWorth(s, pid, a, harmful, damage))[0]!;
+}
+
+type SameNameGroup = NonNullable<Extract<ObjRef, { ref: "target" }>["sameName"]>;
+
+/** The "and all other ... with the same name" group an effect gives target `i`, if any (Maelstrom Pulse). */
+function sameNameGroup(body: AbilityBody, i: number): SameNameGroup | undefined {
+  const walk = (v: unknown): SameNameGroup | undefined => {
+    if (!v || typeof v !== "object") return undefined;
+    const r = v as { ref?: string; index?: number; sameName?: SameNameGroup };
+    if (r.ref === "target" && r.index === i && r.sameName) return r.sameName;
+    for (const x of Object.values(v)) {
+      const g = walk(x);
+      if (g) return g;
+    }
+    return undefined;
+  };
+  return walk(body.effects);
+}
+
+/**
+ * A harmful "target X and all other Xs with the same name" target: the one where what it hits of the opponents' is worth
+ * the most more than what it hits of ours. Unless `forced`, nothing that costs us as much as it gains.
+ */
+function bestGroupTarget(s: GameState, pid: PlayerId, pool: ChosenTarget[], group: SameNameGroup, damage: number, forced: boolean): ChosenTarget | undefined {
+  const value = (t: ChosenTarget) => {
+    if (t.kind !== "object") return targetWorth(s, pid, t, true, damage);
+    const hit = [obj(s, t.id), ...sameNamed(s, obj(s, t.id), group, pid)];
+    // Damage that doesn't kill one of ours costs us nothing; one of theirs it doesn't kill gains us nothing.
+    return hit.reduce((n, o) => {
+      const w = Math.max(0, targetWorth(s, pid, { kind: "object", id: o.id }, true, damage));
+      return controllerOf(s, o) === pid ? n - w : n + w;
+    }, 0);
+  };
+  const ranked = pool.map((t) => ({ t, v: value(t) })).sort((a, b) => b.v - a.v);
+  return ranked[0] && (forced || ranked[0].v > 0) ? ranked[0].t : undefined;
 }
 
 /** How many times a bot activates one ability in a turn at most, so it can't go round a loop forever. */

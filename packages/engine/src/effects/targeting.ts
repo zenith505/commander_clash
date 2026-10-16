@@ -1,4 +1,4 @@
-import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
+import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
@@ -23,6 +23,20 @@ const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) =>
  * Does `o` match the filter? `chars`: its characteristics as the layers applied so far left them, and `view` the others',
  * when the layers are being worked out (CR 613.8a).
  */
+/**
+ * "And all other permanents with the same name as that permanent" (Maelstrom Pulse): the others with the target's name
+ * on the battlefield now, matching `filter` (and controlled by the target's controller, with `of`). A face-down permanent
+ * has no name, so it shares one with nothing (CR 708.2a).
+ */
+export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extract<ObjRef, { ref: "target" }>["sameName"]>, controller: PlayerId): GameObject[] {
+  if (t.zone !== "battlefield" || t.faceDown) return [];
+  const name = characteristics(s, t).name;
+  const whose = controllerOf(s, t);
+  return s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => o.id !== t.id && !o.faceDown && characteristics(s, o).name === name && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
+}
+
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
   if (o.zone !== "battlefield") return false;
   const c = chars ?? characteristics(s, o);

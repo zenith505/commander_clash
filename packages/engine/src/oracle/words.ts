@@ -69,7 +69,7 @@ export const WHEEL = /^(?:.+? )?discards? (?:all the cards in )?(?:your|their|hi
  * white mana", "at least three mana of the same color" (adamant), "five or more mana" / "at least four mana" (opus),
  * "no mana", "no colored mana". `SPENT` matches the phrase, `SPENT_TO_CAST` it with what was cast.
  */
-export const SPENT = "((?:\\{[WUBRGC]\\})+|at least \\w+ (?:white|blue|black|red|green) mana|at least \\w+ mana of the same color|at least \\w+ mana|\\w+ or more mana|no(?: colored)? mana)";
+export const SPENT = "((?:\\{[WUBRGC]\\})+|\\{S\\}(?: of any of that spell's colors)?|at least \\w+ (?:white|blue|black|red|green|colorless) mana|at least \\w+ mana of the same color|at least \\w+ mana|\\w+ or more mana|no(?: colored)? mana)";
 export const SPENT_TO_CAST = `${SPENT} was spent to cast (~|it|that spell)`;
 
 export function parseSpentReq(what: string): SpentReq | null {
@@ -83,6 +83,10 @@ export function parseSpentReq(what: string): SpentReq | null {
     }
     return { colors };
   }
+  // "If {S} was spent" (CR 107.4h): mana from a snow source; Boreal Outrider's of one of the spell's colors.
+  if (what === "{S}") return { snow: 1 };
+  if (what === "{S} of any of that spell's colors") return { snowOfColors: true };
+  if ((m = /^at least (\w+) colorless mana$/.exec(what))) return Number.isFinite(num(m[1]!)) ? { colorless: num(m[1]!) } : null;
   if ((m = /^at least (\w+) (white|blue|black|red|green) mana$/.exec(what))) return Number.isFinite(num(m[1]!)) ? { colors: { [COLOR_OF[m[2]!]!]: num(m[1]!) } } : null;
   if ((m = /^at least (\w+) mana of the same color$/.exec(what))) return Number.isFinite(num(m[1]!)) ? { sameColor: num(m[1]!) } : null;
   if ((m = /^(?:at least (\w+) mana|(\w+) or more mana)$/.exec(what))) {

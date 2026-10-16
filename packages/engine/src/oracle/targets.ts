@@ -139,6 +139,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (ctx.selfCard && /^it$/i.test(x)) return { ref: "selfCard" };
     return ctx.subject && /^that creature$/i.test(x) ? { ref: "subject" } : null;
   }
+  // "Put a +1/+1 counter on target creature you control, then it fights target creature you don't control. ... the
+  // creature you control gains indestructible" (Outmuscle): the one target described that way.
+  const described = /^the (creature you control|creature you don't control)$/i.exec(x);
+  if (described) {
+    const at = ctx.targets.flatMap((t, i) => (t.kind === "object" && t.text === `target ${described[1]!.toLowerCase()}` ? [i] : []));
+    return at.length === 1 ? { ref: "target", index: at[0]! } : null;
+  }
   // "Enchanted creature", "equipped creature": what the source is attached to (not targeted).
   if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) {
     ctx.lastAttached = true;

@@ -2,7 +2,7 @@ import type { DamageRecipient, Effect } from "../abilities";
 import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
 import { addPhases, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
-import { invalidateCharacteristics } from "../layers";
+import { characteristics, invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
 import type { GameObject, GameState, ManaType, PlayerId, RedirectShield } from "../types";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
@@ -10,6 +10,17 @@ import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
+/** Is the source of what's resolving a snow object (CR 106.3, 107.4h): the spell itself, or the ability's source? */
+function snowSource(s: GameState, ctx: ResolveCtx): boolean {
+  const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  if (o && o.zone === "battlefield") return characteristics(s, o).supertypes.includes("Snow");
+  const item = s.resolving?.item;
+  const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+  if (spell) return characteristics(s, spell).supertypes.includes("Snow");
+  // A permanent that's gone: as it last existed (CR 113.7a), its printed card here.
+  return !!ctx.sourceDef?.supertypes?.includes("Snow");
+}
+
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
     case "skip": {
@@ -208,10 +219,18 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
       const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
+      // Mana from a snow source is snow mana (CR 107.4h): a snow spell's, or a snow permanent's ability's (106.3).
+      const snow = s.resolving?.item.manaAbility ? !!s.resolving.item.manaAbility.snow : snowSource(s, ctx);
       for (const m of added.matchAll(/\{([WUBRGC])\}/g)) {
         p.manaPool[m[1] as "W"]++;
         // A Treasure's mana ability: "mana from a Treasure" (CR 106.3).
         if (s.resolving?.item.manaAbility?.treasure) (p.treasureMana ??= {})[m[1] as ManaType] = (p.treasureMana[m[1] as ManaType] ?? 0) + 1;
+        if (snow) (p.snowMana ??= {})[m[1] as ManaType] = (p.snowMana[m[1] as ManaType] ?? 0) + 1;
+        // "Until end of turn, you don't lose this mana as steps and phases end."
+        if (e.keep) {
+          if (p.keptMana?.turn !== s.turn) p.keptMana = { turn: s.turn, mana: {} };
+          p.keptMana.mana[m[1] as ManaType] = (p.keptMana.mana[m[1] as ManaType] ?? 0) + 1;
+        }
         if (s.resolving?.item.manaAbility) (s.resolving.made ??= []).push(m[1] as ManaType);
       }
       if (added) log(s, `${p.name} adds ${added}.`);

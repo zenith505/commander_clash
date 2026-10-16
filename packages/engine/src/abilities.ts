@@ -1375,6 +1375,8 @@ export interface SpentReq {
   total?: number;
   /** "No mana was spent", "no colored mana was spent". */
   none?: "mana" | "colored";
+  /** "Unless two or more colors of mana were spent" (Steel Exemplar): at most this many colors spent. */
+  maxColors?: number;
   /** "If at least three colorless mana was spent" (Desecrate Reality): {C} spent. */
   colorless?: number;
   /** "If {S} was spent": at least this much mana from snow sources (CR 107.4h). */

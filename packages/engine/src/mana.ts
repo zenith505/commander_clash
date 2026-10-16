@@ -233,6 +233,7 @@ export function spentMeets(spent: ManaSpent | undefined, req: import("./abilitie
   if (req.colors && Object.entries(req.colors).some(([c, n]) => of(c as Color) < (n ?? 1))) return false;
   if (req.sameColor && !COLORS.some((c) => of(c) >= req.sameColor!)) return false;
   if (req.colorless && of("C") < req.colorless) return false;
+  if (req.maxColors !== undefined && COLORS.filter((c) => of(c) > 0).length > req.maxColors) return false;
   if (req.snow && snowSpent(spent) < req.snow) return false;
   // "If {S} of any of that spell's colors was spent to cast it" (Boreal Outrider).
   if (req.snowOfColors && !(spellColors ?? []).some((c) => (spent?.snow?.[c] ?? 0) > 0)) return false;

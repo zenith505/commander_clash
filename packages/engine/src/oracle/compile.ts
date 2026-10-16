@@ -691,6 +691,15 @@ export function compile(d: CardDef): CompiledCard {
       else out.entersWithCounters = { counter: spentCounters[3] === "-1/-1" ? "-1/-1" : "+1/+1", n: { count: { kind: "spentWas", req: spentReq }, times: num(spentCounters[2]!) } };
       continue;
     }
+    // "~ enters with two +1/+1 counters on it if it wasn't cast or no mana was spent to cast it" (Freestrider Commando),
+    // "... unless two or more colors of mana were spent to cast it" (Steel Exemplar): what was spent on its total cost
+    // (CR 601.2h, rulings); nothing if it wasn't cast.
+    const spentUnless = new RegExp(`^~ enters(?: the battlefield)? with ${NUM} ([+-]1/[+-]1) counters? on it (if it wasn't cast or no mana was spent to cast it|unless two or more colors of mana were spent to cast it)\\.$`).exec(line);
+    if (spentUnless) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: spentUnless[2] === "-1/-1" ? "-1/-1" : "+1/+1", n: { count: { kind: "spentWas", req: spentUnless[3]!.startsWith("if") ? { none: "mana" } : { maxColors: 1 } }, times: num(spentUnless[1]!) } };
+      continue;
+    }
     // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a), maybe with "This spell costs
     // {2} less to cast if evidence was collected" in the same paragraph.
     const evidence = !d.types.includes("Land") ? /^As an additional cost to cast ~, you may collect evidence (\d+)\.(?: ~ costs \{(\d+)\} less to cast if evidence was collected\.)?$/.exec(line) : null;

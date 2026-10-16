@@ -3963,6 +3963,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "demonstrate") {
+    const c = r.scratch?.copies;
+    if (!c) throw new RulesError("nothing to demonstrate");
+    c.opp = Number(choice) as PlayerId; // the opponent who also copies the spell (CR 702.144a)
+    log(s, `${p.name} chooses ${player(s, c.opp).name} to also copy ${pend.source} (demonstrate).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "clash") {
     (r.scratch ??= {}).clash = { ...r.scratch?.clash, opp: Number(choice) as PlayerId }; // the opponent to clash with (CR 701.30b)
     log(s, `${p.name} clashes with ${player(s, Number(choice) as PlayerId).name}.`);

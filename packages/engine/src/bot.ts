@@ -223,6 +223,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
+    // Demonstrate: the opponent who also copies the spell is the one with the least on the battlefield.
+    if (pend.kind === "chooseOption" && pend.what === "demonstrate") {
+      const owned = (o: string) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(o)).length;
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => owned(a) - owned(b))[0]! }];
+    }
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
@@ -1516,6 +1521,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (e.keep && e.otherwise?.length === 1 && e.otherwise[0]!.type === "discard" && e.effects.length === 1 && e.effects[0]!.type === "discard") return true;
   // Duplicity: swap our hand for the cards exiled with it when that's at least as many cards.
   if (e.effects.length === 1 && e.effects[0]!.type === "exileFaceDown" && e.effects[0]!.from === "hand") return linkedOwned(s, r.item.sourceId, pid) >= player(s, pid).hand.length;
+  // Demonstrate: a copy for us and one for one opponent, ahead of the other two (CR 702.144a).
+  if (e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0]!.demonstrate) return true;
   const provoke = e.effects.find((x) => x.type === "mustBlockSource");
   if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
     const t = r.item.targets?.[provoke.what.index];

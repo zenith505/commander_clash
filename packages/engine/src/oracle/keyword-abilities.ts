@@ -596,6 +596,11 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.40a: "When you cast this spell, copy it for each other spell that was cast before it this turn. If the
       // spell has any targets, you may choose new targets for any of the copies."
       out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." } });
+    } else if (/^demonstrate$/i.test(p)) {
+      // CR 702.144a: "When you cast this spell, you may copy it and you may choose new targets for the copy. If you copy
+      // the spell, choose an opponent. That player copies the spell and may choose new targets for that copy."
+      const copy: Effect = { type: "copySpell", spell: "cause", n: 1, newTargets: true, demonstrate: true };
+      out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "may", effects: [copy], text: "copy ~ (an opponent you choose then copies it too)" }], text: "Demonstrate: you may copy ~. If you do, choose an opponent to also copy it. Players may choose new targets for their copies." } });
     } else if (/^gravestorm$/i.test(p)) {
       // CR 702.69a: "When you cast this spell, copy it for each permanent that was put into a graveyard from the
       // battlefield this turn. If the spell has any targets, you may choose new targets for any of the copies."

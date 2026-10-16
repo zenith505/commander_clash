@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf } from "../layers";
 import { shuffle } from "../rng";
-import { castProblem, describeTargets, log, moveObject, newObject, obj, player } from "../game";
+import { castProblem, describeTargets, log, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets } from "./targeting";
@@ -153,6 +153,26 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
         c.targets = undefined;
         c.left--;
+      }
+      if (orig && e.demonstrate && !c.oppDone) {
+        // Demonstrate (CR 702.144a): you copied it, so choose an opponent, who copies it too; their copy goes on the
+        // stack above yours, and they choose its new targets knowing the others (rulings).
+        if (c.opp === undefined) {
+          const opps = opponents(s, ctx.controller);
+          if (!opps.length) return;
+          if (opps.length > 1) {
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "demonstrate", options: opps.map(String), labels: opps.map((pid) => player(s, pid).name), prompt: `demonstrate: choose an opponent to also copy ${src}` };
+            return "paused";
+          }
+          c.opp = opps[0]!;
+        }
+        if (e.newTargets && specs.length && c.targets === undefined) {
+          s.pending = { kind: "copyTargets", player: c.opp, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: 1 };
+          return "paused";
+        }
+        putSpellCopy(s, orig, c.opp, c.targets ?? orig.targets);
+        c.targets = undefined;
+        c.oppDone = true;
       }
       return;
     }

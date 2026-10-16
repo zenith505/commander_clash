@@ -1122,7 +1122,7 @@ export type Effect =
    * `newTargets`: "you may choose new targets for the copy" (707.10c).
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
-  | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean }
+  | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }

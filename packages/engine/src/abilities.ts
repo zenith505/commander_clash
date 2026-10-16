@@ -1173,7 +1173,27 @@ export interface AbilityBody {
    * `both`: "Choose one. If this spell was cast using teamwork, choose both instead." (both modes, then) or "If you
    * control a commander as you cast this spell, you may choose both instead" (one or both, then).
    */
-  modal?: { min: number; max: number; modes: AbilityBody[]; costs?: string[]; entwine?: string; both?: "teamwork" | "commander" };
+  /**
+   * `both` "kicked": "Choose one. If this spell was kicked, choose any number instead." (Inscriptions: one to all, then).
+   * `repeat`: "You may choose the same mode more than once" (CR 700.2d): `modes` may then name one mode several times, each
+   * a mode of its own with its own targets. `pawprints`: each mode's number of {P} (CR 700.2i): any modes whose
+   * pawprints add up to no more than `max` (repeats allowed too). `escalate`: the additional cost for each mode chosen
+   * beyond the first (CR 702.120a), mana or not. `unchosen`: "choose one that hasn't been chosen" ("ever", for this
+   * object) or "... this turn" (GameObject.modesChosen). `random`: "choose one at random" (a triggered ability's).
+   */
+  modal?: {
+    min: number;
+    max: number;
+    modes: AbilityBody[];
+    costs?: string[];
+    entwine?: string;
+    both?: "teamwork" | "commander" | "kicked";
+    repeat?: true;
+    pawprints?: number[];
+    escalate?: { mana?: string; cost?: AdditionalCost; text: string };
+    unchosen?: "ever" | "turn";
+    random?: true;
+  };
 }
 
 export type TriggerEvent =

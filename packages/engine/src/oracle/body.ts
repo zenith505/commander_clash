@@ -96,7 +96,14 @@ function splitSentences(text: string): string[] {
 
 export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
-  if (modal) return parseModal(modal[1]!, modal[2]!, text.trim(), opts.spell);
+  if (modal) {
+    const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts.spell);
+    const how = modal[2]?.trim();
+    // Only "choose one", and an ability's (no spell has these).
+    if (!body || !how) return body;
+    if (modal[1] !== "one" || opts.spell) return null;
+    return { ...body, modal: { ...body.modal!, ...(how === "at random" ? { random: true as const } : { unchosen: how.endsWith("this turn") ? ("turn" as const) : ("ever" as const) }) } };
+  }
   if (text.includes("•")) return null; // modes with text before them, or a kind of choice we don't support
   const ctx: Ctx = {
     targets: [],
@@ -844,9 +851,9 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
   return null;
 }
 
-// "Choose one —" and its bulleted modes. Other kinds ("choose one that hasn't been chosen",
-// "choose one at random", Escalate, Spree's "+ {cost} —" modes) aren't supported yet.
-const MODAL = /^[Cc]hoose (one|two|three|one or both|one or more|up to one) —\s*((?:•[^•]+)+)$/;
+// "Choose one —" and its bulleted modes; "choose one that hasn't been chosen [this turn] —" (GameObject.modesChosen) and
+// "choose one at random —". Spree's "+ {cost} —" modes, escalate, pawprints and repeated modes are read in compile.ts.
+const MODAL = /^[Cc]hoose (one|two|three|one or both|one or more|up to one)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
 
 /** How many modes each "Choose ..." allows (CR 700.2), given how many there are. */
 const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {

@@ -6,7 +6,8 @@ import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
 import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneName } from "../types";
 import { RulesError } from "../types";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, offerTargets, settleDivided } from "./targeting";
+import { nextRandom } from "../rng";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -831,7 +832,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     const printed = triggerBody(s, t);
     if (printed.modal && !t.modes) {
       // Modes are chosen as it's put on the stack; a mode without legal targets can't be (CR 603.3c).
-      const legal = legalModes(s, printed, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId));
+      // "Choose one that hasn't been chosen": not one this object has had chosen (rulings on Demonic Pact).
+      const legal = legalModes(s, printed, t.controller, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
       const n = legal.filter(Boolean).length;
       if (n === 0 || n < printed.modal.min) {
         log(s, `${def.name}'s ability has no mode that can be chosen and is removed.`);
@@ -839,7 +841,12 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         continue;
       }
       if (n === printed.modal.min) t.modes = legal.flatMap((ok, i) => (ok ? [i] : [])); // the only possible choice
-      else {
+      else if (printed.modal.random) {
+        // "Choose one at random": among the modes that can be chosen (rulings on Umaro), as it's put on the stack.
+        const can = legal.flatMap((ok, i) => (ok ? [i] : []));
+        t.modes = [can[Math.floor(nextRandom(s) * can.length)]!];
+        log(s, `${def.name}'s ability chooses at random: ${printed.modal.modes[t.modes[0]!]!.text.replace(/~/g, def.name)}`);
+      } else {
         const modes = printed.modal.modes.map((m) => m.text);
         s.pending = { kind: "chooseModes", player: t.controller, sourceId: t.sourceId, description: describeAbility(def, printed.text), min: printed.modal.min, max: printed.modal.max, modes, legal };
         return added;
@@ -910,6 +917,8 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
   if (typeof fit === "string") throw new RulesError(fit);
   const { body, targets } = fit;
   s.triggerQueue = s.triggerQueue.filter((x) => x !== t);
+  // Chosen as it's put on the stack, it stays chosen even if the ability doesn't resolve (rulings on Demonic Pact).
+  if (t.modes) noteModesChosen(s, triggerBody(s, t), t.sourceId, t.modes, t.sourceZc);
   s.stack.push({
     id: `s${s.nextId++}`,
     kind: "ability",

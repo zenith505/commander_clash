@@ -239,12 +239,24 @@ export function compile(d: CardDef): CompiledCard {
   let ascendSpell = false;
   // "Choose one. If this spell was cast using teamwork, choose both instead." and "Choose one. If you control a commander
   // as you cast this spell, you may choose both instead.": a "Choose one —" list whose count can change as it's cast.
-  let both: "teamwork" | "commander" | undefined;
+  // "Choose one. If this spell was kicked, choose any number instead." (Inscriptions) too.
+  let both: "teamwork" | "commander" | "kicked" | undefined;
+  // "Choose three. You may choose the same mode more than once." (the Confluences, CR 700.2d).
+  let repeat = false;
   let cipher = false;
   const all = joinModes(
     normalizeSelf(d)
       .split("\n")
       .map((l) => {
+        const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
+        if (same && isSpell) {
+          repeat = true;
+          return `Choose ${same[1]} —`;
+        }
+        if (/^Choose one\. If ~ was kicked, choose any number instead\.$/.test(l.trim())) {
+          both = "kicked";
+          return "Choose one —";
+        }
         const m = /^Choose one\. If (~ was cast using teamwork, choose|you control a commander as you cast ~, you may choose) both instead\.$/.exec(l.trim());
         if (!m) return l;
         both = m[1]!.startsWith("~") ? "teamwork" : "commander";
@@ -261,6 +273,12 @@ export function compile(d: CardDef): CompiledCard {
   // Entwine (CR 702.42a): "You may choose all modes of this spell instead of just the number specified. If you do, you
   // pay an additional [cost]." Mana costs only.
   let entwine: { cost: string; raw: string } | undefined;
+  // Escalate (CR 702.120a): "For each mode you choose beyond the first as you cast this spell, you pay an additional
+  // [cost]": mana, or one cost beyond mana ("Escalate—Discard a card.").
+  let escalate: { mana?: string; cost?: AdditionalCost; text: string; raw: string } | "fail" | undefined;
+  // Pawprints (CR 700.2i): "Choose up to five {P} worth of modes. You may choose the same mode more than once." and a
+  // "{P}{P} — [effect]" line for each mode.
+  let paws: { budget: number; costs: number[]; texts: string[]; lines: string[] } | undefined;
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
@@ -275,6 +293,31 @@ export function compile(d: CardDef): CompiledCard {
       spree.costs.push(spreeMode[1]!);
       spree.texts.push(spreeMode[2]!);
       spree.lines.push(raw);
+      continue;
+    }
+    const pawHeader = isSpell && !paws && /^Choose up to (one|two|three|four|five|six) \{P\} worth of modes\. You may choose the same mode more than once\.$/.exec(line);
+    if (pawHeader) {
+      paws = { budget: num(pawHeader[1]!), costs: [], texts: [], lines: [raw] };
+      continue;
+    }
+    const pawMode = paws && /^((?:\{P\})+) — (.+)$/.exec(line);
+    if (paws && pawMode) {
+      paws.costs.push(pawMode[1]!.length / 3);
+      paws.texts.push(pawMode[2]!);
+      paws.lines.push(raw);
+      continue;
+    }
+    const esc = isSpell && !escalate && /^Escalate(?: ((?:\{[0-9WUBRGC]+\})+)|—(.+)\.)$/.exec(line);
+    if (esc) {
+      const cost = esc[2] ? parseAdditionalCost(esc[2].replace(/^./, (c) => c.toLowerCase())) : null;
+      // Costs beyond mana that add up per mode: discarding, tapping, sacrificing (n of them for each mode).
+      if (esc[1] && parseManaCost(esc[1]).supported) escalate = { mana: esc[1], text: esc[1], raw };
+      else if (cost && (cost.kind === "tap" || cost.kind === "sacrifice" || (cost.kind === "discard" && !cost.random && !cost.oneOf)) && !("x" in cost && cost.x))
+        escalate = { cost, text: esc[2]!, raw };
+      else {
+        escalate = "fail";
+        out.unsupported.push(raw);
+      }
       continue;
     }
     const ent = isSpell && /^Entwine ((?:\{[0-9WUBRGC]+\})+)$/.exec(line);
@@ -1058,7 +1101,12 @@ export function compile(d: CardDef): CompiledCard {
     if (isSpell) spellLines.push(stripAbilityWord(line));
     else out.unsupported.push(raw);
   }
-  if (spree) {
+  if (paws) {
+    const modes = paws.texts.map((t) => parseBody(t, { spell: true }));
+    // Every mode has to work, and nothing else may be in the spell's text (it would be outside the modes).
+    if (spellLines.length || paws.costs.length < 2 || spree || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...paws.lines, ...spellLines);
+    else out.spell = { targets: [], effects: [], text: paws.lines.join(" "), modal: { min: 0, max: paws.budget, modes: modes as AbilityBody[], pawprints: paws.costs, repeat: true } };
+  } else if (spree) {
     const modes = spree.texts.map((t) => parseBody(t, { spell: true }));
     // Every mode has to work, and nothing else may be in the spell's text (it would be outside the modes).
     if (spellLines.length || spree.costs.length < 2 || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...spree.lines, ...spellLines);
@@ -1069,7 +1117,30 @@ export function compile(d: CardDef): CompiledCard {
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
   }
-  if (both) {
+  if (repeat) {
+    const modal = out.spell?.modal;
+    if (modal && !modal.costs && !modal.pawprints && modal.min === modal.max && modal.min > 1) modal.repeat = true;
+    else if (out.spell) {
+      delete out.spell;
+      out.unsupported.push("You may choose the same mode more than once.");
+    }
+  }
+  if (escalate && escalate !== "fail") {
+    // A "Choose one or more" (or "one or both") list without other mode costs.
+    const modal = out.spell?.modal;
+    const { raw, ...esc } = escalate;
+    if (modal && modal.min === 1 && modal.max > 1 && !modal.costs && !modal.pawprints && !modal.repeat) modal.escalate = esc;
+    else out.unsupported.push(raw);
+  }
+  if (both === "kicked") {
+    // "Choose any number instead" when kicked: a "Choose one —" list, and a kicker to pay (one kicker cost).
+    const modal = out.spell?.modal;
+    if (modal && modal.min === 1 && modal.max === 1 && out.kicker?.costs.length === 1 && !out.kicker.multi) modal.both = both;
+    else if (out.spell) {
+      delete out.spell;
+      out.unsupported.push("Choose one. If ~ was kicked, choose any number instead.");
+    }
+  } else if (both) {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
     if (modal && modal.min === 1 && modal.max === 1 && modal.modes.length === 2 && (both === "commander" || out.teamwork !== undefined)) modal.both = both;
@@ -1269,7 +1340,10 @@ function joinModes(lines: string[]): string[] {
   const out: string[] = [];
   for (const line of lines) {
     const prev = out[out.length - 1];
-    if (/^\s*•/.test(line) && prev !== undefined && /—\s*(•.*)?$/.test(prev)) out[out.length - 1] = `${prev} ${line.trim()}`;
+    // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
+    const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random)?\.$/i.test(prev);
+    if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
+    else if (/^\s*•/.test(line) && prev !== undefined && /—\s*(•.*)?$/.test(prev)) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
   return out;

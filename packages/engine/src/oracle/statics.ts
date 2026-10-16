@@ -557,7 +557,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // "Gets +2/+2 and can't block" (Childhood Horror), "gets +1/+1 and attacks each combat if able".
   // "Gets +1/+1 and is goaded" (the Impetus Auras, CR 701.15), "gets -2/-0 and loses all abilities" (Mystic Subdual).
-  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|must be blocked if able|is goaded|loses all abilities)$`).exec(rest))) {
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|loses all abilities)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
@@ -641,6 +641,10 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   if (/^can block only creatures with flying$/.test(rest)) return [{ kind: "blocksOnlyFlyers" }];
   if (/^attacks? each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }];
+  // "Blocks each combat if able" (CR 509.1c): the same requirement as "blocks this turn if able", every turn. "Attacks or
+  // blocks each combat if able" is both: one that changes sides after attacking must block too (Relentless Raptor rulings).
+  if (/^blocks? each combat if able$/.test(rest)) return [{ kind: "mustBlock" }];
+  if (/^attacks or blocks each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }, { kind: "mustBlock" }];
   if (/^(?:doesn't untap during (?:its controller's|your) untap step|don't untap during their controllers' untap steps)$/.test(rest)) return [{ kind: "doesntUntap" }];
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   if (/^loses all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
@@ -861,7 +865,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

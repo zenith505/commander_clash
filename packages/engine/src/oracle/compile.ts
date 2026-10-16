@@ -11,7 +11,7 @@ import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
 import { parseTrigger } from "./triggers";
-import { parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
+import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseGroup, parseTargetPhrase } from "./targets";
@@ -312,6 +312,11 @@ export function compile(d: CardDef): CompiledCard {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
     let line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
+    // An ability word (CR 207.2c) or a flavor word (Khârn's "Berzerker — ", CR 207.2d) before a static or replacement
+    // ability: no rules meaning. Not a keyword written with a dash ("Boast — ", CR 702), a chapter number ("II — ", CR
+    // 714.2b) or a modal choice.
+    const word = !isSpell ? /^([A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
+    if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!)) line = line.slice(word[0].length);
     if (!line) continue;
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };

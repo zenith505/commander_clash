@@ -169,6 +169,18 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (/choose new targets/.test(s)) for (const y of inner) if (y.type === "copySpell") y.newTargets = true;
     return [{ type: "nextCast", filter, effects: inner, text: m[2]! }];
   }
+  // "The next noncreature spell you cast this turn has cascade" (Dark Apostle), "the next instant spell and the next sorcery
+  // spell you cast this turn each have cascade" (Smoldering Stagecoach): the spell gains cascade as it's cast and it
+  // triggers then; each such effect is an instance of its own (rulings, CR 702.85c).
+  if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? you cast this turn (?:has|each have) cascade$/.exec(s)) && !!m[2] === /each have/.test(s)) {
+    const out: Effect[] = [];
+    for (const w of [m[1]!, m[2]].filter((x): x is string => !!x)) {
+      const filter = parseTargetPhrase(w);
+      if (filter?.kind !== "spell") return null;
+      out.push({ type: "nextCast", filter, effects: [], text: `the next ${w} you cast this turn has cascade`, cascade: true });
+    }
+    return out;
+  }
   // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
   if ((m = /^Copy target (.*?spell(?: you control)?)$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);

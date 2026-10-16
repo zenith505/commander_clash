@@ -1097,7 +1097,8 @@ export type Effect =
    */
   | { type: "encore" }
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string }
+  /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.

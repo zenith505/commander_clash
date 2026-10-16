@@ -439,6 +439,10 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
       if (w === "token" || w === "nontoken") {
         if (alts.length > 1) return null;
         extra.token = w === "token";
+      } else if (w === "commander" || w === "noncommander") {
+        // A commander on the battlefield (CR 903.3): "commander creature you control", "noncommander creature".
+        if (alts.length > 1 || extra.commander !== undefined) return null;
+        extra.commander = w === "commander";
       } else if (w.startsWith("non")) {
         const rest = w.slice(3).replace(/^-/, "");
         if (COLOR_WORDS[rest]) notColors.push(COLOR_WORDS[rest]!);
@@ -483,10 +487,10 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     ...extra,
   };
   if (inGraveyard) {
-    if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined) return null;
+    if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined) return null;
     return { kind: "card", ...filters, ...(owner ? { owner } : {}), text };
   }
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || supertypes.length ? null : { kind: "spell", ...filters, text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || supertypes.length ? null : { kind: "spell", ...filters, text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
 }
 

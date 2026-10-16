@@ -213,6 +213,8 @@ export interface TargetSpec {
   dealtDamageThisTurn?: true;
   /** true: a token; false: "nontoken". */
   token?: boolean;
+  /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
+  commander?: boolean;
   /** "a card named ~": the source's name (only for searches). */
   named?: string;
   /** None of these subtypes. */
@@ -1230,6 +1232,7 @@ export type TriggerEvent =
   | "anotherCreatureYouControlEnters"
   | "landYouControlEnters" // landfall: "Whenever a land you control enters"
   | "creatureYouControlAttacksAlone" // exalted (CR 702.83a)
+  | "creatureYouControlAttacks" // "Whenever a creature you control attacks": each one as it's declared (CR 508.3a)
   | "yourUpkeep" // At the beginning of your upkeep
   | "yourEndStep" // At the beginning of your end step
   | "yourBeginCombat" // At the beginning of combat on your turn (CR 507.1)
@@ -1338,6 +1341,8 @@ export interface TriggeredAbility {
   discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean };
+  /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
+  attacker?: { filter: TargetSpec; other?: boolean };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */

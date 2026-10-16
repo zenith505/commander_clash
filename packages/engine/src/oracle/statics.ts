@@ -90,7 +90,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
   if (!statement || !cond) return null;
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
-  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
+  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
   // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
@@ -313,6 +313,9 @@ function parseAffected(subject: string): Affects | null {
     return { ...a, spec, controller: "enchanted" };
   }
   if (/^(Enchanted|Equipped) (creature|permanent|artifact|land)$/.test(x)) return { kind: "attached" };
+  // "Commander creatures you control get +2/+2", "Commanders you control have ward {2}" (CR 903.3): any player's.
+  if (/^Commanders? (?:creatures )?you control$/.test(x))
+    return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };
   let m = /^(Other )?((?:[A-Z]?[a-z]+ )*?)creatures (you control|your opponents control)$/i.exec(x);
   if (m) {
     const words = m[2]!.trim().split(/\s+/).filter(Boolean);

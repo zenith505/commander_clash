@@ -3478,6 +3478,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
   if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
+  // The source as it was activated, for "whenever an opponent activates an ability of a creature".
+  const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets);
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
@@ -3557,6 +3559,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     const what = ab.body.modal ? `${cost}: ${body.text}` : ab.text;
     log(s, `${p.name} activates ${d.name} (${what.replace(/~/g, d.name).replace(/\.$/, "")})${abCost.hasX ? ` with X=${x ?? 0}` : ""}${describeTargets(s, targets)}.`);
   }
+  // Once it's activated (CR 602.2i), abilities that trigger on that do.
+  fireEvent(s, { type: "activated", player: p.id, ...(activatedFrom ? { source: activatedFrom } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

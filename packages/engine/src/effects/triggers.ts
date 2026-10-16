@@ -122,6 +122,8 @@ export type TriggerSourceEvent =
   | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number }
+  /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
+  | { type: "activated"; player: PlayerId; source?: { snapshot: GameObject; chars: Characteristics } }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -805,6 +807,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
     if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers);
+  } else if (ev.type === "activated") {
+    // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, (e, t) => {
+        const a = t.activates;
+        if (e !== "abilityActivated" || !a || (a.by === "opponent" && ev.player === you)) return false;
+        return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
+      }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "draw") {
     for (const id of s.battlefield) {
       const o = obj(s, id);

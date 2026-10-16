@@ -1596,6 +1596,8 @@ export type TriggerEvent =
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
+  /** "Whenever an opponent activates an ability that isn't a mana ability" (see TriggeredAbility.activates). */
+  | "abilityActivated"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
@@ -1677,6 +1679,12 @@ export interface TriggeredAbility {
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
+  /**
+   * For "abilityActivated": who activated an ability that isn't a mana ability (CR 602, 605.1a), and `of`: what its
+   * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
+   * "That player" is who activated it.
+   */
+  activates?: { by: "opponent" | "any"; of?: TargetSpec };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"

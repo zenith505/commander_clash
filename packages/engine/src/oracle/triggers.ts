@@ -536,6 +536,25 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "batch", batch, body, ...(yourTurn ? { activeIf: { kind: "yourTurn" as const } } : {}) };
 }
 
+/**
+ * "Whenever a player activates an ability that isn't a mana ability" (Burning-Tree Shaman), "Whenever an opponent
+ * activates an ability of an artifact, creature, or land that isn't a mana ability" (Immolation Shaman), "... on the
+ * battlefield, if it isn't a mana ability" (Harsh Mentor). One that mana abilities trigger too isn't modeled.
+ */
+function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (a player|an opponent) activates an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
+  if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
+  let of: TargetSpec | undefined;
+  if (m[2]) {
+    const f = parseTargetPhrase(m[3]!);
+    if (f?.kind !== "object") return "fail";
+    of = f;
+  }
+  const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
+  if (!body) return "fail";
+  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : "any", ...(of ? { of } : {}) }, body };
+}
+
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
   if (!m) return null;
@@ -811,6 +830,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (enters) return enters;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
+  const activates = parseActivatesTrigger(line);
+  if (activates) return activates;
   const dies = parseDiesTrigger(line);
   if (dies) return dies;
   const dealer = parseDealerTrigger(line);

@@ -4,7 +4,8 @@ import type { Effect, ObjRef } from "../../abilities";
 import { NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
 import { pickFilter, parseObject, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
-import { parseChanges } from "../sentence";
+import { parseCount } from "../counts";
+import { parseChanges, parseSentence } from "../sentence";
 import { parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 
@@ -43,6 +44,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const b = a && parseObject(m[3]!, ctx);
     const type = m[1]!.toLowerCase() as "destroy" | "exile";
     return a?.ref === "target" && b?.ref === "target" ? [{ type, what: a }, { type, what: b }] : null;
+  }
+  // Threaten: "Untap target creature and gain control of it until end of turn" (Spinal Embrace without a duration: for as
+  // long as it stays on the battlefield, CR 611.2a).
+  if ((m = /^Untap ((?:another )?target .+?) and gain control of it( until end of turn)?$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "untap", what }, { type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
@@ -145,6 +152,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what ? [{ type: "bounce", what }] : null;
   }
   // Counters
+  // "Put a flying counter on ~ and ~ becomes a Spirit Warrior Angel with base power and toughness 4/4", "Put two +1/+1
+  // counters on ~ and ~ gains ...": one instruction after the other.
+  if ((m = /^(Put .+? counters? on ~) and (~ (?:becomes?|gains?) .+)$/.exec(s)) && !ctx.spell) {
+    const first = parseSentence(m[1]!, ctx);
+    const second = first && parseSentence(m[2]!, ctx);
+    if (first && second) return [...first, ...second];
+  }
   // "Put a +1/+1 counter on a creature you control": picked as it resolves, not targeted.
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {
     const filter = pickFilter(m[3]!.replace(/^an? /i, ""));
@@ -193,6 +207,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
     ctx.lastTargets = { index: first, n };
     return [{ type: "counters", what: { ref: "target", index: first, n }, counter: counterKind(m[2]!), n: total, divided: true }];
+  }
+  // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
+  // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it
+  // resolves (CR 608.2d).
+  if ((m = new RegExp(`^Distribute (?:${NUMX}|a number of) ${COUNTER} counters (?:equal to (.+?) )?among any number of (.+?) you control$`, "i").exec(s))) {
+    if (!m[1] === !m[3]) return null;
+    const filter = pickFilter(m[4]!);
+    const n = m[3] ? parseCount(m[3], ctx) : amt(m[1]!);
+    return filter && n ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[4]!} you control` } }] : null;
   }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
@@ -269,6 +292,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat
+  // damage to a player, draw a card."' (Ascendant Spirit): no duration, so for as long as it stays on the battlefield
+  // (CR 611.2a; a new object after a zone change, CR 400.7). New creature types replace its others (rulings).
+  if ((m = /^~ ((?:becomes?|gains?) .+)$/.exec(s)) && !ctx.spell) {
+    const what = parseObject("~", ctx);
+    const mods = what?.ref === "self" ? parseChanges(m[1]!) : null;
+    if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // Goad (CR 701.15a): "until your next turn, that creature attacks each combat if able and attacks a player other than you if able".
   // "Goad all creatures you don't control" (Disrupt Decorum), "goad all suspected creatures" (Nelly Borca): the creatures

@@ -575,6 +575,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.permanentLeftThisTurn ?? []).includes(you);
     case "void":
       return !!s.voidThisTurn;
+    case "selfIs": {
+      const c = chars.get(sourceId);
+      return !!c && objectMatches(s, cond.filter, src, you, false, undefined, c, (x) => chars.get(x.id));
+    }
     case "attachedIs": {
       const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
       const c = host && chars.get(host.id);

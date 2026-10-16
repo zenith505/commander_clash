@@ -346,6 +346,26 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       si++;
       continue;
     }
+    // "Each player discards cards the same way", "Players sacrifice creatures and discard cards the same way" (Balancing
+    // Act, Restore Balance, Magus of the Balance): after the "chooses a number of lands ... equal to the number ...
+    // controlled by the player who controls the fewest, then sacrifices the rest" before it, the same again for the
+    // creatures and the cards in hand, one after another in the order written, each counted when its turn comes (rulings).
+    const same = /^(?:Each player|Players) (.+) the same way$/.exec(s);
+    if (same) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "keepRest" || !prev.keep[0]?.fewest || prev.keep.length !== 1 || prev.youChoose) return null;
+      const steps = same[1]!.split(" and ");
+      const more: Effect[] = [];
+      for (const step of steps) {
+        if (/^discards? cards$/.test(step)) more.push({ type: "discard", who: prev.who, n: 0, downToFewest: true });
+        else if (/^sacrifices? creatures$/.test(step)) {
+          const among: TargetSpec = { kind: "object", types: ["Creature"], text: "creature" };
+          more.push({ type: "keepRest", who: prev.who, keep: [{ filter: among, n: 0, fewest: true }], among });
+        } else return null;
+      }
+      effects.push(...more);
+      continue;
+    }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
     const rider = parsePreventionRider(s);
     if (rider) {
@@ -673,6 +693,17 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const trailIf = !insteadIf ? /^((?:Draw|Create|You gain|Each opponent loses|Put) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
+    // "If ~ is a Warrior, put a flying counter on it and it becomes a ..." (Figure of Destiny, Ascendant Spirit): its
+    // creature types as it resolves (CR 608.2c; rulings: it doesn't matter how it got them). "It" is ~ there.
+    const ifSelfIs = !ctx.spell ? /^If ~ is an? ([A-Z][a-z]+), ((?:(?!\btarget\b).)+)$/.exec(s) : null;
+    if (ifSelfIs && !/\binstead$/.test(ifSelfIs[2]!)) {
+      const filter = parseTargetPhrase(ifSelfIs[1]!.toLowerCase());
+      const then = ifSelfIs[2]!.replace(/("[^"]*")|\bit\b/g, (w, q) => q ?? "~");
+      const inner = filter?.kind === "object" && parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!inner || filter?.kind !== "object") return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfIs", filter: { ...filter, text: ifSelfIs[1]! } } }, effects: inner });
+      continue;
+    }
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
@@ -996,6 +1027,16 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   // "That creature also gains flying": in addition to what the sentence before did.
   if (!instead) t = t.replace(/^(That creature|That player|It|~|Permanents you control|Creatures you control) also (?=(?:gains?|gets?|deals?|has|have|loses?) )/, "$1 ");
   if (instead && !previous.length) return null;
+  // "If eight or more mana was spent to cast that spell, sacrifice ~ and it deals that much damage to each opponent"
+  // (Tellah): two instructions under the one condition, both about ~ (as at the top of parseBody).
+  const pair = !instead && /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(t);
+  if (pair) {
+    const before = ctx.targets.length;
+    const first = parseOne(pair[1]!, ctx);
+    const second = first && parseOne(`~ ${pair[2]!}`, ctx);
+    if (!first || !second || (!newTargets && ctx.targets.length !== before)) return null;
+    return { effects: [...first, ...second], instead };
+  }
   // "~ deals 2 damage to any target. If ~ was kicked, it deals 5 damage instead": the same damage, more of it.
   const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|it))?$/.exec(t);
   if (more && instead) {

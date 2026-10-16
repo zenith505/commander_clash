@@ -268,6 +268,30 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "distribute": {
+      // Chosen as it resolves (CR 608.2d), among what its controller controls then; untargeted, so protection doesn't
+      // matter (rulings on Blessing of Frost).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const n = (sc.n ??= amountNow(s, e.n, ctx));
+      const options = s.battlefield.filter((id) => objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), ctx.controller, false));
+      if (n <= 0 || !options.length) return;
+      let parts = sc.distributed;
+      if (!parts && options.length === 1) parts = { [options[0]!]: n };
+      if (!parts) {
+        s.pending = { kind: "distribute", player: ctx.controller, source: src, counter: e.counter, total: n, options, what: e.filter.text };
+        return "paused";
+      }
+      for (const id of options) {
+        const k = parts[id] ?? 0;
+        const o = obj(s, id);
+        if (k <= 0) continue;
+        invalidateCharacteristics(s);
+        const put = putCounters(s, o, e.counter, k);
+        log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
+      }
+      return;
+    }
     case "lastKnownCounters": {
       const had = Object.entries(ctx.lki?.counters ?? {}).filter(([k, n]) => n > 0 && (!e.only || k === e.only));
       for (const o of objects(s, e.what, ctx))

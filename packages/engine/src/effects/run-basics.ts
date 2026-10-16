@@ -6,6 +6,7 @@ import { characteristics, invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
 import type { GameObject, GameState, ManaOrigin, ManaType, PlayerId, RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
+import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
@@ -229,7 +230,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // The mana empties from the pool as the step or phase ends (CR 106.4).
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
-      const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
+      let added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
+      // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
+      // replacement effect multiplies what it produces (106.12b).
+      if (s.resolving?.item.manaAbility?.tapped) added = timesAsMuch([...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType), tapManaTimes(s, ctx.controller)).map((m) => `{${m}}`).join("");
       // What the mana's source was (CR 106.3): a mana ability's source as it was activated, else a snow spell, or the
       // ability's source (snow mana, CR 107.4h; mana from a creature).
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);

@@ -100,7 +100,8 @@ export function parseCopyExcept(text: string): CopyExcept | null {
   // Quoted abilities first, so commas inside them don't split anything.
   const quoted: string[] = [];
   let t = text.replace(/"([^"]+)"/g, (_, q: string) => `\u0000${quoted.push(q) - 1}\u0000`);
-  t = t.replace(/^(?:it|they|he|she) /, "");
+  // "Except the token has ..." (Mythos of Illuna) says the same as "except it has".
+  t = t.replace(/^(?:it|they|he|she|the tokens?) /, "");
   const parts = t.split(/,? and (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)|, (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)/).map((p) => p.trim().replace(/^(?:it|they|he|she) /, ""));
   for (const p of parts) {
     let m: RegExpExecArray | null;

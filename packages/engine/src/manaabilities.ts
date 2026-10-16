@@ -73,8 +73,34 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   return commanderIdentity(s, controllerOf(s, o));
 }
 
-/** Exactly what activating it with `choice` (or the combination numbered `combo`, for "combos") adds to the pool. */
+/**
+ * How many times as much mana `pid` gets for tapping a permanent for mana (CR 106.12): the replacement effects of the
+ * permanents they control that say "If you tap a permanent for mana, it produces twice as much of that mana instead"
+ * (CR 106.12b). They multiply together (rulings on Mana Reflection), so the order they apply in doesn't matter (616.1).
+ */
+export function tapManaTimes(s: GameState, pid: PlayerId): number {
+  let n = 1;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const times = abilitiesOf(s, o).tapManaTimes;
+    if (times && controllerOf(s, o) === pid) n *= times;
+  }
+  return n;
+}
+
+/** The same mana `n` times as much (the riders on it stay with all of it, rulings on Mana Reflection). */
+export const timesAsMuch = (mana: ManaType[], n: number): ManaType[] => (n === 1 ? mana : mana.flatMap((m) => Array<ManaType>(n).fill(m)));
+
+/**
+ * Exactly what activating it with `choice` (or the combination numbered `combo`, for "combos") adds to the pool:
+ * multiplied when it's tapped for mana (`tapManaTimes`).
+ */
 export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
+  const made = baseManaProduced(s, o, ab, choice, combo);
+  return ab.tap && made.length ? timesAsMuch(made, tapManaTimes(s, controllerOf(s, o))) : made;
+}
+
+function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
   const p = ab.produces;
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
   if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {

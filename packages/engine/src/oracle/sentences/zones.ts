@@ -110,6 +110,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   }
   // "Return a creature card from your graveyard to the battlefield" (Summon Undead), "... tapped" (Port of Karfell), "... with
   // a finality counter on it" (Charnel Serenade): chosen as it resolves, not targeted, under your control (CR 110.2a).
+  // "Each player puts a creature card from their graveyard onto the battlefield" (Exhume), "... a creature card with mana
+  // value 3 or less ..." (Crypt Champion): each chooses one of their own as it resolves. Only creature cards, so no Aura
+  // needs something to enchant.
+  if ((m = /^[Ee]ach player puts an? (creature card(?: with mana value \d+ or less)?) from their graveyard onto the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    if (!filter || !filter.types?.includes("Creature")) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
+  }
   if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
     // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
     // as it resolves.
@@ -318,8 +326,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     let r: RegExpExecArray | null;
     let among: TargetSpec | null = null;
     let list: string | undefined;
-    let keep: { filter: TargetSpec; n: number; upTo?: true }[] | null = null;
-    if ((r = /^from among the permanents they control (.+)$/.exec(what))) [among, list] = [{ kind: "object", text: "permanent" }, r[1]!];
+    let keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[] | null = null;
+    // "Each player chooses a number of lands they control equal to the number of lands controlled by the player who
+    // controls the fewest, then sacrifices the rest" (Restore Balance, Balancing Act).
+    if ((r = /^a number of (lands|creatures|permanents) they control equal to the number of \1 controlled by the player who controls the fewest$/.exec(what))) {
+      among = pickFilter(r[1]!.replace(/s$/, ""));
+      keep = among && [{ filter: among, n: 0, fewest: true }];
+    } else if ((r = /^from among the permanents they control (.+)$/.exec(what))) [among, list] = [{ kind: "object", text: "permanent" }, r[1]!];
     else if ((r = /^(.+) from among the (nonland permanents|creatures) they control$/.exec(what))) [among, list] = [pickFilter(r[2]!), r[1]!];
     else if ((r = /^from the lands they control a land of each basic land type$/.exec(what))) {
       among = { kind: "object", types: ["Land"], text: "land" };

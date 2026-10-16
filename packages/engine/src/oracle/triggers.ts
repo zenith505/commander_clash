@@ -1,4 +1,4 @@
-import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, SpentReq, TargetSpec, TriggerEvent } from "../abilities";
+import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, SpentReq, StaticCondition, TargetSpec, TriggerEvent } from "../abilities";
 import { NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
@@ -235,8 +235,14 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const spent = spentIf ? parseSpentReq(spentIf[1]!) : undefined;
   if (spentIf && (m[2] || !spent)) return "fail";
   // "That player" is the one who cast it.
-  const body = parseBody(treasure ? treasure[1]! : spentIf ? spentIf[2]! : m[4]!, { castSpell: true, eventPlayer: true });
+  // "If eight or more mana was spent to cast that spell, ... it deals that much damage to each opponent" (Tellah): the
+  // mana spent to cast it (CR 601.2h), which the cast event carries.
+  let text = treasure ? treasure[1]! : spentIf ? spentIf[2]! : m[4]!;
+  const thatMuch = /\bIf [^.,]+ mana was spent to cast that spell, [^.]*\bthat much\b/.test(text) && !/\bX\b/.test(text) && !m[2];
+  if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
+  let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}) }, body };
 }
 
@@ -702,7 +708,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever ~ attacks, if its toughness is 3 or less" (Young Hero Role): its own power or toughness as it triggers and resolves.
   const ptIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? new RegExp(`^(?:its|~'s) (power|toughness) is ${NUM} or (less|greater)$`).exec(intervening[2]!) : null;
   const ptCond = ptIf && ({ kind: "selfPT", stat: ptIf[1] as "power" | "toughness", ...(ptIf[3] === "less" ? { max: num(ptIf[2]!) } : { min: num(ptIf[2]!) }) } as const);
-  const ifCond = ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "When this token enters, if it's a creature, ..." (Mythos of Illuna's token): its card type as it triggers and
+  // resolves (CR 603.4, rulings).
+  const typeIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? /^(?:it's|~ is) an? (creature|artifact|enchantment|land)$/.exec(intervening[2]!) : null;
+  const typeCond: StaticCondition | null = typeIf && { kind: "selfIs", filter: { kind: "object", types: [(typeIf[1]!.charAt(0).toUpperCase() + typeIf[1]!.slice(1)) as "Creature"], text: typeIf[1]! } };
+  const ifCond = typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {

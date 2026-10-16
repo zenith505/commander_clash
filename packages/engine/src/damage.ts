@@ -6,6 +6,7 @@
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
 import { abilitiesOf } from "./cards";
+import { evalAmount } from "./amounts";
 import { putCounters } from "./counters";
 import { fireEvent } from "./effects";
 import { objectMatches } from "./effects/targeting";
@@ -199,7 +200,7 @@ type ShieldOp =
   | { kind: "protection"; srcName: string; toName: string }
   | { kind: "preventAll"; srcName: string; toName: string; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource }
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
-  | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource }
+  | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean };
 
 interface ShieldPlan {
@@ -223,6 +224,32 @@ interface PlanShield {
 // aren't a shield on one permanent or player.
 
 const live = (s: GameState) => (s.damageRules ?? []).filter((r) => r.turn === s.turn);
+
+/**
+ * The damage rules permanents' static abilities make for this damage (CR 615.1a), worked out as it would be dealt: Cover
+ * of Winter's "prevent X of that damage" for each creature dealing combat damage, a shield of X for that creature's
+ * damage to its controller and the creatures they control, divided as they choose (rulings). Nothing is used up: the
+ * next combat damage step gets X again.
+ */
+function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
+  const out: DamageRule[] = [];
+  for (const id of s.battlefield) {
+    const cover = obj(s, id);
+    const n = abilitiesOf(s, cover).preventCombatFromEach;
+    if (n === undefined) continue;
+    const you = controllerOf(s, cover);
+    const x = evalAmount(s, n, { controller: you, sourceId: id });
+    if (x <= 0) continue;
+    const seen = new Set<string>();
+    for (const e of events) {
+      const ref = e.src.ref;
+      if (!e.combat || !ref || !e.src.types.includes("Creature") || seen.has(`${ref.object}:${ref.zc}`)) continue;
+      seen.add(`${ref.object}:${ref.zc}`);
+      out.push({ id: `static:${id}:${ref.object}`, turn: s.turn, controller: you, cardId: cover.cardId, combat: "only", to: { players: "you", objects: { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" } }, by: { chosen: { id: ref.object, zc: ref.zc } }, left: x });
+    }
+  }
+  return out;
+}
 /** A rule that prevents all the damage it applies to, using nothing up, as opposed to a shield (CR 615.1, 615.7-8). */
 const preventsAll = (r: DamageRule) => r.left === undefined && !r.nextTime && !r.redirect;
 const cardName = (s: GameState, r: DamageRule) => s.cards[r.cardId]?.name ?? "a damage shield";
@@ -311,6 +338,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   };
   const ops: ShieldOp[] = [];
   const final: DamageEvent[] = [];
+  const allRules = [...live(s), ...staticRules(s, events)];
   const preventCap = new Map<string, number>();
   const redirectCap = new Map<string, number>();
   const counters = new Map<ObjectId, number>();
@@ -334,7 +362,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       const dest = redirectDestination(s, sh);
       if (redirectCap.get(sh.id)! > 0 && dest && !applied.has(sh.id)) out.push({ key: sh.id, kind: "redirect", cap: redirectCap.get(sh.id)!, to: dest, card: sh.source });
     }
-    for (const rule of live(s)) {
+    for (const rule of allRules) {
       if (preventsAll(rule) || applied.has(rule.id) || !ruleCovers(s, rule, r)) continue;
       const dest = ruleDestination(s, rule);
       if (rule.redirect ? !dest : !preventing) continue;
@@ -349,7 +377,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   const order = turnOrderFrom(s, s.activePlayer);
   // A rule's "next N damage" shield protecting several permanents and players (Harm's Way's "you and/or permanents you
   // control"): when its source would deal more than N to them at once, its controller chooses which N (rulings).
-  for (const rule of live(s)) {
+  for (const rule of allRules) {
     if (rule.left === undefined || rule.left <= 0 || (!rule.redirect && !preventing)) continue;
     const per = new Map<string, { to: Rec; n: number }>();
     for (const e of queue) {
@@ -398,7 +426,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     for (const e of here) {
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
-      const rules = preventing ? live(s).filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
+      const rules = preventing ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
       const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src))) ?? (preventedAll(s, e) ? undefined : rules[0]);
       if (rule) {
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n: e.n, src: e.src });
@@ -496,7 +524,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if (!n) continue;
         used += n;
         const e = incoming[i]!;
-        if (sh.kind === "prevent") ops.push({ kind: "prevent", to, n, srcName: e.src.name, toName, ...(sh.rule ? { rule: sh.key, src: e.src } : {}) });
+        if (sh.kind === "prevent") ops.push({ kind: "prevent", to, n, srcName: e.src.name, toName, ...(sh.rule ? { rule: sh.key, src: e.src, card: sh.card! } : {}) });
         else {
           ops.push({ kind: "redirect", to, shield: sh.key, n, srcName: e.src.name, fromName: toName, toName: nameOf(sh.to!), card: sh.card!, ...(sh.rule ? { rule: true } : {}) });
           queue.push({ ...e, to: sh.to!, n, applied: [...(e.applied ?? []), sh.key] });
@@ -603,7 +631,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
     else if (op.kind === "prevent" && op.rule) {
       const r = s.damageRules?.find((x) => x.id === op.rule);
-      log(s, `${op.n} damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : ""}.`);
+      log(s, `${op.n} damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.card ? ` (${op.card})` : ""}.`);
       ruleUsed(op.rule, op.n, op.src, true);
     } else if (op.kind === "redirect" && op.rule) {
       log(s, `${op.n} damage from ${op.srcName} to ${op.fromName} is dealt to ${op.toName} instead (${op.card}).`);

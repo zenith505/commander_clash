@@ -351,6 +351,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "240d650b-97ea-40ad-8c1b-fe1ea52d861f",
+  "name": "Blessing of Frost",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Snow Sorcery",
+  "supertypes": [
+   "Snow"
+  ],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Distribute X +1/+1 counters among any number of creatures you control, where X is the amount of {S} spent to cast this spell. Then draw a card for each creature you control with power 4 or greater.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a731f5bc-892c-4857-9590-4fa31c1caf00",
   "name": "Blind Hunter",
   "manaCost": "{2}{W}{B}",
@@ -3935,6 +3963,38 @@
   "set": "uma",
   "releasedAt": "2018-12-07",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5f0d3be8-e63e-4ade-ae58-6b0c14f2ce6d",
+  "name": "Snow-Covered Forest",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Basic Snow Land — Forest",
+  "supertypes": [
+   "Basic",
+   "Snow"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Forest"
+  ],
+  "oracleText": "({T}: Add {G}.)",
+  "colors": [],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

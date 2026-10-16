@@ -1796,6 +1796,50 @@ function CardChoice({
 }
 
 /** Cards from your graveyard to collect evidence N with (CR 701.59a): Done once their mana values add up to N or more. */
+/** "Distribute X +1/+1 counters among any number of creatures you control": − and + for each, until all are given out. */
+function DistributeChoice({
+  s,
+  pending,
+  dispatch,
+  onHover,
+}: {
+  s: GameState;
+  pending: Extract<NonNullable<GameState["pending"]>, { kind: "distribute" }>;
+  dispatch: ReturnType<typeof useGame>["dispatch"];
+  onHover: (d: CardDef | null) => void;
+}) {
+  const [parts, setParts] = useState<Record<string, number>>({});
+  const given = Object.values(parts).reduce((a, n) => a + n, 0);
+  const left = pending.total - given;
+  const set = (id: string, n: number) => setParts({ ...parts, [id]: Math.max(0, n) });
+  return (
+    <div className="controls">
+      <span>
+        <strong>{pending.source}:</strong> distribute {pending.total} {pending.counter} counter{pending.total > 1 ? "s" : ""} among any number of {pending.what} ({left} left)
+      </span>
+      {pending.options.map((id) => {
+        const n = parts[id] ?? 0;
+        const d = cardOf(s, id);
+        return (
+          <span key={id} className="divide" data-distribute={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
+            {d.name}{" "}
+            <button className="ghost" disabled={n <= 0} onClick={() => set(id, n - 1)}>
+              −
+            </button>
+            <strong>{n}</strong>
+            <button className="ghost" disabled={left <= 0} onClick={() => set(id, n + 1)}>
+              +
+            </button>
+          </span>
+        );
+      })}
+      <button disabled={left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
+        Done
+      </button>
+    </div>
+  );
+}
+
 function EvidenceChoice({
   s,
   title,
@@ -3386,6 +3430,8 @@ function Controls({
         ))}
       </div>
     );
+  if (pending?.kind === "distribute" && pending.player === HUMAN)
+    return <DistributeChoice key={`${pending.source}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
     const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : "return to your hand";
     const an = `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;

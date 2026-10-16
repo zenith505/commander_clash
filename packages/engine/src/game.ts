@@ -363,6 +363,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "pickPermanents":
       pickPermanents(s, p, action.ids);
       break;
+    case "distribute":
+      distributeChosen(s, p, action.parts);
+      break;
     case "chooseMay":
       chooseMay(s, p, action.yes);
       break;
@@ -696,6 +699,7 @@ export function moveObject(
   o.preventNext = undefined;
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
+  o.activatedEver = undefined; // exhaust (CR 702.177a): a new object can activate it again
   o.targetedThisTurn = undefined;
   o.modesChosen = undefined; // "choose one that hasn't been chosen": a new object starts over (CR 400.7)
   o.skipNextUntap = undefined;
@@ -3325,6 +3329,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
+  if (ab.onceEver && o.activatedEver?.includes(index)) return `${d.name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
@@ -3485,6 +3490,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     invalidateCharacteristics(s);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
+  if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
   if (ab.tap) tapPermanent(s, o);
@@ -3721,6 +3727,21 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;
+  continueResolution(s);
+}
+
+/** How a "distribute" effect's counters are divided (CR 608.2d): all of them, among the permanents offered. */
+function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, number>) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "distribute" || pend.player !== p.id || !r) throw new RulesError("nothing to distribute");
+  const given = Object.entries(parts).filter(([, n]) => n !== 0);
+  if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`distribute the counters among the ${pend.what}`);
+  const sum = given.reduce((a, [, n]) => a + n, 0);
+  if (sum !== pend.total) throw new RulesError(`distribute all ${pend.total} ${pend.counter} counters`);
+  r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
+  s.pending = null;
+  log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
   continueResolution(s);
 }
 

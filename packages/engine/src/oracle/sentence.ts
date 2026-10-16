@@ -173,9 +173,15 @@ export function parseBecomes(text: string): Modification[] | null {
     pt = [Number(m[1]), Number(m[2])];
     rest = m[3]!;
   }
-  if ((m = /^(.+?) with base power and toughness (\d+)\/(\d+)$/i.exec(rest))) {
+  // "... with base power and toughness 8/8, flying, and first strike" (Figure of Destiny): it gains those too.
+  if ((m = /^(.+?) with base power and toughness (\d+)\/(\d+)(?:(?:,? and |, )(.+))?$/i.exec(rest))) {
     pt = [Number(m[2]), Number(m[3])];
     rest = m[1]!;
+    if (m[4]) {
+      const g = parseGrants(m[4]);
+      if (!g) return null;
+      grants.push(...g);
+    }
   }
   const colors: Color[] = [];
   const subtypes: string[] = [];

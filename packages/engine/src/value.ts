@@ -89,8 +89,10 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
         const best = !e.youChoose || p === pid ? -1 : 1;
         const theirs = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && objectMatches(s, { ...e.among, controller: "you" }, o, p, false));
         const kept = new Set<string>();
+        // Restore Balance: as many as the player who controls the fewest.
+        const fewest = Math.min(...who.map((q) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === q && objectMatches(s, { ...e.among, controller: "you" }, obj(s, id), q, false)).length));
         for (const k of e.keep)
-          theirs.filter((o) => objectMatches(s, { ...k.filter, controller: "you" }, o, p, false)).sort((a, b) => best * (worth(s, pid, a) - worth(s, pid, b))).slice(0, k.n).forEach((o) => kept.add(o.id));
+          theirs.filter((o) => objectMatches(s, { ...k.filter, controller: "you" }, o, p, false)).sort((a, b) => best * (worth(s, pid, a) - worth(s, pid, b))).slice(0, k.fewest ? fewest : k.n).forEach((o) => kept.add(o.id));
         add(theirs.filter((o) => !kept.has(o.id)), true);
       }
       v = v ?? 0;

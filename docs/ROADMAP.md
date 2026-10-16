@@ -1,6 +1,6 @@
 # Roadmap
 
-18,230 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,322 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -87,29 +87,34 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
      Auras" (Anti-Magic Aura), Wall of Shadows.
    Left from the snow-mana rounds (snow mana, mana that remembers its source, "was spent", sacrifice the rest):
-   - "Was spent to cast" (85 of 100 legal supported) still out on its own words: Primeval Spawn ("if ~ would enter and
-     it wasn't cast"), Satoru's batch trigger, Tellah ("four or more mana was spent to cast that spell", "that much
-     damage"), Rain of Riches (cascade for a spell Treasure mana was spent on), Vazi and Shadow the Hedgehog (mana spent
-     to activate an ability, split second granted to spells), Mythos of Illuna (a token copy with a granted fight
-     trigger), Flash Conscription (a granted "deals combat damage" trigger), Crypt Champion ("each player puts a
-     creature card ... from their graveyard onto the battlefield"). Blazing Bomb's "Blow Up —" is a flavor word
-     (CR 207.2d) the activated-ability parser doesn't strip; other flavor-word activated abilities (Arcane
-     Investigator's "Search the Room —") are out the same way. Autopay doesn't try to spend mana from creatures for
-     Inga and Esika, or a single color for Steel Exemplar.
-   - Snow (42 of 45 legal {S} cards supported): Cover of Winter (prevent X of each creature's combat damage, divided
-     among the recipients by the defender), Blessing of Frost ("distribute X +1/+1 counters among any number of
-     creatures you control" chosen as it resolves; also blocks Crashing Wave, Feast of the Victorious Dead, Vastwood
-     Hydra), Ascendant Spirit (level-like "becomes" abilities). Mana Reflection is a replacement effect, unsupported.
-   - "Each player chooses ..., then sacrifices the rest" works for fixed choices (Cataclysm, Cataclysmic Gearhulk,
-     Covetous Elegy, Global Ruin, Planetary Annihilation, Razia's Purification, Archfiend of Depravity, Mythos of
-     Snapdax); still out: "a number of permanents equal to the number controlled by the player who controls the
-     fewest" (Balancing Act, Restore Balance, Magus of the Balance), Natural Balance, Promise of Loyalty's vow
-     counters, Stick Together's party, Single Combat's "can't cast creature or planeswalker spells until the end of
-     your next turn".
-   - "Return a creature card from your graveyard to the battlefield" (chosen, not targeted) works; still out: "each
-     player" (Crypt Champion, Infernal Offering, Tempt with Immortality), "at random" (Moldgraf Monstrosity, Tomb
-     Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a spell's own count, and
-     cards blocked on other lines (Tayam, Tyvar, Sauron, Incarnation Technique's demonstrate).
+   - "Was spent to cast" still out on its own words: Primeval Spawn ("if ~ would enter and it wasn't cast"), Satoru's
+     batch trigger, Rain of Riches (cascade for a spell Treasure mana was spent on), Vazi and Shadow the Hedgehog (mana
+     spent to activate an ability, split second granted to spells). Autopay doesn't try to spend mana from creatures
+     for Inga and Esika, or a single color for Steel Exemplar.
+   - Snow: all 45 legal {S} cards are supported. Mana Reflection and Nyxbloom Ancient multiply mana as a replacement
+     effect while a {T} mana ability resolves (CR 106.12b); other "produces ... instead" replacements (Contamination,
+     Infernal Darkness, Pulse of Llanowar) are out.
+   - "Each player chooses ..., then sacrifices the rest" still out: Natural Balance, Promise of Loyalty's vow counters,
+     Stick Together's party, Single Combat's "can't cast creature or planeswalker spells until the end of your next
+     turn".
+   - "Return a creature card from your graveyard to the battlefield" (chosen, not targeted) works, also for each player
+     (Exhume, Crypt Champion); still out: Infernal Offering and Tempt with Immortality (their other parts), "at random"
+     (Moldgraf Monstrosity, Tomb Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a
+     spell's own count, and cards blocked on other lines (Tayam, Tyvar, Sauron, Incarnation Technique's demonstrate).
+   Left from the round after Cataclysm (distribute, step-by-step becomes, Cover of Winter, flavor words, Threaten,
+   Balancing Act, exhaust and boast):
+   - Distributing counters as it resolves works for "among any number of creatures you control"; still out: Feast of
+     the Victorious Dead ("that many" creatures that died), Crashing Wave (waterbend {X}, stun counters among tapped
+     creatures your opponents control).
+   - "Becomes" without a duration works on ~ itself; still out: Figure of Fable ("protection from each of your
+     opponents"), Tenth District Hero ("named Mileva").
+   - Threaten's "untap ... and gain control of it" works; still out: Ray of Command and Magus of the Unseen ("When you
+     lose control of ..., tap it"), Temporary Insanity's target filter, Spinal Embrace (sacrifice "if you do").
+   - Exhaust and boast abilities work (CR 702.177a, 702.142a); still out: exhaust mana abilities (Loot, the
+     Pathfinder), "as long as you haven't activated an exhaust ability this turn" (Elvish Refueler, 702.177b), and the
+     "whenever you boast / activate an exhaust ability" triggers.
+   - Gained abilities in quotes that end a sentence before "until end of turn" (`gains "... draw a card." until end of
+     turn`) are split in two by the sentence splitter, so such cards stay out.
    Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
    counters):
    - Keyword and +1/+1 counters count on cards in other zones (CR 122.1b), but printed-card filters (a card in a

@@ -657,6 +657,12 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" }
+  /**
+   * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
+   * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
+   * on the layers being worked out.
+   */
+  | { kind: "selfIs"; filter: TargetSpec }
   /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
   | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
@@ -912,7 +918,14 @@ export type Effect =
    * permanent may be chosen for several (rulings). Then every unchosen permanent matching `among` is sacrificed at once.
    * `youChoose`: you make every player's choices (Mythos of Snapdax).
    */
-  | { type: "keepRest"; who: PlayerRef; keep: { filter: TargetSpec; n: number; upTo?: true }[]; among: TargetSpec; youChoose?: true }
+  | {
+      type: "keepRest";
+      who: PlayerRef;
+      /** `fewest`: "a number of lands they control equal to the number of lands controlled by the player who controls the fewest" (Restore Balance), counted as it resolves; `n` is unused then. */
+      keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[];
+      among: TargetSpec;
+      youChoose?: true;
+    }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
@@ -1009,6 +1022,12 @@ export type Effect =
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
   | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true }
+  /**
+   * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
+   * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
+   * chosen one getting at least one.
+   */
+  | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
   | { type: "sacrifice"; what: ObjRef; byController?: true }
@@ -1170,7 +1189,7 @@ export type Effect =
   | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile"; until?: "sourceLeaves"; linked?: boolean }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
@@ -1822,6 +1841,10 @@ export interface ActivatedAbility {
   station?: true;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
+  /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
+  onceEver?: true;
+  /** The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). */
+  keyword?: "Exhaust" | "Boast";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
@@ -2199,6 +2222,12 @@ export interface CompiledCard {
   beginOnBattlefield?: boolean;
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
+  /**
+   * "If you tap a permanent for mana, it produces twice as much of that mana instead" (Mana Reflection; three times,
+   * Nyxbloom Ancient): a replacement effect on the mana a mana ability with {T} in its cost produces (CR 106.12b,
+   * 614.1a), the factor it multiplies by. Several multiply together (rulings).
+   */
+  tapManaTimes?: number;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
@@ -2209,6 +2238,13 @@ export interface CompiledCard {
   roomsTwice?: true;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents" | "enchanted";
+  /**
+   * Cover of Winter: "If a creature would deal combat damage to you and/or one or more creatures you control, prevent X
+   * of that damage, where X is the number of age counters on ~" (a prevention effect, CR 615.1a): X of each creature's
+   * combat damage in each combat damage step, divided by this permanent's controller among those it would be dealt to
+   * (rulings).
+   */
+  preventCombatFromEach?: Amount;
   /** "Damage can't be prevented." (CR 615.12) */
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */

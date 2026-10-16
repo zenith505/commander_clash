@@ -1702,6 +1702,7 @@ function beginStep(s: GameState, step: Step): void {
         if (put) log(s, `${player(s, ap).name} puts ${put === 1 ? "a lore counter" : `${put} lore counters`} on ${nameOf(s, id)}.`);
       }
       invalidateCharacteristics(s);
+      fireEvent(s, { type: "step", step: "main1", active: ap }); // paradigm's "at the beginning of each of your precombat main phases"
       break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;

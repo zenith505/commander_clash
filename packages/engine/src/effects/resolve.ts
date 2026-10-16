@@ -582,6 +582,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
     case "castCipher":
+    case "castParadigm":
     case "copySpell":
     case "nextCast":
     case "cascade":
@@ -646,6 +647,18 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     (s.epics ??= {})[item.id] = structuredClone(item);
     addDelayed(s, "eachYourUpkeep", controller, o, { targets: [], effects: [{ type: "copySpell", spell: { epic: item.id }, n: 1, newTargets: true }], text: "Epic: copy ~ except for its epic ability. You may choose new targets for the copy." });
     log(s, `${player(s, controller).name} can't cast spells for the rest of the game (epic).`);
+  }
+  // Paradigm (CR 702.192a): the first time a spell with this name resolves for its controller, a copy of it every
+  // precombat main phase of theirs from now on; then this spell is exiled (a copy ceases to exist there, 704.5e).
+  if (compileCard(d).paradigm) {
+    const p = player(s, controller);
+    if (!(p.paradigms ??= []).includes(d.name)) {
+      p.paradigms.push(d.name);
+      addDelayed(s, "eachYourPrecombatMain", controller, o, { targets: [], effects: [{ type: "castParadigm", card: cardIdOf(o) }], text: `Paradigm: you may cast a copy of ${d.name} from exile without paying its mana cost.` });
+    }
+    moveObject(s, id, "exile");
+    if (s.objects[id]?.zone === "exile") log(s, `${d.name} is exiled (paradigm).`);
+    return;
   }
   if (compileCard(d).rebound && o.castFrom === "hand" && !o.exileIfLeaves) {
     moveObject(s, id, "exile");

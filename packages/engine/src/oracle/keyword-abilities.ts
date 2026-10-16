@@ -548,6 +548,7 @@ interface KeywordParts {
   undaunted?: number;
   /** Epic (CR 702.50a), on an instant or sorcery. */
   epic?: boolean;
+  paradigm?: boolean;
 }
 
 /** CR 702.189a: "Whenever this creature attacks, add N {R}. Until end of combat, you don't lose this mana as steps and phases end." */
@@ -606,6 +607,12 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // new targets for the copy." Both happen as it resolves, after its other instructions.
       if (!d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return null;
       out.epic = true;
+    } else if (/^paradigm$/i.test(p)) {
+      // CR 702.192a: "If this is the first time a spell you control with this spell's name has resolved this game, at
+      // the beginning of each of your precombat main phases for the rest of the game, create a copy of this object in
+      // exile. You may cast the copy without paying its mana cost" and "Exile this spell", as it resolves.
+      if (!d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return null;
+      out.paradigm = true;
     } else if (/^undaunted$/i.test(p)) {
       // CR 702.125a: "This spell costs {1} less to cast for each opponent you have"; players who left aren't counted
       // (702.125b), and each instance applies (702.125c).

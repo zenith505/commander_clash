@@ -906,6 +906,11 @@ export type Effect =
    */
   | { type: "castCipher"; card: ObjectId; zc: number }
   /**
+   * Paradigm's delayed trigger (CR 702.192a): "create a copy of this object in exile. You may cast the copy without
+   * paying its mana cost". `card`: the card definition (GameState.cards) it copies; the card itself may be gone (rulings).
+   */
+  | { type: "castParadigm"; card: string }
+  /**
    * Haunt's triggered ability (CR 702.55a): "exile it haunting target creature" (target 0). "It" is this card in the
    * graveyard it was just put into; it does nothing if the card left (CR 400.7).
    */
@@ -2461,6 +2466,8 @@ export interface CompiledCard {
   rebound?: boolean;
   /** Epic (CR 702.50a): see finishSpell. */
   epic?: true;
+  /** Paradigm (CR 702.192a): see finishSpell. */
+  paradigm?: true;
   /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
   altCosts?: {
     kind: AltCostKind;

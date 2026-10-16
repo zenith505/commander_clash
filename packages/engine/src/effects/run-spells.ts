@@ -103,6 +103,30 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `The copy of ${defOf(s, card).name} can't be cast.`);
       return;
     }
+    case "castParadigm": {
+      // "Create a copy of this object in exile. You may cast the copy without paying its mana cost" (CR 702.192a): one
+      // not cast ceases to exist (704.5e; rulings).
+      const def = s.cards[e.card];
+      if (!def) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (sc.playLinked) {
+        if (sc.cipherCopy && s.objects[sc.cipherCopy]?.zone === "exile") removeCopy(s, sc.cipherCopy);
+        return;
+      }
+      sc.playLinked = true;
+      const copy = newObject(s, def, p.id, "exile");
+      copy.spellCopy = true;
+      p.exile.push(copy.id);
+      sc.cipherCopy = copy.id;
+      log(s, `${p.name} creates a copy of ${def.name} in exile (paradigm).`);
+      s.pending = { kind: "castFree", player: p.id, objectId: copy.id, source: src };
+      if (castProblem(s, p.id, copy.id) === null) return "paused";
+      s.pending = null;
+      removeCopy(s, copy.id);
+      log(s, `The copy of ${def.name} can't be cast.`);
+      return;
+    }
     case "copySpell": {
       // Copies of a spell go on the stack one at a time, each with its targets chosen first (CR 707.10, 707.10c).
       const r = s.resolving!;

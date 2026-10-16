@@ -367,6 +367,8 @@ export interface ManaLot {
 export interface Player {
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
+  /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */
+  paradigms?: string[];
   /**
    * "Skip your next untap step / draw step / combat phase / turn" (CR 614.10): each entry skips one, the next to happen;
    * `turn`: only during that turn ("skips their next combat phase this turn").
@@ -529,7 +531,7 @@ export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
   /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
   to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;

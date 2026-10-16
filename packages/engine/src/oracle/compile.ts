@@ -540,6 +540,7 @@ export function compile(d: CardDef): CompiledCard {
       if (kw.convoke) out.convoke = true;
       if (kw.improvise) out.improvise = true;
       if (kw.epic) out.epic = true;
+      if (kw.paradigm) out.paradigm = true;
       for (let i = 0; i < (kw.undaunted ?? 0); i++) out.costLess = [...(out.costLess ?? []), { count: { kind: "players", opponents: true } }];
       if (kw.affinity.length) out.costLess = [...(out.costLess ?? []), ...kw.affinity.map((filter) => ({ count: { kind: "permanents" as const, filter } }))];
       if (kw.plusCounters) {

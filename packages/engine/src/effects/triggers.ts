@@ -111,7 +111,7 @@ export type TriggerSourceEvent =
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
-  | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "main1" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -885,9 +885,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
-            : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
+            : d.when === "eachYourPrecombatMain"
+              ? ev.step === "main1" && ev.active === d.controller
+              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
-      if (d.when !== "eachYourUpkeep") s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).

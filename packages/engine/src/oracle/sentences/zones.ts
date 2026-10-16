@@ -1,7 +1,7 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, amt, num, singularWord } from "../words";
+import { NUM, COUNTER, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
@@ -177,8 +177,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it
   // became (CR 701.60a).
-  if (ctx.selfCard && (m = /^[Rr]eturn (?:it|~) to the battlefield under (your|its owner's) control( and suspect it)?$/.exec(s)))
-    return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] === "its owner's" ? { owner: true } : {}) }, ...(m[2] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : [])];
+  // "Return it to the battlefield tapped under its owner's control" (Supernatural Stamina, Fungal Fortitude), "... with a
+  // +1/+1 counter on it" (Undying Malice; it enters with it, CR 614.1c).
+  if (ctx.selfCard && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)? under (your|its owner's) control(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?$`).exec(s)))
+    return [
+      { type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] ? { tapped: true } : {}), ...(m[2] === "its owner's" ? { owner: true } : {}), ...(m[3] ? { counters: { [counterKind(m[4]!)]: num(m[3]) } } : {}) },
+      ...(m[5] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : []),
+    ];
   // "When enchanted creature dies, return that card to the battlefield under your control" (False Demise): the card
   // that went to the graveyard, if it's still there (CR 400.7); a token is gone (CR 111.7).
   if ((m = /^Return (that card|it) to the battlefield( tapped)? under (your|its owner's) control$/i.exec(s)) && ctx.subjectLeft) {

@@ -899,6 +899,8 @@ export type Effect =
       haste?: "endOfTurn" | "game";
       /** "Exile it at the beginning of the next end step", "Sacrifice it ...": a delayed trigger for it (CR 603.7), while it's that object. */
       atEndStep?: "exile" | "sacrifice";
+      /** "With a +1/+1 counter on it" (Undying Malice): counters it enters with (CR 614.1c). */
+      counters?: Record<string, number>;
     }
   /**
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target

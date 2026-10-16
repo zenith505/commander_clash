@@ -692,7 +692,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           continue;
         }
         log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-        moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...host }); // CR 110.2a
+        moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host }); // CR 110.2a
         // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
         // the permanent it became, while it's still that object (CR 400.7, rulings).
         if (o.zone !== "battlefield") continue;

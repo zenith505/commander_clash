@@ -375,24 +375,53 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
 // ---------------------------------------------------------------------------
 // Modes (CR 700.2)
 
-/** Which modes of a modal body can be chosen right now: one that needs targets needs legal ones (CR 700.2a). */
-export const legalModes = (s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality): boolean[] =>
-  body.modal ? body.modal.modes.map((m) => hasLegalTargets(s, m.targets, controller, src)) : [];
+/**
+ * Which modes of a modal body can be chosen right now: one that needs targets needs legal ones (CR 700.2a), and for
+ * "choose one that hasn't been chosen [this turn]", one `sourceId` hasn't had chosen yet (see modesUsed).
+ */
+export const legalModes = (s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean[] => {
+  if (!body.modal) return [];
+  const used = modesUsed(s, body, sourceId);
+  return body.modal.modes.map((m, i) => !used.includes(i) && hasLegalTargets(s, m.targets, controller, src));
+};
+
+/**
+ * "Choose one that hasn't been chosen" (Demonic Pact) and "... this turn" (Gala Greeters): the modes already chosen for
+ * this ability of this object, by any player (rulings on Demonic Pact). Recorded by noteModesChosen.
+ */
+export function modesUsed(s: GameState, body: AbilityBody, sourceId?: ObjectId): number[] {
+  const how = body.modal?.unchosen;
+  const o = how && sourceId !== undefined ? s.objects[sourceId] : undefined;
+  const rec = o?.modesChosen?.[body.text];
+  return rec && (how === "ever" || rec.turn === s.turn) ? rec.modes : [];
+}
+
+/** Remember the modes chosen for a "choose one that hasn't been chosen [this turn]" ability of `sourceId` (see modesUsed). */
+export function noteModesChosen(s: GameState, body: AbilityBody, sourceId: ObjectId, modes: number[], sourceZc?: number) {
+  const o = s.objects[sourceId];
+  if (!body.modal?.unchosen || !o || (sourceZc !== undefined && (o.zoneChanges ?? 0) !== sourceZc)) return;
+  const before = modesUsed(s, body, sourceId);
+  (o.modesChosen ??= {})[body.text] = { modes: [...before, ...modes], turn: s.turn };
+}
 
 /** Is there a valid choice of modes? Spells and activated abilities need at least one mode. */
-export function canChooseModes(s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality): boolean {
+export function canChooseModes(s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   if (!body.modal) return true;
-  return legalModes(s, body, controller, src).filter(Boolean).length >= Math.max(1, body.modal.min);
+  // With "you may choose the same mode more than once" (CR 700.2d), one mode that can be chosen is enough.
+  return legalModes(s, body, controller, src, sourceId).filter(Boolean).length >= (body.modal.repeat ? 1 : Math.max(1, body.modal.min));
 }
 
 /** Why these modes can't be chosen, or null. */
 /** `both`: a "choose both instead" applies (see AbilityBody.modal.both). */
-export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | undefined, controller: PlayerId, src?: SourceQuality, both = false): string | null {
+export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | undefined, controller: PlayerId, src?: SourceQuality, both = false, sourceId?: ObjectId): string | null {
   if (!body.modal) return modes?.length ? "this isn't modal" : null;
   if (!modes) return "choose a mode";
   const count = modeCountProblem(body, modes, both);
   if (count) return count;
-  const legal = legalModes(s, body, controller, src);
+  const used = modesUsed(s, body, sourceId);
+  const again = modes.find((i) => used.includes(i));
+  if (again !== undefined) return `"${body.modal.modes[again]!.text}" has already been chosen${body.modal.unchosen === "turn" ? " this turn" : ""}`;
+  const legal = legalModes(s, body, controller, src, sourceId);
   const bad = modes.find((i) => !legal[i]);
   return bad === undefined ? null : `can't choose "${body.modal.modes[bad]!.text}": no legal targets`;
 }

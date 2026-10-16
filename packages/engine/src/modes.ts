@@ -13,20 +13,27 @@ export function modeCountProblem(body: AbilityBody, modes: number[], both = fals
   const m = body.modal;
   if (!m) return modes.length ? "this isn't modal" : null;
   if (modes.some((i) => !Number.isInteger(i) || i < 0 || i >= m.modes.length)) return "no such mode";
-  if (new Set(modes).size !== modes.length) return "each mode can be chosen only once"; // CR 700.2d
+  // Unless "you may choose the same mode more than once" (CR 700.2d); a kicked Inscription can't (rulings).
+  if (!m.repeat && new Set(modes).size !== modes.length) return "each mode can be chosen only once";
+  // Pawprints (CR 700.2i): modes worth up to that many {P}, as many as fit.
+  if (m.pawprints) return pawprintsOf(m, modes) > m.max ? `choose up to ${m.max} {P} worth of modes` : null;
   const [min, max] = modeRange(body, both);
   if (modes.length < min || (modes.length > max && !entwined(body, modes))) return `choose ${describeCount(min, max)}${m.entwine ? ", or all of them (entwine)" : ""}`;
   return null;
 }
 
+/** How many {P} these modes are worth (CR 700.2i). */
+export const pawprintsOf = (m: NonNullable<AbilityBody["modal"]>, modes: number[]) => modes.reduce((n, i) => n + (m.pawprints?.[i] ?? 0), 0);
+
 /**
- * How many modes may be chosen. `both`: "If this spell was cast using teamwork, choose both instead" (exactly two) or
- * "If you control a commander as you cast this spell, you may choose both instead" (one or both) applies.
+ * How many modes may be chosen. `both`: "If this spell was cast using teamwork, choose both instead" (exactly two),
+ * "If you control a commander as you cast this spell, you may choose both instead" (one or both), or "If this spell was
+ * kicked, choose any number instead" (one to all of them) applies.
  */
 export function modeRange(body: AbilityBody, both = false): [number, number] {
   const m = body.modal!;
   if (!both || !m.both) return [m.min, m.max];
-  return m.both === "teamwork" ? [2, 2] : [1, 2];
+  return m.both === "teamwork" ? [2, 2] : m.both === "kicked" ? [1, m.modes.length] : [1, 2];
 }
 
 /** All the modes of a spell with entwine were chosen, so it costs its entwine cost more (CR 702.42a). */

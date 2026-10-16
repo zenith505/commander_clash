@@ -241,7 +241,7 @@ function evenDivision(specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice
 }
 
 /** The human is choosing modes for a modal spell or activated ability they're casting (CR 700.2a). */
-type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[]; teamwork?: string[] } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
+type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[]; teamwork?: string[]; /** Kicker already announced (Inscriptions): the cast goes on from here. */ draft?: CastDraft } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
 
 /** Picking creatures to tap: to crew a Vehicle (CR 702.122a), to station (CR 702.184a, one creature) or to convoke a spell (CR 702.51a). */
 type TapPick =
@@ -654,6 +654,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     if (d.kicks === undefined && compiled.kicker)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
+    // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
+    const kickedModal = compiled.spell?.modal?.both === "kicked" ? compiled.spell : undefined;
+    if (d.modes === undefined && kickedModal) {
+      const body = { targets: [], effects: [], text: card.oracleText, modal: kickedModal.modal! };
+      return setModePick({ mode: "cast", objectId: d.objectId, label: card.name, body: d.kicks?.length ? { ...body, modal: { ...body.modal, max: body.modal.modes.length } } : body, draft: d });
+    }
     if (d.buyback === undefined && compiled.buyback) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback });
     if (d.costOr === undefined && compiled.costOr) return setCostOrPick({ draft: d, label: card.name, options: compiled.costOr.map((c) => c.text) });
     // Gift: you may promise an opponent a gift as you cast it (CR 702.174a), announced with the other costs (601.2b).
@@ -818,6 +824,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         const both = bothModes(s, HUMAN, body, { ...(teamwork?.length ? { teamwork } : {}) });
         // "If this spell was cast using teamwork, choose both instead": no choice left to make.
         if (both && modal.both === "teamwork") return continueCast({ objectId: id, convoke, teamwork, modes: [0, 1] });
+        // "If this spell was kicked, choose any number instead": kicker is announced first, then the modes.
+        if (modal.both === "kicked") return continueCast({ objectId: id, convoke, teamwork });
         // "If you control a commander as you cast this spell, you may choose both instead."
         return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: 2 } } : body, convoke, teamwork });
       }
@@ -839,7 +847,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setModePick(null);
     if (pending?.kind === "chooseModes") return dispatch([{ type: "chooseModes", player: HUMAN, modes }]);
     if (!pick) return;
-    if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke, teamwork: pick.teamwork });
+    if (pick.mode === "cast" && pick.draft) continueCast({ ...pick.draft, modes });
+    else if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke, teamwork: pick.teamwork });
     else useAbility(pick.objectId, pick.index, modes);
   }
 
@@ -1117,7 +1126,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               key={modePick ? `${modePick.mode}:${modePick.objectId}` : `trigger:${pending?.kind === "chooseModes" ? pending.description : ""}`}
               {...(pending?.kind === "chooseModes"
                 ? { label: pending.description.split(":")[0]!, min: pending.min, max: pending.max, modes: pending.modes, legal: pending.legal }
-                : { label: modePick!.label, min: modePick!.body.modal!.min, max: modePick!.body.modal!.max, modes: modePick!.body.modal!.modes.map((m, i) => (modePick!.body.modal!.costs ? `+ ${modePick!.body.modal!.costs[i]} — ${m.text}` : m.text)), legal: legalModes(s, modePick!.body, HUMAN), entwine: modePick!.body.modal!.entwine })}
+                : modeMenuProps(s, modePick!))}
               sourceName={(pending?.kind === "chooseModes" ? cardOf(s, pending.sourceId) : cardOf(s, modePick!.objectId)).name}
               onDone={pickModes}
               onCancel={pending?.kind === "chooseModes" ? undefined : () => setModePick(null)}
@@ -2805,6 +2814,23 @@ function LibrarySearch({
  * it chooses it; otherwise modes toggle and "Done" confirms. Modes that can't be chosen
  * (no legal targets, CR 700.2a) are disabled.
  */
+/** What the mode menu shows for a spell being cast or an ability being activated. */
+function modeMenuProps(s: GameState, pick: ModePick) {
+  const m = pick.body.modal!;
+  const text = (t: string, i: number) => (m.costs ? `+ ${m.costs[i]} — ${t}` : m.pawprints ? `${"{P}".repeat(m.pawprints[i]!)} — ${t}` : t);
+  return {
+    label: pick.label,
+    min: m.min,
+    max: m.max,
+    modes: m.modes.map((x, i) => text(x.text, i)),
+    legal: legalModes(s, pick.body, HUMAN, undefined, pick.mode === "activate" ? pick.objectId : undefined),
+    entwine: m.entwine,
+    ...(m.repeat ? { repeat: true } : {}),
+    ...(m.pawprints ? { pawprints: m.pawprints } : {}),
+    ...(m.escalate ? { escalate: m.escalate.mana ?? m.escalate.text.toLowerCase() } : {}),
+  };
+}
+
 function ModeMenu({
   label,
   sourceName,
@@ -2813,6 +2839,9 @@ function ModeMenu({
   modes,
   legal,
   entwine,
+  repeat,
+  pawprints,
+  escalate,
   onDone,
   onCancel,
 }: {
@@ -2824,30 +2853,52 @@ function ModeMenu({
   legal: boolean[];
   /** Entwine's cost: all the modes, for that much more (CR 702.42a). */
   entwine?: string;
+  /** "You may choose the same mode more than once" (CR 700.2d): each click adds the mode once more. */
+  repeat?: boolean;
+  /** Each mode's {P}: any modes worth up to `max` of them (CR 700.2i). */
+  pawprints?: number[];
+  /** Escalate's cost, for each mode beyond the first (CR 702.120a). */
+  escalate?: string;
   onDone: (modes: number[]) => void;
   onCancel?: () => void;
 }) {
   const [chosen, setChosen] = useState<number[]>([]);
-  const single = max === 1 && min === 1;
+  const single = max === 1 && min === 1 && !pawprints;
+  const used = pawprints ? chosen.reduce((n, i) => n + pawprints[i]!, 0) : chosen.length;
+  const room = (i: number) => (pawprints ? used + pawprints[i]! <= max : chosen.length < max);
   const toggle = (i: number) => {
     if (single) return onDone([i]);
-    setChosen((c) => (c.includes(i) ? c.filter((x) => x !== i) : c.length < max ? [...c, i] : c));
+    if (repeat) return room(i) && setChosen((c) => [...c, i]);
+    setChosen((c) => (c.includes(i) ? c.filter((x) => x !== i) : room(i) ? [...c, i] : c));
   };
-  const ok = chosen.length >= min && chosen.length <= max;
+  const less = (i: number) => setChosen((c) => c.filter((_, k) => k !== c.lastIndexOf(i)));
+  const times = (i: number) => chosen.filter((x) => x === i).length;
+  const ok = pawprints ? used <= max : chosen.length >= min && chosen.length <= max;
   return (
     <div className="ability-menu mode-menu">
       <strong>{label}</strong>
-      <span className="muted">choose {describeCount(min, max)}</span>
+      <span className="muted">
+        {pawprints ? `choose up to ${max} {P} worth of modes (${max - used} left)` : `choose ${describeCount(min, max)}`}
+        {repeat && !pawprints ? ", the same one more than once if you like" : ""}
+        {escalate ? `; escalate ${escalate} for each mode beyond the first` : ""}
+      </span>
       {modes.map((m, i) => (
-        <button
-          key={i}
-          className={chosen.includes(i) ? "chosen" : ""}
-          disabled={!legal[i]}
-          title={legal[i] ? "" : "No legal targets for this mode"}
-          onClick={() => toggle(i)}
-        >
-          {m.replace(/~/g, sourceName)}
-        </button>
+        <span key={i} className="mode-choice">
+          <button
+            className={times(i) ? "chosen" : ""}
+            disabled={!legal[i] || (repeat && !room(i))}
+            title={legal[i] ? "" : "This mode can't be chosen now: no legal targets, or it has been chosen already"}
+            onClick={() => toggle(i)}
+          >
+            {m.replace(/~/g, sourceName)}
+            {repeat && times(i) > 0 && <b className="times"> ×{times(i)}</b>}
+          </button>
+          {repeat && times(i) > 0 && (
+            <button className="ghost less" aria-label="Choose it one time fewer" onClick={() => less(i)}>
+              −
+            </button>
+          )}
+        </span>
       ))}
       {entwine && (
         <button className="entwine" disabled={!legal.every(Boolean)} title={legal.every(Boolean) ? "" : "Every mode needs a legal target"} onClick={() => onDone(modes.map((_, i) => i))}>
@@ -2856,7 +2907,7 @@ function ModeMenu({
       )}
       {!single && (
         <button disabled={!ok} onClick={() => onDone([...chosen].sort((a, b) => a - b))}>
-          {chosen.length === 0 && min === 0 ? "Choose none" : "Done"}
+          {chosen.length === 0 && (min === 0 || pawprints) ? "Choose none" : "Done"}
         </button>
       )}
       {onCancel && (

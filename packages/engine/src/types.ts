@@ -132,6 +132,12 @@ export interface GameObject {
   redirectNext?: RedirectShield[];
   /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
+  /**
+   * "Choose one that hasn't been chosen [this turn]" (Demonic Pact, Gala Greeters): the modes chosen so far for each such
+   * ability of this object, keyed by the ability's text, with the turn for "this turn". Any player's choices count, and a
+   * new object starts over (rulings on Demonic Pact, CR 400.7).
+   */
+  modesChosen?: Record<string, { modes: number[]; turn: number }>;
   /** The players whose spells and abilities targeted it this turn, each once ("for the first time each turn"). */
   targetedThisTurn?: { turn: number; by: PlayerId[] };
   /** Renown's designation (CR 702.112b), until it leaves the battlefield. */

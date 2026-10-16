@@ -3,7 +3,7 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -653,6 +653,7 @@ export function moveObject(
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
   o.targetedThisTurn = undefined;
+  o.modesChosen = undefined; // "choose one that hasn't been chosen": a new object starts over (CR 400.7)
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
@@ -2147,7 +2148,7 @@ export function castProblem(
   if (or && choices?.costOr === undefined && or.every((c) => c.cost && extraCostProblem(s, pid, o, [c.cost], undefined, `cast ${d.name}`)))
     return `you can't pay ${d.name}'s additional cost (${or.map((c) => c.text).join(" or ")})`;
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
-  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0);
+  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined);
   if (ap) return ap;
   const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
@@ -2175,7 +2176,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const entwine = spell && entwined(spell, how.modes) ? spell.modal!.entwine! : "";
   // Strive's cost for each target beyond the first is one too, paid even when it's cast without paying its mana cost (rulings).
   const strive = compileCard(d).strive?.repeat(Math.max(0, (how.targets ?? []).filter((t) => t.kind !== "none").length - 1)) ?? "";
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive;
+  // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
+  const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
+  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate;
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x);
@@ -2542,7 +2545,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices, x ?? 0, s, p.id), choices, returned);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
@@ -2666,11 +2669,13 @@ export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): Obj
 
 /**
  * "Choose both instead" of "Choose one" (see AbilityBody.modal.both): when the spell is cast using teamwork, or by a
- * player who controls a commander as they cast it (any commander, rulings on Akroma's Will).
+ * player who controls a commander as they cast it (any commander, rulings on Akroma's Will); "choose any number instead"
+ * when it's kicked (Inscriptions).
  */
-export function bothModes(s: GameState, pid: PlayerId, body: AbilityBody, choices?: Pick<CostChoices, "teamwork">): boolean {
+export function bothModes(s: GameState, pid: PlayerId, body: AbilityBody, choices?: Pick<CostChoices, "teamwork" | "kicks">): boolean {
   const both = body.modal?.both;
   if (both === "teamwork") return !!choices?.teamwork?.length;
+  if (both === "kicked") return !!choices?.kicks?.length;
   if (both === "commander") return s.battlefield.some((id) => obj(s, id).isCommander && controllerOf(s, obj(s, id)) === pid);
   return false;
 }
@@ -2811,15 +2816,19 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 }
 
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
-function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0): string | null {
+function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0, modes?: number[]): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, choices, x, s, pid), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, ...(modes ? { modes } : {}) }, x, s, pid), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr"> & { modes?: number[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? [])];
+  // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
+  const esc = compileCard(d).spell?.modal?.escalate?.cost;
+  const beyond = Math.max(0, (choices?.modes?.length ?? 0) - 1);
+  const escalate: AdditionalCost[] = esc && beyond && "n" in esc ? [{ ...esc, n: esc.n * beyond }] : [];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -3090,7 +3099,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     }
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
-    const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
+    const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id), id) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id), false, id);
     if (mp) return mp;
   }
   let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 }, !targets);
@@ -3221,6 +3230,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     invalidateCharacteristics(s);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
+  // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
+  if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
   if (ab.tap) tapPermanent(s, o);
   if (ab.exertCost && o.zone === "battlefield") {
     o.skipNextUntap = true; // CR 701.43a
@@ -3315,7 +3326,7 @@ function chooseTriggerModes(s: GameState, p: Player, modes: number[]) {
   const pend = s.pending;
   if (pend?.kind !== "chooseModes" || pend.player !== p.id) throw new RulesError("no modes to choose");
   const t = s.triggerQueue[0]!;
-  const problem = modesProblem(s, triggerBody(s, t), modes, p.id);
+  const problem = modesProblem(s, triggerBody(s, t), modes, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), false, t.sourceId);
   // Choosing no modes is allowed for "choose up to"; the ability is then removed (CR 603.3c).
   if (problem && !(modes.length === 0 && pend.min === 0)) throw new RulesError(problem);
   t.modes = modes;

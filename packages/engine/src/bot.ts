@@ -923,15 +923,23 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   }
   // "Choose both instead" (teamwork, or controlling a commander): both modes when both can be chosen.
   const both = printed?.modal?.both;
-  if (both && legalModes(s, printed!, pid).every(Boolean)) {
+  if (both && both !== "kicked" && legalModes(s, printed!, pid).every(Boolean)) {
     const tw = both === "teamwork" ? spareTappers(s, pid, id, compileCard(defOf(s, obj(s, id))).teamwork ?? 0) : undefined;
     if (both === "commander" ? bothModes(s, pid, printed!) : tw) {
       const plan = castPlanWithModes(s, pid, id, free, x, via, alt, [0, 1], tw);
       if (plan) return plan;
     }
   }
-  if (!printed?.modal?.costs) return castPlanWithModes(s, pid, id, free, x, via, alt, choice?.modes);
-  // Spree (CR 702.172a): each mode costs more, so the most useful modes we can pay for.
+  // "If this spell was kicked, choose any number instead" (Inscriptions): all the useful modes, kicked, if we can pay.
+  if (both === "kicked") {
+    const all = chooseModes(s, pid, { ...printed!, modal: { ...printed!.modal!, max: printed!.modal!.modes.length } }, false, id);
+    if (all && all.modes.length > 1) {
+      const plan = castPlanWithModes(s, pid, id, free, x, via, alt, all.modes);
+      if (plan) return plan;
+    }
+  }
+  if (!printed?.modal?.costs && !printed?.modal?.escalate) return castPlanWithModes(s, pid, id, free, x, via, alt, choice?.modes);
+  // Spree (CR 702.172a) and escalate (CR 702.120a): each mode costs more, so the most useful modes we can pay for.
   for (let n = choice!.ranked.length; n >= 1; n--) {
     const plan = castPlanWithModes(s, pid, id, free, x, via, alt, choice!.ranked.slice(0, n).sort((a, b) => a - b));
     if (plan) return plan;
@@ -976,7 +984,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const ors = compileCard(defOf(s, obj(s, id))).costOr?.map((_, i) => i) ?? [undefined];
   let extra: CostChoices | null = null;
   for (const costOr of ors) {
-    const e = chooseExtraCosts(s, pid, id, targets ?? [], via, alt, costOr, x ?? 0);
+    const e = chooseExtraCosts(s, pid, id, targets ?? [], via, alt, costOr, x ?? 0, modes);
     if (!e) continue;
     if (costOr !== undefined) e.costOr = costOr;
     if (costOr === undefined || planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...e, ...(via ? { via } : {}), ...(alt ? { alt } : {}) })) {
@@ -1036,7 +1044,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   // Buy it back if we can afford to (CR 702.27a), then kick it if we can: the most kicker costs first (CR 702.33).
   const buybacks = compileCard(defOf(s, obj(s, id))).buyback && !via ? [true, false] : [false];
   for (const buyback of buybacks)
-    for (const kicks of kickOptions(s, pid, id, free).filter(kickOk)) {
+    for (const kicks of kickOptions(s, pid, id, free).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
       const plan = planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...extra, ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}) });
       // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
       if (plan && targets && !canAlsoPayWard(s, pid, plan, targets)) continue;
@@ -1081,11 +1089,11 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): nu
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0, modes?: number[]): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt, costOr }, x, s, pid)) {
+  for (const c of castExtraCosts(d, { via, alt, costOr, ...(modes ? { modes } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     if (c.kind === "giveLife") {
       // Invigorate: the opponent with the least life gets it (the least threat to us); "each other player": nothing to choose.
@@ -1325,7 +1333,7 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
 export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string): { modes: number[]; ranked: number[] } | null {
   const m = body.modal;
   if (!m) return { modes: [], ranked: [] };
-  const legal = legalModes(s, body, pid, sourceId ? sourceQuality(s, sourceId) : undefined);
+  const legal = legalModes(s, body, pid, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId);
   const scored = m.modes
     .map((mode, i) => {
       if (!legal[i]) return null;
@@ -1335,12 +1343,29 @@ export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forc
     .filter((x): x is { i: number; value: number } => !!x && x.value > 0)
     .sort((a, b) => b.value - a.value);
   let modes = scored.slice(0, m.max).map((x) => x.i);
+  if (m.pawprints && scored.length) {
+    // Pawprints (CR 700.2i): the most useful modes again and again, as long as their pawprints fit.
+    modes = [];
+    for (let left = m.max, added = true; added; ) {
+      added = false;
+      for (const x of scored)
+        if (m.pawprints[x.i]! <= left) {
+          modes.push(x.i);
+          left -= m.pawprints[x.i]!;
+          added = true;
+        }
+    }
+  } else if (m.repeat && scored.length) {
+    // "You may choose the same mode more than once" (CR 700.2d): the useful modes in turn, until there are enough.
+    modes = Array.from({ length: m.max }, (_, k) => scored[k % scored.length]!.i);
+  }
   if (modes.length < m.min) {
     if (!forced) return null;
     const rest = legal.flatMap((ok, i) => (ok && !modes.includes(i) ? [i] : []));
     modes = [...modes, ...rest].slice(0, m.min);
   }
-  if (!modes.length && m.min > 0) return null;
+  // Nothing worth choosing: not cast or activated at all (a Season could be cast with no modes, rulings).
+  if (!modes.length && (m.min > 0 || !forced)) return null;
   // `ranked`: the same modes, most useful first.
   return { ranked: [...modes], modes: modes.sort((a, b) => a - b) };
 }

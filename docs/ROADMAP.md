@@ -1,6 +1,6 @@
 # Roadmap
 
-16,769 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,835 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -16,6 +16,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
+   Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
+   - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
+     (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
+     graveyard, copy with haste); Seasons of Gathering, the Bold, the Burrow and Weaving; Inscription of Abundance;
+     Inscription of Insight's "target player creates an X/X ... cards in their hand".
+   - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
+     Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko, Genku.
+     Random modes still out: Outlaws' Merriment, Typhoid Mary.
+   - Forbidden Orchard: "whenever you tap ~ for mana" is a trigger, not a mana ability (CR 605.1a), not modeled.
    Left from the haunt/Aura-host rounds:
    - Auras put onto the battlefield without being cast ask what they enchant (CR 303.4f), returns from exile and
      "until ~ leaves" included. An "until ~ leaves" Aura is placed after the instruction or state-based-action pass
@@ -62,8 +71,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      removal only with as much X as they can pay; they never hold a free Fierce Guardianship for a bigger threat.
    Left from the conditional targets/Will cycle/hideaway conditions round:
    - "Choose target X ... If the gift was promised, instead choose target Y ... the chosen" (Too Evil to Stay Dead,
-     Expel the Unworthy, The Eagles Are Coming!); Role tokens (Diminisher Witch); "choose both instead" on modes
-     that don't parse (Atlantis Attacks); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead"
+     Expel the Unworthy, The Eagles Are Coming!); Role tokens (Diminisher Witch); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead"
      (Earth's Mightiest Heroes); "twice X ... instead"
      (Stonesplitter Bolt, Torch the Tower).
    - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Cruelclaw's Heist, Dawn's Truce, Longstalk Brawl,

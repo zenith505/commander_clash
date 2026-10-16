@@ -1,6 +1,6 @@
 # Roadmap
 
-18,142 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,230 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -86,20 +86,30 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (Kamahl's Druidic Vow), "When a creature is put onto the battlefield this way" (Vivien's Invocation, Gilgamesh).
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
      Auras" (Anti-Magic Aura), Wall of Shadows.
-   Left from the snow-mana round (snow mana, kept mana, more "was spent", bots and same-named permanents):
-   - "Was spent to cast" (77 of 101 legal supported) still out on its own words: colorless mana (Desecrate Reality),
-     mana from creatures, artifacts or Treasures (Inga and Esika, Shadow the Hedgehog, Devour Intellect, Rain of Riches,
-     Vazi), "if ~ would enter and it wasn't cast" (Primeval Spawn), Satoru's batch trigger, "seven red mana" with
-     "instead ... each of those permanents and/or players" (Sundering Stroke), "instead return those cards" (Once and
-     Future), the other Mythoi (Illuna, Snapdax, Vadrok). The rest are blocked on other lines (`npm run blockers`).
-   - Snow (28 of 45 legal {S} cards supported): cumulative upkeep {S} (Cover of Winter, Glacial Plating), "If that card
-     is snow" (Frost Augur, Scrying Sheets), lands that become creatures (Faceless Haven, Frostwalk Bastion), Ascendant
-     Spirit's level-like abilities, snow landwalk (Zombie Musher), ice counters (Rimefeather Owl, Rimescale Dragon),
-     "snow and Zombie creatures" (Narfi), Blessing of Frost's distribution, Blood on the Snow, Search for Glory's
-     either-or search, Stalking Yeti, Rimehorn Aurochs, Rime Transfusion. Approximations: mana from a triggered mana
-     ability (Mana Reflection's extra) and restricted mana from a snow source aren't counted as snow; mana kept until
-     end of turn forgets it came from a Treasure once a step ends; autopay doesn't try to spend a single color for
-     Steel Exemplar.
+   Left from the snow-mana rounds (snow mana, mana that remembers its source, "was spent", sacrifice the rest):
+   - "Was spent to cast" (85 of 100 legal supported) still out on its own words: Primeval Spawn ("if ~ would enter and
+     it wasn't cast"), Satoru's batch trigger, Tellah ("four or more mana was spent to cast that spell", "that much
+     damage"), Rain of Riches (cascade for a spell Treasure mana was spent on), Vazi and Shadow the Hedgehog (mana spent
+     to activate an ability, split second granted to spells), Mythos of Illuna (a token copy with a granted fight
+     trigger), Flash Conscription (a granted "deals combat damage" trigger), Crypt Champion ("each player puts a
+     creature card ... from their graveyard onto the battlefield"). Blazing Bomb's "Blow Up —" is a flavor word
+     (CR 207.2d) the activated-ability parser doesn't strip; other flavor-word activated abilities (Arcane
+     Investigator's "Search the Room —") are out the same way. Autopay doesn't try to spend mana from creatures for
+     Inga and Esika, or a single color for Steel Exemplar.
+   - Snow (42 of 45 legal {S} cards supported): Cover of Winter (prevent X of each creature's combat damage, divided
+     among the recipients by the defender), Blessing of Frost ("distribute X +1/+1 counters among any number of
+     creatures you control" chosen as it resolves; also blocks Crashing Wave, Feast of the Victorious Dead, Vastwood
+     Hydra), Ascendant Spirit (level-like "becomes" abilities). Mana Reflection is a replacement effect, unsupported.
+   - "Each player chooses ..., then sacrifices the rest" works for fixed choices (Cataclysm, Cataclysmic Gearhulk,
+     Covetous Elegy, Global Ruin, Planetary Annihilation, Razia's Purification, Archfiend of Depravity, Mythos of
+     Snapdax); still out: "a number of permanents equal to the number controlled by the player who controls the
+     fewest" (Balancing Act, Restore Balance, Magus of the Balance), Natural Balance, Promise of Loyalty's vow
+     counters, Stick Together's party, Single Combat's "can't cast creature or planeswalker spells until the end of
+     your next turn".
+   - "Return a creature card from your graveyard to the battlefield" (chosen, not targeted) works; still out: "each
+     player" (Crypt Champion, Infernal Offering, Tempt with Immortality), "at random" (Moldgraf Monstrosity, Tomb
+     Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a spell's own count, and
+     cards blocked on other lines (Tayam, Tyvar, Sauron, Incarnation Technique's demonstrate).
    Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
    counters):
    - Keyword and +1/+1 counters count on cards in other zones (CR 122.1b), but printed-card filters (a card in a

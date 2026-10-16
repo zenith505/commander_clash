@@ -17,6 +17,16 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // "For each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their
+  // choice or discards a card" (Rottenmouth Viper): each player makes all the choices, then they all happen (rulings).
+  if ((m = /^[Ff]or each ([a-z+\/0-9-]+) counter on (?:it|~), (.+)$/.exec(s)) && (ctx.selfIt || /on ~,/.test(s))) {
+    const fx = parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)}`, ctx);
+    const p = fx?.length === 1 ? fx[0] : undefined;
+    if (p?.type !== "punisher" || p.times !== undefined || p.picks !== undefined) return undefined;
+    // One kind of permanent to sacrifice and no payment, so the picks can be made all together.
+    if (p.options.some((o) => "pay" in o) || p.options.filter((o) => "sacrifice" in o).length > 1) return null;
+    return [{ ...p, picks: { count: { kind: "counters", counter: m[1]!, of: { ref: "self" } } } }];
+  }
   // Punishers: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards a
   // card", "that player loses 2 life unless they pay {2}" (see the punisher effect).
   if ((m = new RegExp(`^(.+?) (?:loses|lose) ${NUMX} life unless (?:they|that player|he or she) (.+)$`).exec(s))) {
@@ -24,6 +34,24 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const options = parsePunisherOptions(m[3]!, ctx);
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
+  }
+  // "~ deals 5 damage to target opponent unless that player sacrifices a creature of their choice" (Demanding Dragon).
+  if ((m = new RegExp(`^(?:~|It) deals ${NUMX} damage to (.+?) unless (?:they|that player|he or she) ((?:sacrifices?|discards?|pays?) .+)$`).exec(s))) {
+    if (/^It /.test(s) && !ctx.selfIt) return null;
+    const who = parsePlayer(m[2]!, ctx);
+    const options = parsePunisherOptions(m[3]!, ctx);
+    if (!who || who.ref === "you" || !options) return null;
+    return [{ type: "punisher", who, options, effects: [{ type: "damage", amount: amt(m[1]!), to: { ref: "punished" } }] }];
+  }
+  // "For each opponent, you create a 2/2 black Zombie creature token unless that player sacrifices a creature of their
+  // choice" (Acererak): one token for each opponent who doesn't, all made at once after the sacrifices (rulings).
+  if ((m = /^[Ff]or each opponent, you (create .+?) unless (?:that player|they) ((?:sacrifices?|discards?) .+)$/.exec(s))) {
+    const options = parsePunisherOptions(m[2]!, ctx);
+    const before = ctx.targets.length;
+    const fx = options && parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)}`, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    if (!options || tok?.type !== "createToken" || typeof tok.n !== "number" || ctx.targets.length !== before) return null;
+    return [{ type: "punisher", who: { ref: "eachOpponent" }, options, effects: [{ ...tok, n: { count: { kind: "punished" }, times: tok.n } }] }];
   }
   // "You may collect evidence 4" as it resolves (CR 701.59a): only after "you may" (a player can't be made to).
   if ((m = /^Collect evidence (\d+)$/.exec(s))) return ctx.mayNow ? [{ type: "collectEvidence", n: Number(m[1]) }] : null;

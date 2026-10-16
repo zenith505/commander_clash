@@ -606,7 +606,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}) };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}) };
   }
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
   const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
@@ -663,6 +663,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
+  o.classLevel = undefined; // CR 716.2b
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
@@ -1457,7 +1458,10 @@ function startNextTurn(s: GameState) {
   releasePhased(s, began);
   s.turn++;
   for (const p of s.players) p.landsPlayedThisTurn = 0;
-  for (const o of Object.values(s.objects)) o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
+  for (const o of Object.values(s.objects)) {
+    o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
+    o.triggeredThisTurn = undefined;
+  }
   s.damagedThisTurn = undefined;
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
@@ -1909,7 +1913,14 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId): { by: GameOb
 
 /** "You may look at the top card of your library any time" (Vizier of the Menagerie): whether `viewer` may see `pid`'s top card. */
 export function topVisible(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
-  return topRevealed(s, pid) || (pid === viewer && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).lookTop));
+  return (
+    topRevealed(s, pid) ||
+    (pid === viewer &&
+      s.battlefield.some((id) => {
+        const a = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+        return !!a && (!!a.lookTop || (!!a.lookTopIf && staticConditionNow(s, a.lookTopIf, id, pid)));
+      }))
+  );
 }
 
 /** Cards `pid` may play from the top of their library right now (see mayPlayFromTop). */
@@ -1938,7 +1949,12 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   let n = 1;
-  if (s.activePlayer === pid) for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === pid) n += abilitiesOf(s, obj(s, id)).extraLands ?? 0;
+  if (s.activePlayer === pid)
+    for (const id of s.battlefield) {
+      if (controllerOf(s, obj(s, id)) !== pid) continue;
+      const a = abilitiesOf(s, obj(s, id));
+      n += (a.extraLands ?? 0) + (a.extraLandsIf ?? []).filter((c) => staticConditionNow(s, c, id, pid)).length;
+    }
   return n;
 }
 
@@ -2286,6 +2302,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : false) continue;
       if (m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
+      if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
       const { manaValue: range, ...rest } = m.filter;
       if (!printedMatches(rest, d)) continue;
       if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
@@ -3227,6 +3244,7 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
     if (!c.hasPrintedAbilities || c.controller !== pid) continue;
     for (const m of mods) {
       if (m.otherEquipment && src.id === o.id) continue;
+      if (m.if && !staticConditionNow(s, m.if, src.id, pid)) continue;
       // "That target ~": it's a creature you control, so it could be the target (CR 702.6a).
       if (m.targetSelf && (targets ? target !== src.id : !c.types.includes("Creature"))) continue;
       less += m.n;

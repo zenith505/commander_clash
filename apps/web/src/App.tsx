@@ -2067,6 +2067,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Saddled
           </span>
         )}
+        {o.classLevel !== undefined && (
+          <span className="chip other" title={`This Class is level ${o.classLevel}: it has the abilities of level ${o.classLevel} and below.`}>
+            Level {o.classLevel}
+          </span>
+        )}
         {o.attachedToPlayer !== undefined && (
           <span className="chip other" title={`${s.players[controllerOf(s, o)]!.name}'s Aura, enchanting ${s.players[o.attachedToPlayer]!.name}.`}>
             On {s.players[o.attachedToPlayer]!.name}

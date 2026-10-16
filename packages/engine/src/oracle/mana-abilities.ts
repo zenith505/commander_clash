@@ -4,7 +4,7 @@ import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } f
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseCount } from "./counts";
-import { parseOnlyClauses } from "./statics";
+import { parseOnlyClauses, parseStaticCondition } from "./statics";
 
 /**
  * A mana ability (CR 605.1a): "{T}: Add {G}.", "{T}: Add {W} or {U}. ~ deals 1 damage to you.",
@@ -49,6 +49,13 @@ export function parseManaAbility(line: string): ManaAbility | null {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
+    else if ((m2 = new RegExp(`^If ([^,]+), add ${NUM} \\{([WUBRGC])\\} instead\\.$`).exec(extra)) && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
+      // "Add {G}{G}. If you've completed a dungeon, add six {G} instead." (Undermountain Adventurer): as it resolves.
+      const p = out.produces;
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || p.mana.some((x) => x !== m2![3]) || num(m2[2]!) <= p.mana.length) return null;
+      out.produces = { kind: "fixed", mana: [p.mana[0]!], n: { count: { kind: "stateIf", cond }, times: num(m2[2]!) - p.mana.length, plus: p.mana.length } };
+    }
     else if ((m2 = /^Activate only ([^.]+)\.$/.exec(extra)) && !out.activateIf && !out.oncePerTurn) {
       // "Activate only if you control a Swamp", "... only once each turn", "... only during an opponent's turn" (CR 602.5b).
       const clauses = parseOnlyClauses(m2[1]!);

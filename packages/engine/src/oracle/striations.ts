@@ -14,6 +14,8 @@ export interface Striation {
   cond: StaticCondition;
   /** Base power and toughness while it applies; `creature`: a station card's, which also makes it a creature. */
   pt?: { power: number; toughness: number; creature?: true };
+  /** A class level bar's activated ability (CR 716.2a): its cost, and the level it gives. */
+  levelBar?: { cost: string; level: number };
   lines: string[];
 }
 
@@ -26,13 +28,21 @@ export function striations(d: CardDef, lines: string[]): { base: string[]; parts
   const base: string[] = [];
   const parts: Striation[] = [];
   const station = d.keywords.includes("Station");
+  // Class cards (CR 716): "[Cost]: Level N" bars, each with the abilities printed in its section.
+  const isClass = d.subtypes.includes("Class");
   // "It's an artifact creature at 8+." (the station keyword's reminder text) names the striation with the P/T box.
   const creatureAt = /It's an artifact creature at (\d+)\+/.exec(d.oracleText)?.[1];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!.trim();
     const level = /^LEVEL (\d+)(?:-(\d+)|\+)$/.exec(line);
     const sym = station ? /^(\d+)\+ \| (.+)$/.exec(line) : null;
-    if (level) {
+    const bar = isClass ? /^((?:\{[^}]+\})+): Level (\d+)$/.exec(line) : null;
+    if (bar) {
+      const n = Number(bar[2]);
+      // The bars go up one level at a time from level 1 (CR 716.2a, 716.2d).
+      if (n !== (parts[parts.length - 1]?.levelBar?.level ?? 1) + 1) return "fail";
+      parts.push({ header: line, cond: { kind: "classLevel", min: n }, levelBar: { cost: bar[1]!, level: n }, lines: [] });
+    } else if (level) {
       // CR 711.2a-b: the level symbol's P/T box comes right after it in the text.
       const pt = /^(\d+)\/(\d+)$/.exec(lines[i + 1]?.trim() ?? "");
       if (!pt) return "fail";
@@ -78,6 +88,14 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
       condition: cond,
       text: `${part.header}: ${part.pt.creature ? "it's a creature with base power and toughness" : "base power and toughness"} ${part.pt.power}/${part.pt.toughness}`,
     });
+  // "[Cost]: This Class's level becomes N. Activate only if this Class is level N-1 and only as a sorcery" (CR 716.2a).
+  if (part.levelBar) {
+    const { cost, level } = part.levelBar;
+    const bar = compileLine(`${cost}: ~'s level becomes ${level}. Activate only as a sorcery.`).activated[0];
+    if (!bar || bar.activateIf) return false;
+    add.activated.push({ ...bar, activateIf: { kind: "classLevel", min: level - 1, max: level - 1 }, text: part.header });
+  }
+  const more = { costMods: [] as NonNullable<CompiledCard["costMods"]>, equipLess: [] as NonNullable<CompiledCard["equipLess"]>, fromTop: [] as NonNullable<CompiledCard["fromTop"]>, lookTop: false, extraLandsIf: [] as StaticCondition[] };
   const lists = ["triggers", "activated", "mana", "statics"] as const;
   const rest = (c: CompiledCard) => JSON.stringify(Object.entries(c).filter(([k]) => !(lists as readonly string[]).includes(k) && k !== "textKeywords").sort(([a], [b]) => a.localeCompare(b)));
   for (const line of part.lines) {
@@ -88,7 +106,16 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
       continue;
     }
     const inner = compileLine(line);
-    if (inner.unsupported.length || rest(inner) !== rest(empty)) return false;
+    if (inner.unsupported.length) return false;
+    // Static abilities kept in fields of their own, each made conditional the same way.
+    const { costMods, equipLess, fromTop, lookTop, extraLands, ...others } = inner;
+    if (rest(others as CompiledCard) !== rest(empty)) return false;
+    if (costMods?.some((m) => m.if) || equipLess?.some((m) => m.if) || fromTop?.some((t) => t.if)) return false;
+    if (costMods) more.costMods.push(...costMods.map((m) => ({ ...m, if: cond })));
+    if (equipLess) more.equipLess.push(...equipLess.map((m) => ({ ...m, if: cond })));
+    if (fromTop) more.fromTop.push(...fromTop.map((t) => ({ ...t, if: cond })));
+    if (lookTop) more.lookTop = true;
+    for (let i = 0; i < (extraLands ?? 0); i++) more.extraLandsIf.push(cond);
     for (const st of inner.statics) {
       if (st.condition) return false;
       statics.push({ ...st, condition: cond });
@@ -106,6 +133,12 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
       add.mana.push({ ...m, activeIf: cond });
     }
   }
+  if (more.lookTop && (out.lookTopIf || out.lookTop)) return false;
+  if (more.costMods.length) out.costMods = [...(out.costMods ?? []), ...more.costMods];
+  if (more.equipLess.length) out.equipLess = [...(out.equipLess ?? []), ...more.equipLess];
+  if (more.fromTop.length) out.fromTop = [...(out.fromTop ?? []), ...more.fromTop];
+  if (more.extraLandsIf.length) out.extraLandsIf = [...(out.extraLandsIf ?? []), ...more.extraLandsIf];
+  if (more.lookTop) out.lookTopIf = cond;
   out.statics.push(...statics);
   out.triggers.push(...add.triggers);
   out.activated.push(...add.activated);

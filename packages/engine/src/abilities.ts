@@ -125,7 +125,11 @@ export type Count =
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
-  | { kind: "stationPower" };
+  | { kind: "stationPower" }
+  /** How many players took a punisher's penalty this time (Acererak's "for each opponent, you create ... unless"). */
+  | { kind: "punished" }
+  /** 1 while the condition holds, else 0: "Add {G}{G}. If you've completed a dungeon, add six {G} instead." */
+  | { kind: "stateIf"; cond: StaticCondition };
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
@@ -576,6 +580,8 @@ export type StaticCondition =
   | { kind: "selfCounter"; counter: CounterKind }
   /** A level symbol's "at least N1 and no more than N2 level counters" (CR 711.2), a station symbol's "N or more charge counters" (CR 721.2). */
   | { kind: "selfCounters"; counter: CounterKind; min: number; max?: number }
+  /** A Class's level (CR 716.2a): at least `min`, at most `max`; a permanent without a level is level 1 (716.2d). */
+  | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" }
   /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
@@ -1108,7 +1114,8 @@ export type Effect =
    * "You may [do something]": the controller chooses as it resolves whether to do it
    * (CR 608.2d). Its targets were still chosen when it was put on the stack (CR 603.3d).
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean }
+  /** `once`: "Do this only once each turn" (CR 603.2h): see GameObject.triggeredThisTurn. */
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean }
   /**
    * "Each player may discard their hand and draw five cards" (Will of the Jeskai): each of them decides in APNAP order,
    * knowing the earlier answers (CR 101.4), then `effects` happen to those who chose to ({ ref: "choseThisWay" }).
@@ -1123,7 +1130,8 @@ export type Effect =
    * Bolas, the Deceiver and Court of Ambition). A player may always choose none. `times`: "Repeat this process X times",
    * each time all the way through (rulings on Torment of Hailfire).
    */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount }
+  /** `picks`: "for each blight counter on it, ... unless" (Rottenmouth Viper): each player chooses that many times first. */
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -1151,6 +1159,8 @@ export type Effect =
   | { type: "becomeMonarch"; who: PlayerRef }
   /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
   | { type: "becomeSaddled"; what: ObjRef }
+  /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
+  | { type: "classLevel"; n: number }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
@@ -1322,6 +1332,8 @@ export type TriggerEvent =
   | "selfCountersPut"
   /** "When ~ becomes monstrous" (CR 701.37b). */
   | "selfBecomesMonstrous"
+  /** "When this Class becomes level 2" (CR 716.2a): TriggeredAbility.level. */
+  | "selfBecomesLevel"
   /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
   | "selfExerted"
   /** "Whenever you exert a creature": the exerted creature is the subject. */
@@ -1437,6 +1449,10 @@ export type TriggerEvent =
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
+  oncePerTurn?: boolean;
+  /** For "selfBecomesLevel": the level. */
+  level?: number;
   /**
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
@@ -1752,6 +1768,8 @@ export interface CostMod {
   fromGraveyard?: boolean;
   /** "The first creature spell you cast each turn", "the second spell you cast each turn": only the nth matching spell. */
   nth?: number;
+  /** Only while this holds: a Class level's (CR 716.2a). */
+  if?: StaticCondition;
   text: string;
 }
 
@@ -1997,7 +2015,7 @@ export interface CompiledCard {
    * "Equip abilities you activate cost {1} less to activate" (CR 602.2b, 601.2f); `targetSelf`: "that target ~";
    * `otherEquipment`: "of other Equipment".
    */
-  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true }[];
+  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
   /**
    * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the
    * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).
@@ -2024,6 +2042,8 @@ export interface CompiledCard {
   countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;
+  /** The same, only while each condition holds (a Class level's, CR 716.2a). */
+  extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
   /**
@@ -2037,6 +2057,8 @@ export interface CompiledCard {
   fromTop?: FromTop[];
   /** "You may look at the top card of your library any time" (Vizier of the Menagerie): only its controller sees it. */
   lookTop?: true;
+  /** The same, only while this holds (a Class level's, CR 716.2a). */
+  lookTopIf?: StaticCondition;
   /** "Play with the top card of your library revealed" ("you"), "Players play with the top card of their libraries revealed" (CR 401.5). */
   revealTop?: "you" | "players";
   /** "Players play with their hands revealed", "Your opponents play with their hands revealed" (Telepathy). */

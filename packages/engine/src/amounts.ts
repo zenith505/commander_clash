@@ -7,7 +7,7 @@
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
-import { characteristics, type Characteristics } from "./layers";
+import { characteristics, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
 
@@ -113,6 +113,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
+    case "punished":
+      return (s.resolving?.scratch?.punished ?? []).filter((p) => !s.players[p]!.lost).length;
+    case "stateIf":
+      return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
     case "diedThisTurn":
       return (s.diedThisTurn ?? []).filter((p) => !c.yours || p === ctx.controller).length;
     case "attackersThisTurn":
@@ -180,6 +184,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "counters": {
       const o = refObjects(s, c.of, ctx)[0];
       if (o?.zone === "battlefield") return o.counters[c.counter] ?? 0;
+      // "For each blight counter on it" after it left: as it last existed on the battlefield (CR 608.2h).
+      const lk = c.of.ref === "self" && !ctx.lki && ctx.sourceId && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
+      if (lk && lk.zc === ctx.sourceZc) return lk.counters?.[c.counter] ?? 0;
       return c.of.ref === "self" || c.of.ref === "subject" ? (ctx.lki?.counters?.[c.counter] ?? 0) : 0;
     }
     case "devotion": {
@@ -307,6 +314,10 @@ function describeCount(c: Count): string {
       return "life";
     case "speed":
       return "speed";
+    case "punished":
+      return "#players punished";
+    case "stateIf":
+      return "1 if the condition holds";
     case "players":
       return c.opponents ? "#opponents" : "#players";
     case "diedThisTurn":

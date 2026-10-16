@@ -12,6 +12,8 @@ import type { Ctx } from "../body";
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // A class level bar's activated ability (CR 716.2a; see striations.ts): only in an activated ability of its own.
+  if ((m = /^~'s level becomes (\d+)$/.exec(s))) return ctx.activated ? [{ type: "classLevel", n: Number(m[1]) }] : null;
   // "Tap that creature and it doesn't untap during its controller's next untap step" (Kashi-Tribe Warriors).
   if ((m = /^Tap (target .+?|that creature|it) and it doesn't untap during its controller's next untap step$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

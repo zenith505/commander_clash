@@ -377,6 +377,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (/^You may choose new targets for the cop(?:y|ies)$/i.test(s)) {
       const prev = effects[effects.length - 1];
       const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev;
+      // "Copy it. If you've completed a dungeon, copy that spell twice instead. You may choose new targets for the
+      // copies" (Tomb of Horrors Adventurer): the copies either way.
+      const both = prev?.type === "if" ? [...prev.effects, ...(prev.otherwise ?? [])] : [];
+      if (both.length === 2 && both.every((e) => e.type === "copySpell")) {
+        for (const e of both) if (e.type === "copySpell") e.newTargets = true;
+        continue;
+      }
       if (copy?.type !== "copySpell") return null;
       copy.newTargets = true;
       continue;
@@ -430,6 +437,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "If there are seven or more cards in your graveyard, create four Bear tokens instead."
     const insteadIf = /^(.+) instead if ([^,]+)$/.exec(s);
     if (insteadIf) s = `If ${insteadIf[2]}, ${insteadIf[1]!.charAt(0).toLowerCase()}${insteadIf[1]!.slice(1)} instead`;
+    // "Draw another card if you've completed a dungeon" (Imoen): "If you've completed a dungeon, draw a card". Only a
+    // condition about the game (one the static parser reads), not about "it".
+    const trailIf = !insteadIf ? /^((?:Draw|Create|You gain|Each opponent loses|Put) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
+    if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
+      s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
@@ -440,7 +452,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const previous = effects.slice(prevStart);
       const t = ifState[2]!.replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "");
       const before = ctx.targets.length;
-      const inner = parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+      // "Create a Treasure token. If you've completed a dungeon, create three of those tokens instead" (Safana).
+      const those = new RegExp(`^create ${NUMX} of those tokens$`, "i").exec(t);
+      const prevToken = previous.length === 1 && previous[0]!.type === "createToken" ? previous[0]! : null;
+      const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one).
@@ -461,7 +476,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     if (ifState && stateCond) {
-      const inner = parseOne(ifState[2]!.charAt(0).toUpperCase() + ifState[2]!.slice(1), ctx);
+      // "If you've completed a dungeon, that creature also gets +5/+0" (Rilsa Rael): as well as what came before.
+      // "Draw another card": one more.
+      const then = ifState[2]!.replace(/^(that creature|that player|it|~) also (?=(?:gains?|gets?|deals?|has|loses?) )/i, "$1 ").replace(/^draw another card$/, "draw a card");
+      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "state", cond: stateCond }, effects: inner });
@@ -719,7 +737,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
   if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
-  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
+  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
   if (fx) {
     // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
@@ -956,6 +974,24 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
   const first = parseSentence(`${subject} ${m[2]}`, ctx);
   const second = first && parseSentence(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`, ctx);
   return first && second ? [...first, ...second] : null;
+}
+
+/**
+ * "You take the initiative, gain 3 life, draw a card, and create a Treasure token" (Dungeoneer's Pack): a list of three
+ * or more instructions for you, in order. Each part has to read on its own.
+ */
+function parseYouList(s: string, ctx: Ctx): Effect[] | null {
+  const m = /^[Yy]ou (.+), and (.+)$/.exec(s);
+  if (!m) return null;
+  const parts = [...m[1]!.split(", "), m[2]!];
+  if (parts.length < 3) return null;
+  const out: Effect[] = [];
+  for (const p of parts) {
+    const fx = parseSentence(`You ${p}`, ctx);
+    if (!fx) return null;
+    out.push(...fx);
+  }
+  return out;
 }
 
 export function addTarget(ctx: Ctx, spec: TargetSpec): number {

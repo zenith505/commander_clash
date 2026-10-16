@@ -20,6 +20,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // The controller decides now whether to do it (CR 608.2d); the answer is kept while it runs.
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
+      const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const key = `${ctx.sourceZc ?? source?.zoneChanges ?? 0}|do:${e.text}`;
+      if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
         const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self");
@@ -42,6 +45,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const inner of e.otherwise ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
         return;
       }
+      if (source && !source.triggeredThisTurn?.includes(key)) (source.triggeredThisTurn ??= []).push(key);
       for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
     }
@@ -208,99 +212,145 @@ export function punisherLabel(o: PunisherOption): string {
 }
 
 /** Which of a punisher's options this player can do now: enough cards to discard (CR 701.9b), a permanent to sacrifice. */
-export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punisher" }>, pid: PlayerId, sourceId?: string): number[] {
+export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punisher" }>, pid: PlayerId, sourceId?: string, made: string[] = []): number[] {
   const p = player(s, pid);
-  return e.options.flatMap((o, i) => (("discard" in o && p.hand.length < o.discard) || ("sacrifice" in o && !pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length) ? [] : [i]));
+  // With several picks (Rottenmouth Viper), the cards and permanents picked before can't be picked again (rulings).
+  const discarding = made.reduce((n, m) => n + (e.options[Number(m)] && "discard" in e.options[Number(m)]! ? (e.options[Number(m)] as { discard: number }).discard : 0), 0);
+  const sacrificing = made.filter((m) => e.options[Number(m)] && "sacrifice" in e.options[Number(m)]!).length;
+  return e.options.flatMap((o, i) => (("discard" in o && p.hand.length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length <= sacrificing) ? [] : [i]));
 }
 
 /**
  * A punisher (see its effect): each player chooses in APNAP order, cards and permanents included, then the discards and
- * sacrifices happen at once, then the penalty to those who did neither. Payments are made as they're chosen.
+ * sacrifices happen at once, then the penalty to those who did neither. Payments are made as they're chosen. With
+ * `picks`, each player makes that many choices before picking the cards and permanents, and takes the penalty once
+ * for each "neither" (rulings on Rottenmouth Viper).
  */
 function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const sc = (s.resolving!.scratch ??= {});
   if (!sc.punish) {
     const times = e.times === undefined ? 1 : amountNow(s, e.times, ctx);
-    if (times <= 0) return;
-    const lose = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
-    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, round: 0, times, options: e.options, ...(typeof lose === "number" ? { lose } : {}) };
+    const picks = e.picks === undefined ? 1 : amountNow(s, e.picks, ctx);
+    if (times <= 0 || picks <= 0) return;
+    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options: e.options, ...punisherHarm(e) };
   }
   const pu = sc.punish;
   for (;;) {
     while (pu.queue.length) {
       const pid = pu.queue[0]!;
       const p = player(s, pid);
-      if (pu.picked[pid] === undefined) {
-        const can = p.lost ? [] : punisherOptions(s, e, pid, ctx.sourceId);
-        if (!can.length) pu.picked[pid] = "none";
-        // Only a payment: its own prompt has "Don't pay".
-        else if (can.length === 1 && e.options.length === 1 && "pay" in e.options[can[0]!]!) pu.picked[pid] = String(can[0]);
+      const made = (pu.made[pid] ??= []);
+      while (made.length < pu.picks) {
+        if (pu.picked[pid] === undefined) {
+          const can = p.lost ? [] : punisherOptions(s, e, pid, ctx.sourceId, made);
+          if (!can.length) pu.picked[pid] = "none";
+          // Only a payment: its own prompt has "Don't pay".
+          else if (can.length === 1 && e.options.length === 1 && "pay" in e.options[can[0]!]!) pu.picked[pid] = String(can[0]);
+          else {
+            const penalty = describePenalty(e);
+            const which = pu.picks > 1 ? ` (${made.length + 1} of ${pu.picks})` : "";
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt: `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${penalty.toLowerCase()}?${which}` };
+            return "paused";
+          }
+        }
+        const o = pu.picked[pid] === "none" ? undefined : e.options[Number(pu.picked[pid])];
+        if (o && "pay" in o) {
+          const paid = paidUnless(s, ctx, pid, o.pay, src, describePenalty(e).toLowerCase(), describePenalty(e).toLowerCase());
+          if (paid === "paused") return "paused";
+          if (!paid) pu.picked[pid] = "none";
+          sc.paid = undefined;
+        }
+        made.push(pu.picked[pid]!);
+        delete pu.picked[pid];
+      }
+      // Which cards and permanents: a card to be discarded isn't revealed until it's discarded (rulings).
+      const chosen = (pu.chosen ??= {});
+      const mine = (chosen[pid] ??= {});
+      const discards = made.reduce((n, m) => {
+        const o = e.options[Number(m)];
+        return n + (o && "discard" in o ? o.discard : 0);
+      }, 0);
+      if (discards && !mine.discard) {
+        if (sc.chosen?.[pid] && sc.queue?.length === 0) mine.discard = sc.chosen[pid]!;
+        else if (p.hand.length <= discards) mine.discard = [...p.hand];
         else {
-          const penalty = describePenalty(e);
-          s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt: `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${penalty.toLowerCase()}?` };
+          sc.chosen = {};
+          sc.queue = [pid];
+          s.pending = { kind: "discard", player: pid, count: discards, source: src };
           return "paused";
         }
+        sc.chosen = undefined;
+        sc.queue = undefined;
       }
-      const pick = pu.picked[pid]!;
-      const o = pick === "none" ? undefined : e.options[Number(pick)];
-      if (o && "pay" in o) {
-        const paid = paidUnless(s, ctx, pid, o.pay, src, describePenalty(e).toLowerCase(), describePenalty(e).toLowerCase());
-        if (paid === "paused") return "paused";
-        if (!paid) pu.picked[pid] = "none";
-        sc.paid = undefined;
-      } else if (o && !sc.chosen?.[pid]) {
-        // Which cards or permanent: a card to be discarded isn't revealed until it's discarded (rulings).
-        sc.chosen ??= {};
-        if ("discard" in o) {
-          if (p.hand.length <= o.discard) sc.chosen[pid] = [...p.hand];
-          else {
-            sc.queue = [pid];
-            s.pending = { kind: "discard", player: pid, count: o.discard, source: src };
-            return "paused";
-          }
-        } else if ("sacrifice" in o) {
-          const options = pickOptions(s, { filter: o.sacrifice }, pid, ctx.sourceId);
-          if (options.length <= 1) sc.chosen[pid] = options;
-          else {
-            sc.queue = [pid];
-            s.pending = { kind: "pickPermanents", player: pid, source: src, action: "sacrifice", what: o.sacrifice.text, options, count: 1 };
-            return "paused";
-          }
+      const sacs = made.flatMap((m) => {
+        const o = e.options[Number(m)];
+        return o && "sacrifice" in o ? [o.sacrifice] : [];
+      });
+      if (sacs.length && !mine.sacrifice) {
+        // The same kind of permanent each time (one sacrifice option when there are several picks, see the parser).
+        const options = pickOptions(s, { filter: sacs[0]! }, pid, ctx.sourceId);
+        if (sc.chosen?.[pid] && sc.queue?.length === 0) mine.sacrifice = sc.chosen[pid]!;
+        else if (options.length <= sacs.length) mine.sacrifice = options;
+        else {
+          sc.chosen = {};
+          sc.queue = [pid];
+          s.pending = { kind: "pickPermanents", player: pid, source: src, action: "sacrifice", what: sacs[0]!.text, options, count: sacs.length };
+          return "paused";
         }
+        sc.chosen = undefined;
+        sc.queue = undefined;
       }
       pu.queue.shift();
     }
-    if (!sc.punished) {
-      const who = apnap(s, Object.keys(pu.picked).map(Number) as PlayerId[]);
-      for (const pid of who) {
-        const o = e.options[Number(pu.picked[pid])];
-        if (o && "discard" in o) discardCards(s, pid, (sc.chosen?.[pid] ?? []).filter((id) => player(s, pid).hand.includes(id)), "", false, false, ctx.controller);
-      }
-      for (const pid of who) {
-        const o = e.options[Number(pu.picked[pid])];
-        if (!o || !("sacrifice" in o)) continue;
-        for (const id of sc.chosen?.[pid] ?? []) {
+    if (!pu.acted) {
+      const who = apnap(s, Object.keys(pu.made).map(Number) as PlayerId[]);
+      for (const pid of who) discardCards(s, pid, (pu.chosen?.[pid]?.discard ?? []).filter((id) => player(s, pid).hand.includes(id)), "", false, false, ctx.controller);
+      for (const pid of who)
+        for (const id of pu.chosen?.[pid]?.sacrifice ?? []) {
           const x = s.objects[id];
           if (x?.zone !== "battlefield") continue;
           log(s, `${player(s, pid).name} sacrifices ${defOf(s, x).name}.`);
           moveObject(s, id, "graveyard", { sacrificed: true });
         }
-      }
-      sc.punished = who.filter((pid) => pu.picked[pid] === "none");
-      sc.mayStep = 0;
+      pu.acted = true;
+      pu.penalty = 0;
+      sc.mayStep = e.effects.length;
     }
-    for (; sc.mayStep! < e.effects.length; sc.mayStep!++) if (runEffect(s, e.effects[sc.mayStep!]!, ctx) === "paused") return "paused";
+    // The penalty once for each "neither": the players with that many or more (rulings on Rottenmouth Viper).
+    for (;;) {
+      if (sc.mayStep! >= e.effects.length) {
+        const nones = (pid: string) => pu.made[pid]!.filter((m) => m === "none").length;
+        const next = Object.keys(pu.made).filter((pid) => nones(pid) > pu.penalty!).map(Number) as PlayerId[];
+        if (!next.length) break;
+        sc.punished = apnap(s, next);
+        pu.penalty!++;
+        sc.mayStep = 0;
+      }
+      for (; sc.mayStep! < e.effects.length; sc.mayStep!++) if (runEffect(s, e.effects[sc.mayStep!]!, ctx) === "paused") return "paused";
+    }
     if (++pu.round >= pu.times) {
       // Done: another punisher later in the same resolution starts afresh.
-      sc.punish = sc.chosen = sc.punished = sc.mayStep = undefined;
+      sc.punish = sc.punished = sc.mayStep = undefined;
       return;
     }
     // "Repeat this process": the same players, all over again.
     pu.queue = apnap(s, players(s, e.who, ctx));
     pu.picked = {};
-    sc.chosen = undefined;
+    pu.made = {};
+    pu.chosen = undefined;
+    pu.acted = undefined;
     sc.punished = undefined;
   }
+}
+
+/** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
+function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number } {
+  const [f] = e.effects;
+  if (e.effects.length !== 1 || !f) return {};
+  if (f.type === "loseLife" && typeof f.n === "number") return { lose: f.n };
+  if (f.type === "damage" && typeof f.amount === "number") return { lose: f.amount };
+  if (f.type === "createToken") return { tokens: 1 };
+  return {};
 }
 
 /** The penalty, for its button: "Lose 3 life". */

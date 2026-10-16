@@ -138,6 +138,12 @@ export interface GameObject {
   /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
   /**
+   * Its "triggers only once each turn" abilities that triggered this turn, and ("do:" and the may's text) its "you may
+   * ... Do this only once each turn" abilities done this turn (CR 603.2h), as "zoneChanges|text": a new object starts
+   * over (CR 400.7), and one that just left the battlefield still remembers (see onceUsed).
+   */
+  triggeredThisTurn?: string[];
+  /**
    * "Choose one that hasn't been chosen [this turn]" (Demonic Pact, Gala Greeters): the modes chosen so far for each such
    * ability of this object, keyed by the ability's text, with the turn for "this turn". Any player's choices count, and a
    * new object starts over (rulings on Demonic Pact, CR 400.7).
@@ -149,6 +155,8 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /** A Class's level (CR 716.2a-b), a designation it keeps until it leaves the battlefield; unset is level 1 (716.2d). */
+  classLevel?: number;
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
   saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
@@ -828,7 +836,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number> }>;
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
@@ -955,7 +963,25 @@ export interface Resolving {
     mayers?: PlayerId[]; // and those who chose to
     mayStep?: number; // how many of its instructions are done
     /** A punisher (see its effect): players still to choose, what each chose (an option's index or "none"), the round. */
-    punish?: { queue: PlayerId[]; picked: Record<string, string>; round: number; times: number; options: PunisherOption[]; lose?: number };
+    punish?: {
+      queue: PlayerId[];
+      /** The choice being made: an option's index or "none". */
+      picked: Record<string, string>;
+      /** The choices each player made this round (one, or `picks`). */
+      made: Record<string, string[]>;
+      /** The cards each player picked to discard and the permanents to sacrifice. */
+      chosen?: Record<string, { discard?: ObjectId[]; sacrifice?: ObjectId[] }>;
+      /** The discards and sacrifices are done; `penalty`: how many times the penalty has been run. */
+      acted?: boolean;
+      penalty?: number;
+      round: number;
+      times: number;
+      picks: number;
+      options: PunisherOption[];
+      /** For the bots: the life the penalty costs, or that it makes a token for its controller. */
+      lose?: number;
+      tokens?: number;
+    };
     punished?: PlayerId[]; // those who did none of its options, this round
     /** "Sacrifice an artifact, a creature, and a land": players still to pick, the slot being picked, the picks so far. */
     slots?: { queue: PlayerId[]; slot: number; picked: Record<string, ObjectId[]> };

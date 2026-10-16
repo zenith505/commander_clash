@@ -3,7 +3,7 @@ import { defOf, power, toughness } from "../cards";
 import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokensToCreate } from "../counters";
 import { copyKey, type CopyExcept } from "../copies";
-import type { CardDef, GameState, ObjectId, PlayerId } from "../types";
+import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault } from "./triggers";
 import { copiedValues } from "./run-copies";
@@ -24,6 +24,7 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
       moveObject(s, o.id, "battlefield", opts.tapped || opts.attacking ? { tapped: true } : {});
       if (defender !== undefined && o.zone === "battlefield") o.attacking = defender;
       s.resolving?.created?.push(o.id);
+      noteCreated(s, pid, o);
     }
   });
   if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a token that's a copy" : `${k} tokens that are copies`} of ${base.name}.`);
@@ -151,6 +152,7 @@ function attachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }
         }
         moveObject(s, o.id, "battlefield", { attachTo: host });
         s.resolving?.created?.push(o.id);
+        noteCreated(s, pid, o);
         made++;
       }
       if (made) log(s, `${src} creates ${made === 1 ? "a" : made} ${e.token.name} ${e.token.subtypes.includes("Role") ? "Role " : ""}token${made > 1 ? "s" : ""} attached to ${nameOf(s, host)}.`);
@@ -185,4 +187,10 @@ export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { t
   moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
   if (opts.attacking !== undefined && o.zone === "battlefield") o.attacking = opts.attacking;
   s.resolving?.created?.push(o.id);
+  noteCreated(s, pid, o);
+}
+
+/** A token `pid` created (CR 111.2), for "the number of Treasure tokens you created this turn". */
+function noteCreated(s: GameState, pid: PlayerId, o: GameObject) {
+  ((s.turnLog ??= {}).tokensCreated ??= []).push({ player: pid, subtypes: [...defOf(s, o).subtypes] });
 }

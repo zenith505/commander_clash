@@ -4544,6 +4544,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "112322ad-8f66-4cd4-98a1-f425d61a69ce",
+  "name": "True-Name Nemesis",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Merfolk Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Rogue"
+  ],
+  "oracleText": "As this creature enters, choose a player.\nThis creature has protection from the chosen player.",
+  "power": "3",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c13",
+  "releasedAt": "2013-11-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "773ad2ef-5acc-49ea-8d85-056330e87039",
   "name": "Twiddle",
   "manaCost": "{U}",

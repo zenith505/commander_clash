@@ -1,5 +1,5 @@
 import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, SpentReq, StaticCondition, TargetSpec, TriggerEvent } from "../abilities";
-import { NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
+import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -494,6 +494,18 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (filter === null) return "fail";
     batch = { what: "discards", ...(m[1] === "you" ? { whose: "you" as const } : {}), ...(filter ? { filter } : {}), ...(m[3] ? { first: true as const } : {}) };
     rest = m[4]!;
+  } else if ((m = /^Whenever ~ and\/or one or more other (.+?) enter, (.+)$/.exec(line))) {
+    // "Whenever ~ and/or one or more other Vampires you control enter" (Anje): it or any of the others (CR 603.2c).
+    const what = batchPermanents(`other ${m[1]!}`);
+    if (!what?.other) return "fail";
+    batch = { what: "enters", filter: what.filter, other: true, orSelf: true };
+    rest = m[2]!;
+    // Satoru: "if none of them were cast or no mana was spent to cast them": none of them was cast with mana spent on it.
+    const none = /^if none of them were cast or no mana was spent to cast them, (.+)$/.exec(rest);
+    if (none) {
+      batch.noneCastWithMana = true;
+      rest = none[1]!;
+    }
   } else if ((m = /^Whenever one or more (.+?) (enter|die|leave the battlefield( without dying)?|are put into a graveyard from the battlefield)( during your turn)?, (.+)$/.exec(line))) {
     const what = batchPermanents(m[1]!);
     if (!what) return "fail";
@@ -522,6 +534,25 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, rest) };
   return { event: "batch", batch, body, ...(yourTurn ? { activeIf: { kind: "yourTurn" as const } } : {}) };
+}
+
+/**
+ * "Whenever a player activates an ability that isn't a mana ability" (Burning-Tree Shaman), "Whenever an opponent
+ * activates an ability of an artifact, creature, or land that isn't a mana ability" (Immolation Shaman), "... on the
+ * battlefield, if it isn't a mana ability" (Harsh Mentor). One that mana abilities trigger too isn't modeled.
+ */
+function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (a player|an opponent) activates an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
+  if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
+  let of: TargetSpec | undefined;
+  if (m[2]) {
+    const f = parseTargetPhrase(m[3]!);
+    if (f?.kind !== "object") return "fail";
+    of = f;
+  }
+  const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
+  if (!body) return "fail";
+  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : "any", ...(of ? { of } : {}) }, body };
 }
 
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -614,6 +645,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (level) {
     const body = parseBody(level[2]!, { selfIt: true });
     return body ? { event: "selfBecomesLevel", level: Number(level[1]), body } : "fail";
+  }
+  // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to cast it or
+  // activate it, ...": the cast trigger, which an activation (of any ability, CR 602.2) with a Treasure's mana also triggers.
+  const orActivates = /^Whenever (an opponent|you|a player) casts? a spell or activates? an ability, if mana from a Treasure was spent to cast it or activate it, (.+)$/.exec(line);
+  if (orActivates) {
+    const t = parseTrigger(`Whenever ${orActivates[1]} ${orActivates[1] === "you" ? "cast" : "casts"} a spell, if mana from a Treasure was spent to cast it, ${orActivates[2]}`);
+    if (!t || t === "fail" || !t.cast?.treasure || /\b(it|that spell|that player)\b/.test(orActivates[2]!)) return "fail";
+    return { ...t, cast: { ...t.cast, orActivates: true } };
   }
   // "This ability triggers only once each turn": once it has triggered this turn, it doesn't again (the object's own
   // count; a new object starts over, CR 400.7).
@@ -716,7 +755,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
-    const t = parseTrigger(`${intervening[1]}, ${intervening[3]}`);
+    // Feast of the Victorious Dead: "if one or more creatures died this turn, you gain that much life and distribute that
+    // many +1/+1 counters": the number of creatures that died this turn, counted as it resolves.
+    let rest = intervening[3]!;
+    if (/^one or more creatures died this turn$/.test(intervening[2]!) && /\bthat (much|many)\b/.test(rest)) {
+      const died = "the number of creatures that died this turn";
+      rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");
+      if (/\bthat (much|many)\b/.test(rest)) return "fail";
+    }
+    const t = parseTrigger(`${intervening[1]}, ${rest}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
   }
   // "At the beginning of each opponent's upkeep, ~ deals 1 damage to that player": an "each upkeep" trigger that
@@ -791,6 +838,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (enters) return enters;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
+  const activates = parseActivatesTrigger(line);
+  if (activates) return activates;
   const dies = parseDiesTrigger(line);
   if (dies) return dies;
   const dealer = parseDealerTrigger(line);

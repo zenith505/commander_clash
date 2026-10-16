@@ -134,6 +134,8 @@ export type Count =
   | { kind: "devoured" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
   | { kind: "diedThisTurn"; yours?: true }
+  /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
+  | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
   | { kind: "toGraveyardThisTurn" }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
@@ -1062,7 +1064,8 @@ export type Effect =
    * `each`: about each token just created, or about the object the trigger was about ("destroy that creature at end
    * of combat"), instead of the source.
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" }
+  /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard"; of?: ObjRef }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1397,7 +1400,7 @@ export type Effect =
 export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -1595,6 +1598,8 @@ export type TriggerEvent =
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
+  /** "Whenever an opponent activates an ability that isn't a mana ability" (see TriggeredAbility.activates). */
+  | "abilityActivated"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
@@ -1671,11 +1676,17 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
+  /**
+   * For "abilityActivated": who activated an ability that isn't a mana ability (CR 602, 605.1a), and `of`: what its
+   * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
+   * "That player" is who activated it.
+   */
+  activates?: { by: "opponent" | "any"; of?: TargetSpec };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -1808,6 +1819,10 @@ export interface BatchTrigger {
   whose?: "you" | "opponent";
   /** "One or more other creatures": not this permanent. */
   other?: true;
+  /** "Whenever ~ and/or one or more other creatures you control enter": this permanent entering counts too. */
+  orSelf?: true;
+  /** Satoru: "if none of them were cast or no mana was spent to cast them" (an intervening if, CR 603.4). */
+  noneCastWithMana?: true;
   dies?: true;
   notDies?: true;
   from?: "library" | "battlefield";
@@ -1925,6 +1940,8 @@ export interface ManaAbility {
   skipNextUntap?: boolean;
   /** "Activate only once each turn." (CR 602.5b) */
   oncePerTurn?: boolean;
+  /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object: see GameObject.activatedEver. */
+  onceEver?: true;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
@@ -2133,6 +2150,8 @@ export interface CompiledCard {
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
   entersChoose?: { what: ChoiceKind; except?: string }[];
+  /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
+  entersChoosePlayer?: "player" | "opponent";
   /**
    * Riot (CR 702.136a): enters with a +1/+1 counter or gains haste. Unleash (CR 702.98a): may enter with
    * a +1/+1 counter. Chosen as it enters, by its controller.
@@ -2248,7 +2267,7 @@ export interface CompiledCard {
   /** "Damage can't be prevented." (CR 615.12) */
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
-  youHave?: "hexproof" | "shroud";
+  youHave?: "hexproof" | "shroud" | "protection";
   /**
    * Platinum Angel: "You can't lose the game and your opponents can't win the game" (`cantLose` "you", `cantWin`
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).
@@ -2257,6 +2276,15 @@ export interface CompiledCard {
   cantWin?: "you" | "opponents";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /**
+   * "Sliver spells you cast have cascade", "Instant and sorcery spells you cast from your hand have cascade", "The first
+   * spell you cast each turn has cascade" (CR 702.85a): those spells have cascade as they're cast. `first`: the first such
+   * spell its controller cast this turn, counting ones before this permanent was there; `fromHand` / `fromExile`: cast
+   * from there; `treasure`: "that mana from a Treasure was spent to cast" (CR 106.3).
+   */
+  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; text: string }[];
+  /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
+  splitSecondIfArtifactMana?: true;
   /**
    * "~ (saddles Mounts and) crews Vehicles as though its power were 2 greater" (`n`), "... using its toughness rather
    * than its power" (`toughness`): what it counts for when it's tapped to pay a crew or saddle cost (CR 702.122a,

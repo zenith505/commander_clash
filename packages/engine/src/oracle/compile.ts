@@ -1,6 +1,6 @@
 import { allEffects } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
-import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
+import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -410,7 +410,14 @@ export function compile(d: CardDef): CompiledCard {
       else out.activated.push(bindThisAbility(ab, line));
       continue;
     }
-    const manaAb = parseManaAbility(line);
+    // "Exhaust — [Cost]: Add ..." is a mana ability that can be activated only once (CR 702.177a, 605.1a).
+    const exhaust = /^Exhaust — (.+)$/.exec(line);
+    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(line);
+    if (manaAb && exhaust) {
+      if (manaAb.oncePerTurn) out.unsupported.push(raw);
+      else out.mana.push({ ...manaAb, text: line, onceEver: true });
+      continue;
+    }
     if (manaAb) {
       out.mana.push(manaAb);
       continue;
@@ -599,6 +606,12 @@ export function compile(d: CardDef): CompiledCard {
         for (const g of groups) (out.othersEnterTapped ??= []).push({ filter: g!.filter, text: line });
         continue;
       }
+    }
+    // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player".
+    const choosePlayer = /^As (?:~|it) enters, choose (a player|an opponent)\.$/.exec(line);
+    if (choosePlayer && !out.entersChoosePlayer) {
+      out.entersChoosePlayer = choosePlayer[1] === "a player" ? "player" : "opponent";
+      continue;
     }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
     const asEnters = /^(~ enters tapped\. )?As (?:~|it) enters, choose (an? (?:creature type|color)(?: other than \w+)?(?: and an? (?:creature type|color))?)\.$/.exec(line);
@@ -876,9 +889,11 @@ export function compile(d: CardDef): CompiledCard {
       out.drawTwoInstead = true;
       continue;
     }
-    const youHave = /^You have (hexproof|shroud)\.$/.exec(line);
-    if (youHave) {
-      out.youHave = youHave[1] as "hexproof" | "shroud";
+    // "You have protection from each of your opponents" (CR 702.16k): their spells and abilities can't target you, their
+    // Auras can't enchant you, and damage from their sources is prevented.
+    const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
+    if (youHave && !out.youHave) {
+      out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
       continue;
     }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
@@ -904,6 +919,30 @@ export function compile(d: CardDef): CompiledCard {
     if (lockEnd && lockEnd[1] !== lockEnd[2]) {
       if (lockEnd[1] === "lose") [out.cantLose, out.cantWin] = ["you", "opponents"];
       else [out.cantWin, out.cantLose] = ["you", "opponents"];
+      continue;
+    }
+    // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you
+    // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
+    const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have cascade\.$/.exec(line);
+    const firstCascade = /^The first spell you cast (from exile )?each turn( that mana from a Treasure was spent to cast)? has cascade\.$/.exec(line);
+    if (giveCascade || firstCascade) {
+      let filter: TargetSpec | undefined;
+      if (giveCascade && (giveCascade[1] || giveCascade[3])) {
+        const words = (giveCascade[1] ?? "").replace(/ and /g, " or ").replace(/^./, (c) => c.toLowerCase());
+        const f = parseTargetPhrase(`${words ? `${words} ` : ""}spell${giveCascade[3] ?? ""}`);
+        if (f?.kind !== "spell") {
+          out.unsupported.push(raw);
+          continue;
+        }
+        filter = f;
+      }
+      const from = giveCascade?.[2] ? "hand" : firstCascade?.[1] ? "exile" : undefined;
+      (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
+      continue;
+    }
+    // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
+    if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
+      out.splitSecondIfArtifactMana = true;
       continue;
     }
     if (/^You have no maximum hand size\.$/.test(line)) {
@@ -1477,6 +1516,7 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PROTECTION)) needs.add("color");
+    if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     Object.values(o).forEach(visit);
   };

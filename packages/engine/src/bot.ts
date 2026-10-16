@@ -1,3 +1,4 @@
+import { playerProtectedFrom } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
@@ -178,6 +179,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Tribute (CR 702.104a): ask the opponent with the most life, who can best afford to let its ability happen.
     if (pend.kind === "chooseOption" && pend.what === "tribute") {
       const best = [...pend.options].sort((a, b) => player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: best }];
+    }
+    // "As ~ enters, choose a player" (True-Name Nemesis's protection): the opponent with the most power on the battlefield.
+    if (pend.kind === "chooseOption" && pend.what === "player") {
+      const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+      const opps = pend.options.filter((x) => Number(x) !== pid);
+      const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
@@ -2542,7 +2550,10 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
 }
 
 function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
-  const opps = opponents(s, pid);
+  // Damage to a player with protection from us is prevented (CR 702.16k): attack someone else when we can.
+  const all = opponents(s, pid);
+  const open = all.filter((d) => !playerProtectedFrom(s, d, pid));
+  const opps = open.length ? open : all;
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
   // (CR 725.2) unless someone else is low enough to finish.
   const lowest = [...opps].sort((a, b) => player(s, a).life - player(s, b).life)[0]!;

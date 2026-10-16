@@ -78,6 +78,8 @@ const PROTECTION_TYPES: Record<string, string> = {
 /** What protection looks at in a source (CR 702.16a): its colors, card types and subtypes. */
 export interface SourceQuality {
   colors: readonly string[];
+  /** Who controls it, for protection from a player (CR 702.16k). */
+  controller?: number;
   types?: readonly string[];
   subtypes?: readonly string[];
   /** It's a spell (not an ability of the source), for "can't be the target of spells". */
@@ -105,6 +107,8 @@ export function canonicalKeyword(text: string): string | undefined {
   const m = /^protection from (.+)$/.exec(p);
   if (!m) return undefined;
   const q = m[1]!;
+  if (q === "each of your opponents") return PROTECTION_FROM_OPPONENTS;
+  if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
   const st = creatureTypeOfPlural(q);
@@ -116,6 +120,10 @@ export const CHOSEN_TYPE = "(the chosen creature type)";
 export const CHOSEN_LAND_TYPE = "(the chosen basic land type)";
 /** "Gains your choice of menace or lifelink": filled in with the keyword chosen as it resolved. */
 export const CHOSEN_KEYWORD = "(the chosen keyword)";
+/** "Protection from each of your opponents" (CR 702.16i, 702.16k): from each player who is an opponent of its controller. */
+export const PROTECTION_FROM_OPPONENTS = "Protection from each of your opponents";
+/** "Protection from the chosen player" (True-Name Nemesis): the player chosen as it entered (CR 702.16k). */
+export const CHOSEN_PLAYER_PROTECTION = "Protection from the chosen player";
 /** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
@@ -140,7 +148,8 @@ export function protectionColors(keywords: readonly string[]): ("W" | "U" | "B" 
  * anything (702.16j), "from multicolored" a source with two or more colors, "from artifacts" an
  * artifact source, "from Goblins" a Goblin source.
  */
-export function protectedFrom(keywords: readonly string[], src: SourceQuality): boolean {
+export function protectedFrom(keywords: readonly string[], src: SourceQuality, holder?: ProtectionHolder): boolean {
+  if (src.controller !== undefined && protectedFromPlayer(keywords, src.controller, holder)) return true;
   for (const k of keywords) {
     const m = /^protection from (.+)$/i.exec(k);
     if (!m) continue;
@@ -154,6 +163,26 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality): 
     if (PROTECTION_TYPES[q] && src.types?.includes(PROTECTION_TYPES[q])) return true;
     const st = creatureTypeOfPlural(q);
     if (st && src.subtypes?.includes(st)) return true;
+  }
+  return false;
+}
+
+/** Who has the protection: its controller, and the player chosen for it as it entered ("the chosen player"). */
+export interface ProtectionHolder {
+  controller: number;
+  chosenPlayer?: number;
+}
+
+/**
+ * Does it have protection from this player (CR 702.16k)? Then it has protection from each object that player controls:
+ * spells and abilities they control can't target it, their Auras and Equipment can't be attached to it, their creatures
+ * can't block it, and damage from their sources is prevented. Every other player in a game is an opponent (CR 102.3, 800.4).
+ */
+export function protectedFromPlayer(keywords: readonly string[], pid: number, holder?: ProtectionHolder): boolean {
+  if (!holder) return false;
+  for (const k of keywords) {
+    if (k === PROTECTION_FROM_OPPONENTS && pid !== holder.controller) return true;
+    if (k === CHOSEN_PLAYER_PROTECTION && holder.chosenPlayer === pid) return true;
   }
   return false;
 }

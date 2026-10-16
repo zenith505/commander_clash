@@ -1,5 +1,5 @@
 import type { Amount, CounterKind, AmountExpr, Effect, ObjRef, SpentReq } from "../abilities";
-import { canonicalKeyword, CHOSEN_PROTECTION } from "../keywords";
+import { canonicalKeyword, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { Color, ManaType } from "../types";
 
@@ -28,7 +28,7 @@ export const TYPE_WORDS: Record<string, string> = {
 /** A keyword the engine implements, spelled its way; "protection from the chosen color" only where a choice fills it in. */
 export const keywordOf = (p: string, chosen = false) => {
   const k = canonicalKeyword(p);
-  return k === CHOSEN_PROTECTION && !chosen ? undefined : k;
+  return (k === CHOSEN_PROTECTION || k === CHOSEN_PLAYER_PROTECTION) && !chosen ? undefined : k;
 };
 
 export const ALL_COLORS: ManaType[] = ["W", "U", "B", "R", "G"];

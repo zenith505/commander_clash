@@ -6,7 +6,7 @@ import { shuffle } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, spellQuality, stampTargets } from "./targeting";
+import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets } from "./targeting";
 import { ResolveCtx, objects, amountNow } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
@@ -57,6 +57,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       const body = { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
+      if (e.when === "lostControl") {
+        // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
+        for (const o of objects(s, e.of!, ctx)) if (o.zone === "battlefield") addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+        return;
+      }
       if (e.each === "created") {
         for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
         return;
@@ -146,7 +151,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.cascade) {
-        const limit = manaValue(parseManaCost(ctx.sourceDef.manaCost));
+        // On the stack, its mana value counts the X chosen for it (CR 202.3e).
+        const spell = ctx.cause !== undefined ? s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") : undefined;
+        const limit = spell ? spellManaValue(s, spell) : manaValue(parseManaCost(ctx.sourceDef.manaCost));
         const exiled: ObjectId[] = [];
         let hit: ObjectId | undefined;
         while (p.library.length) {

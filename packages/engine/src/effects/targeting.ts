@@ -5,7 +5,7 @@ import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "
 import { creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
-import { CREATURE_TYPES, type SourceQuality } from "../keywords";
+import { CREATURE_TYPES, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
@@ -78,8 +78,11 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
   if (targeting && c.untargetable?.some((u) => untargetableBy(u, controller, src))) return false;
-  // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d).
-  if (src && protectedFrom(c.keywords, src)) return false;
+  // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d). From a
+  // player: not by what that player controls (702.16k); the one targeting controls the spell or ability.
+  const holder = { controller: c.controller, chosenPlayer: o.chosen?.player };
+  if (src && protectedFrom(c.keywords, { ...src, controller: src.controller ?? controller }, holder)) return false;
+  if (!src && targeting && protectedFromPlayer(c.keywords, controller, holder)) return false;
   return true;
 }
 
@@ -242,9 +245,15 @@ export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shr
     if (controllerOf(s, o) !== pid) continue;
     const has = abilitiesOf(s, o).youHave;
     if (has === "shroud") return "shroud";
-    if (has) out = has;
+    if (has === "hexproof") out = has;
   }
   return out;
+}
+
+/** Does `pid` have protection from player `from` ("You have protection from each of your opponents", CR 702.16k)? */
+export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId): boolean {
+  if (from === pid) return false;
+  return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youHave === "protection");
 }
 
 export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, controller: PlayerId, src?: SourceQuality): boolean {
@@ -255,6 +264,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // "You have hexproof": not by opponents' spells and abilities (CR 702.11d); "you have shroud": by none (CR 702.18d).
     const prot = playerProtection(s, t.id);
     if (prot === "shroud" || (prot === "hexproof" && t.id !== controller)) return false;
+    if (playerProtectedFrom(s, t.id, controller)) return false; // CR 702.16k
     if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
     return !spec.opponent || t.id !== controller;

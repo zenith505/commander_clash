@@ -516,7 +516,8 @@ export interface StackItem {
 export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
   /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "endOfCombat" | "nextCleanup" | "leaves";
+  /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
   to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;
@@ -753,6 +754,8 @@ export interface GameEvent {
 export interface TurnLog {
   /** Players who searched their library (Archive Trap). */
   searched?: PlayerId[];
+  /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
+  tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
   entered?: { controller: PlayerId; types: string[]; colors: Color[] }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
@@ -828,7 +831,7 @@ export interface GameState {
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
-  castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[] }[];
+  castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
@@ -996,6 +999,8 @@ export interface Chosen {
   landType?: string;
   /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
   keyword?: string;
+  /** "As ~ enters, choose a player" (True-Name Nemesis). */
+  player?: PlayerId;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

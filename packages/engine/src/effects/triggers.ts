@@ -122,6 +122,8 @@ export type TriggerSourceEvent =
   | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number }
+  /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
+  | { type: "activated"; player: PlayerId; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -691,6 +693,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
+    // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
+    if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
     const castWatch = (o: GameObject, you: PlayerId) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
@@ -803,6 +807,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
     if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers);
+  } else if (ev.type === "activated") {
+    // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, (e, t) => {
+        // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
+        if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
+        const a = t.activates;
+        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you)) return false;
+        return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
+      }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "draw") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -825,8 +842,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.event !== "batch" || !t.batch) continue;
         const b = t.batch;
         if (gone ? !lookBack(b) : lookBack(b) && arrived.has(`${w.id}@${w.zoneChanges ?? 0}`)) continue;
-        const n = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone)).length;
+        const matched = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone));
+        const n = matched.length;
         if (!n) continue;
+        // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
+        if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: n, ...(b.whose === "you" ? { player: you } : {}) });
       }
@@ -857,7 +877,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
-            : d.when !== "leaves" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
+            : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep") s.delayed = s.delayed!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
@@ -978,7 +998,23 @@ const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : com
  * State triggers (CR 603.8): one triggers when its state is true, and not again until that instance has
  * resolved or left the stack.
  */
+/**
+ * "When you lose control of the creature, tap it" (Ray of Command): a delayed trigger that triggers once, when its
+ * controller no longer controls that object (CR 603.7). Once the object has left the battlefield it's gone for good.
+ */
+export function checkLostControl(s: GameState) {
+  for (const d of [...(s.delayed ?? [])]) {
+    if (d.when !== "lostControl") continue;
+    const o = s.objects[d.subject.id];
+    const here = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === d.subject.zc;
+    if (here && controllerOf(s, o) === d.controller) continue;
+    s.delayed = s.delayed!.filter((x) => x !== d);
+    if (here) s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
+  }
+}
+
 export function checkStateTriggers(s: GameState) {
+  checkLostControl(s);
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const triggers = abilitiesOf(s, o).triggers;
@@ -1080,6 +1116,27 @@ function speedTrigger(s: GameState, loser: PlayerId) {
   });
 }
 
+const CASCADE_BODY: AbilityBody = { targets: [], effects: [{ type: "cascade" }], text: "Cascade: exile cards from the top of your library until you exile a cheaper nonland card. You may cast it without paying its mana cost." };
+
+/** The cascade abilities the permanents `you` controls give this spell as it's cast ("Sliver spells you cast have cascade"). */
+function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: PlayerId): unknown[] {
+  const cast = (s.castThisTurn ?? []).filter((c) => c.player === you);
+  const out: unknown[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== you) continue;
+    for (const g of abilitiesOf(s, o).spellsHaveCascade ?? []) {
+      if (g.from && spell.castFrom !== g.from) continue;
+      if (g.treasure && !spell.treasureSpent) continue;
+      if (g.filter && !spellMatches(s, g.filter, item)) continue;
+      // "The first spell you cast each turn ...": this one is the first of its kind this turn (it's already counted).
+      if (g.first && cast.filter((c) => (!g.from || c.from === g.from) && (!g.treasure || c.treasure)).length !== 1) continue;
+      out.push(g);
+    }
+  }
+  return out;
+}
+
 /** Is this moved object one that `b` counts, for the permanent `w` (as it is now, or as it last existed: `gone`)? */
 function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObject, you: PlayerId, gone: boolean): boolean {
   const whose = (p: PlayerId | undefined) => !b.whose || (b.whose === "you" ? p === you : p !== undefined && p !== you);
@@ -1088,6 +1145,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (!m.entered || !o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== m.zc) return false;
     // Torpor Orb: "creatures entering don't cause abilities to trigger" for these controllers.
     if (m.locks?.some((l) => !l.opponents || l.by !== you)) return false;
+    if (b.orSelf && o.id === w.id) return true;
     if (b.other && o.id === w.id) return false;
     return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, o, you, false));
   }

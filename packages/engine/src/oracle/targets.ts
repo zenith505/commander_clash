@@ -433,10 +433,13 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
   } else if ((m = / (with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
-    const kws = parseKeywordList(m[2]!);
-    if (!kws || kws.length !== 1) return null;
-    if (m[1] === "with") extra.keywords = kws;
-    else extra.notKeywords = kws;
+    // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
+    const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
+    const kws = either ? [either[1]!, either[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
+    if (!kws || kws.some((k) => !k) || kws.length !== (either ? 2 : 1)) return null;
+    if (either) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
+    else if (m[1] === "with") extra.keywords = kws as string[];
+    else extra.notKeywords = kws as string[];
     // "Creature without flying you don't control" (Street Spasm): whose it is, read below.
     p = p.slice(0, m.index) + (m[3] ?? "");
   }
@@ -495,6 +498,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
   const quality = (a: string) => a.trim().split(/\s+/).some((w) => !TYPE_WORDS[w]);
   const leading = quality(alts[0] ?? "") && !alts.slice(1).every(quality);
   if (alts.length > 1 && typeWords.every((n) => n === 1) && alts.some(quality) && !leading && !inGraveyard && !isSpell && !extra.token && !extra.status && extra.commander === undefined) {
+    if (extra.anyOf) return null;
     const anyOf: TargetSpec[] = [];
     for (const alt of alts) {
       const sub = parseTargetPhrase(alt);
@@ -582,7 +586,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
     return { kind: "card", ...filters, ...(owner ? { owner } : {}), text };
   }
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.anyOf || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
 }
 

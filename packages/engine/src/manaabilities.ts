@@ -217,6 +217,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
+  if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, o.id, pid)) return `${name}'s ability can't be activated now`; // CR 602.5b
   const p = player(s, pid);
@@ -235,7 +236,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
 
 /** How much a player gives up by using it, beyond the tap: lower is better. */
 export function manaPenalty(ab: ManaAbility): number {
-  return (ab.sacrificeSelf ? 8 : 0) + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap ? 1 : 0);
+  return (ab.sacrificeSelf || ab.onceEver ? 8 : 0) + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap ? 1 : 0);
 }
 
 /**

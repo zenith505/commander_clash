@@ -3,9 +3,10 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
+import { playerProtectedFrom } from "./effects/targeting";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
-import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
+import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -849,6 +850,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
+  if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
   const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
@@ -1774,6 +1776,8 @@ function finishCleanup(s: GameState) {
   }
   s.preventCombatDamage = undefined;
   s.damageRules = undefined;
+  // "Until end of turn" control ends: "when you lose control of the creature" triggers now (rulings on Ray of Command).
+  checkLostControl(s);
   // "You may play that card this turn" / "until the end of your next turn" ends now.
   for (const q of s.players)
     for (const id of q.exile) {
@@ -1943,7 +1947,14 @@ export function canActAtSorcerySpeed(s: GameState, pid: PlayerId) {
  * and triggered abilities still work; so does a spell's split second only while it's on the stack.
  */
 export function splitSecondOnStack(s: GameState): boolean {
-  return s.stack.some((x) => x.kind === "spell" && !!x.objectId && !!s.objects[x.objectId] && objHasKeyword(s, s.objects[x.objectId]!, "Split second"));
+  return s.stack.some((x) => x.kind === "spell" && !!x.objectId && !!s.objects[x.objectId] && hasSplitSecond(s, s.objects[x.objectId]!, x.controller));
+}
+
+/** A spell's split second: its own, or Shadow the Hedgehog's for its controller's spells cast with mana from an artifact. */
+function hasSplitSecond(s: GameState, o: GameObject, controller: PlayerId): boolean {
+  if (objHasKeyword(s, o, "Split second")) return true;
+  if (!o.spent?.from?.artifact) return false;
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === controller && !!abilitiesOf(s, obj(s, id)).splitSecondIfArtifactMana);
 }
 
 /**
@@ -2130,7 +2141,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // What its source was as it was activated, before it's sacrificed (CR 106.3): a Treasure, a snow permanent, ...
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
-  if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
+  const manaPaid = ab.manaCost ? spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o }) : null;
   if (ab.tap) tapPermanent(s, o);
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
@@ -2138,6 +2149,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
+  if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
@@ -2147,6 +2159,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
+  // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
+  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -2818,7 +2832,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
   s.cards[d.oracleId] ??= d;
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors] });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}) });
@@ -3466,6 +3480,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   const manaPick = ab.mana ? manaAbilityPick(s, p.id, o, index, mana, extra) : undefined;
   if (!ab.mana && (mana !== undefined || extra !== undefined)) throw new RulesError(`${d.name}'s ability isn't a mana ability`);
+  // The source as it was activated, for "whenever an opponent activates an ability of a creature".
+  const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets);
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
@@ -3532,6 +3548,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
     log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
     resolveManaAbility(s, item, body, manaPick.mana);
+    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(paid.treasure ? { treasure: paid.treasure } : {}) });
     return true;
   }
   s.stack.push(item);
@@ -3545,6 +3562,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     const what = ab.body.modal ? `${cost}: ${body.text}` : ab.text;
     log(s, `${p.name} activates ${d.name} (${what.replace(/~/g, d.name).replace(/\.$/, "")})${abCost.hasX ? ` with X=${x ?? 0}` : ""}${describeTargets(s, targets)}.`);
   }
+  // Once it's activated (CR 602.2i), abilities that trigger on that do.
+  fireEvent(s, { type: "activated", player: p.id, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }
@@ -3831,6 +3850,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
       return;
     }
+    if (pend.what === "player") {
+      const pid = Number(choice);
+      if (!pend.options.includes(choice)) throw new RulesError("choose one of the players offered");
+      o.chosen = { ...o.chosen, player: pid };
+      log(s, `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
+      invalidateCharacteristics(s);
+      return;
+    }
     if (pend.what === "readAhead") {
       // Read ahead: it enters with the chosen number of lore counters (CR 702.155b, 714.3b).
       const n = Number(choice);
@@ -3855,7 +3882,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player") throw new RulesError("nothing to choose");
   if (pend.what === "topOrBottom") {
     if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
     (r.scratch ??= {}).topOrBottom = choice;
@@ -4032,6 +4059,17 @@ function askEntersChoice(s: GameState): boolean {
       }
       const n = compileCard(defOf(s, o)).tribute;
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "tribute", options: opps.map(String), labels: opps.map((x) => player(s, x).name), objectId: o.id, prompt: `tribute ${n}: choose an opponent, who may put ${n} +1/+1 counter${n === 1 ? "" : "s"} on it` };
+      return true;
+    }
+    if (c.what === "player") {
+      // "As ~ enters, choose a player" (CR 614.12): one still in the game (CR 800.4a), or an opponent.
+      const you = controllerOf(s, o);
+      const options = s.turnOrder.filter((x) => !player(s, x).lost && (c.except !== "you" || x !== you));
+      if (!options.length) {
+        q.shift();
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `choose ${c.except === "you" ? "an opponent" : "a player"}` };
       return true;
     }
     if (c.what === "readAhead") {
@@ -4595,7 +4633,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Shadow") !== has(b, "Shadow")) return has(a, "Shadow") ? `only creatures with shadow can block ${a.name}` : `${b.name} has shadow and can only block creatures with shadow`; // CR 702.28b
   if (has(a, "Fear") && !b.types.includes("Artifact") && !b.colors.includes("B")) return `${a.name} has fear`; // CR 702.36b
   if (has(a, "Intimidate") && !b.types.includes("Artifact") && !b.colors.some((c) => a.colors.includes(c))) return `${a.name} has intimidate`; // CR 702.13b
-  if (protectedFrom(a.keywords, b)) return `${a.name} has protection from ${b.name}`; // CR 702.16f
+  if (protectedFrom(a.keywords, b, protectionHolder(s, attacker))) return `${a.name} has protection from ${b.name}`; // CR 702.16f, 702.16k
   if (b.blocksOnlyFlyers && !has(a, "Flying")) return `${b.name} can block only creatures with flying`; // CR 509.1b
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
@@ -4661,7 +4699,7 @@ function bandSplit(s: GameState, source: GameObject, targets: GameObject[], dmg:
   const src = objectSource(s, source);
   const deathtouch = objHasKeyword(s, source, "Deathtouch");
   const room = (t: GameObject) =>
-    protectedFrom(characteristics(s, t).keywords, src) || objHasKeyword(s, t, "Indestructible") ? Infinity : deathtouch ? 0 : Math.max(0, toughness(s, t) - t.damage - 1);
+    protectedFrom(characteristics(s, t).keywords, src, protectionHolder(s, t)) || objHasKeyword(s, t, "Indestructible") ? Infinity : deathtouch ? 0 : Math.max(0, toughness(s, t) - t.damage - 1);
   const out = new Map<GameObject, number>();
   let left = dmg;
   for (const t of [...targets].sort((a, b) => room(b) - room(a))) {
@@ -4939,7 +4977,8 @@ function attachmentSBAs(s: GameState): boolean {
       // (CR 303.4d, 704.5m): "enchant opponent" checks against its controller now, so a change of control can end it.
       const p = o.attachedToPlayer;
       const enchant = compileCard(defOf(s, o)).enchant!;
-      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p));
+      // Nor can it stay on a player with protection from its controller (CR 702.16c, 702.16k).
+      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller);
       if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
         moveObject(s, id, "graveyard");
@@ -4951,7 +4990,7 @@ function attachmentSBAs(s: GameState): boolean {
       // effect that "doesn't remove" this Aura.
       const hc = host && characteristics(s, host);
       const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id) : [];
-      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false) && !protectedFrom(shielding, c);
+      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false) && !protectedFrom(shielding, c, protectionHolder(s, host));
       if (!legal && o.bestowed) {
         // A bestowed Aura becomes unattached and stops being bestowed: it's an enchantment creature (CR 702.103f).
         o.attachedTo = undefined;
@@ -4967,7 +5006,7 @@ function attachmentSBAs(s: GameState): boolean {
     } else if (c.subtypes.includes("Equipment") && o.attachedTo) {
       // Unattached from anything but a creature, and when it becomes a creature itself (CR 301.5c, 704.5n, 704.5p).
       // Also when the creature has protection from the Equipment's color (CR 702.16d).
-      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, c)) {
+      if (!host || host.zone !== "battlefield" || !objIsType(s, host, "Creature") || c.types.includes("Creature") || protectedFrom(characteristics(s, host).keywords, c, protectionHolder(s, host))) {
         if (host) fireEvent(s, { type: "unattached", id: o.id, host: host.id });
         o.attachedTo = undefined;
         invalidateCharacteristics(s);

@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
 import { castProblem, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { addMana, manaFromPool } from "../src/spend";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState) => {
@@ -53,9 +54,9 @@ describe("snow mana", () => {
     let s = act(s0, { type: "activateMana", player: ap, objectId: sf!, mana: "G" });
     s = act(s, { type: "activateMana", player: ap, objectId: f!, mana: "G" });
     expect(s.players[ap]!.manaPool.G).toBe(2);
-    expect(s.players[ap]!.snowMana).toEqual({ G: 1 });
+    expect(manaFromPool(s, ap, "snow")).toMatchObject({ G: 1, W: 0, U: 0, B: 0, R: 0, C: 0 });
     s = passAll(s);
-    expect(s.players[ap]!.snowMana).toBeUndefined();
+    expect(s.players[ap]!.manaLots).toBeUndefined();
   });
 
   it("{S} can only be paid with snow mana; other mana pays the rest of the cost", () => {
@@ -121,7 +122,7 @@ describe("snow mana", () => {
     expect(s.objects[b]!.zone).toBe("graveyard");
     expect(s.players[ap]!.manaPool.C).toBe(1);
     // A snow sorcery made it: it's snow mana (CR 106.3), so it pays {S}.
-    expect(s.players[ap]!.snowMana).toEqual({ C: 1 });
+    expect(manaFromPool(s, ap, "snow")).toMatchObject({ C: 1, W: 0, U: 0, B: 0, R: 0, G: 0 });
     // Through the end of main phase 1 and the combat steps.
     s = passAll(s);
     expect(s.step).not.toBe("main1");
@@ -133,14 +134,13 @@ describe("snow mana", () => {
   it("kept mana is gone after the turn ends", () => {
     const { s: s0, ap } = setup([]);
     const s = s0;
-    s.players[ap]!.manaPool.R = 1;
-    s.players[ap]!.keptMana = { turn: s.turn, mana: { R: 1 } };
+    addMana(s, ap, ["R"], { keep: "turn" });
     // Still there in the end step.
     let t = passUntil(s, "end", ap);
     expect(t.players[ap]!.manaPool.R).toBe(1);
     t = passUntil(t, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]);
     expect(t.players[ap]!.manaPool.R).toBe(0);
-    expect(t.players[ap]!.keptMana).toBeUndefined();
+    expect(t.players[ap]!.manaLots).toBeUndefined();
   });
 });
 

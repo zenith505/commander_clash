@@ -8,9 +8,9 @@ import { abilityProblem, isSummoningSick, obj, player, tapCostCandidates } from 
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
-import { canPayFromPool } from "./spend";
+import { canPayFromPool, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
-import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
+import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
 export const MANA_ABILITY_OFFSET = 1000;
@@ -101,6 +101,15 @@ export interface ManaOption {
   combo?: number;
   adds: ManaType[];
   extra?: ManaType[];
+  /** The part of `adds` that's snow mana (CR 107.4h): its own if the source is snow, a triggered ability's if that one's is. */
+  snow?: ManaType[];
+}
+
+/** The part of the mana a source and the triggered mana abilities make that's snow mana (CR 106.3, 107.4h). */
+function snowPart(s: GameState, o: GameObject, adds: ManaType[], r: ManaTriggerResult): { snow?: ManaType[] } {
+  const own = manaOriginsOf(s, o).includes("snow") ? adds : [];
+  const snow = [...own, ...r.adds.filter((_, i) => r.from[i]?.includes("snow"))];
+  return snow.length ? { snow } : {};
 }
 
 /** The triggered mana abilities on the battlefield (CR 605.1b) and their sources. */
@@ -111,14 +120,21 @@ function manaTriggerSources(s: GameState): { src: GameObject; t: ManaTrigger }[]
   });
 }
 
+/** What the triggered mana abilities add: the picks for their mana, the mana, and each mana's source (`from`, CR 106.3). */
+export interface ManaTriggerResult {
+  extra: ManaType[];
+  adds: ManaType[];
+  from: ManaOrigin[][];
+}
+
 /**
  * What the triggered mana abilities add when `pid` taps `o` for mana with `ab`, making `made`: one entry per way to
  * pick their mana (`extra`, the picks). Tapping it for mana is activating a mana ability of it with {T} in the cost
  * (CR 106.12; not tapping it for another permanent's cost, rulings on Leyline of Abundance), and they trigger only
  * when that makes mana (106.12a). They resolve right after it (CR 605.4a), each adding its mana.
  */
-export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility, made: ManaType[], sources = manaTriggerSources(s)): { extra: ManaType[]; adds: ManaType[] }[] {
-  let results: { extra: ManaType[]; adds: ManaType[] }[] = [{ extra: [], adds: [] }];
+export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility, made: ManaType[], sources = manaTriggerSources(s)): ManaTriggerResult[] {
+  let results: ManaTriggerResult[] = [{ extra: [], adds: [], from: [] }];
   if (!ab.tap || !made.length) return results;
   for (const { src, t } of sources) {
     const ctl = controllerOf(s, src);
@@ -142,7 +158,9 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
       for (let i = 0; i < a.n; i++) combos = combos.flatMap((c) => COLORS.filter((x) => !c.length || COLORS.indexOf(x) >= COLORS.indexOf(c[c.length - 1]!)).map((x) => [...c, x]));
       picks = combos.map((c) => ({ extra: c, adds: c }));
     }
-    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds] })));
+    // Each mana's source is the triggered ability's source (CR 106.3), as it is now.
+    const from = manaOriginsOf(s, src);
+    results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds], from: [...r.from, ...p.adds.map(() => from)] })));
   }
   return results;
 }
@@ -155,7 +173,7 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
     const picks: { mana: ManaType; combo?: number }[] = p.kind === "combos" ? p.options.map((c, combo) => ({ mana: c[0]!, combo })) : manaChoices(s, o, ab).map((mana) => ({ mana }));
     return picks.flatMap(({ mana, combo }) => {
       const adds = manaProduced(s, o, ab, mana, combo);
-      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}) }));
+      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
     });
   });
 }
@@ -253,7 +271,7 @@ export function activatedManaOptions(s: GameState, o: GameObject, index: number)
   const pid = controllerOf(s, o);
   return manaChoices(s, o, m).flatMap((mana) => {
     const adds = manaProduced(s, o, m, mana);
-    return manaTriggerResults(s, pid, o, m, adds).map((r) => ({ ability: index, mana, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}) }));
+    return manaTriggerResults(s, pid, o, m, adds).map((r) => ({ ability: index, mana, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
   });
 }
 

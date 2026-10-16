@@ -2348,7 +2348,7 @@ function Seat({
             </span>
           ))}
         {p.lost && <span className="error">Out: {p.lossReason}</span>}
-        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} restricted={p.restrictedMana} />}</span>
+        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} restricted={p.manaLots?.flatMap((l) => (l.only ? [{ mana: l.mana, n: l.n, only: l.only }] : []))} />}</span>
       </header>
       <div className="seat-body">
         <div className="zones" onClick={(e) => e.stopPropagation()}>

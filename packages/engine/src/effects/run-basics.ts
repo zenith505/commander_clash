@@ -4,21 +4,32 @@ import { addPhases, draw, gainLife, giveCitysBlessing, log, loseLife, obj, playe
 import { MONARCH } from "../oracle";
 import { characteristics, invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
-import type { GameObject, GameState, ManaType, PlayerId, RedirectShield } from "../types";
+import type { GameObject, GameState, ManaOrigin, ManaType, PlayerId, RedirectShield } from "../types";
+import { addMana, manaOriginsOf } from "../spend";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
-/** Is the source of what's resolving a snow object (CR 106.3, 107.4h): the spell itself, or the ability's source? */
-function snowSource(s: GameState, ctx: ResolveCtx): boolean {
+/**
+ * What the source of the mana an effect adds is (CR 106.3): the spell itself, or the ability's source (a snow source's
+ * mana is snow mana, 107.4h; a creature's is "mana from a creature").
+ */
+function manaSourceOrigins(s: GameState, ctx: ResolveCtx): ManaOrigin[] {
   const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-  if (o && o.zone === "battlefield") return characteristics(s, o).supertypes.includes("Snow");
+  if (o && o.zone === "battlefield") return manaOriginsOf(s, o);
   const item = s.resolving?.item;
   const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
-  if (spell) return characteristics(s, spell).supertypes.includes("Snow");
+  if (spell) return manaOriginsOf(s, spell);
   // A permanent that's gone: as it last existed (CR 113.7a), its printed card here.
-  return !!ctx.sourceDef?.supertypes?.includes("Snow");
+  const d = ctx.sourceDef;
+  if (!d) return [];
+  const out: ManaOrigin[] = [];
+  if (d.types.includes("Artifact")) out.push("artifact");
+  if (d.types.includes("Creature")) out.push("creature");
+  if (d.supertypes?.includes("Snow")) out.push("snow");
+  if (d.subtypes?.includes("Treasure")) out.push("treasure");
+  return out;
 }
 
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -219,18 +230,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
       const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
-      // Mana from a snow source is snow mana (CR 107.4h): a snow spell's, or a snow permanent's ability's (106.3).
-      const snow = s.resolving?.item.manaAbility ? !!s.resolving.item.manaAbility.snow : snowSource(s, ctx);
+      // What the mana's source was (CR 106.3): a mana ability's source as it was activated, else a snow spell, or the
+      // ability's source (snow mana, CR 107.4h; mana from a creature).
+      const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
       for (const m of added.matchAll(/\{([WUBRGC])\}/g)) {
-        p.manaPool[m[1] as "W"]++;
-        // A Treasure's mana ability: "mana from a Treasure" (CR 106.3).
-        if (s.resolving?.item.manaAbility?.treasure) (p.treasureMana ??= {})[m[1] as ManaType] = (p.treasureMana[m[1] as ManaType] ?? 0) + 1;
-        if (snow) (p.snowMana ??= {})[m[1] as ManaType] = (p.snowMana[m[1] as ManaType] ?? 0) + 1;
         // "Until end of turn, you don't lose this mana as steps and phases end."
-        if (e.keep) {
-          if (p.keptMana?.turn !== s.turn) p.keptMana = { turn: s.turn, mana: {} };
-          p.keptMana.mana[m[1] as ManaType] = (p.keptMana.mana[m[1] as ManaType] ?? 0) + 1;
-        }
+        addMana(s, p.id, [m[1] as ManaType], { from, ...(e.keep ? { keep: "turn" as const } : {}) });
         if (s.resolving?.item.manaAbility) (s.resolving.made ??= []).push(m[1] as ManaType);
       }
       if (added) log(s, `${p.name} adds ${added}.`);
@@ -248,8 +253,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Firebending (CR 702.189a): red mana that stays in the pool until end of combat (see advanceStep).
       const n = amountNow(s, e.n, ctx);
       const p = player(s, ctx.controller);
-      p.manaPool.R += n;
-      p.combatMana = (p.combatMana ?? 0) + n;
+      addMana(s, p.id, Array(n).fill("R"), { from: manaSourceOrigins(s, ctx), keep: "combat" });
       if (n) log(s, `${p.name} adds ${"{R}".repeat(n)} (until end of combat).`);
       return;
     }

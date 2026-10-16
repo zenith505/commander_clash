@@ -28,7 +28,7 @@ test("Hired Hexblade: sacrifice a Treasure for {B}, cast it, and it draws a card
   await open(page, s);
   await page.locator(`[data-obj="${treasure}"]`).click();
   await menu(page).locator("button", { has: page.locator('[title="{B}"]') }).click();
-  await expect.poll(async () => (await state(page)).players[0]!.treasureMana?.B).toBe(1);
+  await expect.poll(async () => (await state(page)).players[0]!.manaLots?.find((l) => l.mana === "B" && l.from?.includes("treasure"))?.n).toBe(1);
   await card(page, "Hired Hexblade", s).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.triggerQueue.length === 0 && st.objects[hexblade]!.zone === "battlefield" && st.players[0]!.life === 39);
   expect(after.objects[hexblade]!.treasureSpent).toBe(1);

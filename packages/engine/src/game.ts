@@ -12,7 +12,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
-import { addMana, canPayFromPool, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { addMana, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
@@ -32,6 +32,7 @@ import {
   type GameState,
   type LastKnown,
   type StackItem,
+  type ManaOrigin,
   type ManaType,
   type SpentMana,
   type ObjectId,
@@ -1439,27 +1440,13 @@ const KEEPS_COMBAT_MANA = new Set<Step>(["beginCombat", "declareAttackers", "dec
 
 function advanceStep(s: GameState): void {
   for (const p of s.players) {
-    // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a). Red mana
-    // spent is spent from the rest first, so what's kept is the red left, up to firebending's.
-    const restrictedRed = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === "R" ? r.n : 0), 0);
-    const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R - restrictedRed) : 0;
-    // Mana kept "until end of turn" is lost as the cleanup step ends (CR 514.2, 500.4); other mana is spent first, so
-    // what's kept is what's left of each type, up to how much is kept (snow mana stays snow mana, kept first).
-    const kept = emptyPool();
-    if (p.keptMana?.turn === s.turn && s.step !== "cleanup")
-      for (const m of Object.keys(kept) as ManaType[]) {
-        const restricted = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === m ? r.n : 0), 0);
-        kept[m] = Math.max(0, Math.min(p.keptMana.mana[m] ?? 0, p.manaPool[m] - restricted - (m === "R" ? keep : 0)));
-      }
-    const keptSnow = Object.fromEntries((Object.keys(kept) as ManaType[]).map((m) => [m, Math.min(kept[m], p.snowMana?.[m] ?? 0)]).filter(([, n]) => n));
+    // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a) and mana kept
+    // "until end of turn", lost as the cleanup step ends (514.2). Kept mana keeps what its source was and how it can
+    // be spent.
+    const kept = (p.manaLots ?? []).filter((l) => (l.keep === "combat" ? KEEPS_COMBAT_MANA.has(s.step) : l.keep === "turn" && s.step !== "cleanup"));
     p.manaPool = emptyPool();
-    p.restrictedMana = undefined;
-    p.treasureMana = undefined;
-    p.snowMana = Object.keys(keptSnow).length ? keptSnow : undefined;
-    p.manaPool.R = keep;
-    p.combatMana = keep || undefined;
-    for (const m of Object.keys(kept) as ManaType[]) p.manaPool[m] += kept[m];
-    p.keptMana = Object.values(kept).some((n) => n) ? { turn: s.turn, mana: Object.fromEntries(Object.entries(kept).filter(([, n]) => n)) } : undefined;
+    for (const l of kept) p.manaPool[l.mana] += l.n;
+    p.manaLots = kept.length ? kept : undefined;
   }
   if (s.step === "cleanup" && s.cleanupAgain) {
     s.cleanupAgain = undefined;
@@ -2136,9 +2123,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
   if (!picked) throw new RulesError(triggered.length > 1 ? `choose the mana that tapping ${name} also adds` : `${name} adds no other mana to choose`);
   const src = objectSource(s, o);
-  // Mana from a Treasure (CR 106.3): what its source was as it was activated, before it's sacrificed.
-  const treasure = isTreasure(s, o);
-  const snow = isSnowSource(s, o);
+  // What its source was as it was activated, before it's sacrificed (CR 106.3): a Treasure, a snow permanent, ...
+  const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
   if (ab.tap) tapPermanent(s, o);
@@ -2152,9 +2138,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
-  addMana(s, p.id, adds, ab.spendOnly, treasure, snow);
+  addMana(s, p.id, adds, { only: ab.spendOnly, from });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
-  addMana(s, p.id, picked.adds);
+  addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
 }
@@ -2166,6 +2152,14 @@ export const spellUse = (d: CardDef, alt?: AltCostKind): ManaUse => (altCost(d, 
 export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
 /** A snow permanent: the mana its abilities make is snow mana, for {S} (CR 107.4h, 205.4g). */
 export const isSnowSource = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).supertypes.includes("Snow");
+
+/**
+ * Add the mana that triggered mana abilities add (CR 605.4a). Its source is each ability's source (CR 106.3): mana from
+ * Utopia Sprawl on a snow Forest isn't snow mana, mana from a snow Mana Flare is.
+ */
+export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][] }): void {
+  picked.adds.forEach((m, i) => addMana(s, pid, [m], { from: picked.from?.[i] ?? [] }));
+}
 
 export function commanderTax(p: Player, o: GameObject) {
   return 2 * (p.commanderCasts[o.id] ?? 0); // CR 903.8
@@ -2696,6 +2690,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // How much of it snow sources made: "if {S} was spent", "for each {S} spent" (CR 107.4h).
   const snow = Object.fromEntries(Object.entries(paid.snow).filter(([, n]) => n > 0));
   if (Object.keys(snow).length) spent.snow = snow;
+  // And how much a Treasure, a creature or an artifact made (CR 106.3): "three or more mana from creatures".
+  const spentFrom = Object.fromEntries(Object.entries(paid.from).filter(([, n]) => n > 0));
+  if (Object.keys(spentFrom).length) spent.from = spentFrom;
   o.spent = Object.keys(spent).length ? spent : undefined;
   o.treasureSpent = paid.treasure || undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
@@ -3468,8 +3465,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const abCost = activationCost(s, p.id, o, ab, targets);
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
-  const treasure = !!manaPick && isTreasure(s, o);
-  const snow = !!manaPick && isSnowSource(s, o);
+  const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
@@ -3523,7 +3519,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
-    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(treasure ? { treasure: true as const } : {}), ...(snow ? { snow: true as const } : {}) } } : {}),
+    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
   };
   if (manaPick) {

@@ -260,8 +260,8 @@ export interface TargetSpec {
   named?: string;
   /** None of these subtypes. */
   notSubtypes?: string[];
-  /** "creature with a +1/+1 counter on it" */
-  counter?: "+1/+1" | "-1/-1";
+  /** "creature with a +1/+1 counter on it", "permanents with ice counters on them" */
+  counter?: CounterKind;
   /**
    * "of the chosen type", "that aren't of the chosen type", "of the chosen color": the creature type
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before

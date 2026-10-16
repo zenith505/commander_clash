@@ -53,7 +53,12 @@ export type Color = "W" | "U" | "B" | "R" | "G";
 export const COLORS: readonly Color[] = ["W", "U", "B", "R", "G"];
 export type ManaType = Color | "C";
 /** The mana spent to cast a spell by type (CR 601.2h), and how much of each type a snow source made (`snow`, CR 107.4h). */
-export type SpentMana = Partial<Record<ManaType, number>> & { snow?: Partial<Record<ManaType, number>> };
+export type SpentMana = Partial<Record<ManaType, number>> & {
+  /** How much of it a snow source made, by type (CR 107.4h). */
+  snow?: Partial<Record<ManaType, number>>;
+  /** How much of it a Treasure, a creature or an artifact made (CR 106.3). */
+  from?: Partial<Record<"treasure" | "creature" | "artifact", number>>;
+};
 
 export type PlayerId = number;
 export type ObjectId = string;
@@ -337,11 +342,24 @@ export interface CopyEffect {
   until?: "endOfTurn" | { turnOf: PlayerId };
 }
 
-/** `n` of the `mana` in a player's pool that can only be spent as `only` says (CR 106.6). */
-export interface RestrictedMana {
+/**
+ * What a mana's source was as it made the mana (CR 106.3): snow mana pays {S} (107.4h); "mana from a Treasure", "mana
+ * from a creature", "mana from an artifact".
+ */
+export type ManaOrigin = "snow" | "treasure" | "creature" | "artifact";
+
+/**
+ * `n` of the `mana` in a player's pool that's set apart from the rest (counted in manaPool too): it can only be spent
+ * as `only` says (CR 106.6), its source was `from` (106.3), or it isn't lost as steps end (`keep`: until end of turn,
+ * or firebending's until end of combat, 702.189a). Mana of a type not in any lot is plain mana.
+ */
+export interface ManaLot {
   mana: ManaType;
   n: number;
-  only: ManaSpend;
+  only?: ManaSpend;
+  /** Sorted, without repeats. */
+  from?: ManaOrigin[];
+  keep?: "turn" | "combat";
 }
 
 export interface Player {
@@ -361,16 +379,8 @@ export interface Player {
   exile: ObjectId[];
   command: ObjectId[];
   manaPool: Record<ManaType, number>;
-  /** Mana in the pool (counted in manaPool too) that can only be spent some ways (CR 106.6). */
-  restrictedMana?: RestrictedMana[];
-  /** Mana in the pool (counted in manaPool too, none of it restricted) that a Treasure produced: "mana from a Treasure" (CR 106.3). */
-  treasureMana?: Partial<Record<ManaType, number>>;
-  /** Mana in the pool (counted in manaPool too, none of it restricted) that a snow source produced, for {S} (CR 107.4h). */
-  snowMana?: Partial<Record<ManaType, number>>;
-  /** "Until end of turn, you don't lose this mana as steps and phases end": how much of each type is kept, this `turn`. */
-  keptMana?: { turn: number; mana: Partial<Record<ManaType, number>> };
-  /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
-  combatMana?: number;
+  /** The mana in the pool that's restricted, from a source that matters, or kept as steps end (see ManaLot). */
+  manaLots?: ManaLot[];
   landsPlayedThisTurn: number;
   /** "You may play an additional land this turn" (CR 305.2a): how many more this turn (`turn`). */
   extraLands?: { turn: number; n: number };
@@ -480,7 +490,7 @@ export interface StackItem {
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
    */
-  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** Its source was a Treasure as it was activated: its mana is "mana from a Treasure" (CR 106.3). */ treasure?: true; /** Its source was a snow permanent: its mana is snow mana (CR 107.4h). */ snow?: true };
+  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** What its source was as it was activated: a snow permanent, a Treasure, a creature, an artifact (CR 106.3). */ from?: ManaOrigin[] };
   /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
   treasureSpent?: number;
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */

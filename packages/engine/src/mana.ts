@@ -82,12 +82,13 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   const hybrids: Color[][] = [];
   const twoHybrids: Color[] = [];
   const phyrexian: Color[] = [];
-  // {S} first, each from the snow mana the rest of the cost needs least: {C}, then the color there's most of to spare.
+  // {S} first, each from the snow mana the rest of the cost needs least: restricted mana that may be spent on this, {C},
+  // then the color there's most of to spare.
   const named = emptyPool();
   for (const sym of cost.symbols) if (sym.kind === "colored" || sym.kind === "phyrexian") named[sym.color]++;
   for (const sym of cost.symbols) {
     if (sym.kind !== "snow") continue;
-    const from = (["C", ...COLORS] as ManaType[]).filter((c) => sn[c] > 0).sort((a, b) => Number(b === "C") - Number(a === "C") || p[b] - named[b] - (p[a] - named[a]))[0];
+    const from = (["C", ...COLORS] as ManaType[]).filter((c) => sn[c] > 0).sort((a, b) => Number(pref[b] > 0) - Number(pref[a] > 0) || Number(b === "C") - Number(a === "C") || p[b] - named[b] - (p[a] - named[a]))[0];
     if (!from) return null;
     takeSnow(from);
     p[from]--;

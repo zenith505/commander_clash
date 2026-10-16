@@ -890,6 +890,16 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
   }
   const printed = compileCard(defOf(s, o));
+  // A Clone entering as a copy of Primeval Spawn has its "If ~ would enter and it wasn't cast or no mana was spent to cast
+  // it, exile it instead" as it would exist on the battlefield (CR 614.12, 707.5), judged by the Clone's own casting. It
+  // never was on the battlefield, so nothing sees it leave.
+  if (printed.exileUnlessCastWithMana && characteristics(s, o).hasPrintedAbilities && !(opts.fromStack && !o.isToken && (o.manaSpent ?? 0) > 0)) {
+    log(s, `${realDefOf(s, o).name} is exiled instead of entering: ${opts.fromStack && !o.isToken ? "no mana was spent to cast it" : "it wasn't cast"}.`);
+    s.battlefield = s.battlefield.filter((x) => x !== o.id);
+    o.zone = "stack"; // in no zone list, so moving it isn't leaving the battlefield
+    moveObject(s, o.id, "exile");
+    return;
+  }
   const ewc = printed.entersWithCounters;
   const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent })) : 0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);

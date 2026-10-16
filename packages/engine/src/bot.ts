@@ -61,6 +61,8 @@ import {
   auraHostKey,
   payableLife,
   linkedExileCards,
+  MAX_HAND_SIZE,
+  hasNoMaxHandSize,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -1918,8 +1920,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
-      // Gustha's Scepter: bots don't hide cards from their hand, so there's nothing to take back either.
-      if (ab.body.effects.some((e) => e.type === "exileFaceDown" || (e.type === "moveLinked" && !linkedOwned(s, id, pid)))) continue;
+      // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step
+      // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
+      const hand = player(s, pid).hand.length;
+      const handRoom = hasNoMaxHandSize(s, pid) ? Infinity : MAX_HAND_SIZE - hand;
+      if (ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
+      if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)

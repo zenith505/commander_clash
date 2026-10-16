@@ -302,7 +302,13 @@ export type ObjRef =
   /** Joint Assault's "if it's paired with a creature, that creature": what target `index` is paired with as this resolves (CR 702.95b). */
   | { ref: "pairedWithTarget"; index: number }
   /** "all creatures", "each artifact and enchantment", "other creatures you control": every permanent that matches, not targeted. */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number };
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number }
+  /**
+   * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
+   * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
+   * of target player's graveyard is a creature card, put that card ...": the top card, only if it matches.
+   */
+  | { ref: "graveyardEnd"; who: PlayerRef; filter?: TargetSpec; bottom?: true; only?: true };
 
 /** Which player(s) an effect touches. */
 export type PlayerRef =
@@ -516,6 +522,8 @@ export interface StaticAbility {
  */
 export type StaticCondition =
   | { kind: "graveyardAtLeast"; n: number }
+  /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
+  | { kind: "selfInGraveyard"; creatureAbove?: true }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
   | { kind: "graveyardTypes"; n: number }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
@@ -717,6 +725,14 @@ export type Effect =
   | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
+  /**
+   * "Return a creature card at random from your graveyard to your hand" (Haunted Fengraf); "an opponent chooses a card at
+   * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
+   * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
+   */
+  | { type: "randomFromGraveyard"; filter?: TargetSpec; dest: "hand" | "creatureOrExile" }
+  /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
+  | { type: "reorderGraveyard"; random?: true }
   | {
       type: "putOntoBattlefield";
       what: ObjRef;
@@ -727,6 +743,10 @@ export type Effect =
       attachToSubject?: boolean;
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[] };
+      /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */
+      haste?: "endOfTurn" | "game";
+      /** "Exile it at the beginning of the next end step", "Sacrifice it ...": a delayed trigger for it (CR 603.7), while it's that object. */
+      atEndStep?: "exile" | "sacrifice";
     }
   /**
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
@@ -1570,7 +1590,8 @@ export type AdditionalCost =
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true }
+  /** `top`: "exile the top creature card of your graveyard": the topmost `n` that match, nothing to choose (CR 404.1). */
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
   | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**

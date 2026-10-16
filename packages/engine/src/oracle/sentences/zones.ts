@@ -1,6 +1,6 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
-import type { Effect, Modification, PlayerRef } from "../../abilities";
+import type { Effect, Modification, ObjRef, PlayerRef } from "../../abilities";
 import { NUM, amt, num, singularWord } from "../words";
 import { mayBeAura, parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
@@ -71,6 +71,33 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // to the battlefield attached to that creature."
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
+  // The order of a graveyard (CR 404.1; see graveyard.ts): "Return the top creature card of your graveyard to the
+  // battlefield" (Corpse Dance), "put the top creature card of defending player's graveyard onto the battlefield under
+  // your control" (Bone Dancer), "Put the top card of your graveyard on the bottom of your library" (Soldevi Digger),
+  // "If the top card of target player's graveyard is a creature card, put that card on top of that player's library"
+  // (Guiding Spirit), "Exile the bottom card of target player's graveyard" (Phyrexian Furnace).
+  if ((m = /^(Return|Put) the top (.+?) of (your|defending player's) graveyard (?:to|onto) the battlefield( under your control)?$/i.exec(s)) && (m[3] === "your") === !m[4] && (m[1] === "Return") === (m[3] === "your")) {
+    const what = graveyardEnd(m[2]!, m[3]!, ctx);
+    if (!what?.filter?.types?.length || mayBeAura(what.filter) || what.filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+    return [{ type: "putOntoBattlefield", what }];
+  }
+  // "Return a creature card at random from your graveyard to your hand" (Haunted Fengraf), "Reorder your graveyard as you
+  // choose" (Fossil Find), "Reorder your graveyard at random" (Search for Survivors).
+  if ((m = /^[Rr]eturn an? (.+?) at random from your graveyard to your hand$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter === null ? null : [{ type: "randomFromGraveyard", dest: "hand", ...(filter ? { filter } : {}) }];
+  }
+  if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
+  if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];
+  if ((m = /^Put the top card of your graveyard on (top|the bottom) of your library$/i.exec(s))) return [{ type: "putInLibrary", what: { ref: "graveyardEnd", who: { ref: "you" } }, position: m[1] === "top" ? "top" : "bottom" }];
+  if ((m = /^If the top card of (target player's|your) graveyard is an? (.+?), put that card on top of (that player's|your) library$/i.exec(s)) && (m[1] === "your") === (m[3] === "your")) {
+    const what = graveyardEnd(m[2]!, m[1]!, ctx);
+    return what?.filter ? [{ type: "putInLibrary", what: { ...what, only: true }, position: "top" }] : null;
+  }
+  if ((m = /^Exile the (top|bottom) card of (target player's|your) graveyard$/i.exec(s))) {
+    const what = graveyardEnd("card", m[2]!, ctx);
+    return what ? [{ type: "exile", what: { ...what, ...(m[1] === "bottom" ? { bottom: true as const } : {}) } }] : null;
+  }
   // "Return all land cards from your graveyard to the battlefield tapped" (Will of the Sultai), "Return all basic land cards
   // from all graveyards to the battlefield tapped under their owners' control" (Planar Birth). Not Auras (CR 303.4f).
   if ((m = /^Return all (.+?) cards from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
@@ -213,4 +240,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return who && filter && [{ type: "pick", who, filter, n: amt(m[2]!), action: "sacrifice", ...(unless ? { unless } : {}) }];
   }
   return undefined;
+}
+
+/** "The top creature card of your graveyard": `kind` is "creature card", `whose` "your", "target player's" or "defending player's". */
+function graveyardEnd(kind: string, whose: string, ctx: Ctx): Extract<ObjRef, { ref: "graveyardEnd" }> | null {
+  const filter = parseSearchFilter(kind);
+  const who = whose === "your" ? ({ ref: "you" } as const) : parsePlayer(whose.replace(/'s$/, ""), ctx);
+  if (filter === null || !who) return null;
+  return { ref: "graveyardEnd", who, ...(filter ? { filter } : {}) };
 }

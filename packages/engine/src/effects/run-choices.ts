@@ -182,6 +182,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "discard" && e.who.ref === "you" && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).length) return false;
+    // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.
+    if ((e.type === "exile" || e.type === "putOntoBattlefield") && e.what.ref === "graveyardEnd" && !objects(s, e.what, ctx).length) return false;
     // Damage to a target that's no longer legal isn't dealt (CR 608.2b); a creature that's gone deals none.
     if (e.type === "damage" && "index" in e.to && !ctx.legal[e.to.index]) return false;
     if (e.type === "bite" && (!objects(s, e.a, ctx).length || !objects(s, e.b, ctx).length)) return false;

@@ -643,6 +643,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setGiftPick({ draft: d, label: card.name, what: `have an opponent gain ${c.n} life`, options: opps.filter((p) => canGainLife(s, p)), life: c.n });
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
+      if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       if (c.kind === "returnToHand")
@@ -1086,6 +1087,17 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               cards={pending.cards}
               onHover={setHover}
               onDone={(top, away) => dispatch([{ type: "arrangeTop", player: HUMAN, top, away }])}
+            />
+          )}
+          {pending?.kind === "orderGraveyard" && pending.player === HUMAN && (
+            <ArrangeTop
+              key={pending.cards.join(",")}
+              s={s}
+              how={pending.whole ? "wholeGraveyard" : "graveyard"}
+              source={pending.source}
+              cards={pending.cards}
+              onHover={setHover}
+              onDone={(order) => dispatch([{ type: "orderGraveyard", player: HUMAN, order }])}
             />
           )}
           {menu && s.objects[menu] && (
@@ -2420,7 +2432,8 @@ function GraveyardPicker({
  * Scry or surveil (CR 701.22, 701.25): look at the top cards of your library, then put any
  * number back on top in any order and the rest on the bottom (scry) or into your graveyard
  * (surveil). Clicking a card moves it between the two rows; the arrows reorder the top row,
- * whose leftmost card ends up on top.
+ * whose leftmost card ends up on top. Also used to arrange cards put into your graveyard at the
+ * same time (CR 404.3), or all of it ("reorder your graveyard as you choose").
  */
 function ArrangeTop({
   s,
@@ -2432,7 +2445,7 @@ function ArrangeTop({
   onDone,
 }: {
   s: GameState;
-  how: "scry" | "surveil" | "order" | "bottom";
+  how: "scry" | "surveil" | "order" | "bottom" | "graveyard" | "wholeGraveyard";
   /** Whose library, when it isn't yours. */
   owner?: string;
   source: string;
@@ -2443,8 +2456,9 @@ function ArrangeTop({
   const [top, setTop] = useState<string[]>(cards);
   const [away, setAway] = useState<string[]>([]);
   const awayName = how === "scry" ? "Bottom of library" : "Graveyard";
+  const together = how !== "scry" && how !== "surveil"; // they all go back together
   const toggle = (id: string) => {
-    if (how === "order" || how === "bottom") return; // they all go back together
+    if (together) return;
     if (top.includes(id)) {
       setTop(top.filter((x) => x !== id));
       setAway([...away, id]);
@@ -2467,7 +2481,7 @@ function ArrangeTop({
         const d = cardOf(s, id);
         return (
           <div key={id} className="arrange-card">
-            <div className="card big" data-arrange={id} onClick={() => toggle(id)} {...hoverProps(d, onHover)} title={how === "order" ? undefined : "Click to move to the other row"}>
+            <div className="card big" data-arrange={id} onClick={() => toggle(id)} {...hoverProps(d, onHover)} title={together ? undefined : "Click to move to the other row"}>
               <CardFace d={d} />
             </div>
             {ordered && ids.length > 1 && (
@@ -2496,15 +2510,25 @@ function ArrangeTop({
               ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order`
               : how === "bottom"
                 ? `put ${cards.length} cards on the bottom of your library in any order`
-                : `${how} ${cards.length}`}
+                : how === "graveyard"
+                  ? `put these ${cards.length} cards into your graveyard in any order`
+                  : how === "wholeGraveyard"
+                    ? "reorder your graveyard as you choose"
+                    : `${how} ${cards.length}`}
           </strong>
-          <span className="muted">{how === "order" || how === "bottom" ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>
+          <span className="muted">{together ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>
           <button onClick={() => onDone(top, away)}>Done</button>
         </header>
         <div className="modal-body">
-          <h4>{how === "bottom" ? "Bottom of library (rightmost at the very bottom)" : "Top of library (leftmost on top)"}</h4>
+          <h4>
+            {how === "bottom"
+              ? "Bottom of library (rightmost at the very bottom)"
+              : how === "graveyard" || how === "wholeGraveyard"
+                ? "Top of graveyard (leftmost on top)"
+                : "Top of library (leftmost on top)"}
+          </h4>
           {row(top, true, setTop, how === "bottom")}
-          {how !== "order" && how !== "bottom" && (
+          {!together && (
             <>
               <h4>{how === "scry" ? `${awayName} (rightmost at the very bottom)` : awayName}</h4>
               {row(away, how === "scry", setAway, true)}

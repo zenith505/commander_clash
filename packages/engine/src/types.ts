@@ -646,7 +646,12 @@ export type PendingDecision =
   /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
   | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
-  | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] };
+  | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] }
+  /**
+   * Cards put into this player's graveyard at the same time (CR 404.3), or with `whole` their whole graveyard ("reorder
+   * your graveyard as you choose", Fossil Find): put them in any order. `cards` are as they are now, top first.
+   */
+  | { kind: "orderGraveyard"; player: PlayerId; cards: ObjectId[]; source: string; whole?: true };
 
 export interface GameEvent {
   seq: number;
@@ -680,6 +685,13 @@ export interface GameState {
    * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).
    */
   leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId }[];
+  /**
+   * Cards put into a graveyard in the current event (one instruction of a resolving spell or ability, one pass of
+   * state-based actions, one action's costs), as they are there: their owner arranges them (CR 404.3). See graveyard.ts.
+   */
+  graveyardBatch?: { id: ObjectId; zc: number }[];
+  /** Groups of two or more cards that went to one graveyard at the same time, waiting for their owner to arrange them. */
+  graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[] }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
@@ -884,6 +896,7 @@ export interface Resolving {
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
+    ordered?: boolean; // "reorder your graveyard as you choose" asked already (graveyard.ts)
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
     ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
@@ -947,6 +960,8 @@ export type Action =
   /** Answer to arrangeTop: `top` goes back on top in this order (first = top); `away` goes to the bottom (scry) or graveyard (surveil). */
   /** For "bottom", `top` is the order the cards take at the bottom (first = highest, last = the very bottom). */
   | { type: "arrangeTop"; player: PlayerId; top: ObjectId[]; away: ObjectId[] }
+  /** Answer to orderGraveyard: the same cards in their new order, first = top. */
+  | { type: "orderGraveyard"; player: PlayerId; order: ObjectId[] }
   /** Answer to searchLibrary: the cards found (first = the one for `firstTo`). */
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
   /** Answer to pickPermanents. */

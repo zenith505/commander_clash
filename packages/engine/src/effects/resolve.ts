@@ -8,6 +8,7 @@ import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
 import { manaTriggerResults } from "../manaabilities";
+import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import { addMana } from "../spend";
 import { objectMatches, bindChosen, sourceQuality, isLegalTarget, lesserPowerOk } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
@@ -132,7 +133,15 @@ export function continueResolution(s: GameState): Resolution {
     sourceUntaps: item.sourceUntaps,
   };
   Object.defineProperty(ctx, "chosen", { get: () => r.chosen ?? sourceChosen(s, ctx), enumerable: true });
-  while (r.next < r.body.effects.length) {
+  for (;;) {
+    // Between instructions: the cards the last one put into a graveyard together are arranged by their owner before
+    // the next one, and before the spell itself goes to the graveyard (CR 404.3, 608.2n). Not inside a mana ability,
+    // which can't stop for a choice: the event it's part of ends later.
+    if (!r.scratch && !item.manaAbility) {
+      closeGraveyardBatch(s);
+      if (askGraveyardOrder(s)) return "paused";
+    }
+    if (r.next >= r.body.effects.length) break;
     if (!r.scratch) s.leftTogether = undefined; // a new instruction, not one resuming after a choice
     if (runEffect(s, r.body.effects[r.next]!, ctx) === "paused") return "paused";
     r.next++;
@@ -221,6 +230,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "damagedThisWay") return [...new Set(s.resolving?.damagedThisWay ?? [])].map((id) => obj(s, id)).filter((o) => o.zone === "battlefield" && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)));
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
+  if (ref.ref === "graveyardEnd")
+    return players(s, ref.who, ctx)
+      .map((pid) => graveyardEnd(s, pid, { ...(ref.filter ? { filter: ref.filter } : {}), ...(ref.bottom ? { bottom: true } : {}), ...(ref.only ? { only: true } : {}) }))
+      .filter((o): o is GameObject => !!o);
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
   if (ref.ref === "attached") {
     // What the Aura or Equipment is attached to, while it's still the object the ability came from (CR 400.7).
@@ -440,6 +453,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
+    case "randomFromGraveyard":
+    case "reorderGraveyard":
     case "returnAllFromGraveyard":
     case "putFromHand":
     case "putInLibrary":

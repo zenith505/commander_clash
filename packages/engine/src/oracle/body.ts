@@ -278,6 +278,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       si++;
       continue;
     }
+    // "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
+    // among them without paying their mana costs." (Primeval Spawn), "Target opponent exiles the top X cards of their
+    // library. You may cast any number of spells with mana value X or less from among them ..." (Villainous Wealth): cast
+    // one after another as it resolves, ignoring timing (CR 608.2g, 601.2); lands can't be cast, and the rest stay exiled.
+    // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
+    const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
+    const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
+    const castAmong = castAmongHead && /^You may cast any number of spells(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (castAmongHead && castAmong && (castAmongHead[2] || castAmongHead[3] || afterShuffle)) {
+      const n = castAmongHead[1] ?? castAmongHead[4]!;
+      const whose = castAmongHead[2] ? (castAmongHead[2] === "your" ? "you" : castAmongHead[2] === "their" ? "that player" : castAmongHead[2].replace(/'s$/, "")) : castAmongHead[3] ?? "you";
+      const who = parsePlayer(whose, ctx);
+      if (!who) return null;
+      const limit = castAmong[2] ? amt(castAmong[2]) : undefined;
+      effects.push({ type: "castFromAmong", who, n: amt(n), ...(limit !== undefined ? (castAmong[1] ? { totalMv: limit } : { maxMv: limit }) : {}) });
+      si++;
+      continue;
+    }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
     // counter on it" (Cauldron's Gift): one choice and one move, nothing in between (rulings), and not targeted.
     const yardPick = /^You may choose an? (.+? card) in your graveyard$/.exec(s);

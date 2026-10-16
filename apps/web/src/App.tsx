@@ -3396,7 +3396,7 @@ function Controls({
     );
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none.
-  if (pending?.kind === "chooseOption" && pending.what === "castFromHand" && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

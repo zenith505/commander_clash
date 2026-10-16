@@ -4733,6 +4733,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f2fae95d-074b-4c0c-99cd-f9385a424c05",
+  "name": "Villainous Wealth",
+  "manaCost": "{X}{B}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent exiles the top X cards of their library. You may cast any number of spells with mana value X or less from among them without paying their mana costs.",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ktk",
+  "releasedAt": "2014-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fea95888-e16a-4209-9cd4-623f7f4d2f67",
   "name": "Walking Corpse",
   "manaCost": "{1}{B}",

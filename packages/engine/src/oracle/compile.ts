@@ -898,6 +898,10 @@ export function compile(d: CardDef): CompiledCard {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
       continue;
     }
+    if (line === "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead.") {
+      out.exileUnlessCastWithMana = true;
+      continue;
+    }
     if (line === "During your turn, as long as you haven't activated an exhaust ability this turn, you may activate exhaust abilities as though they haven't been activated.") {
       out.exhaustAgain = true;
       continue;

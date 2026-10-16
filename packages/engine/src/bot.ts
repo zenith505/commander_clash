@@ -215,6 +215,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
     }
+    // "You may cast any number of spells ... from among them": the biggest each time, until none is left or worth it.
+    if (pend.kind === "chooseOption" && pend.what === "castFromAmong") {
+      const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));
+      const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.

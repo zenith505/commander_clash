@@ -730,7 +730,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1146,6 +1146,11 @@ export interface Resolving {
     tapOrUntap?: string; // "tap", "untap" or "neither", for "tap or untap target permanent"
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */
     castFromHand?: string;
+    /**
+     * "You may cast any number of spells ... from among them" (Primeval Spawn): the exiled cards, the total mana value
+     * still allowed, the card last offered, the cards not cast when offered, and the card picked ("none" to stop).
+     */
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     evidence?: ObjectId[]; // the cards picked to collect evidence with as it resolves (CR 701.59a)

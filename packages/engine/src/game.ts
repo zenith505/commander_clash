@@ -576,6 +576,13 @@ export function moveObject(
     delete s.objects[id];
     return;
   }
+  // Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
+  // with the abilities it would have there (614.12). Mana paid for any cost to cast it counts; a copy of a spell, or a
+  // token, wasn't cast (rulings).
+  if (to === "battlefield" && fromZone !== "battlefield" && entersRulesOf(s, opts.controller ?? o.controller, id).exileUnlessCastWithMana && !(fromZone === "stack" && !o.spellCopy && (o.manaSpent ?? 0) > 0)) {
+    log(s, `${defOf(s, o).name} is exiled instead of entering: ${fromZone === "stack" && !o.spellCopy ? "no mana was spent to cast it" : "it wasn't cast"}.`);
+    to = "exile";
+  }
   // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
   o.exileIfLeaves = undefined;
@@ -3901,6 +3908,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "castFromHand") {
     (r.scratch ??= {}).castFromHand = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "castFromAmong") {
+    const st = r.scratch?.castAmong;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");
+    st.pick = choice;
     continueResolution(s);
     return;
   }

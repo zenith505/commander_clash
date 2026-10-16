@@ -1394,6 +1394,11 @@ export type Effect =
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
    */
   /**
+   * "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
+   * among them without paying their mana costs" (Primeval Spawn): `maxMv` each, `totalMv` all together.
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount }
+  /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
@@ -2161,6 +2166,11 @@ export interface CompiledCard {
   entersChoose?: { what: ChoiceKind; except?: string }[];
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
+  /**
+   * Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
+   * judged by the abilities it would have on the battlefield (614.12): under Humility it enters (rulings).
+   */
+  exileUnlessCastWithMana?: true;
   /** "As ~ enters, secretly choose an opponent" (Guardian Archon): see Chosen.secret. */
   entersChooseSecret?: true;
   /**

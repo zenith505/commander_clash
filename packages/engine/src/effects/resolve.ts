@@ -527,6 +527,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "madness":
     case "miracle":
     case "castFromHand":
+    case "castFromAmong":
     case "suspendTick":
     case "suspendCast":
     case "exileSelfWithTime":

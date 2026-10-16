@@ -3,6 +3,7 @@ import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from ".
 import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
+import { manaValue, parseManaCost } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
@@ -555,6 +556,59 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       sc.castFromHand = "cast";
       if (!s.objects[id] || obj(s, id).zone !== "hand" || !castable(id)) return;
       s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
+      return "paused";
+    }
+    case "castFromAmong": {
+      // Exiled face up (CR 406.3), then cast one at a time as this resolves, ignoring timing (CR 608.2g); X is 0 and
+      // no alternative costs (CR 107.3b, 118.9). The total counts the spells' mana values on the stack, which for a
+      // card cast without paying its mana cost is its own with X as 0 (rulings on Primeval Spawn). Lands can't be cast.
+      const sc = (s.resolving!.scratch ??= {});
+      const you = player(s, ctx.controller);
+      if (!sc.castAmong) {
+        const whose = players(s, e.who, ctx)[0];
+        if (whose === undefined) return;
+        const lib = player(s, whose).library;
+        const ids = lib.slice(0, amountNow(s, e.n, ctx));
+        for (const id of ids) moveObject(s, id, "exile");
+        log(s, `${player(s, whose).name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}) };
+      }
+      const st = sc.castAmong;
+      if (st.done) return;
+      const mvOf = (id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
+      if (st.casting) {
+        // Cast: it's on the stack now (a new object, CR 400.7); declined: it stays in exile.
+        if (exiled(st.casting)) st.declined.push(st.casting);
+        else if (st.budget !== undefined) st.budget -= mvOf(st.casting);
+        st.casting = undefined;
+      }
+      if (st.pick !== undefined) {
+        const pick = st.pick;
+        st.pick = undefined;
+        if (pick === "none" || !exiled(pick)) {
+          st.done = true;
+          return;
+        }
+        st.casting = pick;
+        s.pending = { kind: "castFree", player: you.id, objectId: pick, source: src };
+        return "paused";
+      }
+      const castable = (id: ObjectId) => {
+        s.pending = { kind: "castFree", player: you.id, objectId: id, source: src };
+        const problem = castProblem(s, you.id, id);
+        s.pending = null;
+        return problem === null || /^not enough mana/.test(problem);
+      };
+      const options = st.ids
+        .map((x) => x.id)
+        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && castable(id));
+      if (!options.length) {
+        st.done = true;
+        return;
+      }
+      const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the exiled cards without paying its mana cost${left}?` };
       return "paused";
     }
     case "suspendTick": {

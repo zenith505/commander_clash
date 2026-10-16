@@ -850,7 +850,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
-  if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}) });
+  if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
   const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
@@ -1771,6 +1771,7 @@ function finishCleanup(s: GameState) {
   }
   invalidateCharacteristics(s);
   for (const p of s.players) {
+    p.gained = undefined; // "until end of turn" (CR 514.2)
     p.preventNext = undefined;
     p.redirectNext = undefined;
   }
@@ -3345,6 +3346,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
+  // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
+  if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
@@ -3489,7 +3492,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
-  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
+  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
+  if (ab.revealChosen && o.chosen?.player !== undefined) {
+    o.chosen = { ...o.chosen, secret: undefined };
+    log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
+  }
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -3855,8 +3862,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (pend.what === "player") {
       const pid = Number(choice);
       if (!pend.options.includes(choice)) throw new RulesError("choose one of the players offered");
-      o.chosen = { ...o.chosen, player: pid };
-      log(s, `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
+      // "Secretly choose an opponent": nobody else learns who until it's revealed (Guardian Archon).
+      o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
+      log(s, entry?.secret ? `${p.name} secretly chooses an opponent for ${pend.source}.` : `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
       invalidateCharacteristics(s);
       return;
     }
@@ -4071,7 +4079,7 @@ function askEntersChoice(s: GameState): boolean {
         q.shift();
         continue;
       }
-      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `choose ${c.except === "you" ? "an opponent" : "a player"}` };
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
       return true;
     }
     if (c.what === "readAhead") {
@@ -4980,7 +4988,7 @@ function attachmentSBAs(s: GameState): boolean {
       const p = o.attachedToPlayer;
       const enchant = compileCard(defOf(s, o)).enchant!;
       // Nor can it stay on a player with protection from its controller (CR 702.16c, 702.16k).
-      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller);
+      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller, c);
       if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
         moveObject(s, id, "graveyard");

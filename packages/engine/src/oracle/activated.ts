@@ -32,7 +32,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -161,6 +161,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     tap,
     sacrificeSelf: /Sacrifice ~/.test(costs),
     ...(/Exert ~/.test(costs) ? { exertCost: true as const } : {}),
+    ...(/Reveal the player you chose/.test(costs) ? { revealChosen: true as const } : {}),
     sorcerySpeed,
     body,
     text: raw,

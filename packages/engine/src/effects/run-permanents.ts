@@ -12,6 +12,7 @@ import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
 import { phaseOut } from "../phasing";
+import { keywordLabel } from "../keywords";
 
 /**
  * Proliferate (CR 701.27a): choose any number of permanents and players with counters; each gets another of
@@ -505,6 +506,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       });
       const names = affected.map((id) => defOf(s, obj(s, id)).name);
       log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : ""}.`);
+      return;
+    }
+    case "playerGains": {
+      // The chosen color or player filled in now (CR 608.2h); until end of turn (CR 514.2).
+      const mod = fixMods(s, [{ kind: "addKeywords", keywords: e.keywords }], ctx)[0];
+      const keywords = mod?.kind === "addKeywords" ? mod.keywords : [];
+      if (!keywords.length) return;
+      const p = player(s, ctx.controller);
+      p.gained = [...new Set([...(p.gained ?? []), ...keywords])];
+      log(s, `${p.name} gains ${keywords.map((k) => keywordLabel(k, (x) => player(s, x).name).toLowerCase()).join(" and ")} until end of turn.`);
       return;
     }
     case "attach": {

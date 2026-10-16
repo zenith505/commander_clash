@@ -124,6 +124,14 @@ export const CHOSEN_KEYWORD = "(the chosen keyword)";
 export const PROTECTION_FROM_OPPONENTS = "Protection from each of your opponents";
 /** "Protection from the chosen player" (True-Name Nemesis): the player chosen as it entered (CR 702.16k). */
 export const CHOSEN_PLAYER_PROTECTION = "Protection from the chosen player";
+/**
+ * "Gains protection from the chosen player until end of turn" (Guardian Archon), as it resolved: protection from that
+ * one player (CR 702.16k), whoever the permanent's own chosen player is.
+ */
+export const protectionFromPlayer = (pid: number) => `Protection from player #${pid}`;
+const PLAYER_PROTECTION = /^Protection from player #(\d+)$/;
+/** A keyword as shown to people: "Protection from player #2" names that player. */
+export const keywordLabel = (k: string, name: (pid: number) => string) => k.replace(PLAYER_PROTECTION, (_, n: string) => `Protection from ${name(Number(n))}`);
 /** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
@@ -183,6 +191,7 @@ export function protectedFromPlayer(keywords: readonly string[], pid: number, ho
   for (const k of keywords) {
     if (k === PROTECTION_FROM_OPPONENTS && pid !== holder.controller) return true;
     if (k === CHOSEN_PLAYER_PROTECTION && holder.chosenPlayer === pid) return true;
+    if (Number(PLAYER_PROTECTION.exec(k)?.[1] ?? NaN) === pid) return true;
   }
   return false;
 }

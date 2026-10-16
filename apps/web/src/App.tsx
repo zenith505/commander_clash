@@ -109,6 +109,7 @@ import {
   power,
   toughness,
   waitingOn,
+  keywordLabel,
   type CardDef,
   type ManaType,
   type GameObject,
@@ -2070,7 +2071,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
           {m.lostAllAbilities && <span className="kw none">No abilities</span>}
           {m.grantedKeywords.map((k) => (
             <span key={k} className="kw">
-              {k}
+              {keywordLabel(k, (x) => s.players[x]!.name)}
             </span>
           ))}
           {m.grantedAbilities.length > 0 && (
@@ -2356,6 +2357,11 @@ function Seat({
             {ringBearer(s, pid) ? `: ${cardOf(s, ringBearer(s, pid)!.id).name}` : ""}
           </span>
         )}
+        {p.gained?.length ? (
+          <span className="muted" title={`Until end of turn, ${p.name} has ${p.gained.map((k) => keywordLabel(k, (x) => s.players[x]!.name).toLowerCase()).join(" and ")}.`}>
+            🛡 {p.gained.map((k) => keywordLabel(k, (x) => s.players[x]!.name)).join(", ")}
+          </span>
+        ) : null}
         {phasedOut.length > 0 && (
           <span className="muted" title={`Phased out (treated as though they don't exist until they phase in during their controller's untap step): ${phasedOut.map((id) => cardOf(s, id).name).join(", ")}`}>
             ◌ Phased out {phasedOut.length}

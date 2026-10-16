@@ -8,6 +8,7 @@ import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
 import { parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
+import { canonicalKeyword } from "../../keywords";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -285,6 +286,21 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
     const first = what && parseChanges(m[2]!);
     return what && first ? [{ type: "continuous", what, mods: [...first, { kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
+  }
+  // "You gain shroud until end of turn" (Gilded Light), "You and permanents you control gain hexproof until end of turn"
+  // (Lazotep Plating), "You and target permanent you control each gain protection from the chosen player until end of
+  // turn" (Guardian Archon), "you gain protection from the chosen color" (Seht's Tiger): the player gains it too (CR
+  // 702.11d, 702.16b-e, 702.16k, 702.18d).
+  if ((m = /^You(?: and (.+?))?(?: each)? gains? (hexproof|shroud|protection from [a-z ]+?) until end of turn$/i.exec(s))) {
+    const k = canonicalKeyword(m[2]!);
+    if (!k || !/^(?:Hexproof|Shroud|Protection from )/.test(k)) return null;
+    const out: Effect[] = [{ type: "playerGains", keywords: [k] }];
+    if (m[1]) {
+      const what = parseObject(m[1], ctx);
+      if (!what) return null;
+      out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: [k] }], duration: "endOfTurn" });
+    }
+    return out;
   }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

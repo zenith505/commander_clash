@@ -1393,6 +1393,11 @@ export type Effect =
    * "Choose a creature type." / "Choose a color." while it resolves: later instructions use the
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
    */
+  /**
+   * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
+   * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
+   */
+  | { type: "playerGains"; keywords: string[] }
   | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[] };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
@@ -1856,6 +1861,8 @@ export interface ActivatedAbility {
   station?: true;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
+  /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
+  revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
   onceEver?: true;
   /** The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). */
@@ -2154,6 +2161,8 @@ export interface CompiledCard {
   entersChoose?: { what: ChoiceKind; except?: string }[];
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
+  /** "As ~ enters, secretly choose an opponent" (Guardian Archon): see Chosen.secret. */
+  entersChooseSecret?: true;
   /**
    * Riot (CR 702.136a): enters with a +1/+1 counter or gains haste. Unleash (CR 702.98a): may enter with
    * a +1/+1 counter. Chosen as it enters, by its controller.

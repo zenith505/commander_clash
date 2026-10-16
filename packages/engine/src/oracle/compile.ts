@@ -607,10 +607,12 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
-    // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player".
-    const choosePlayer = /^As (?:~|it) enters, choose (a player|an opponent)\.$/.exec(line);
+    // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player". "Secretly choose an opponent"
+    // (Guardian Archon): the same, but only its controller knows who until it's revealed.
+    const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
     if (choosePlayer && !out.entersChoosePlayer) {
-      out.entersChoosePlayer = choosePlayer[1] === "a player" ? "player" : "opponent";
+      out.entersChoosePlayer = choosePlayer[2] === "a player" ? "player" : "opponent";
+      if (choosePlayer[1]) out.entersChooseSecret = true;
       continue;
     }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."

@@ -3,7 +3,7 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { addTriggeredMana, askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
+import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -413,6 +413,13 @@ function subjectEvenIfGone(s: GameState, ctx: ResolveCtx): GameObject[] {
   return zc === ctx.subject!.zc ? [o] : zc === ctx.subject!.zc + 1 && o.zone !== "battlefield" ? [o] : [];
 }
 
+/** The player chosen for the source as it entered ("the chosen player"), as the ability was activated or as it is now. */
+export function chosenPlayerOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
+  if (ctx.lki?.chosenPlayer !== undefined) return ctx.lki.chosenPlayer;
+  const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  return o && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc) ? o.chosen?.player : undefined;
+}
+
 /**
  * A resolving effect's changes with their numbers worked out now: "gets +X/+X" doesn't change
  * later if X's count does (CR 608.2h, 611.2c).
@@ -425,6 +432,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
       : // "Gains protection from the color of your choice": the color chosen as it resolved.
         m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PROTECTION)
         ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
+        : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
+          m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
+        ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_PLAYER_PROTECTION ? [k] : chosenPlayerOf(s, ctx) !== undefined ? [protectionFromPlayer(chosenPlayerOf(s, ctx)!)] : [])) }
         : // "Gains your choice of menace or lifelink": the keyword chosen as it resolved.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_KEYWORD)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_KEYWORD ? [k] : s.resolving?.chosen?.keyword ? [s.resolving.chosen.keyword] : [])) }
@@ -554,6 +564,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "evolve":
     case "explore":
     case "continuous":
+    case "playerGains":
     case "attach":
     case "unattachSelf":
     case "transformSelf":

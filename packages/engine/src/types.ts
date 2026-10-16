@@ -389,6 +389,11 @@ export interface Player {
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;
   speedTurn?: number;
+  /**
+   * What this player gained until end of turn ("You gain shroud until end of turn", "you gain protection from the chosen
+   * player"): Hexproof, Shroud or a protection keyword (CR 702.11d, 702.16b-e, 702.18d), lost in the cleanup step (514.2).
+   */
+  gained?: string[];
   /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
   exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
@@ -583,6 +588,8 @@ export interface LastKnown {
   controller?: PlayerId;
   /** It was suspected as it last existed (CR 701.60): "if the sacrificed creature was suspected". */
   suspected?: true;
+  /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
+  chosenPlayer?: PlayerId;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
@@ -966,7 +973,7 @@ export interface GameState {
    * in `returned`. `asking`: that one is being asked now.
    */
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; secret?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -1008,6 +1015,8 @@ export interface Chosen {
   keyword?: string;
   /** "As ~ enters, choose a player" (True-Name Nemesis). */
   player?: PlayerId;
+  /** "Secretly choose an opponent" (Guardian Archon): only its controller knows who, until it's revealed. */
+  secret?: true;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

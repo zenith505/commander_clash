@@ -2100,6 +2100,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c7748659-0206-448f-8567-83565cb0b51a",
+  "name": "Guardian Archon",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Archon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Archon"
+  ],
+  "oracleText": "Flying\nAs this creature enters, secretly choose an opponent.\nReveal the player you chose: You and target permanent you control each gain protection from the chosen player until end of turn. Activate only once.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8e04a5e0-e22c-430b-a39a-c9f38e16ea86",
   "name": "Guardian of Faith",
   "manaCost": "{1}{W}{W}",

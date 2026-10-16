@@ -241,9 +241,11 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
 
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
 
-/** Hexproof or shroud a player has from a permanent they control ("You have hexproof"). */
+/** Hexproof or shroud a player has from a permanent they control ("You have hexproof"), or until end of turn ("You gain shroud"). */
 export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shroud" | undefined {
-  let out: "hexproof" | undefined;
+  const gained = s.players[pid]?.gained ?? [];
+  if (gained.includes("Shroud")) return "shroud";
+  let out: "hexproof" | undefined = gained.includes("Hexproof") ? "hexproof" : undefined;
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     if (controllerOf(s, o) !== pid) continue;
@@ -254,9 +256,16 @@ export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shr
   return out;
 }
 
-/** Does `pid` have protection from player `from` ("You have protection from each of your opponents", CR 702.16k)? */
-export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId): boolean {
-  if (from === pid) return false;
+/**
+ * Does `pid` have protection from player `from` ("You have protection from each of your opponents", CR 702.16k), or from
+ * a source that player controls (`src`: "you gain protection from the color of your choice until end of turn", 702.16b-e)?
+ */
+export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId | undefined, src?: SourceQuality): boolean {
+  const gained = s.players[pid]?.gained ?? [];
+  const holder = { controller: pid };
+  if (src && protectedFrom(gained, src.controller === undefined && from !== undefined ? { ...src, controller: from } : src, holder)) return true;
+  if (from === undefined || from === pid) return false;
+  if (protectedFromPlayer(gained, from, holder)) return true;
   return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youHave === "protection");
 }
 
@@ -268,7 +277,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // "You have hexproof": not by opponents' spells and abilities (CR 702.11d); "you have shroud": by none (CR 702.18d).
     const prot = playerProtection(s, t.id);
     if (prot === "shroud" || (prot === "hexproof" && t.id !== controller)) return false;
-    if (playerProtectedFrom(s, t.id, controller)) return false; // CR 702.16k
+    if (playerProtectedFrom(s, t.id, controller, src)) return false; // CR 702.16b, 702.16k
     if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
     return !spec.opponent || t.id !== controller;

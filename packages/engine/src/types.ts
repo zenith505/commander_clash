@@ -1022,6 +1022,8 @@ export interface Resolving {
   destroyed?: { o: GameObject; ch: Characteristics }[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
   countered?: Record<ObjectId, { zc: number; x: number }>;
+  /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
+  revealed?: { id: ObjectId; zc: number };
   /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */

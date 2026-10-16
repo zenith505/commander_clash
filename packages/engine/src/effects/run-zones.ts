@@ -783,6 +783,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) })));
       return;
     }
+    case "putInGraveyard":
+      for (const o of objects(s, e.what, ctx)) {
+        log(s, `${src}: ${player(s, o.owner).name} puts ${defOf(s, o).name} into their graveyard.`);
+        moveObject(s, o.id, "graveyard");
+      }
+      return;
     case "putInLibrary":
       for (const o of objects(s, e.what, ctx)) {
         let position = e.position;

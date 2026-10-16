@@ -143,6 +143,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (ctx.treasureSpent ?? 0) > 0
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
+            : e.cond.kind === "revealedIs"
+            ? revealedIs(s, e.cond.filter) !== !!e.cond.not
             : e.cond.kind === "targetIs"
             ? objects(s, { ref: "target", index: e.cond.index }, ctx).some((o) => o.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, o, ctx.controller, false))
             : e.cond.kind === "teamwork"
@@ -161,6 +163,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return runBranch(s, holds, holds ? e.effects : (e.otherwise ?? []), ctx);
     }
   }
+}
+
+/** Is the card the last "reveal the top card of your library" revealed one like this (printed characteristics, in the library)? */
+function revealedIs(s: GameState, filter: TargetSpec): boolean {
+  const rv = s.resolving?.revealed;
+  const o = rv && s.objects[rv.id];
+  return !!o && (o.zoneChanges ?? 0) === rv.zc && printedMatches(filter, defOf(s, o));
 }
 
 /** How many "if" instructions are running inside one another right now: each keeps its place in `scratch.ifs`. */
@@ -250,6 +259,8 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).length) return false;
     // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.
     if ((e.type === "exile" || e.type === "putOntoBattlefield") && e.what.ref === "graveyardEnd" && !objects(s, e.what, ctx).length) return false;
+    // "You may put it into your graveyard" after revealing nothing (an empty library) or a card that has left: nothing to ask.
+    if ("what" in e && typeof e.what === "object" && e.what && "ref" in e.what && e.what.ref === "revealed" && !objects(s, e.what, ctx).length) return false;
     // Damage to a target that's no longer legal isn't dealt (CR 608.2b); a creature that's gone deals none.
     if (e.type === "damage" && "index" in e.to && !ctx.legal[e.to.index]) return false;
     if (e.type === "bite" && (!objects(s, e.a, ctx).length || !objects(s, e.b, ctx).length)) return false;

@@ -97,7 +97,7 @@ function shiftTargets<T>(x: T, offset: number): T {
   const copy: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(o)) copy[k] = shiftTargets(v, offset);
   // References into the targets list: { ref: "target" | "targetController" | "anyTarget", index } and counterSpell's index.
-  const refersToTarget = o.ref === "target" || o.ref === "targetController" || o.ref === "anyTarget" || o.type === "counterSpell";
+  const refersToTarget = o.ref === "target" || o.ref === "targetController" || o.ref === "targetOwner" || o.ref === "anyTarget" || o.type === "counterSpell";
   if (refersToTarget && typeof o.index === "number") copy.index = o.index + offset;
   return copy as T;
 }

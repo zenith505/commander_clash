@@ -32,6 +32,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
       }
       return;
+    case "revealTop": {
+      // An empty library: nothing is revealed, and an "if it's a ... card" after it is false.
+      const p = player(s, ctx.controller);
+      const id = p.library[0];
+      s.resolving!.revealed = id ? { id, zc: s.objects[id]!.zoneChanges ?? 0 } : undefined;
+      if (id) log(s, `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
+      return;
+    }
     case "revealTopToHand": {
       const p = player(s, ctx.controller);
       const id = p.library[0];

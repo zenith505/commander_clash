@@ -434,6 +434,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const ap = s.players[s.activePlayer];
       return s.step === "declareAttackers" && ap?.attackedPlayers?.turn === s.turn && ap.attackedPlayers.players.includes(you);
     }
+    case "amount": {
+      // Counted as the layers applied so far left things ("permanents you control": control is layer 2).
+      const n = evalAmount(s, cond.amount, { controller: you, sourceId, view: (o) => chars.get(o.id) });
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+    }
     case "monarch":
       return s.monarch === you;
     case "initiative":

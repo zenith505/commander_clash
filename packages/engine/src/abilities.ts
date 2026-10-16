@@ -77,6 +77,8 @@ export type Count =
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
   | { kind: "destroyedThisWay"; filter: TargetSpec }
+  /** "For each nontoken creature exiled this way" (Declaration in Stone): permanents, as they last existed. */
+  | { kind: "exiledThisWay"; filter: TargetSpec }
   /**
    * "If the discovered card's mana value is less than 10, ... equal to the difference" (Hit the Mother Lode): `n` minus the
    * mana value of the card this spell or ability discovered (CR 701.57c), 0 if it's not less or nothing was discovered.
@@ -335,7 +337,18 @@ export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 /** Which object(s) an effect touches. */
 export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
-  | { ref: "target"; index: number; n?: number }
+  | {
+      ref: "target";
+      index: number;
+      n?: number;
+      /**
+       * "Target creature and all other creatures with the same name as that creature" (Maelstrom Pulse): also every other
+       * permanent matching `filter` (controlled by the target's controller, `of`) with the target's name as this resolves.
+       * Only the target is targeted; none are affected if it's illegal (CR 608.2b, rulings). A face-down permanent has no
+       * name (CR 708.2a), so it shares one with nothing.
+       */
+      sameName?: { filter: TargetSpec; of?: true };
+    }
   | { ref: "self" } // the source permanent ("this creature")
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
   | { ref: "castSpell" }
@@ -350,6 +363,8 @@ export type ObjRef =
   | { ref: "created" }
   /** "The sacrificed creature": what was sacrificed to cast the spell, as it last existed (CR 608.2h). */
   | { ref: "sacrificed" }
+  /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
+  | { ref: "revealed" }
   /**
    * "Creatures you control get +1/+1 until end of turn. Untap those creatures": the permanents this resolution's last
    * continuous effect changed, locked in as it began (CR 611.2c), while they're still those objects on the battlefield.
@@ -383,6 +398,7 @@ export type PlayerRef =
   | { ref: "eachOpponent" }
   | { ref: "eachPlayer" }
   | { ref: "targetController"; index: number } // "its controller"
+  | { ref: "targetOwner"; index: number } // "its owner": a targeted card's owner (Pharika's "Its owner creates ...")
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
   | { ref: "eventPlayer" }
   /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
@@ -621,6 +637,8 @@ export interface StaticAbility {
  */
 export type StaticCondition =
   | { kind: "graveyardAtLeast"; n: number }
+  /** A number compared to fixed bounds: "as long as your devotion to black is less than five" (Theros gods, CR 700.5). */
+  | { kind: "amount"; amount: Amount; min?: number; max?: number }
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
   | { kind: "selfInGraveyard"; creatureAbove?: true }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
@@ -1117,6 +1135,10 @@ export type Effect =
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
    */
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean } }
+  /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
+  | { type: "revealTop" }
+  /** "Put it into your graveyard": the revealed card, from the library (not milling, CR 701.17). */
+  | { type: "putInGraveyard"; what: ObjRef }
   /** Champion's first ability (CR 702.72a): "sacrifice it unless you exile another [object] you control". */
   | { type: "champion"; filter: TargetSpec }
   /** Champion's second: "When this permanent leaves the battlefield, return the exiled card to the battlefield under its owner's control." */
@@ -1383,7 +1405,9 @@ export type SpellCondition =
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
-  | { kind: "targetIs"; index: number; filter: TargetSpec };
+  | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
+  | { kind: "revealedIs"; filter: TargetSpec; not?: true };
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>

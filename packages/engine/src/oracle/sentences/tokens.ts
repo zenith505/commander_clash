@@ -6,6 +6,7 @@ import { NUMX, X, amt, singularWord, isGroup } from "../words";
 import { parsePlayer, parseObject } from "../targets";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept } from "../tokens";
 import { parseSentence } from "../sentence";
+import { parseCount } from "../counts";
 import type { Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -15,8 +16,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Tokens, maybe "tapped and attacking" (CR 508.4): "Create a tapped and attacking 1/1 red Warrior creature
   // token", "Create two 1/1 white Soldier creature tokens with haste that are tapped and attacking".
   // Another player can create them: "Target opponent creates three 2/2 white Knight creature tokens", "each opponent
-  // creates ..." (Hunted Dragon, Forbidden Orchard): that player creates and controls them (CR 111.2).
-  if ((m = new RegExp(`^(?:(.+?) creates|Create) ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
+  // creates ..." (Hunted Dragon, Forbidden Orchard): that player creates and controls them (CR 111.2). "You create" after
+  // another player's instruction (No Way Out) is the plain "create".
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const token = parseToken(Number(m[4]), Number(m[5]), m[6]!, m[7]);
     const how = `${m[3] ?? ""} ${m[8] ?? ""}`;
@@ -26,7 +28,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
   // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name
   // means the token itself ("When Smaug dies, ...").
-  if ((m = /^(?:(.+?) creates|[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (\d+)\/(\d+) (.+?) creature token(?: with (.+))?$/.exec(s))) {
+  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (\d+)\/(\d+) (.+?) creature token(?: with (.+))?$/.exec(s))) {
     const name = m[2]!;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -36,7 +38,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".
-  if ((m = new RegExp(`^(?:(.+?) creates|Create) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const what = parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
     const except = m[5] ? parseCopyExcept(m[5]) : undefined;
@@ -97,6 +99,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Investigate (CR 701.16): create a Clue token.
   if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
+  // "That player investigates for each nontoken creature exiled this way" (Declaration in Stone).
+  if ((m = /^(.+?) investigates for each (.+)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const n = parseCount(m[2]!, ctx, true);
+    return who && n ? [{ type: "createToken", who, n, token: PREDEFINED_TOKENS.Clue! }] : null;
+  }
   // Explore (CR 701.44)
   if (/^~ explores$/.test(s)) return [{ type: "explore" }];
   // "Target creature you control explores" (a Map token, CR 111.10s): its controller is you.

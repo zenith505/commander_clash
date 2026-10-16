@@ -245,10 +245,9 @@ const copyChars = (c: Characteristics): Characteristics => ({
 type CharMap = Map<ObjectId, Characteristics>;
 
 /**
- * The keywords a keyword counter can be (CR 122.1b): the keyword a counter of this kind gives, if it's one. (Decayed is
- * one too, but the engine doesn't have that keyword.)
+ * The keywords a keyword counter can be (CR 122.1b): the keyword a counter of this kind gives, if it's one.
  */
-const KEYWORD_COUNTERS = ["flying", "first strike", "double strike", "deathtouch", "exalted", "haste", "hexproof", "indestructible", "lifelink", "menace", "reach", "shadow", "trample", "vigilance"];
+const KEYWORD_COUNTERS = ["flying", "first strike", "double strike", "deathtouch", "decayed", "exalted", "haste", "hexproof", "indestructible", "lifelink", "menace", "reach", "shadow", "trample", "vigilance"];
 export function keywordOfCounter(kind: string): string | undefined {
   return KEYWORD_COUNTERS.includes(kind) ? kind[0]!.toUpperCase() + kind.slice(1) : undefined;
 }
@@ -434,6 +433,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       // Attackers are declared as the declare attackers step begins (CR 508.1); attacking only planeswalkers doesn't count.
       const ap = s.players[s.activePlayer];
       return s.step === "declareAttackers" && ap?.attackedPlayers?.turn === s.turn && ap.attackedPlayers.players.includes(you);
+    }
+    case "amount": {
+      // Counted as the layers applied so far left things ("permanents you control": control is layer 2).
+      const n = evalAmount(s, cond.amount, { controller: you, sourceId, view: (o) => chars.get(o.id) });
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
     case "monarch":
       return s.monarch === you;
@@ -1013,7 +1017,7 @@ export function invalidateCharacteristics(s: GameState) {
 }
 
 export function characteristics(s: GameState, o: GameObject): Characteristics {
-  if (o.zone !== "battlefield") return printed(s, o);
+  if (o.zone !== "battlefield") return withCounters(o, printed(s, o));
   let hit = cacheEnabled ? cache.get(s) : undefined;
   if (hit?.sig !== undefined && hit.sig !== countSignature(s)) hit = undefined;
   if (!hit || !hit.map.has(o.id)) {
@@ -1021,6 +1025,24 @@ export function characteristics(s: GameState, o: GameObject): Characteristics {
     if (cacheEnabled) cache.set(s, hit);
   }
   return hit.map.get(o.id) ?? printed(s, o);
+}
+
+/**
+ * A card outside the battlefield with counters on it (an effect put them there, CR 122.2): a keyword counter gives it that
+ * keyword (CR 122.1b), and +1/+1 and -1/-1 counters change a creature card's power and toughness (CR 122.1a).
+ */
+function withCounters(o: GameObject, c: Characteristics): Characteristics {
+  for (const [kind, n] of Object.entries(o.counters)) {
+    const kw = (n ?? 0) > 0 ? keywordOfCounter(kind) : undefined;
+    if (kw && !c.keywords.some((k) => sameCI(k, kw))) c.keywords.push(kw);
+  }
+  const n = (o.counters["+1/+1"] ?? 0) - (o.counters["-1/-1"] ?? 0);
+  if (n && c.types.includes("Creature")) {
+    c.power += n;
+    c.toughness += n;
+    c.pt.push({ source: "counters", kind: "counters", power: n, toughness: n, untilEndOfTurn: false });
+  }
+  return c;
 }
 
 /** Who controls this object right now (after control-changing effects). */

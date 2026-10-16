@@ -92,6 +92,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).
   else if ((m = /^(~ .+?) if (you've committed a crime this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   if (!statement || !cond) return null;
+  // Theros gods: "As long as your devotion to black is less than five, ~ isn't a creature": it loses the card type
+  // creature and its creature types (layer 4, CR 205.3d; rulings). It works even if the God lost all abilities, as layer 4
+  // comes before layer 6 (rulings).
+  if (statement === "~ isn't a creature") {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "loseTypes", types: ["Creature"] }], text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
   const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
@@ -266,6 +274,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
+  // "Your devotion to black is less than five" (Theros gods, CR 700.5), "... is five or greater".
+  if ((m = new RegExp(`^(your devotion to .+?) is (?:less than ${NUM}|${NUM} or greater)$`).exec(text))) {
+    const amount = parseCount(m[1]!, null);
+    if (!amount) return null;
+    return m[2] ? { kind: "amount", amount, max: num(m[2]) - 1 } : { kind: "amount", amount, min: num(m[3]!) };
+  }
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"

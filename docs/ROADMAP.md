@@ -1,6 +1,6 @@
 # Roadmap
 
-17,999 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,108 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -94,8 +94,24 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (`npm run blockers`).
    Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
    counters):
-   - Keyword counters work on permanents; one on a card in another zone (CR 122.1b) isn't modeled, and decayed counters
-     aren't (the engine has no decayed keyword: Rot-Curse Rakshasa).
+   - Keyword and +1/+1 counters count on cards in other zones (CR 122.1b), but printed-card filters (a card in a
+     graveyard "with flying") don't see them; no supported card puts counters on a card off the battlefield yet.
+   Left from the decayed, Theros gods, reveal-top and same-name round:
+   - Decayed still out on other lines: Diregraf Horde ("When you do, exile up to two target cards from graveyards"),
+     Ghoulcaller's Harvest ("half ... rounded up"), Ghouls' Night Out, Gisa ("They gain decayed"), Poppet Stitcher,
+     Tainted Adversary ("pay {2}{B} any number of times").
+   - Gods still out on other lines: Athreos (both), Ephara, Keranos, Klothys, Kruphix, Phenax, Purphoros Bronze-Blooded.
+   - "Reveal the top card of your library. If it's a X card, A. Otherwise, B" works for a card type filter and moves
+     of "it"; still out: "you may reveal ... If a X card is revealed this way" (Elven Farsight, Galadriel, Isolated
+     Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter), "with mana value 3 or less" (Kellan),
+     "of the chosen type" (Bloodline Shaman), "it" meaning the source (Harsh Deceiver), amounts from the revealed card
+     (Nissa's Revelation, Sapling of Colfenor, Baneful Omen), "repeat this process" (Countryside Crusher), casting it
+     (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel).
+   - "Target X and all other Xs with the same name as that X" works on the battlefield; still out: cards in a graveyard
+     (Echoing Return, Rat King), "not named ~" (Detention Sphere), "search its controller's graveyard, hand, and
+     library for all cards with the same name" (Eradicate, Splinter, Scour, Sowing Salt, Crumble to Dust, The End),
+     Legion's End's "exiles all cards with that name from their hand". Bots don't check whether a same-named
+     permanent of their own would be hit too.
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
      (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and

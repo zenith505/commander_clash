@@ -648,7 +648,7 @@ export type PendingDecision =
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
-  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom"; cards: ObjectId[]; source: string; owner?: PlayerId }
+  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom" | "look"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
   /**
    * "You may collect evidence N" as a spell or ability resolves (CR 701.59a): pick cards in your graveyard with total
@@ -1020,8 +1020,12 @@ export interface Resolving {
    * counts; one that wasn't destroyed (indestructible, regenerated) doesn't (rulings on Fumigate and Bane of Progress).
    */
   destroyed?: { o: GameObject; ch: Characteristics }[];
+  /** The permanents its exile instructions exiled so far while this resolves, as they last existed ("exiled this way"). */
+  exiled?: { o: GameObject; ch: Characteristics }[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
   countered?: Record<ObjectId, { zc: number; x: number }>;
+  /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
+  revealed?: { id: ObjectId; zc: number };
   /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */

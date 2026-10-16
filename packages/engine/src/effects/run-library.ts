@@ -32,6 +32,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
       }
       return;
+    case "revealTop": {
+      // An empty library: nothing is revealed, and an "if it's a ... card" after it is false.
+      const p = player(s, ctx.controller);
+      const id = p.library[0];
+      s.resolving!.revealed = id ? { id, zc: s.objects[id]!.zoneChanges ?? 0 } : undefined;
+      if (id) log(s, `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
+      return;
+    }
     case "revealTopToHand": {
       const p = player(s, ctx.controller);
       const id = p.library[0];
@@ -233,13 +241,18 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const lib = player(s, owner);
       const arranged = r.scratch?.arranged;
       if (!arranged) {
-        const cards = lib.library.slice(0, amountNow(s, e.n, ctx));
-        if (cards.length < 2) return; // nothing to order
-        s.pending = { kind: "arrangeTop", player: ctx.controller, how: "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
+        const n = amountNow(s, e.n, ctx);
+        const cards = lib.library.slice(0, n);
+        // "Look at the top card of your library" (Brutal Deceiver): the player sees it; with more asked for, one card
+        // has nothing to order.
+        const look = n === 1 && cards.length === 1;
+        if (cards.length < 2 && !look) return;
+        s.pending = { kind: "arrangeTop", player: ctx.controller, how: look ? "look" : "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
         return "paused";
       }
       const looked = new Set(arranged.top);
       lib.library = [...arranged.top, ...lib.library.filter((id) => !looked.has(id))];
+      if (looked.size === 1) return void log(s, `${player(s, ctx.controller).name} looks at the top card of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library.`);
       log(s, `${player(s, ctx.controller).name} looks at the top ${looked.size} cards of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library and puts them back in any order.`);
       return;
     }

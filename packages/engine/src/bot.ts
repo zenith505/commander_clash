@@ -234,7 +234,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "arrangeTop", player: pid, top: [...pend.cards].sort((a, b) => rank(a) - rank(b)), away: [] }];
     }
     // Going to the bottom (CR 401.4): the order hardly matters to a bot.
-    if (pend.kind === "arrangeTop" && pend.how === "bottom") return [{ type: "arrangeTop", player: pid, top: [...pend.cards], away: [] }];
+    if (pend.kind === "arrangeTop" && (pend.how === "bottom" || pend.how === "look")) return [{ type: "arrangeTop", player: pid, top: [...pend.cards], away: [] }];
     if (pend.kind === "arrangeTop") {
       const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
       return [{ type: "arrangeTop", player: pid, top: keep, away: pend.cards.filter((id) => !keep.includes(id)) }];
@@ -1451,6 +1451,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       v += harm[i] !== isMine(s, pid, t) ? 1 : -1;
     } else if ((inner.type === "loseLife" || inner.type === "discard") && "who" in inner && inner.who.ref === "you") v -= 1;
     else if (inner.type === "pick" && inner.action === "bounce" && inner.who.ref === "you") v -= 1; // our own permanent back to hand
+    else if (inner.type === "pick" && inner.action === "sacrifice" && inner.who.ref === "you") {
+      // "You may sacrifice a Zombie. If you do, draw a card": a token, a decayed creature or a spare land costs little.
+      const options = pickOptions(s, inner, pid, r.item.sourceId).map((id) => obj(s, id)).filter((o) => !o.isCommander);
+      const cost = (o: GameObject) => (o.isToken || objHasKeyword(s, o, "Decayed") ? 0.5 : objIsType(s, o, "Land") ? (lands(s, pid) >= 7 ? 0.5 : 3) : worth(s, pid, o) <= 3 ? 1.5 : 3);
+      v -= options.length ? Math.min(...options.map(cost)) : 10;
+    }
     else if (inner.type === "moveCounter") {
       // Graft: only onto our own creatures.
       const to = r.item.subject && s.objects[r.item.subject.id];
@@ -1784,6 +1790,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
+      // "{1}: Look at the top card of your library" (Brutal Deceiver): nothing a bot can use.
+      if (!ab.body.modal && ab.body.effects.every((e) => e.type === "orderTop" && e.n === 1)) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;

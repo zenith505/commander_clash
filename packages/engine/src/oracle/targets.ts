@@ -47,7 +47,9 @@ export function pickFilter(phrase: string): TargetSpec | null {
   const words = phrase.trim().replace(/ you control$/i, "").split(" ");
   // "a Plains" is already singular; "two creatures" isn't.
   const asIs = words.join(" ");
-  const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === words.length - 1 ? singular(w) : w)).join(" ");
+  // "creatures with decayed": the noun before "with" is the plural one.
+  const head = words.indexOf("with") > 0 ? words.indexOf("with") - 1 : words.length - 1;
+  const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === head ? singular(w) : w)).join(" ");
   const spec = parseTargetPhrase(one);
   if (spec?.kind !== "object" || spec.controller) return null;
   return { ...spec, text: one };
@@ -75,11 +77,17 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   }
   const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
   if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
+  // "Exile target creature and all other creatures its controller controls .... That player investigates ...": that
+  // creature's controller (as it last existed, CR 608.2h).
+  if (x === "that player" && ctx.controllerNamed !== undefined && ctx.controllerNamed === ctx.lastObjectTarget && ctx.lastPlayerTarget === undefined) return { ref: "targetController", index: ctx.controllerNamed };
   // "Target player discards two cards. ... that player discards a card": the player targeted before.
   if (x === "that player" && ctx.lastPlayerTarget !== undefined && !manyNow) return { ref: "target", index: ctx.lastPlayerTarget };
   // "Counter target spell. ... that spell's controller mills X cards" (Induce Paranoia): who controlled it as it was
   // countered (CR 608.2h).
   if (x === "that spell's controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell") return { ref: "targetController", index: ctx.lastObjectTarget };
+  // "Exile target creature card from a graveyard. Its owner creates ..." (Pharika): whose card it is (CR 108.3).
+  const lastCard = ctx.targets.length - 1;
+  if ((x === "its owner" || x === "that card's owner") && ctx.targets[lastCard]?.kind === "card" && ctx.targets.filter((t) => t.kind === "card").length === 1 && !ctx.targets[lastCard]!.many) return { ref: "targetOwner", index: lastCard };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -135,6 +143,21 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) {
     ctx.lastAttached = true;
     return { ref: "attached" };
+  }
+  // "Target creature and all other creatures with the same name as that creature" (Maelstrom Pulse, Homing Lightning,
+  // Declaration in Stone's "all other creatures its controller controls", Legions to Ashes' "all tokens that player
+  // controls"): one target, and the others by name as it resolves.
+  const same = /^(target .+?) and (all|each) (?:other )?(.+?) with the same name as that (creature|permanent|artifact|enchantment|land)$/i.exec(x);
+  if (same && !cards) {
+    let rest = same[3]!;
+    const ctl = / (?:its controller|that player) controls$/i.exec(rest);
+    if (ctl) rest = rest.slice(0, ctl.index);
+    const g = /^tokens$/i.test(rest) ? { filter: { kind: "object" as const, token: true, text: "tokens" }, other: false } : parseGroup(`${same[2]} ${rest}`, true);
+    if (!g || g.other || (ctl && g.filter.controller)) return null;
+    const t = parseObjectNow(same[1]!, ctx, cards);
+    if (t?.ref !== "target" || t.n) return null;
+    if (ctl) ctx.controllerNamed = t.index;
+    return { ...t, sameName: { filter: g.filter, ...(ctl ? { of: true as const } : {}) } };
   }
   // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
   // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).
@@ -195,7 +218,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // many is announced as it's cast, so one entry stands for them all until then (TargetSpec.many).
   // "Destroy X target creatures": exactly X of them (Eliminate the Competition).
   const many = range === "any number of" ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
-  if (count === "X" && (!ctx.spell || ctx.whereX)) return null;
+  // A spell's X, or an activated ability's {X} (CR 107.3a, 602.2b), announced before targets are chosen.
+  if (count === "X" && (!(ctx.spell || ctx.activated) || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
   const [mine0, theirs] = thatPlayerControls(phrase!, ctx);

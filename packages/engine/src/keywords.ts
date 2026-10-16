@@ -59,6 +59,9 @@ export const SUPPORTED_KEYWORDS = [
   // CR 702.22: attacking bands are declared with attackers (see finishAttacks), a block spreads to the whole band, and
   // the other player divides combat damage (see bandSplit). "Bands with other" isn't modeled.
   "Banding",
+  // CR 702.147a: "This creature can't block" (see cantBlockNow) and "When this creature attacks, sacrifice it at end of
+  // combat" (see abilitiesOf). It can be a keyword counter (CR 122.1b).
+  "Decayed",
 ] as const;
 export type SupportedKeyword = (typeof SUPPORTED_KEYWORDS)[number];
 

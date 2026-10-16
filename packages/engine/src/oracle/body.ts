@@ -1,4 +1,4 @@
-import { refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
+import { allEffects, refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, counterKind, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
@@ -35,6 +35,8 @@ export interface Ctx {
   lastGroup?: ObjRef;
   /** Index of the most recent player target, for "that player's hand". */
   lastPlayerTarget?: number;
+  /** "Target creature and all other creatures its controller controls ...": that target, whose controller "that player" is. */
+  controllerNamed?: number;
   /** "Any number of target players": that target (see TargetSpec.many); "those players" are all of them. */
   manyPlayers?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */
@@ -77,11 +79,70 @@ const checkableMay = (e: Effect) =>
   (e.type === "sacrifice" && e.what.ref === "self") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
   (e.type === "putOntoBattlefield" && e.what.ref === "graveyardEnd" && !e.atEndStep && !e.haste) ||
-  // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return.
-  (e.type === "pick" && e.who.ref === "you" && e.action === "bounce" && e.n === 1 && !e.unless) ||
+  // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return. "You may
+  // sacrifice a Zombie. If you do, ..." (Wilhelt): only with one to sacrifice.
+  (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice") && e.n === 1 && !e.unless) ||
   // "You may have it deal 3 damage to target creature. If you do, ...": done if that target is still legal.
   (e.type === "damage" && (e.to.ref === "target" || e.to.ref === "anyTarget") && !("n" in e.to && e.to.n) && !e.also && !e.divided) ||
   (e.type === "bite" && e.b.ref === "target" && !e.b.n && (e.a.ref === "self" || e.a.ref === "target"));
+
+/**
+ * What follows "Reveal the top card of your library": "If it's a creature card, put it into your hand", "If it isn't a
+ * creature card, put it into your graveyard", then maybe "Otherwise, [you may] put it ..." and, after "put it onto the
+ * battlefield", "That creature gains haste [until end of turn]" and "Sacrifice it at the beginning of the next end step".
+ * `next`: the sentence after the last one used.
+ */
+function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
+  const first = /^If (?:it's|that card is) (not |)(an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "");
+  if (!first) return null;
+  const filter = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
+  const then = filter && revealedAction(first[3]!, ctx);
+  if (!filter || !then) return null;
+  let next = at + 1;
+  const other = /^Otherwise, (.+)$/.exec(sentences[next] ?? "");
+  const otherwise = other ? revealedAction(other[1]!, ctx) : undefined;
+  if (otherwise === null) return null;
+  if (other) next++;
+  // "That creature gains haste. Sacrifice it at the beginning of the next end step." (Impromptu Raid, Killer Instinct):
+  // about the permanent the one "put it onto the battlefield" made.
+  const puts = [...then, ...(otherwise ?? [])].flatMap((e) => (e.type === "putOntoBattlefield" ? [e] : e.type === "may" ? e.effects.filter((x) => x.type === "putOntoBattlefield") : [])) as Extract<Effect, { type: "putOntoBattlefield" }>[];
+  const haste = /^That creature gains haste( until end of turn)?$/.exec(sentences[next] ?? "");
+  if (haste) {
+    if (puts.length !== 1) return null;
+    puts[0]!.haste = haste[1] ? "endOfTurn" : "game";
+    next++;
+  }
+  const atEnd = /^(Exile|Sacrifice) (?:it|that creature) at the beginning of the next end step$/.exec(sentences[next] ?? "");
+  if (atEnd) {
+    if (puts.length !== 1) return null;
+    puts[0]!.atEndStep = atEnd[1] === "Exile" ? "exile" : "sacrifice";
+    next++;
+  }
+  const effect: Effect = { type: "if", cond: { kind: "revealedIs", filter, ...(first[1] ? { not: true as const } : {}) }, effects: then, ...(otherwise ? { otherwise } : {}) };
+  return { effect, next };
+}
+
+/** One thing done with the revealed card ("put it into your hand", "you may put it into your graveyard"), or "draw a card". */
+function revealedAction(text: string, ctx: Ctx): Effect[] | null {
+  const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
+  if (!m) {
+    // Not about the card: "draw a card" (Track Down, Thrasios).
+    if (/(?:it|its|that card|that card's)/.test(text)) return null;
+    const before = ctx.targets.length;
+    const fx = parseSentence(text.charAt(0).toUpperCase() + text.slice(1), ctx);
+    return fx && ctx.targets.length === before && !allEffects(fx).some((e) => PAUSING.has(e.type)) ? fx : null;
+  }
+  const what = { ref: "revealed" as const };
+  const dest = m[2]!;
+  const e: Effect = /hand/.test(dest)
+    ? { type: "bounce", what }
+    : /graveyard/.test(dest)
+      ? { type: "putInGraveyard", what }
+      : /bottom/.test(dest)
+        ? { type: "putInLibrary", what, position: "bottom" }
+        : { type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}) };
+  return m[1] ? [{ type: "may", effects: [e], text: `put the revealed card ${dest.replace(/ under your control$/, "")}` }] : [e];
+}
 
 /** Split text into sentences, keeping a quoted ability ('gains "Sacrifice ~. Draw a card."') whole. */
 function splitSentences(text: string): string[] {
@@ -196,6 +257,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         effects.push({ type: "may", effects: [{ type: "shuffle", who }], text: shuffle[1]! });
         si++;
       }
+      continue;
+    }
+    // "{1}: Look at the top card of your library." (Brutal Deceiver): only as the last instruction, so nothing after it
+    // refers to the card.
+    const lookTop = /^[Ll]ook at the top card of (your|target player's|target opponent's) library$/.exec(s);
+    if (lookTop && si === sentences.length - 1) {
+      const who = parsePlayer(lookTop[1] === "your" ? "you" : lookTop[1]!.replace(/'s$/, ""), ctx);
+      if (!who) return null;
+      effects.push({ type: "orderTop", who, n: 1 });
+      continue;
+    }
+    // "Reveal the top card of your library. If it's a creature card, put it into your hand. Otherwise, you may put it into
+    // your graveyard." (Nylea, Keen-Eyed; CR 701.20a): what's done depends on the revealed card's printed characteristics;
+    // it stays in the library until an instruction moves it.
+    if (/^[Rr]eveal the top card of your library$/.test(s)) {
+      const r = parseRevealedIf(sentences, si + 1, ctx);
+      if (!r) return null;
+      effects.push({ type: "revealTop" }, r.effect);
+      si = r.next - 1;
       continue;
     }
     // Dark Confidant: "Reveal the top card of your library and put that card into your hand. You lose life equal to
@@ -1002,6 +1082,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     if (o.count && (o.count as Count).kind === "x") return true;
+    if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
     return Object.values(o).some(usesX);
   }
   return false;

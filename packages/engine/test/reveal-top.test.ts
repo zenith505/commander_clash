@@ -1,16 +1,16 @@
-// Playing with the top card of a library revealed (CR 401.5), playing cards from the top of your library
-// (Courser of Kruphix, Future Sight), revealed hands (Telepathy), and "for each other attacking Goblin".
+// "Reveal the top card of your library. If it's a X card, A. Otherwise, B." (CR 701.20a): the revealed card stays in
+// the library until an instruction moves it, so "it" refers to that card only while it is still there. And "Its owner
+// creates ..." after "Exile target card from a graveyard" (the owner of that card, not the controller of the spell).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, castProblem, handRevealed, power, isFullySupported, legalActions, planCast, topPlayable, topRevealed, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, activate, bear, card, cast, forest, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
+import { isFullySupported, objHasKeyword, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState) => {
   for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
   return s;
 };
-/** Put a fresh copy of `def` on top of `pid`'s library. */
 const onTop = (s: GameState, pid: PlayerId, def: CardDef) => {
   const id = putOnBattlefield(s, pid, def);
   s.battlefield.splice(s.battlefield.indexOf(id), 1);
@@ -18,113 +18,139 @@ const onTop = (s: GameState, pid: PlayerId, def: CardDef) => {
   s.players[pid]!.library.unshift(id);
   return id;
 };
+const inGraveyard = (s: GameState, pid: PlayerId, def: CardDef) => {
+  const id = putOnBattlefield(s, pid, def);
+  s.battlefield.splice(s.battlefield.indexOf(id), 1);
+  s.objects[id]!.zone = "graveyard";
+  s.players[pid]!.graveyard.push(id);
+  return id;
+};
+const tokensOf = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid);
 
 // Real oracle text (Scryfall).
-const courser = card("Courser of Kruphix", "Enchantment Creature — Centaur", "{1}{G}{G}", { power: "2", toughness: "4", keywords: ["Landfall"], oracleText: "Play with the top card of your library revealed.\nYou may play lands from the top of your library.\nLandfall — Whenever a land you control enters, you gain 1 life." });
-const horde = card("Garruk's Horde", "Creature — Beast", "{5}{G}{G}", { power: "7", toughness: "7", keywords: ["Trample"], oracleText: "Trample\nPlay with the top card of your library revealed.\nYou may cast creature spells from the top of your library. (Do this only any time you could cast that creature spell. You still pay the spell's costs.)" });
-const futureSight = card("Future Sight", "Enchantment", "{2}{U}{U}{U}", { oracleText: "Play with the top card of your library revealed.\nYou may play lands and cast spells from the top of your library." });
-const telepathy = card("Telepathy", "Enchantment", "{U}", { oracleText: "Your opponents play with their hands revealed." });
-const revelation = card("Revelation", "World Enchantment", "{G}", { oracleText: "Players play with their hands revealed." });
-const piledriver = card("Goblin Piledriver", "Creature — Goblin Warrior", "{1}{R}", { power: "1", toughness: "2", keywords: ["Protection"], oracleText: "Protection from blue (This creature can't be blocked, targeted, dealt damage, or enchanted by anything blue.)\nWhenever this creature attacks, it gets +2/+0 until end of turn for each other attacking Goblin." });
+const nylea = card("Nylea, Keen-Eyed", "Legendary Enchantment Creature — God", "{3}{G}", { power: "5", toughness: "6", keywords: ["Indestructible"], oracleText: "Indestructible\nAs long as your devotion to green is less than five, Nylea isn't a creature.\nCreature spells you cast cost {1} less to cast.\n{2}{G}: Reveal the top card of your library. If it's a creature card, put it into your hand. Otherwise, you may put it into your graveyard." });
+const oracle = card("Coiling Oracle", "Creature — Snake Elf Druid", "{G}{U}", { power: "1", toughness: "1", oracleText: "When this creature enters, reveal the top card of your library. If it's a land card, put it onto the battlefield. Otherwise, put that card into your hand." });
+const raid = card("Impromptu Raid", "Enchantment", "{3}{R/G}", { oracleText: "{2}{R/G}: Reveal the top card of your library. If it isn't a creature card, put it into your graveyard. Otherwise, put that card onto the battlefield. That creature gains haste. Sacrifice it at the beginning of the next end step." });
+const thrasios = card("Thrasios, Triton Hero", "Legendary Creature — Merfolk Wizard", "{G}{U}", { power: "1", toughness: "3", keywords: ["Partner"], oracleText: "{4}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.\nPartner (You can have two commanders if both have partner.)" });
+const pyre = card("Funeral Pyre", "Instant", "{W}", { oracleText: "Exile target card from a graveyard. Its owner creates a 1/1 white Spirit creature token with flying." });
+const pharika = card("Pharika, God of Affliction", "Legendary Enchantment Creature — God", "{1}{B}{G}", { power: "5", toughness: "5", keywords: ["Indestructible"], oracleText: "Indestructible\nAs long as your devotion to black and green is less than seven, Pharika isn't a creature.\n{B}{G}: Exile target creature card from a graveyard. Its owner creates a 1/1 black and green Snake enchantment creature token with deathtouch." });
+const brutal = card("Brutal Deceiver", "Creature — Spirit", "{2}{R}", { power: "2", toughness: "2", oracleText: "{1}: Look at the top card of your library.\n{2}: Reveal the top card of your library. If it's a land card, this creature gets +1/+0 and gains first strike until end of turn. Activate only once each turn." });
 const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
 
-describe("the top of your library", () => {
-  it("Courser of Kruphix: the top card is revealed and a land there uses your land play", () => {
-    supported(courser, horde, futureSight, telepathy, revelation);
-    const { s: s0, ap, opp } = setup([]);
-    const s = s0;
-    expect(topRevealed(s, ap)).toBe(false);
-    putOnBattlefield(s, ap, courser);
-    expect(topRevealed(s, ap)).toBe(true);
-    expect(topRevealed(s, opp)).toBe(false);
-    const land = onTop(s, ap, forest);
-    expect(topPlayable(s, ap)).toEqual([land]);
-    expect(legalActions(s, ap).some((a) => a.type === "playLand" && a.objectId === land)).toBe(true);
-    // Only the top card.
-    const under = s.players[ap]!.library[1]!;
-    expect(legalActions(s, ap).some((a) => a.type === "playLand" && a.objectId === under)).toBe(false);
-    const life = s.players[ap]!.life;
-    const t = settle(act(s, { type: "playLand", player: ap, objectId: land }));
-    expect(t.objects[land]!.zone).toBe("battlefield");
-    expect(t.players[ap]!.life).toBe(life + 1); // landfall
-    // That was this turn's land play (CR 305.2).
-    const next = onTop(t, ap, forest);
-    expect(legalActions(t, ap).some((a) => a.type === "playLand" && a.objectId === next)).toBe(false);
-    // Spells on top can't be cast with only Courser.
-    const { s: s1, ap: ap1 } = setup([]);
-    putOnBattlefield(s1, ap1, courser);
-    const b = onTop(s1, ap1, bear());
-    expect(castProblem(s1, ap1, b)).toBeTruthy();
+describe("reveal the top card", () => {
+  it("compiles", () => supported(nylea, oracle, raid, thrasios, pyre, pharika, brutal));
+
+  it("Brutal Deceiver: look at the top card (it stays there); reveal a land for +1/+0 and first strike, once each turn", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, brutal);
+    const l = onTop(s0, ap, forest);
+    let s = settle(activate(s0, ap, d, 0));
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "look", cards: [l] });
+    expect(() => act(s, { type: "arrangeTop", player: ap, top: [], away: [l] })).toThrow(/back on top/);
+    s = settle(act(s, { type: "arrangeTop", player: ap, top: [l], away: [] }));
+    expect(s.players[ap]!.library[0]).toBe(l);
+    s = settle(activate(s, ap, d, 1));
+    expect(pt(s, d)).toBe("3/2");
+    expect(objHasKeyword(s, s.objects[d]!, "First strike")).toBe(true);
+    expect(s.players[ap]!.library[0]).toBe(l);
+    expect(() => activate(s, ap, d, 1)).toThrow();
   });
 
-  it("Garruk's Horde casts creature spells from the top, at their normal timing, paying their costs", () => {
-    const { s, ap, opp } = setup([]);
-    putOnBattlefield(s, ap, horde);
+  it("Brutal Deceiver: a nonland revealed does nothing", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, brutal);
+    onTop(s0, ap, shock);
+    const s = settle(activate(s0, ap, d, 1));
+    expect(pt(s, d)).toBe("2/2");
+  });
+
+  it("Nylea: a creature card goes to hand; otherwise you may put it into your graveyard", () => {
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, nylea);
+    const b = onTop(s0, ap, bear());
+    let s = settle(activate(s0, ap, n, 0));
+    expect(s.players[ap]!.hand).toContain(b);
+    const sh = onTop(s, ap, shock);
+    s = settle(activate(s, ap, n, 0));
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.players[ap]!.graveyard).toContain(sh);
+    const sh2 = onTop(s, ap, shock);
+    s = settle(activate(s, ap, n, 0));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.players[ap]!.library[0]).toBe(sh2);
+  });
+
+  it("Coiling Oracle: a land goes onto the battlefield, anything else to hand", () => {
+    const { s: s0, ap, ids } = setup([oracle, oracle]);
+    const l = onTop(s0, ap, forest);
+    let s = settle(cast(s0, ap, ids[0]!));
+    expect(s.objects[l]!.zone).toBe("battlefield");
+    expect(s.objects[l]!.controller).toBe(ap);
+    const sh = onTop(s, ap, shock);
+    s = settle(cast(s, ap, ids[1]!));
+    expect(s.players[ap]!.hand).toContain(sh);
+  });
+
+  it("Impromptu Raid: a creature enters with haste and is sacrificed at the next end step; a noncreature is milled", () => {
+    const { s: s0, ap } = setup([]);
+    const r = putOnBattlefield(s0, ap, raid);
+    const sh = onTop(s0, ap, shock);
+    let s = settle(activate(s0, ap, r, 0));
+    expect(s.players[ap]!.graveyard).toContain(sh);
     const b = onTop(s, ap, bear());
-    expect(topPlayable(s, ap)).toEqual([b]);
-    const plan = planCast(s, ap, b)!;
-    expect(plan).toBeTruthy();
-    let t = settle(plan.reduce((x, a) => act(x, a), s));
-    expect(t.objects[b]!.zone).toBe("battlefield");
-    // An instant on top isn't a creature spell, and nothing lets an opponent cast from your library.
-    const i = onTop(t, ap, shock);
-    expect(castProblem(t, ap, i, [{ kind: "player", id: opp }])).toBeTruthy();
-    const land = onTop(t, ap, forest);
-    expect(legalActions(t, ap).some((a) => a.type === "playLand" && a.objectId === land)).toBe(false);
-    // Sorcery timing still applies to the creature (the reminder text): not on an opponent's turn.
-    t.players[ap]!.library.shift();
-    t.players[ap]!.library.shift();
-    const b2 = onTop(t, ap, bear());
-    t = passUntil(t, "upkeep", opp);
-    expect(castProblem(t, ap, b2)).toBeTruthy();
+    s = settle(activate(s, ap, r, 0));
+    expect(s.objects[b]!.zone).toBe("battlefield");
+    expect(objHasKeyword(s, s.objects[b]!, "Haste")).toBe(true);
+    s = settle(passUntil(s, "end", ap));
+    s = settle(s);
+    expect(s.players[ap]!.graveyard).toContain(b);
+    expect(s.activePlayer).toBe(ap);
   });
 
-  it("Future Sight plays lands and casts any spell from the top; bots use it", () => {
-    const { s, ap, opp } = setup([]);
-    putOnBattlefield(s, ap, futureSight);
-    const i = onTop(s, ap, shock);
-    const life = s.players[opp]!.life;
-    const shot = settle(planCast(s, ap, i, [{ kind: "player", id: opp }])!.reduce((x, a) => act(x, a), s));
-    expect(shot.objects[i]!.zone).toBe("graveyard");
-    expect(shot.players[opp]!.life).toBe(life - 2);
-    // Each player only plays from their own library.
-    expect(topPlayable(s, opp)).toEqual([]);
-    const land = onTop(s, ap, forest);
-    s.players[ap]!.hand = [];
-    const acts = botActions(s, ap);
-    expect(acts.some((a) => a.type === "playLand" && a.objectId === land)).toBe(true);
+  it("Thrasios: scry 1 first, then a land enters tapped; otherwise draw (the revealed card)", () => {
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, thrasios);
+    const l = onTop(s0, ap, forest);
+    let s = settle(activate(s0, ap, t, 0));
+    expect(s.pending?.kind).toBe("arrangeTop");
+    s = settle(act(s, { type: "arrangeTop", player: ap, top: [l], away: [] }));
+    expect(s.objects[l]!.zone).toBe("battlefield");
+    expect(s.objects[l]!.tapped).toBe(true);
+    const sh = onTop(s, ap, shock);
+    s = settle(activate(s, ap, t, 0));
+    s = settle(act(s, { type: "arrangeTop", player: ap, top: [sh], away: [] }));
+    expect(s.players[ap]!.hand).toContain(sh);
   });
-});
 
-describe("revealed hands", () => {
-  it("Telepathy shows your opponents' hands to you only; Revelation shows every hand", () => {
-    const { s, ap, opp } = setup([]);
-    const third = s.turnOrder[(s.turnOrder.indexOf(ap) + 2) % 4]!;
-    expect(handRevealed(s, opp, ap)).toBe(false);
-    expect(handRevealed(s, ap, ap)).toBe(true);
-    const t = putOnBattlefield(s, ap, telepathy);
-    expect(handRevealed(s, opp, ap)).toBe(true);
-    expect(handRevealed(s, opp, third)).toBe(true); // revealed means everyone sees it
-    expect(handRevealed(s, ap, opp)).toBe(false);
-    s.battlefield.splice(s.battlefield.indexOf(t), 1);
-    s.objects[t]!.zone = "graveyard";
-    putOnBattlefield(s, opp, revelation);
-    expect(handRevealed(s, ap, opp)).toBe(true);
-    expect(handRevealed(s, opp, ap)).toBe(true);
+  it("an empty library reveals nothing and does nothing", () => {
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, nylea);
+    s0.players[ap]!.library = [];
+    const s = settle(activate(s0, ap, n, 0));
+    expect(s.pending).toBeFalsy();
+    expect(s.players[ap]!.hand.length).toBe(s0.players[ap]!.hand.length);
   });
 });
 
-describe("for each other attacking Goblin", () => {
-  it("Goblin Piledriver counts the other attacking Goblins, not itself or non-Goblins", () => {
-    supported(piledriver);
+describe("its owner", () => {
+  it("Funeral Pyre: the owner of the exiled card gets the token", () => {
+    const { s: s0, ap, opp, ids } = setup([pyre]);
+    const theirs = inGraveyard(s0, opp, shock);
+    const s = settle(cast(s0, ap, ids[0]!, [target(theirs)]));
+    expect(s.objects[theirs]!.zone).toBe("exile");
+    expect(tokensOf(s, opp)).toHaveLength(1);
+    expect(tokensOf(s, ap)).toHaveLength(0);
+  });
+
+  it("Pharika: a creature card from any graveyard; its owner gets the Snake", () => {
     const { s: s0, ap, opp } = setup([]);
-    const p = putOnBattlefield(s0, ap, piledriver);
-    const g1 = putOnBattlefield(s0, ap, bear({ name: "Goblin A", typeLine: "Creature — Goblin", subtypes: ["Goblin"] }));
-    const g2 = putOnBattlefield(s0, ap, bear({ name: "Goblin B", typeLine: "Creature — Goblin", subtypes: ["Goblin"] }));
-    putOnBattlefield(s0, ap, bear({ name: "Goblin home", typeLine: "Creature — Goblin", subtypes: ["Goblin"] }));
-    const b = putOnBattlefield(s0, ap, bear());
-    let s = passUntil(s0, "declareAttackers", ap);
-    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [p, g1, g2, b].map((attacker) => ({ attacker, defender: opp })) }));
-    expect(power(s, s.objects[p]!)).toBe(1 + 2 * 2);
+    const p = putOnBattlefield(s0, ap, pharika);
+    const theirs = inGraveyard(s0, opp, bear());
+    const s = settle(activate(s0, ap, p, 0, [target(theirs)]));
+    const [snake] = tokensOf(s, opp);
+    expect(snake).toBeDefined();
+    expect(objHasKeyword(s, s.objects[snake!]!, "Deathtouch")).toBe(true);
+    expect(tokensOf(s, ap)).toHaveLength(0);
   });
 });

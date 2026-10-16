@@ -162,7 +162,9 @@ export const NO_ABILITIES: CompiledCard = { triggers: [], activated: [], mana: [
  */
 export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   const c = characteristics(s, o);
-  const own = withGranted(c.hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, c.grantedAbilities);
+  let own = withGranted(c.hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, c.grantedAbilities);
+  // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
+  if (c.keywords.includes("Decayed")) own = withDecayed(own);
   // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
@@ -175,6 +177,17 @@ export function hauntedBy(s: GameState, o: GameObject): GameObject[] {
   if (o.zone !== "battlefield") return [];
   const zc = o.zoneChanges ?? 0;
   return s.turnOrder.flatMap((pid) => s.players[pid]!.exile.map((id) => s.objects[id]!).filter((c) => c.haunting?.id === o.id && c.haunting.zc === zc));
+}
+
+const DECAYED_TRIGGER: TriggeredAbility = {
+  event: "selfAttacks",
+  body: { targets: [], effects: [{ type: "delayed", when: "endOfCombat", effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "sacrifice ~" }], text: "Decayed: when ~ attacks, sacrifice it at end of combat." },
+};
+const decayed = new WeakMap<CompiledCard, CompiledCard>();
+function withDecayed(base: CompiledCard): CompiledCard {
+  let hit = decayed.get(base);
+  if (!hit) decayed.set(base, (hit = { ...base, triggers: [...base.triggers, DECAYED_TRIGGER] }));
+  return hit;
 }
 
 const cipherTrigger = (name: string, e: { id: ObjectId; zc: number }): TriggeredAbility => ({

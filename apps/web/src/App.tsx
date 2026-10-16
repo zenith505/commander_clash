@@ -2582,7 +2582,7 @@ function ArrangeTop({
   onDone,
 }: {
   s: GameState;
-  how: "scry" | "surveil" | "order" | "bottom" | "graveyard" | "wholeGraveyard";
+  how: "scry" | "surveil" | "order" | "bottom" | "look" | "graveyard" | "wholeGraveyard";
   /** Whose library, when it isn't yours. */
   owner?: string;
   source: string;
@@ -2643,7 +2643,9 @@ function ArrangeTop({
         <header>
           <strong>
             {source}:{" "}
-            {how === "order"
+            {how === "look"
+              ? `the top card of ${owner ? `${owner}'s` : "your"} library`
+              : how === "order"
               ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order`
               : how === "bottom"
                 ? `put ${cards.length} cards on the bottom of your library in any order`
@@ -2653,7 +2655,7 @@ function ArrangeTop({
                     ? "reorder your graveyard as you choose"
                     : `${how} ${cards.length}`}
           </strong>
-          <span className="muted">{together ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>
+          {how !== "look" && <span className="muted">{together ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>}
           <button onClick={() => onDone(top, away)}>Done</button>
         </header>
         <div className="modal-body">

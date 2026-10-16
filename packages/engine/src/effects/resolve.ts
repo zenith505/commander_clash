@@ -1,7 +1,7 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
-import { controllerOf, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
@@ -224,6 +224,16 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       const t = ctx.targets[i];
       if (ctx.legal[i] && t?.kind === "object") out.push(obj(s, t.id));
     }
+    if (ref.sameName && out[0]?.zone === "battlefield" && !out[0].faceDown) {
+      const t = out[0];
+      const name = characteristics(s, t).name;
+      const whose = controllerOf(s, t);
+      const { filter, of } = ref.sameName;
+      for (const id of s.battlefield) {
+        const o = obj(s, id);
+        if (o.id !== t.id && !o.faceDown && characteristics(s, o).name === name && (!of || controllerOf(s, o) === whose) && objectMatches(s, filter, o, ctx.controller, false)) out.push(o);
+      }
+    }
     return out;
   }
   if (ref.ref === "selfCard") {
@@ -242,6 +252,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "damagedThisWay") return [...new Set(s.resolving?.damagedThisWay ?? [])].map((id) => obj(s, id)).filter((o) => o.zone === "battlefield" && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)));
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
+  if (ref.ref === "revealed") {
+    const rv = s.resolving?.revealed;
+    const o = rv && s.objects[rv.id];
+    return o && o.zone === "library" && (o.zoneChanges ?? 0) === rv.zc ? [o] : [];
+  }
   if (ref.ref === "affected")
     return (s.resolving?.affected ?? []).map((a) => s.objects[a.id]).filter((o): o is GameObject => o?.zone === "battlefield" && (o.zoneChanges ?? 0) === s.resolving!.affected!.find((a) => a.id === o.id)!.zc);
   if (ref.ref === "graveyardEnd")
@@ -339,6 +354,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const lk = s.lastKnown?.[o.id];
       if (lk && lk.zc === ctx.subject!.zc) return [lk.controller];
       return ctx.lki?.controller !== undefined && !player(s, ctx.lki.controller).lost ? [ctx.lki.controller] : [];
+    }
+    case "targetOwner": {
+      const t = ctx.targets[ref.index];
+      const o = ctx.legal[ref.index] && t?.kind === "object" ? s.objects[t.id] : undefined;
+      return o ? [o.owner] : [];
     }
     case "targetController": {
       const t = ctx.targets[ref.index];
@@ -488,6 +508,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnAllFromGraveyard":
     case "putFromHand":
     case "putInLibrary":
+    case "putInGraveyard":
     case "exileGraveyard":
     case "flicker":
     case "returnExiled":
@@ -568,6 +589,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "mill":
     case "exileTop":
     case "revealTopToHand":
+    case "revealTop":
     case "discard":
     case "takeFromHand":
     case "scry":

@@ -2,7 +2,7 @@ import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, SpentReq, 
 import { NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
-import { parseGroup, parseTargetPhrase } from "./targets";
+import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
@@ -299,6 +299,12 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = bodyText.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
     if (/ an opponent controls$/.test(m![2]!)) bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
   }
+  // "Whenever another Zombie you control dies, if it didn't have decayed, ..." (Wilhelt): an intervening if (CR 603.4) on
+  // the creature as it last existed (CR 603.10a), which can't change, so part of what dies.
+  const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
+  const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
+  if (hadKw && kw?.length !== 1) return "fail";
+  if (hadKw) bodyText = hadKw[3]!;
   const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true });
   if (!body) return "fail";
   if (attached) return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
@@ -308,10 +314,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase);
   if (!filter || filter.kind !== "object") return "fail";
   const kind = m![1]!.toLowerCase();
+  const had = hadKw && kw ? (hadKw[1] === "had" ? { keywords: [...(filter.keywords ?? []), ...kw] } : { notKeywords: [...(filter.notKeywords ?? []), ...kw] }) : {};
   return {
     event: "permanentDies",
     dies: {
-      filter: { ...filter, text: phrase },
+      filter: { ...filter, ...had, text: hadKw ? `${phrase} ${hadKw[1] === "had" ? "with" : "without"} ${hadKw[2]}` : phrase },
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? { damagedBySelf: true } : {}),

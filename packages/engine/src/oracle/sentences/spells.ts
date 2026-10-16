@@ -128,6 +128,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = a && parseObject(m[2]!, ctx);
     return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) && !isSeveral(b) ? [{ type: "fight", a, b }] : null;
   }
+  // "It deals damage equal to its power to target creature an opponent controls and that creature deals damage equal to
+  // its power to ~" (Stalking Yeti): each deals damage to the other at once, and neither does if either is gone, as in a
+  // fight (CR 701.14b; rulings).
+  if ((m = /^(it|~) deals damage equal to its power to (target creature .+?) and that creature deals damage equal to its power to (it|~)$/i.exec(s)) && (m[1] === "~" || ctx.selfIt) && (m[3] === "~" || ctx.selfIt)) {
+    const b = parseObject(m[2]!, ctx);
+    return b?.ref === "target" && !isSeveral(b) ? [{ type: "fight", a: { ref: "self" }, b }] : null;
+  }
   if ((m = /^(.+?) deals damage to itself equal to its power$/i.exec(s)) && m[1] !== "~") {
     // The creature is the source of damage to itself (its deathtouch, lifelink, infect apply).
     const a = parseObject(m[1]!, ctx);

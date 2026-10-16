@@ -2348,7 +2348,7 @@ function Seat({
             </span>
           ))}
         {p.lost && <span className="error">Out: {p.lossReason}</span>}
-        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} restricted={p.restrictedMana} />}</span>
+        <span className="pool-slot">{(pid === HUMAN || Object.values(p.manaPool).some((n) => n > 0)) && <ManaPoolView pool={p.manaPool} restricted={p.manaLots?.flatMap((l) => (l.only ? [{ mana: l.mana, n: l.n, only: l.only }] : []))} />}</span>
       </header>
       <div className="seat-body">
         <div className="zones" onClick={(e) => e.stopPropagation()}>
@@ -2804,7 +2804,7 @@ function LibrarySearch({
                 : pending.fromGraveyard === "exile"
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from your graveyard`
                   : pending.fromGraveyard
-                  ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to your hand`
+                  ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to ${pending.fromGraveyard === "battlefield" ? "the battlefield" : "your hand"}`
                   : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
@@ -3419,10 +3419,12 @@ function Controls({
                 ? `champion: click another ${pending.what} of yours to exile until ${pending.source} leaves the battlefield, or exile none and sacrifice ${pending.source}.`
                 : pending.action === "encode"
                 ? `cipher: click a creature of yours to exile ${pending.source} encoded on it. Whenever that creature deals combat damage to a player, you may cast a copy of ${pending.source} for free.`
+                : pending.action === "keep"
+                ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are sacrificed.`
                 : `click ${what} of yours to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
+          {pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}
         </button>
       </div>
     );

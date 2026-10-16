@@ -81,6 +81,21 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
     for (const o of objs) v = (v ?? 0) + (controllerOf(s, o) === pid ? -1 : 1) * (harmful ? 1 : -1) * worth(s, pid, o) * scale(o);
   };
   for (const e of allEffects(body.effects)) {
+    // "Each player chooses ..., then sacrifices the rest": each keeps their best (with Mythos of Snapdax's choice made by
+    // us, the opponents keep their worst), and loses the rest.
+    if (e.type === "keepRest") {
+      const who = e.who.ref === "eachPlayer" ? livingPlayers(s) : e.who.ref === "eachOpponent" ? opponents(s, pid) : [];
+      for (const p of who) {
+        const best = !e.youChoose || p === pid ? -1 : 1;
+        const theirs = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === p && objectMatches(s, { ...e.among, controller: "you" }, o, p, false));
+        const kept = new Set<string>();
+        for (const k of e.keep)
+          theirs.filter((o) => objectMatches(s, { ...k.filter, controller: "you" }, o, p, false)).sort((a, b) => best * (worth(s, pid, a) - worth(s, pid, b))).slice(0, k.n).forEach((o) => kept.add(o.id));
+        add(theirs.filter((o) => !kept.has(o.id)), true);
+      }
+      v = v ?? 0;
+      continue;
+    }
     if (e.type === "damage") {
       const amount = estimate(e.amount);
       if (e.to.ref === "each") add(group(e.to), true, (o) => (lethalDamage(s, o) <= amount ? 1 : 0.2));

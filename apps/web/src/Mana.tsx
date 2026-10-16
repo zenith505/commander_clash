@@ -71,9 +71,16 @@ function PoolGroup({ c, n, title, restricted }: { c: ManaType; n: number; title?
 }
 
 /** A mana pool as pips. Mana that can only be spent some ways (CR 106.6) is ringed, and says how on hover. */
-export function ManaPoolView({ pool, restricted = [] }: { pool: Record<ManaType, number>; restricted?: { mana: ManaType; n: number; only: { text: string } }[] }) {
+export function ManaPoolView({ pool, restricted: lots = [] }: { pool: Record<ManaType, number>; restricted?: { mana: ManaType; n: number; only: { text: string } }[] }) {
   const free = { ...pool };
-  for (const r of restricted) free[r.mana] -= r.n;
+  for (const r of lots) free[r.mana] -= r.n;
+  // Mana restricted the same way is one group, whatever its sources were.
+  const restricted: typeof lots = [];
+  for (const r of lots) {
+    const same = restricted.find((x) => x.mana === r.mana && x.only.text === r.only.text);
+    if (same) same.n += r.n;
+    else restricted.push({ ...r });
+  }
   const entries = COLOR_ORDER.filter((c) => free[c] > 0);
   if (!entries.length && !restricted.length) return <span className="muted small">Mana pool empty</span>;
   return (

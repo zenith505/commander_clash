@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, pt, putOnBattlefield, setup, target } from "./helpers";
 import { botActions, castProblem, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { manaFromPool } from "../src/spend";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 
@@ -55,11 +56,11 @@ describe("mana from a Treasure", () => {
     const t2 = putOnBattlefield(s0, ap, treasure);
     let s = crack(s0, ap, t1, "R");
     s = crack(s, ap, t2, "B");
-    expect(s.players[ap]!.treasureMana).toEqual({ R: 1, B: 1 });
+    expect(manaFromPool(s, ap, "treasure")).toMatchObject({ R: 1, B: 1, W: 0, U: 0, G: 0, C: 0 });
     // The step ends: the mana, and what it remembered, are gone.
     s = passAll(s);
     expect(s.players[ap]!.manaPool.R).toBe(0);
-    expect(s.players[ap]!.treasureMana).toBeUndefined();
+    expect(s.players[ap]!.manaLots).toBeUndefined();
   });
 
   it("Hired Hexblade: draws a card only if mana from a Treasure paid for it (an intervening if, CR 603.4)", () => {
@@ -90,7 +91,7 @@ describe("mana from a Treasure", () => {
     s = crack(s, ap, t, "B");
     s = act(s, { type: "castSpell", player: ap, objectId: ids[0]! });
     expect(s.objects[ids[0]!]!.treasureSpent).toBe(1);
-    expect(s.players[ap]!.treasureMana).toBeUndefined();
+    expect(s.players[ap]!.manaLots).toBeUndefined();
   });
 
   it("Jaded Sell-Sword: first strike and haste with Treasure mana", () => {

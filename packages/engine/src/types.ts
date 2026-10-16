@@ -53,7 +53,12 @@ export type Color = "W" | "U" | "B" | "R" | "G";
 export const COLORS: readonly Color[] = ["W", "U", "B", "R", "G"];
 export type ManaType = Color | "C";
 /** The mana spent to cast a spell by type (CR 601.2h), and how much of each type a snow source made (`snow`, CR 107.4h). */
-export type SpentMana = Partial<Record<ManaType, number>> & { snow?: Partial<Record<ManaType, number>> };
+export type SpentMana = Partial<Record<ManaType, number>> & {
+  /** How much of it a snow source made, by type (CR 107.4h). */
+  snow?: Partial<Record<ManaType, number>>;
+  /** How much of it a Treasure, a creature or an artifact made (CR 106.3). */
+  from?: Partial<Record<"treasure" | "creature" | "artifact", number>>;
+};
 
 export type PlayerId = number;
 export type ObjectId = string;
@@ -337,11 +342,24 @@ export interface CopyEffect {
   until?: "endOfTurn" | { turnOf: PlayerId };
 }
 
-/** `n` of the `mana` in a player's pool that can only be spent as `only` says (CR 106.6). */
-export interface RestrictedMana {
+/**
+ * What a mana's source was as it made the mana (CR 106.3): snow mana pays {S} (107.4h); "mana from a Treasure", "mana
+ * from a creature", "mana from an artifact".
+ */
+export type ManaOrigin = "snow" | "treasure" | "creature" | "artifact";
+
+/**
+ * `n` of the `mana` in a player's pool that's set apart from the rest (counted in manaPool too): it can only be spent
+ * as `only` says (CR 106.6), its source was `from` (106.3), or it isn't lost as steps end (`keep`: until end of turn,
+ * or firebending's until end of combat, 702.189a). Mana of a type not in any lot is plain mana.
+ */
+export interface ManaLot {
   mana: ManaType;
   n: number;
-  only: ManaSpend;
+  only?: ManaSpend;
+  /** Sorted, without repeats. */
+  from?: ManaOrigin[];
+  keep?: "turn" | "combat";
 }
 
 export interface Player {
@@ -361,16 +379,8 @@ export interface Player {
   exile: ObjectId[];
   command: ObjectId[];
   manaPool: Record<ManaType, number>;
-  /** Mana in the pool (counted in manaPool too) that can only be spent some ways (CR 106.6). */
-  restrictedMana?: RestrictedMana[];
-  /** Mana in the pool (counted in manaPool too, none of it restricted) that a Treasure produced: "mana from a Treasure" (CR 106.3). */
-  treasureMana?: Partial<Record<ManaType, number>>;
-  /** Mana in the pool (counted in manaPool too, none of it restricted) that a snow source produced, for {S} (CR 107.4h). */
-  snowMana?: Partial<Record<ManaType, number>>;
-  /** "Until end of turn, you don't lose this mana as steps and phases end": how much of each type is kept, this `turn`. */
-  keptMana?: { turn: number; mana: Partial<Record<ManaType, number>> };
-  /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
-  combatMana?: number;
+  /** The mana in the pool that's restricted, from a source that matters, or kept as steps end (see ManaLot). */
+  manaLots?: ManaLot[];
   landsPlayedThisTurn: number;
   /** "You may play an additional land this turn" (CR 305.2a): how many more this turn (`turn`). */
   extraLands?: { turn: number; n: number };
@@ -480,7 +490,7 @@ export interface StackItem {
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
    */
-  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** Its source was a Treasure as it was activated: its mana is "mana from a Treasure" (CR 106.3). */ treasure?: true; /** Its source was a snow permanent: its mana is snow mana (CR 107.4h). */ snow?: true };
+  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** What its source was as it was activated: a snow permanent, a Treasure, a creature, an artifact (CR 106.3). */ from?: ManaOrigin[] };
   /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
   treasureSpent?: number;
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
@@ -697,7 +707,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** Not a search: cards in the graveyard to return to the hand, or to exile. */ fromGraveyard?: "hand" | "exile"; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield"; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -710,7 +720,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** For "keep": the player whose permanents these are, when someone else chooses for them (Mythos of Snapdax). */ of?: PlayerId }
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
   /**
    * A copy of a spell may get new targets (CR 707.10c): keep them all, or choose new legal ones. `copyOf` is the
@@ -1085,6 +1095,8 @@ export interface Resolving {
     punished?: PlayerId[]; // those who did none of its options, this round
     /** "Sacrifice an artifact, a creature, and a land": players still to pick, the slot being picked, the picks so far. */
     slots?: { queue: PlayerId[]; slot: number; picked: Record<string, ObjectId[]> };
+    /** "Choose ..., then sacrifice the rest": whose turn to choose, which of their choices, and what each player kept. */
+    keepRest?: { queue: PlayerId[]; slot: number; kept: Record<string, ObjectId[]> };
     paid?: boolean; // the answer to "unless that player pays ..."
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
     paidBy?: PlayerId[]; // and those who paid

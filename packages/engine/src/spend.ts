@@ -1,10 +1,12 @@
-// Spending mana from a pool that may hold restricted mana (CR 106.6): "Spend this mana only to cast a creature spell."
+// Spending mana from a pool that may hold restricted mana (CR 106.6: "Spend this mana only to cast a creature spell."),
+// mana from sources that matter (106.3: snow, Treasures, creatures, artifacts) and mana kept as steps end.
 
 import type { ManaSpend } from "./abilities";
 import { defOf } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
 import { emptyPool, payFromPool, type ManaPool, type ParsedCost, type Payment } from "./mana";
-import type { CardDef, Color, GameObject, GameState, ManaType, PlayerId } from "./types";
+import { characteristics } from "./layers";
+import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaType, PlayerId } from "./types";
 
 /**
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
@@ -12,28 +14,43 @@ import type { CardDef, Color, GameObject, GameState, ManaType, PlayerId } from "
  */
 export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true } | { ability: GameObject } | "other";
 
-/** How much of `pid`'s pool a Treasure made, by type (CR 106.3): never more than is there. */
-export function treasurePool(s: GameState, pid: PlayerId): ManaPool {
+/** The mana of each type in `pid`'s pool that's in no lot: unrestricted, from a source that doesn't matter, not kept. */
+export function plainMana(s: GameState, pid: PlayerId): ManaPool {
   const p = s.players[pid]!;
-  const out = emptyPool();
-  if (!p.treasureMana) return out;
-  for (const m of Object.keys(out) as ManaType[]) {
-    const restricted = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === m ? r.n : 0), 0);
-    out[m] = Math.max(0, Math.min(p.treasureMana[m] ?? 0, p.manaPool[m] - restricted));
-  }
+  const out = { ...p.manaPool };
+  for (const l of p.manaLots ?? []) out[l.mana] -= l.n;
   return out;
 }
 
-/** How much of `pid`'s pool a snow source made, by type (CR 107.4h): never more than is there unrestricted. */
-export function snowPool(s: GameState, pid: PlayerId): ManaPool {
-  const p = s.players[pid]!;
+/** How much of `pid`'s pool a source of this kind made, by type (CR 106.3, 107.4h), restricted or not. */
+export function manaFromPool(s: GameState, pid: PlayerId, origin: ManaOrigin): ManaPool {
   const out = emptyPool();
-  if (!p.snowMana) return out;
-  for (const m of Object.keys(out) as ManaType[]) {
-    const restricted = (p.restrictedMana ?? []).reduce((n, r) => n + (r.mana === m ? r.n : 0), 0);
-    out[m] = Math.max(0, Math.min(p.snowMana[m] ?? 0, p.manaPool[m] - restricted));
-  }
+  for (const l of s.players[pid]!.manaLots ?? []) if (l.from?.includes(origin)) out[l.mana] += l.n;
   return out;
+}
+
+/**
+ * What `o` is as a source of mana now (CR 106.3): a snow object (107.4h), and on the battlefield a Treasure, a creature
+ * or an artifact ("mana from a creature" means a creature permanent, CR 109.2). Sorted, as lots keep them.
+ */
+export function manaOriginsOf(s: GameState, o: GameObject): ManaOrigin[] {
+  const c = characteristics(s, o);
+  const here = o.zone === "battlefield";
+  const out: ManaOrigin[] = [];
+  if (here && c.types.includes("Artifact")) out.push("artifact");
+  if (here && c.types.includes("Creature")) out.push("creature");
+  if (c.supertypes.includes("Snow") && (here || o.zone === "stack")) out.push("snow");
+  if (here && c.subtypes.includes("Treasure")) out.push("treasure");
+  return out;
+}
+
+const treasureOnly = (use: ManaUse) => use !== "other" && "spell" in use && !!use.treasureOnly;
+
+/** The lots of `pid`'s pool that can be spent on `use`. With Security Rhox's cost, only unrestricted mana from Treasures. */
+function usableLots(s: GameState, pid: PlayerId, use: ManaUse): ManaLot[] {
+  const lots = s.players[pid]!.manaLots ?? [];
+  if (treasureOnly(use)) return lots.filter((l) => !l.only && l.from?.includes("treasure"));
+  return lots.filter((l) => !l.only || spendAllows(s, pid, l.only, use));
 }
 
 /** Can mana restricted this way be spent on `use`? */
@@ -49,20 +66,19 @@ export function spendAllows(s: GameState, pid: PlayerId, only: ManaSpend, use: M
 }
 
 /**
- * The mana `pid` can spend on `use`, and how much of it is restricted mana that's best spent first. `treasure`: how
- * much of it a Treasure made, spent before other mana of its type on a spell or an ability ("if mana from a Treasure
- * was spent", the player chooses which mana pays, CR 601.2h).
+ * The mana `pid` can spend on `use`, how much of it is restricted mana that's best spent first (`prefer`), and how much
+ * of it a Treasure (`treasure`) or a snow source (`snow`, for {S}, CR 107.4h) made.
  */
 export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: ManaPool; prefer: ManaPool; treasure: ManaPool; snow: ManaPool } {
-  const p = s.players[pid]!;
-  const treasure = treasurePool(s, pid);
-  const snow = snowPool(s, pid);
-  if (use !== "other" && "spell" in use && use.treasureOnly) return { pool: { ...treasure }, prefer: emptyPool(), treasure, snow: emptyPool() };
-  const pool = { ...p.manaPool };
+  const pool = treasureOnly(use) ? emptyPool() : plainMana(s, pid);
   const prefer = emptyPool();
-  for (const r of p.restrictedMana ?? []) {
-    if (spendAllows(s, pid, r.only, use)) prefer[r.mana] += r.n;
-    else pool[r.mana] -= r.n;
+  const treasure = emptyPool();
+  const snow = emptyPool();
+  for (const l of usableLots(s, pid, use)) {
+    pool[l.mana] += l.n;
+    if (l.only) prefer[l.mana] += l.n;
+    if (l.from?.includes("treasure")) treasure[l.mana] += l.n;
+    if (l.from?.includes("snow")) snow[l.mana] += l.n;
   }
   return { pool, prefer, treasure, snow };
 }
@@ -73,58 +89,62 @@ export function canPayFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, us
   return !!payFromPool(cost, pool, extraGeneric, life, { snow });
 }
 
+/** What spending mana from these sources counts as (CR 106.3): "mana from a Treasure", "from creatures", "from an artifact". */
+export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
+
 /**
- * Pay this from `pid`'s pool for `use`, spending restricted mana it allows first. Returns the payment (with the
- * mana spent by type), or null (and nothing changes) if it can't be paid.
+ * Pay this from `pid`'s pool for `use`. Returns the payment (with the mana spent by type, and how much of it each kind
+ * of source made), or null (and nothing changes) if it can't be paid. Which mana of a type pays is the player's choice
+ * (CR 601.2h): restricted mana it may be spent on first; then, on a spell or an ability, mana from a Treasure, a creature
+ * or an artifact ("if mana from a Treasure was spent"), but on anything else the rest first; mana kept as steps end last.
  */
-export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number }) | null {
+export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom }) | null {
   const p = s.players[pid]!;
   const { pool, prefer, treasure, snow } = poolFor(s, pid, use);
   const first = { ...prefer };
-  if (use !== "other") for (const m of Object.keys(first) as ManaType[]) first[m] += treasure[m];
+  if (use !== "other") for (const m of Object.keys(first) as ManaType[]) first[m] = Math.min(pool[m], first[m] + treasure[m]);
   const paid = payFromPool(cost, pool, extraGeneric, life, { ...opts, prefer: first, snow });
   if (!paid) return null;
+  const lots = usableLots(s, pid, use);
+  const plain = treasureOnly(use) ? emptyPool() : plainMana(s, pid);
   const spent = emptyPool();
-  let fromTreasures = 0;
+  const from: SpentFrom = { treasure: 0, creature: 0, artifact: 0 };
+  // Lower ranks are spent first; `plain` stands for the mana of that type in no lot.
+  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
   for (const m of Object.keys(spent) as ManaType[]) {
     spent[m] = pool[m] - paid.pool[m];
+    if (!spent[m]) continue;
     p.manaPool[m] -= spent[m];
-    // Restricted mana of that type it may be spent on goes first, then mana from Treasures, then the rest.
-    let left = spent[m];
-    for (const r of p.restrictedMana ?? []) {
-      if (!left || r.mana !== m || !spendAllows(s, pid, r.only, use) || (use !== "other" && "spell" in use && use.treasureOnly)) continue;
-      const n = Math.min(left, r.n);
-      r.n -= n;
-      left -= n;
-    }
-    // Mana from snow sources (CR 107.4h): what it spent of that is no Treasure's, and what's left of it neither.
-    if (paid.snow[m] && p.snowMana) p.snowMana[m] = Math.max(0, (p.snowMana[m] ?? 0) - paid.snow[m]);
-    const snowLeft = Math.max(0, snow[m] - paid.snow[m]);
-    // Spent on "other" (a cost while something resolves), the rest of the pool keeps the Treasure mana.
-    const t = use === "other" ? Math.max(0, treasure[m] - (pool[m] - prefer[m] - left - snowLeft)) : Math.min(Math.max(0, left - paid.snow[m]), treasure[m]);
-    if (t && p.treasureMana) p.treasureMana[m] = treasure[m] - t;
-    fromTreasures += t;
+    const plainLot: ManaLot = { mana: m, n: plain[m] };
+    const take = (candidates: ManaLot[], n: number) => {
+      for (const l of candidates.sort((a, b) => rank(a, a === plainLot) - rank(b, b === plainLot))) {
+        const k = Math.min(n, l.n);
+        l.n -= k;
+        n -= k;
+        for (const f of l.from ?? []) if (f !== "snow") from[f] += k;
+      }
+    };
+    // The snow mana it spent came from snow lots (CR 107.4h); the rest from the other lots and plain mana.
+    take(lots.filter((l) => l.mana === m && l.from?.includes("snow")), paid.snow[m]);
+    take([plainLot, ...lots.filter((l) => l.mana === m && !l.from?.includes("snow"))], spent[m] - paid.snow[m]);
   }
-  if (p.restrictedMana) p.restrictedMana = p.restrictedMana.filter((r) => r.n > 0);
-  if (!p.restrictedMana?.length) p.restrictedMana = undefined;
-  if (p.treasureMana && !Object.values(p.treasureMana).some((n) => n)) p.treasureMana = undefined;
-  if (p.snowMana && !Object.values(p.snowMana).some((n) => n)) p.snowMana = undefined;
-  return { ...paid, pool: { ...p.manaPool }, spent, treasure: fromTreasures };
+  if (p.manaLots) p.manaLots = p.manaLots.filter((l) => l.n > 0);
+  if (!p.manaLots?.length) p.manaLots = undefined;
+  return { ...paid, pool: { ...p.manaPool }, spent, treasure: from.treasure, from };
 }
 
 /**
- * Add mana to `pid`'s pool, restricted if `only` says how it can be spent (CR 106.4, 106.6). `treasure`: a Treasure
- * made it (CR 106.3); `snow`: a snow source made it (CR 107.4h). (Restricted mana from a Treasure isn't tracked as Treasure mana: no Treasure makes any.)
+ * Add mana to `pid`'s pool (CR 106.4): restricted if `only` says how it can be spent (106.6), `from` what its source was
+ * (106.3), `keep` if it isn't lost as steps end (until end of turn, or until end of combat for firebending).
  */
-export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], only?: ManaSpend, treasure?: boolean, snow?: boolean): void {
+export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"] } = {}): void {
   const p = s.players[pid]!;
+  const from = how.from?.length ? [...new Set(how.from)].sort() : undefined;
   for (const m of mana) {
     p.manaPool[m]++;
-    if (treasure && !only) (p.treasureMana ??= {})[m] = (p.treasureMana[m] ?? 0) + 1;
-    if (snow && !only) (p.snowMana ??= {})[m] = (p.snowMana[m] ?? 0) + 1;
-    if (!only) continue;
-    const same = p.restrictedMana?.find((r) => r.mana === m && r.only.text === only.text);
+    if (!how.only && !from && !how.keep) continue;
+    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep);
     if (same) same.n++;
-    else (p.restrictedMana ??= []).push({ mana: m, n: 1, only });
+    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}) });
   }
 }

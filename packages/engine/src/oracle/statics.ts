@@ -436,6 +436,13 @@ function parseAffected(subject: string): Affects | null {
   // "Commander creatures you control get +2/+2", "Commanders you control have ward {2}" (CR 903.3): any player's.
   if (/^Commanders? (?:creatures )?you control$/.test(x))
     return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };
+  // "Other snow and Zombie creatures you control" (Narfi): creatures that are snow or Zombies; a snow Zombie gets it once
+  // (rulings).
+  const either = /^(Other )?snow and ([A-Z][a-z]+) creatures you control$/.exec(x);
+  if (either && CREATURE_TYPES.has(either[2]!)) {
+    const anyOf: TargetSpec[] = [{ kind: "object", supertypes: ["Snow"], text: "snow creature" }, { kind: "object", subtypes: [either[2]!], text: `${either[2]} creature` }];
+    return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `snow and ${either[2]} creature` } };
+  }
   let m = /^(Other )?((?:[A-Z]?[a-z]+ )*?)creatures (you control|your opponents control)$/i.exec(x);
   if (m) {
     const words = m[2]!.trim().split(/\s+/).filter(Boolean);
@@ -496,8 +503,9 @@ function parseAffected(subject: string): Affects | null {
   if (/^Commander creatures you own$/.test(x)) return { kind: "filter", types: ["Creature"], ownedCommanders: true };
   // Anything else a group can say: "Each creature you control with a +1/+1 counter on it", "Creatures of the chosen type";
   // "Creatures you control with +1/+1 counters on them" is the same group.
-  const plural = /^Creatures you control with ([+-]1\/[+-]1) counters on them$/.exec(x);
-  const g = parseGroup(plural ? `Each creature you control with a ${plural[1]} counter on it` : x, true);
+  // "Creatures with ice counters on them" (Rimescale Dragon) likewise.
+  const plural = /^Creatures( you control)? with ([+-]1\/[+-]1|ice) counters on them$/.exec(x);
+  const g = parseGroup(plural ? `Each creature${plural[1] ?? ""} with ${plural[2] === "ice" ? "an" : "a"} ${plural[2]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;
 }
 
@@ -633,7 +641,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   if (/^can block only creatures with flying$/.test(rest)) return [{ kind: "blocksOnlyFlyers" }];
   if (/^attacks? each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }];
-  if (/^doesn't untap during (?:its controller's|your) untap step$/.test(rest)) return [{ kind: "doesntUntap" }];
+  if (/^(?:doesn't untap during (?:its controller's|your) untap step|don't untap during their controllers' untap steps)$/.test(rest)) return [{ kind: "doesntUntap" }];
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   if (/^loses all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Doran (CR 510.1a as modified), defender (CR 702.3b).
@@ -780,6 +788,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   let text = line.replace(/\.$/, "");
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;
+  // "Enchanted land is snow" (Glittering Frost), "Permanents with ice counters on them are snow" (Rimefeather Owl): the
+  // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
+  const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };
+  if (/^Enchanted (?:land|permanent) is snow$/.test(text)) return { affects: { kind: "attached" }, mods: [snow], text: line };
+  if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);
   if (silenced) {
@@ -848,7 +861,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

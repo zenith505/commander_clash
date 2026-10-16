@@ -376,6 +376,11 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
   }
   for (let k = 0; k < n; k++)
     addTarget(ctx, { ...spec, divided: { first, n, total }, ...(k ? { optional: true, distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+  // "Those permanents": all the target creatures or planeswalkers (Mythos of Vadrok); not with "targets", which may be players.
+  if (what !== "targets") {
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n };
+  }
   return { index: first, n, amount: total };
 }
 

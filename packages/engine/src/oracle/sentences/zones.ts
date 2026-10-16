@@ -1,11 +1,11 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, COUNTER, amt, counterKind, num, singularWord } from "../words";
+import { NUM, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
-import { parseStaticCondition, parseUntargetable } from "../statics";
+import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -107,6 +107,18 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
+  }
+  // "Return a creature card from your graveyard to the battlefield" (Summon Undead), "... tapped" (Port of Karfell), "... with
+  // a finality counter on it" (Charnel Serenade): chosen as it resolves, not targeted, under your control (CR 110.2a).
+  if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
+    // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
+    // as it resolves.
+    const mvX = / with mana value X or less$/.exec(m[2]!);
+    if (mvX && !ctx.spell && !ctx.activated && !ctx.whereX) return null;
+    const filter = parseSearchFilter(m[2]!.slice(0, mvX?.index).replace(/ and\/or /g, " or "));
+    const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
+    if (filter === null || !Number.isInteger(n) || n < 1) return null;
+    return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(filter ? { filter: mvX ? { ...filter, text: `${filter.text} with mana value X or less` } : filter } : {}), ...(mvX ? { mvMax: amt("X") } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
   }
   // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
   // (Decaying Soil): that player chooses as it resolves.
@@ -255,6 +267,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // "Until your next turn, those permanents can't attack or block and their activated abilities can't be activated" (Mythos
+  // of Vadrok): what detain does, in words (CR 701.35a); mana abilities too (CR 605.1a).
+  if ((m = /^Until your next turn, (.+?) can't attack or block and (?:its|their) activated abilities can't be activated$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantActivate" }], duration: "yourNextTurn" }] : null;
+  }
   // "Until your next turn, those creatures can't block" (Taunt from the Rampart): the same, said first.
   const front = /^Until your next turn, (.+? can't (?:block|attack|attack or block|be blocked))$/.exec(s);
   if (front) s = `${front[1]} until your next turn`;
@@ -263,6 +281,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const mods: Modification[] =
       m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : m[2] === "be blocked" ? [{ kind: "cantBeBlocked" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
     return what ? [{ type: "continuous", what, mods, duration: m[3] === "this turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
+  // "~ can't be blocked this turn except by snow creatures" (Rime Transfusion), "can't be blocked by Walls this turn": the
+  // static ability's evasion (CR 509.1b), until end of turn.
+  if ((m = /^(.+?) can't be blocked (this turn except by .+|by .+? this turn)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what && parseStaticMods(`can't be blocked ${m[2]!.replace(/^this turn (except by .+)$/, "$1").replace(/ this turn$/, "")}`);
+    return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }
   // "Target creature can't be the target of spells or abilities your opponents control this turn" (Vines of Vastwood): the
   // opponents of whoever controls the effect, its spell's controller (rulings on Vines of Vastwood).
@@ -281,6 +306,43 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = new RegExp(`^Return ${NUM} (.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
+  }
+  // "Each player chooses from among the permanents they control an artifact, a creature, an enchantment, and a land,
+  // then sacrifices the rest" (Cataclysm), "... an artifact, a creature, an enchantment, and a planeswalker from among the
+  // nonland permanents they control ..." (Cataclysmic Gearhulk), "... up to two creatures they control ..." (Covetous
+  // Elegy), "... a land of each basic land type" (Global Ruin), "... a permanent they control of each permanent type"
+  // (Liliana, Dreadhorde General). The choices aren't targeted, and are made as it resolves (rulings).
+  if ((m = /^(.+?) chooses (.+?),? (?:then|and) sacrifices the rest$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const what = m[2]!;
+    let r: RegExpExecArray | null;
+    let among: TargetSpec | null = null;
+    let list: string | undefined;
+    let keep: { filter: TargetSpec; n: number; upTo?: true }[] | null = null;
+    if ((r = /^from among the permanents they control (.+)$/.exec(what))) [among, list] = [{ kind: "object", text: "permanent" }, r[1]!];
+    else if ((r = /^(.+) from among the (nonland permanents|creatures) they control$/.exec(what))) [among, list] = [pickFilter(r[2]!), r[1]!];
+    else if ((r = /^from the lands they control a land of each basic land type$/.exec(what))) {
+      among = { kind: "object", types: ["Land"], text: "land" };
+      keep = BASIC_TYPES.map((t) => ({ filter: { kind: "object", types: ["Land"], subtypes: [t], text: t }, n: 1 }));
+    } else if (/^a permanent they control of each permanent type$/.test(what)) {
+      // The permanent types (CR 110.4).
+      among = { kind: "object", text: "permanent" };
+      keep = (["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"] as const).map((t) => ({ filter: { kind: "object", types: [t], text: t.toLowerCase() }, n: 1 }));
+    } else if ((r = new RegExp(`^(up to )?${NUM} (.+?) they control$`).exec(what))) {
+      const filter = pickFilter(r[3]!);
+      const n = amt(r[2]!);
+      if (!filter || typeof n !== "number") return null;
+      among = filter;
+      keep = [{ filter, n, ...(r[1] ? { upTo: true as const } : {}) }];
+    }
+    if (list !== undefined) {
+      const parts = list.split(/,? and |, /);
+      const filters = parts.map((x) => /^an? (.+)$/.exec(x)).map((x) => (x ? pickFilter(x[1]!) : null));
+      if (filters.some((f) => !f)) return null;
+      keep = filters.map((filter) => ({ filter: filter!, n: 1 }));
+    }
+    if (!who || !among || among.kind !== "object" || !keep?.length || keep.some((k) => k.filter.kind !== "object")) return null;
+    return [{ type: "keepRest", who, keep, among }];
   }
   // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
   // control with the greatest power" (Szat's Will).

@@ -1,6 +1,6 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
+import { addTriggeredMana, askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
@@ -9,7 +9,6 @@ import { cardSource, objectSource, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
-import { addMana } from "../spend";
 import type { ManaSpent } from "../mana";
 import { objectMatches, bindChosen, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
@@ -193,7 +192,7 @@ function manaAbilityResolved(s: GameState, item: StackItem, made: ManaType[]): v
   const extra = m.extra ?? [];
   const picked = results.length === 1 ? results[0]! : results.find((r) => r.extra.length === extra.length && r.extra.every((x, i) => x === extra[i]));
   if (!picked) throw new RulesError(`choose the mana that tapping ${defOf(s, o).name} also adds`);
-  addMana(s, item.controller, picked.adds);
+  addTriggeredMana(s, item.controller, picked);
   if (picked.adds.length) log(s, `${player(s, item.controller).name} adds ${picked.adds.map((x) => `{${x}}`).join("")}.`);
 }
 
@@ -490,6 +489,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "grantFlashback":
     case "pick":
     case "sacrificeEach":
+    case "keepRest":
     case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
@@ -582,6 +582,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTop":
     case "revealTopToHand":
     case "revealTop":
+    case "revealRevealed":
     case "discard":
     case "takeFromHand":
     case "scry":

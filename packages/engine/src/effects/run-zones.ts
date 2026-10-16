@@ -1,6 +1,6 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
-import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
@@ -178,6 +178,59 @@ function sacrificeEach(s: GameState, e: Extract<Effect, { type: "sacrificeEach" 
       log(s, `${player(s, pid).name} sacrifices ${defOf(s, o).name}.`);
       moveObject(s, id, "graveyard", { sacrificed: true });
     }
+}
+
+/**
+ * "Each player chooses an artifact, a creature, an enchantment, and a land from among the permanents they control, then
+ * sacrifices the rest" (see the keepRest effect): the active player first, then the others in turn order, each knowing
+ * the choices before theirs (CR 101.4, rulings); then all the rest are sacrificed at the same time.
+ */
+function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const who = apnap(s, players(s, e.who, ctx));
+  const kr = (sc.keepRest ??= { queue: [...who], slot: 0, kept: {} });
+  const among = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, { ...e.among, controller: "you" }, obj(s, id), pid, false));
+  while (kr.queue.length) {
+    const pid = kr.queue[0]!;
+    const chooser = e.youChoose ? ctx.controller : pid;
+    const kept = (kr.kept[pid] ??= []);
+    // The answer to the pick it asked for.
+    if (sc.chosen?.[chooser]) {
+      kept.push(...sc.chosen[chooser]!);
+      sc.chosen = undefined;
+      kr.slot++;
+    }
+    while (kr.slot < e.keep.length) {
+      const k = e.keep[kr.slot]!;
+      const options = among(pid).filter((id) => objectMatches(s, { ...k.filter, controller: "you" }, obj(s, id), pid, false));
+      const max = Math.min(k.n, options.length);
+      // Nothing to choose between: all of them are kept.
+      if (!k.upTo && options.length <= k.n) {
+        kept.push(...options);
+        kr.slot++;
+        continue;
+      }
+      if (!options.length) {
+        kr.slot++;
+        continue;
+      }
+      sc.queue = [chooser];
+      sc.chosen = {};
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(chooser !== pid ? { of: pid } : {}) };
+      return "paused";
+    }
+    kr.queue.shift();
+    kr.slot = 0;
+  }
+  sc.keepRest = undefined;
+  const gone: ObjectId[] = [];
+  for (const pid of who) {
+    const kept = new Set(kr.kept[pid] ?? []);
+    if (kept.size) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}.`);
+    gone.push(...among(pid).filter((id) => !kept.has(id)));
+  }
+  if (gone.length) log(s, `${src}: ${gone.map((id) => nameOf(s, id)).join(", ")} ${gone.length === 1 ? "is" : "are"} sacrificed.`);
+  for (const id of gone) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "graveyard", { sacrificed: true });
 }
 
 /** The token empower Jace creates (CR 701.71a). */
@@ -622,6 +675,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return pickPermanents(s, e, ctx, src);
     case "sacrificeEach":
       return sacrificeEach(s, e, ctx, src);
+    case "keepRest":
+      return keepRest(s, e, ctx, src);
     case "empowerJace":
       return empowerJace(s, e.n, ctx, src);
     case "bounce": {
@@ -736,15 +791,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const p = player(s, pid);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.found) {
-        const cards = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        // Only permanent cards can be put onto the battlefield (CR 110.4b).
+        const mvMax = e.mvMax === undefined ? undefined : amountNow(s, e.mvMax, ctx);
+        const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
+        const cards = p.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
         const max = Math.min(e.n, cards.length);
         if (!max) return;
-        const kind = e.filter?.text ?? "card";
+        const kind = filter?.text ?? "card";
         const what = e.n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand" };
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
+      if (e.dest === "battlefield") {
+        // An Aura's controller chooses what it enchants as it enters (CR 303.4f), or it stays in the graveyard (303.4g).
+        const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src);
+        if (hosts === "paused") return "paused";
+        const ids = found.filter((id) => !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
+        if (ids.length) log(s, `${p.name} returns ${ids.map((id) => defOf(s, obj(s, id)).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} from their graveyard to the battlefield${e.tapped ? ", tapped" : ""}.`);
+        enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: { ...e.counters } } : {}), ...hosts.get(id) })));
+        return;
+      }
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) moveObject(s, id, e.dest ?? "hand");

@@ -157,10 +157,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "mustBlockSource": {
-      // Provoke (CR 702.39a): only the creature that provoked it, as long as it's still that object.
-      if (!ctx.sourceId) return;
-      const source = s.objects[ctx.sourceId];
-      if (!source || source.zone !== "battlefield" || (source.zoneChanges ?? 0) !== ctx.sourceZc) return;
+      // Provoke (CR 702.39a): only the creature that provoked it, as long as it's still that object. "Blocks target
+      // creature": that one, if it's still a legal target (CR 608.2b).
+      const source = e.attacker ? objects(s, e.attacker, ctx)[0] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!source || source.zone !== "battlefield" || (!e.attacker && (source.zoneChanges ?? 0) !== ctx.sourceZc)) return;
       for (const o of objects(s, e.what, ctx)) {
         o.provokedBy = { id: source.id, zc: source.zoneChanges ?? 0, ...(e.thisTurn ? { turn: s.turn } : {}) };
         log(s, `${characteristics(s, o).name} must block ${characteristics(s, source).name} this ${e.thisTurn ? "turn" : "combat"} if able.`);

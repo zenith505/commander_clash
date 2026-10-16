@@ -23,7 +23,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -260,8 +260,8 @@ export interface TargetSpec {
   named?: string;
   /** None of these subtypes. */
   notSubtypes?: string[];
-  /** "creature with a +1/+1 counter on it" */
-  counter?: "+1/+1" | "-1/-1";
+  /** "creature with a +1/+1 counter on it", "permanents with ice counters on them" */
+  counter?: CounterKind;
   /**
    * "of the chosen type", "that aren't of the chosen type", "of the chosen color": the creature type
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
@@ -319,6 +319,8 @@ export interface SearchDest {
 export interface Range {
   min?: number;
   max?: number;
+  /** "With an even mana value" (zero is even), "with an odd mana value". */
+  parity?: "even" | "odd";
 }
 
 /**
@@ -500,7 +502,8 @@ export interface Untargetable {
 
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
-  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
+  /** Layer 4, "in addition to its other types"; `allCreatureTypes`: "with all creature types" (Mutavault). */
+  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true }
   | { kind: "setTypes"; types: string[]; subtypes: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   /**
@@ -653,7 +656,7 @@ export type StaticCondition =
   /** A Class's level (CR 716.2a): at least `min`, at most `max`; a permanent without a level is level 1 (716.2d). */
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" }
+  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" }
   /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
   | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
@@ -902,6 +905,14 @@ export type Effect =
    * theirs in APNAP order, then they're all sacrificed at once (CR 101.4).
    */
   | { type: "sacrificeEach"; who: PlayerRef; filters: TargetSpec[] }
+  /**
+   * "Each player chooses an artifact, a creature, an enchantment, and a land from among the permanents they control, then
+   * sacrifices the rest" (Cataclysm): each player in turn order chooses, for each of `keep`, that many of their
+   * permanents matching both it and `among` (all of them if they have no more, or any number up to it with `upTo`); one
+   * permanent may be chosen for several (rulings). Then every unchosen permanent matching `among` is sacrificed at once.
+   * `youChoose`: you make every player's choices (Mythos of Snapdax).
+   */
+  | { type: "keepRest"; who: PlayerRef; keep: { filter: TargetSpec; n: number; upTo?: true }[]; among: TargetSpec; youChoose?: true }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
@@ -927,7 +938,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** Exiled instead ("Target player exiles a card from their graveyard"). */ dest?: "exile"; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), or put onto the battlefield under your control. */ dest?: "exile" | "battlefield"; tapped?: true; counters?: Record<string, number>; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -991,7 +1002,8 @@ export type Effect =
   | { type: "tapOrUntap"; what: ObjRef; may?: true }
   /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
   /** Provoke and "target creature blocks ~ this turn if able": for this combat, or the rest of the turn (CR 509.1c). */
-  | { type: "mustBlockSource"; what: ObjRef; thisTurn?: true }
+  /** Provoke-like: `what` blocks the source (or `attacker`, "blocks target creature") this combat or turn if able. */
+  | { type: "mustBlockSource"; what: ObjRef; attacker?: ObjRef; thisTurn?: true }
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
@@ -1138,7 +1150,10 @@ export type Effect =
    */
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean } }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
-  | { type: "revealTop" }
+  /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
+  | { type: "revealTop"; look?: true }
+  /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
+  | { type: "revealRevealed" }
   /** "Put it into your graveyard": the revealed card, from the library (not milling, CR 701.17). */
   | { type: "putInGraveyard"; what: ObjRef }
   /** Champion's first ability (CR 702.72a): "sacrifice it unless you exile another [object] you control". */
@@ -1383,6 +1398,8 @@ export interface SpentReq {
   snow?: number;
   /** "If {S} of any of that spell's colors was spent to cast it" (Boreal Outrider). */
   snowOfColors?: true;
+  /** "If three or more mana from creatures was spent": at least this much mana from each kind of source (CR 106.3). */
+  from?: Partial<Record<"creature" | "artifact" | "treasure", number>>;
 }
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */

@@ -41,13 +41,13 @@ describe("restricted mana (CR 106.6)", () => {
     // With only the Ziggurat's {G} in the pool, the instant can't be cast.
     let s = act(s0, { type: "activateMana", player: ap, objectId: z, mana: "G" });
     expect(s.players[ap]!.manaPool.G).toBe(1);
-    expect(s.players[ap]!.restrictedMana).toEqual([{ mana: "G", n: 1, only: expect.objectContaining({ text: "Spend this mana only to cast a creature spell." }) }]);
+    expect(s.players[ap]!.manaLots).toEqual([{ mana: "G", n: 1, only: expect.objectContaining({ text: "Spend this mana only to cast a creature spell." }) }]);
     expect(castProblem(s, ap, ids[1]!, [target(b)])).toMatch(/not enough mana/);
     // A planned payment taps the Forest for the instant, leaving the Ziggurat's mana in the pool.
     s = run(s, planCast(s, ap, ids[1]!, [target(b)]));
     expect(s.stack.at(-1)?.objectId).toBe(ids[1]);
     expect(s.players[ap]!.manaPool.G).toBe(1);
-    expect(s.players[ap]!.restrictedMana?.[0]?.n).toBe(1);
+    expect(s.players[ap]!.manaLots?.[0]?.n).toBe(1);
   });
 
   it("the creature spell spends the restricted mana first, keeping the free mana", () => {
@@ -61,7 +61,7 @@ describe("restricted mana (CR 106.6)", () => {
     s = act(s, { type: "activateMana", player: ap, objectId: f2, mana: "G" });
     s = act(s, { type: "castSpell", player: ap, objectId: ids[0]! });
     expect(s.players[ap]!.manaPool).toMatchObject({ W: 0, G: 1 });
-    expect(s.players[ap]!.restrictedMana).toBeUndefined();
+    expect(s.players[ap]!.manaLots).toBeUndefined();
     // The {G} left is free mana: it pays for the instant.
     s = act(s, { type: "castSpell", player: ap, objectId: ids[1]!, targets: [target(putOnBattlefield(s, ap, bear()))] });
     expect(s.stack.at(-1)?.objectId).toBe(ids[1]);
@@ -94,7 +94,7 @@ describe("restricted mana (CR 106.6)", () => {
     expect(s.stack.at(-1)?.objectId).toBe(ids[0]);
     // {1}{G} + {2}{G} = 5: two from the Ziggurats, three from the Forests; the Workshop's {C}{C}{C} is left.
     expect(s.players[ap]!.manaPool).toMatchObject({ G: 0, C: 3 });
-    expect(s.players[ap]!.restrictedMana).toEqual([{ mana: "C", n: 3, only: expect.objectContaining({ text: "Spend this mana only to cast artifact spells." }) }]);
+    expect(s.players[ap]!.manaLots).toEqual([{ mana: "C", n: 3, only: expect.objectContaining({ text: "Spend this mana only to cast artifact spells." }) }]);
   });
 
   it("artifact-only mana casts an artifact; mana for abilities of artifacts activates them", () => {
@@ -139,7 +139,7 @@ describe("restricted mana (CR 106.6)", () => {
     let s = act(s0, { type: "activateMana", player: ap, objectId: z, mana: "G" });
     s = passUntil(s, "beginCombat", ap, 20);
     expect(s.players[ap]!.manaPool.G).toBe(0);
-    expect(s.players[ap]!.restrictedMana).toBeUndefined();
+    expect(s.players[ap]!.manaLots).toBeUndefined();
   });
 
   it("a bestowed spell is an Aura spell, not a creature spell (CR 702.103b)", () => {
@@ -185,7 +185,7 @@ describe("restricted mana (CR 106.6)", () => {
     s.players[ap]!.manaPool.C++; // one more {C}, free mana
     s = act(s, { type: "castSpell", player: ap, objectId: ids[1]! });
     expect(s.stack.at(-1)?.objectId).toBe(ids[1]);
-    expect(s.players[ap]!.restrictedMana).toBeUndefined();
+    expect(s.players[ap]!.manaLots).toBeUndefined();
   });
 
   it("Powerstone mana pays other costs, like an ability's", () => {

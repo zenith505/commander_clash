@@ -1,13 +1,13 @@
 import { allEffects, refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, counterKind, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
+import { num, NUMX, X, amt, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
-import { parseObject, parsePlayer, parseTargetPhrase } from "./targets";
+import { parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseSearchFilter } from "./search";
 
 export interface Ctx {
@@ -67,7 +67,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
@@ -93,7 +93,7 @@ const checkableMay = (e: Effect) =>
  * `next`: the sentence after the last one used.
  */
 function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
-  const first = /^If (?:it's|that card is) (not |)(an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "");
+  const first = /^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? "");
   if (!first) return null;
   const filter = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
   const then = filter && revealedAction(first[3]!, ctx);
@@ -124,6 +124,9 @@ function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: E
 
 /** One thing done with the revealed card ("put it into your hand", "you may put it into your graveyard"), or "draw a card". */
 function revealedAction(text: string, ctx: Ctx): Effect[] | null {
+  // "You may reveal it and put it into your hand" (Frost Augur): a card only looked at is revealed as it's put there.
+  const shown = /^you may reveal it and put it into your hand$/.test(text);
+  if (shown) return [{ type: "may", effects: [{ type: "revealRevealed" }, { type: "bounce", what: { ref: "revealed" } }], text: "reveal the revealed card and put it into your hand" }];
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
     // Not about the card: "draw a card" (Track Down, Thrasios).
@@ -201,7 +204,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -264,6 +267,17 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       si++;
       continue;
     }
+    // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
+    // counter on it" (Cauldron's Gift): one choice and one move, nothing in between (rulings), and not targeted.
+    const yardPick = /^You may choose an? (.+? card) in your graveyard$/.exec(s);
+    const yardBack = yardPick && new RegExp(`^If you do, return it to the battlefield(?: with an additional (${COUNTER}) counter on it)?$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (yardPick && yardBack) {
+      const filter = parseSearchFilter(yardPick[1]!);
+      if (filter === null || (filter?.types ?? []).some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, dest: "battlefield", ...(filter ? { filter } : {}), ...(yardBack[1] ? { counters: { [counterKind(yardBack[1])]: 1 } } : {}) });
+      si++;
+      continue;
+    }
     // "Look at the top three cards of target player's library, then put them back in any order." The player
     // looking orders them (CR 401.4 lets nobody else see them). "You may shuffle." after it is a choice to shuffle.
     const order = new RegExp(`^(You may )?[Ll]ook at the top ${NUMX} cards of (your|target player's|target opponent's) library$`).exec(s);
@@ -283,6 +297,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "{1}: Look at the top card of your library." (Brutal Deceiver): only as the last instruction, so nothing after it
     // refers to the card.
     const lookTop = /^[Ll]ook at the top card of (your|target player's|target opponent's) library$/.exec(s);
+    // "Look at the top card of your library. If it's a snow card, you may reveal it and put it into your hand" (Frost
+    // Augur; Scrying Sheets: you can't reveal a card that isn't snow, and needn't reveal one that is, rulings).
+    if (lookTop?.[1] === "your" && /^If (?:it's|that card is) /.test(sentences[si + 1] ?? "")) {
+      const r = parseRevealedIf(sentences, si + 1, ctx);
+      if (!r) return null;
+      effects.push({ type: "revealTop", look: true }, r.effect);
+      si = r.next - 1;
+      continue;
+    }
     if (lookTop && si === sentences.length - 1) {
       const who = parsePlayer(lookTop[1] === "your" ? "you" : lookTop[1]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
@@ -439,6 +462,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     const howCast = parseHowCast(s, ctx);
+    // Once and Future's adamant, "instead return those cards to your hand and exile ~": done instead of all the spell's
+    // instructions before it, so each target card goes to your hand whichever zone it was chosen for (CR 601.2c).
+    if (howCast && !howCast.not && ctx.spell && /^instead return those cards to your hand and exile ~$/.test(howCast.text)) {
+      const last = effects[effects.length - 1];
+      const moves = effects.slice(0, -1);
+      const each = moves.map((e, i) => (e.type === "bounce" || e.type === "putInLibrary") && e.what.ref === "target" && e.what.index === i && !e.what.n);
+      if (last?.type !== "exileSpell" || !moves.length || each.includes(false) || ctx.targets.length !== moves.length || ctx.targets.some((x) => x.kind !== "card" || x.owner !== "you")) return null;
+      effects.splice(0, effects.length, { type: "if", cond: howCast.cond, effects: [...moves.map((_, i): Effect => ({ type: "bounce", what: { ref: "target", index: i } })), { type: "exileSpell" }], otherwise: effects.slice() });
+      continue;
+    }
     // "Return target creature card from your graveyard to the battlefield. If {G} was spent to cast ~, that creature enters
     // with an additional +1/+1 counter on it" (Vigor Mortis): it enters with it (CR 614.1c), so the return itself differs.
     const more = howCast && !howCast.not && /^(?:that creature|it) enters with an additional (\+1\/\+1|-1\/-1) counter on it$/i.exec(howCast.text);
@@ -795,8 +828,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).
     if (/^(?:It's still an? (land|artifact|enchantment)|They're still (?:lands|artifacts|enchantments))$/i.test(s)) {
-      const last = [...effects].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes"));
+      const last = [...effects].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes" || (x.kind === "addTypes" && x.types.includes("Creature"))));
       if (!last || last.type !== "continuous") return null;
+      // "Becomes a 2/2 Assembly-Worker artifact creature" already keeps its card types (CR 205.1b).
       last.mods = last.mods.map((x) => (x.kind === "setTypes" ? { kind: "addTypes", types: x.types, subtypes: x.subtypes } : x));
       continue;
     }
@@ -827,7 +861,8 @@ export function parsePayCost(text: string): PayCost | null {
     return Number.isFinite(n) ? { energy: n } : null;
   }
   if ((m = /^(\d+) life$/.exec(text))) return { life: Number(m[1]) };
-  if ((m = /^((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRG])\})+)(?: and (\d+) life)?$/.exec(text))) return { mana: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
+  // {S}: mana from a snow source (CR 107.4h), as in "Cumulative upkeep {S}".
+  if ((m = /^((?:\{(?:\d+|[WUBRGCS]|[WUBRG]\/[WUBRG])\})+)(?: and (\d+) life)?$/.exec(text))) return { mana: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
   return null;
 }
 
@@ -968,14 +1003,27 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     if (previous.length !== 1 || prev?.type !== "damage") return null;
     return { effects: [{ ...prev, amount: amt(more[1]!) }], instead };
   }
+  // "~ deals 7 damage divided as you choose among one, two, or three targets. If at least seven red mana was spent to cast
+  // ~, instead ~ deals 7 damage to each of those permanents and/or players" (Sundering Stroke): the damage is still
+  // divided as it's cast (CR 601.2d, rulings), then each target is dealt the full amount instead.
+  const each = /^(?:It|~) deals (\d+) damage to each of those permanents and\/or players$/.exec(t);
+  if (each && instead) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "damage" || !prev.divided || prev.to.ref !== "anyTarget") return null;
+    const { divided: _divided, ...rest } = prev;
+    return { effects: [{ ...rest, amount: amt(each[1]!) }], instead };
+  }
+  // "If {B}{R} was spent to cast ~, you choose the permanents for each player instead" (Mythos of Snapdax): the same
+  // choices, all made by you, and still legal ones (rulings).
+  if (instead && /^You choose the permanents for each player$/.test(t)) {
+    const prev = previous[0];
+    return previous.length === 1 && prev?.type === "keepRest" ? { effects: [{ ...prev, youChoose: true }], instead } : null;
+  }
   t = t.replace(/^It deals /, "~ deals ");
   const before = ctx.targets.length;
   const fx = parseOne(t, ctx);
   if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
-  // Under an "if", its instructions run one at a time, so one may wait on a player (see the "if" effect); not when done
-  // "instead" of others.
-  if (instead && fx.length > 1 && fx.some((e) => pauses(e))) return null;
-  if (instead && previous.some((e) => pauses(e))) return null;
+  // Under an "if", either branch's instructions run one at a time, so one may wait on a player (see the "if" effect).
   const done = instead ? insteadOfAffected(fx, previous) : fx;
   return done && { effects: done, instead };
 }

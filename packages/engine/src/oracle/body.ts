@@ -1027,6 +1027,16 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   // "That creature also gains flying": in addition to what the sentence before did.
   if (!instead) t = t.replace(/^(That creature|That player|It|~|Permanents you control|Creatures you control) also (?=(?:gains?|gets?|deals?|has|have|loses?) )/, "$1 ");
   if (instead && !previous.length) return null;
+  // "If eight or more mana was spent to cast that spell, sacrifice ~ and it deals that much damage to each opponent"
+  // (Tellah): two instructions under the one condition, both about ~ (as at the top of parseBody).
+  const pair = !instead && /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(t);
+  if (pair) {
+    const before = ctx.targets.length;
+    const first = parseOne(pair[1]!, ctx);
+    const second = first && parseOne(`~ ${pair[2]!}`, ctx);
+    if (!first || !second || (!newTargets && ctx.targets.length !== before)) return null;
+    return { effects: [...first, ...second], instead };
+  }
   // "~ deals 2 damage to any target. If ~ was kicked, it deals 5 damage instead": the same damage, more of it.
   const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|it))?$/.exec(t);
   if (more && instead) {

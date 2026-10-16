@@ -235,8 +235,14 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const spent = spentIf ? parseSpentReq(spentIf[1]!) : undefined;
   if (spentIf && (m[2] || !spent)) return "fail";
   // "That player" is the one who cast it.
-  const body = parseBody(treasure ? treasure[1]! : spentIf ? spentIf[2]! : m[4]!, { castSpell: true, eventPlayer: true });
+  // "If eight or more mana was spent to cast that spell, ... it deals that much damage to each opponent" (Tellah): the
+  // mana spent to cast it (CR 601.2h), which the cast event carries.
+  let text = treasure ? treasure[1]! : spentIf ? spentIf[2]! : m[4]!;
+  const thatMuch = /\bIf [^.,]+ mana was spent to cast that spell, [^.]*\bthat much\b/.test(text) && !/\bX\b/.test(text) && !m[2];
+  if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
+  let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}) }, body };
 }
 

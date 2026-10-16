@@ -4093,6 +4093,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "rollResult") {
+    // "Roll two d8 and choose one result": which die is "that result" (see runDiceEffect).
+    (r.scratch ??= {}).rollChoice = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "damageSource") {
     // The source of damage a prevention or redirection effect is about, chosen as it resolves (CR 609.7a).
     (r.scratch ??= {}).damageSource = choice;

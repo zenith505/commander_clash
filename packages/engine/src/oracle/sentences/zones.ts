@@ -3,6 +3,7 @@
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
 import { NUM, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
+import { parseCount } from "../counts";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
 import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
@@ -120,6 +121,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = parseSearchFilter(m[1]!);
     if (!filter || !filter.types?.includes("Creature")) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
+  }
+  // "... with a number of +1/+1 counters on it equal to that result" (Grave Endeavor): counted as it resolves.
+  const counted = new RegExp(`^([Rr]eturn an? .+? from your graveyard to the battlefield(?: tapped)?) with a number of (${COUNTER}) counters on it equal to (.+)$`).exec(s);
+  if (counted) {
+    const n = parseCount(counted[4]!, ctx); // COUNTER has a group of its own
+    const fx = n && parseZonesSentence(`${counted[1]} with a ${counted[2]} counter on it`, ctx);
+    return n && fx?.length === 1 && fx[0]!.type === "chooseFromGraveyard" && fx[0]!.counters ? [{ ...fx[0]!, countersN: n }] : null;
   }
   if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
     // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X

@@ -16,6 +16,14 @@ import { parsePreventAll } from "../statics";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Search your library for a number of basic land cards equal to the other result, put them onto the battlefield
+  // tapped, then shuffle" (Wild Endeavor): that many, counted as it resolves.
+  const howMany = /^Search your library for a number of (.+? cards) equal to (.+?)((?:,| and) (?:put|then) .+)$/i.exec(s);
+  if (howMany) {
+    const n = parseCount(howMany[2]!, ctx);
+    const fx = n && parseSearch(`Search your library for two ${howMany[1]}${howMany[3]}`);
+    return n && fx?.length === 1 && fx[0]!.type === "search" && !fx[0]!.others ? [{ ...fx[0]!, n }] : null;
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s);
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That

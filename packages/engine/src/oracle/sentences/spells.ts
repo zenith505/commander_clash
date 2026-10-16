@@ -106,11 +106,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Rolling dice (CR 706.1a: "a d20", "N-sided dice"). A modifier in the same instruction ("and add the number of cards
   // in your hand", 706.2); "plus an additional six-sided die for each mana from Treasures spent to activate this
   // ability" (Mr. House).
-  if ((m = new RegExp(`^[Rr]oll ${NUMX} (?:d(\\d+)|(\\w+)-sided (?:die|dice))( and ignore the lower roll)?(?: plus an additional (?:d\\d+|\\w+-sided die) for each (.+)| and (add|subtract) (.+))?$`).exec(s))) {
+  if ((m = new RegExp(`^[Rr]oll ${NUMX} (?:d(\\d+)|(\\w+)-sided (?:die|dice))( and ignore the lower roll| and choose one result)?(?: plus an additional (?:d\\d+|\\w+-sided die) for each (.+)| and (add|subtract) (.+))?$`).exec(s))) {
     const sides = m[2] ? Number(m[2]) : num(m[3]!);
     const n = amt(m[1]!);
     if (!sides || (m[4] && n !== 2)) return null;
-    const roll: Extract<Effect, { type: "roll" }> = { type: "roll", sides, ...(n !== 1 ? { n } : {}), ...(m[4] ? { keepHighest: true as const } : {}) };
+    const choose = m[4] === " and choose one result";
+    if (choose && (ctx.chooseResult || m[5] || m[6])) return null;
+    if (choose) ctx.chooseResult = true;
+    const roll: Extract<Effect, { type: "roll" }> = { type: "roll", sides, ...(n !== 1 ? { n } : {}), ...(m[4] ? (choose ? { chooseOne: true as const } : { keepHighest: true as const }) : {}) };
     if (m[5]) {
       const per = n === 1 ? parseCount(m[5], ctx, true) : null;
       if (!per) return null;

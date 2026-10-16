@@ -3830,6 +3830,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "928bf0d9-89be-462d-aeb7-74a65e95535c",
+  "name": "Reckless Endeavor",
+  "manaCost": "{5}{R}{R}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Roll two d12 and choose one result. Reckless Endeavor deals damage equal to that result to each creature. Then create a number of Treasure tokens equal to the other result.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6a9c3401-570c-41cb-a605-75dfa57d6ab7",
   "name": "Relic of Progenitus",
   "manaCost": "{1}",

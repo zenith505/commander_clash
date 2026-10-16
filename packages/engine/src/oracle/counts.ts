@@ -67,6 +67,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   const count = (c: Count): AmountExpr => ({ count: c });
   // "Draw cards equal to the result", "where X is the result" (CR 706.2), "the total of those results" (Neverwinter Hydra).
   if (!each && /^(?:the result|the total of those results)$/i.test(p)) return count({ kind: "rollResult" });
+  // "Roll two d4 and choose one result. Create a number of ... equal to that result. Then ... equal to the other result."
+  if (!each && ctx?.chooseResult && /^that result$/i.test(p)) return count({ kind: "rollResult" });
+  if (!each && ctx?.chooseResult && /^the other result$/i.test(p)) return count({ kind: "rollOther" });
   // Life and hands.
   if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });

@@ -193,10 +193,16 @@ export function normalizeSelf(d: CardDef): string {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
     t = t.replace(new RegExp(esc(full), "g"), "~");
   }
-  const short = full.split(",")[0]!;
+  // Shortened names (CR 201.5c): "Gylwain" for "Gylwain, Casting Director", and for a legendary card with no comma,
+  // "Ellivere" for "Ellivere of the Wild Court", "Gandalf" for "Gandalf the Grey" (not "Tuktuk the Returned", a token
+  // Tuktuk the Explorer creates).
+  const comma = full.split(",")[0]!;
+  const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:of|the) /.exec(full)?.[1] : undefined;
+  const short = ofThe ?? comma;
   if (short && short !== full) {
-    t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`\\b${esc(short)}\\b`, "g"), QUOTED_SOURCE_NAME));
-    t = t.replace(new RegExp(`\\b${esc(short)}\\b`, "g"), "~");
+    const re = new RegExp(`\\b${esc(short)}\\b${ofThe ? "(?! (?:of|the) [A-Z])" : ""}`, "g");
+    t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
+    t = t.replace(re, "~");
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
@@ -982,6 +988,19 @@ export function compile(d: CardDef): CompiledCard {
         text: line,
         equip: true,
       });
+      continue;
+    }
+    // "Equip legendary creature {3}", "Equip Knight {1}", "Equip commander {3}" (CR 702.6c): only a creature you control
+    // with that quality; "Equip—Pay 3 life.", "Equip—Sacrifice a creature." (a cost that isn't mana, CR 702.6a).
+    const equipQ = /^Equip (?!planeswalker\b)((?:[A-Za-z]+,? (?:or )?)*?[A-Za-z]+) ((?:\{[^}]+\})+)$/.exec(line);
+    const equipCost = /^Equip—(.+?)\.( Activate only once each turn\.)?$/.exec(line);
+    if ((equipQ || equipCost) && d.subtypes.includes("Equipment")) {
+      const q = equipQ?.[1];
+      const what = !q ? "creature" : /\bcreature\b/.test(q) ? q : q === "commander" ? "commander creature" : `${q} creature`;
+      const act = parseActivated(`${equipQ ? equipQ[2] : equipCost![1]}: Attach ~ to target ${what} you control. Activate only as a sorcery${equipCost?.[2] ? " and only once each turn" : ""}.`);
+      const target = act && act !== "fail" ? act.body.targets[0] : undefined;
+      if (!act || act === "fail" || target?.kind !== "object" || !target.types?.includes("Creature")) out.unsupported.push(raw);
+      else out.activated.push({ ...act, text: line, equip: true });
       continue;
     }
     // A double-faced token's "{2}: Transform this token." (CR 701.27a, 701.53b). A double-faced card's back face isn't in

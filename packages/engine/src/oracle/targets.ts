@@ -117,7 +117,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // A legendary character's "him" or "her" is the card itself ("Then put a +1/+1 counter on her").
   if (/^(him|her)$/i.test(x) && !ctx.spell) return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
-    if (ctx.lastCreated && /^it$/i.test(x)) return { ref: "created" };
+    if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
     if (ctx.subjectIt) return { ref: "subject" };
     // "Tap enchanted creature. ... put three stun counters on it": the creature named last.
@@ -339,6 +339,12 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     extra.combat = "attackedThisTurn";
     p = p.slice(0, attacked.index);
   }
+  // "Destroy all creatures that aren't enchanted" (Winds of Rath), "target creature that isn't enchanted" (Brainspoil).
+  const bare = / that (?:isn't|aren't|is not|are not) enchanted$/.exec(p);
+  if (bare) {
+    extra.status = "unenchanted";
+    p = p.slice(0, bare.index);
+  }
   // "creature an opponent controls that was dealt damage this turn"
   const hurt = / that was dealt damage this turn$/.exec(p);
   if (hurt) {
@@ -439,6 +445,10 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
       if (w === "token" || w === "nontoken") {
         if (alts.length > 1) return null;
         extra.token = w === "token";
+      } else if ((w === "enchanted" || w === "equipped" || w === "modified") && !extra.status) {
+        // "Enchanted creatures you control", "an equipped creature", "modified creature" (CR 700.9).
+        if (alts.length > 1) return null;
+        extra.status = w;
       } else if (w === "commander" || w === "noncommander") {
         // A commander on the battlefield (CR 903.3): "commander creature you control", "noncommander creature".
         if (alts.length > 1 || extra.commander !== undefined) return null;
@@ -487,10 +497,10 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     ...extra,
   };
   if (inGraveyard) {
-    if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined) return null;
+    if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
     return { kind: "card", ...filters, ...(owner ? { owner } : {}), text };
   }
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || supertypes.length ? null : { kind: "spell", ...filters, text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
 }
 

@@ -566,7 +566,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   const thatHand = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
-  const ifCond = handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "Whenever ~ attacks, if its toughness is 3 or less" (Young Hero Role): its own power or toughness as it triggers and resolves.
+  const ptIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? new RegExp(`^(?:its|~'s) (power|toughness) is ${NUM} or (less|greater)$`).exec(intervening[2]!) : null;
+  const ptCond = ptIf && ({ kind: "selfPT", stat: ptIf[1] as "power" | "toughness", ...(ptIf[3] === "less" ? { max: num(ptIf[2]!) } : { min: num(ptIf[2]!) }) } as const);
+  const ifCond = ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -715,6 +718,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifTreasure = true;
         body0 = treasure[1]!;
       }
+      // "When ~ enters, if you cast it from your hand, ..." (a commander cast from the command zone wasn't, rulings on
+      // Phage the Untouchable): an intervening if (CR 603.4) on how it got there, which can't change.
+      let ifCastFromHand: boolean | undefined;
+      const fromHand = /^if you (didn't )?cast it from your hand, (.+)$/i.exec(body0);
+      if (fromHand) {
+        if (event !== "selfEnters") return "fail" as const;
+        ifCastFromHand = !fromHand[1];
+        body0 = fromHand[2]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -756,7 +768,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
         : ("fail" as const);
     }
   }

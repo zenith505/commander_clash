@@ -4,7 +4,7 @@ import type { Effect } from "../../abilities";
 import { allEffects } from "../../abilities";
 import { NUMX, X, amt, singularWord, isGroup } from "../words";
 import { parsePlayer, parseObject } from "../targets";
-import { INCUBATOR, PREDEFINED_TOKENS, parseToken, parseCopyExcept } from "../tokens";
+import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept } from "../tokens";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
 
@@ -44,6 +44,21 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     if (!who) return null;
     return [{ type: "createToken", who, n: 1, token: INCUBATOR, counters: { counter: "+1/+1", n: amt(m[2]!) } }];
+  }
+  // Role tokens (CR 111.10j-r, 303.7): "Create a Monster Role token attached to target creature you control", "... attached
+  // to it". "For each creature your opponents control, create a Cursed Role token attached to that creature": one each.
+  const ROLES = Object.keys(ROLE_TOKENS).join("|");
+  if ((m = new RegExp(`^(?:[Ff]or each (.+?), create|[Cc]reate) an? (${ROLES}) Role token attached to (.+)$`).exec(s))) {
+    const token = ROLE_TOKENS[m[2]!]!;
+    if (m[1]) {
+      // The group the sentence goes through; "that creature", "it", "that Rat" are each one of it.
+      if (!/^(?:that (?:creature|[A-Z][a-z]+)|it)$/.test(m[3]!)) return null;
+      const those = /^of (?:those|these) /.test(m[1]);
+      const what = parseObject(those ? m[1].slice(3) : `each ${m[1]}`, ctx);
+      return what && (isGroup(what) || those) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token, attachTo: what }] : null;
+    }
+    const what = parseObject(m[3]!, ctx);
+    return what && !isGroup(what) ? [{ type: "createToken", who: { ref: "you" }, n: 1, token, attachTo: what }] : null;
   }
   // Predefined tokens (CR 111.10): "Create a Treasure token", "Its controller creates two Treasure tokens"
   if ((m = new RegExp(`^(?:(.+?) creates?|Create) ${NUMX} (tapped )?(${Object.keys(PREDEFINED_TOKENS).join("|")}) tokens?$`, "i").exec(s))) {

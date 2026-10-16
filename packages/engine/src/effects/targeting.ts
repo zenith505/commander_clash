@@ -18,7 +18,11 @@ const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) =>
  * characteristics? Hexproof only matters for targeting (CR 702.11b), not for what an Aura
  * can stay attached to (CR 303.4d), hence `targeting`.
  */
-export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics): boolean {
+/**
+ * Does `o` match the filter? `chars`: its characteristics as the layers applied so far left them, and `view` the others',
+ * when the layers are being worked out (CR 613.8a).
+ */
+export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
   if (o.zone !== "battlefield") return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
@@ -53,11 +57,32 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
+  if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
   if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
   // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d).
   if (src && protectedFrom(c.keywords, src)) return false;
   return true;
+}
+
+/**
+ * Enchanted: an Aura is attached to it (CR 303.4b). Equipped: an Equipment is (301.5a). Modified: it has a counter on it,
+ * it's equipped, or it's enchanted by an Aura its controller controls (700.9).
+ */
+function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonNullable<TargetSpec["status"]>, view?: (o: GameObject) => Characteristics | undefined): boolean {
+  if (status === "unenchanted") return !hasStatus(s, o, c, "enchanted", view);
+  if (status === "modified" && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return true;
+  // A permanent that has left: what was attached to it as it last existed (CR 603.10a).
+  for (const id of o.lastAttachments ?? s.battlefield) {
+    const a = s.objects[id];
+    if (!a || (!o.lastAttachments && a.attachedTo !== o.id)) continue;
+    const ac = view && a.zone === "battlefield" ? view(a) : characteristics(s, a);
+    if (!ac) continue;
+    if (status !== "enchanted" && ac.subtypes.includes("Equipment")) return true;
+    if (status === "enchanted" && ac.subtypes.includes("Aura")) return true;
+    if (status === "modified" && ac.subtypes.includes("Aura") && ac.controller === c.controller) return true;
+  }
+  return false;
 }
 
 /**

@@ -192,6 +192,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dca51281-fb21-45b6-beb4-1f13397caee2",
+  "name": "Blackblade Reforged",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Legendary Artifact — Equipment",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +1/+1 for each land you control.\nEquip legendary creature {3}\nEquip {7}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "ss2",
+  "releasedAt": "2019-06-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ccba143d-ed9b-4044-bdad-f010a0e38e47",
   "name": "Blazing Shoal",
   "manaCost": "{X}{R}{R}",
@@ -757,6 +785,32 @@
   "commanderLegal": "legal",
   "set": "ema",
   "releasedAt": "2016-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dac85722-d741-4584-8b98-8ac220958a38",
+  "name": "Demonmail Hauberk",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +4/+2.\nEquip—Sacrifice a creature.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -1818,6 +1872,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d69b1e68-8d8e-460b-9eb4-6a68be886197",
+  "name": "Kodama of the West Tree",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Spirit",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Reach\nModified creatures you control have trample. (Equipment, Auras you control, and counters are modifications.)\nWhenever a modified creature you control deals combat damage to a player, search your library for a basic land card, put it onto the battlefield tapped, then shuffle.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a0ff742b-f709-43ac-84d2-dc00c723bad6",
   "name": "Krosan Cloudscraper",
   "manaCost": "{7}{G}{G}{G}",
@@ -2220,6 +2308,34 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "646a2371-54c0-4492-ac2f-20f109d6108c",
+  "name": "Monstrous Rage",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature gets +2/+0 until end of turn. Create a Monster Role token attached to it. (If you control another Role on it, put that one into the graveyard. Enchanted creature gets +1/+1 and has trample.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Role token"
+  ],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

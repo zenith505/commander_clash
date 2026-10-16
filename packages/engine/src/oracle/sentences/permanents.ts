@@ -24,6 +24,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || isGroup(what)) return null;
     return [...(m[1] ? [{ type: "untap" as const, what }] : []), { type: "removeFromCombat", what }];
   }
+  // "Destroy target nonblack creature and target land" (Plague Spores): two targets, each destroyed.
+  if ((m = /^(Destroy|Exile) (target [^,]+?) and (target .+)$/i.exec(s)) && !/ and target /.test(m[3]!)) {
+    const a = parseObject(m[2]!, ctx);
+    const b = a && parseObject(m[3]!, ctx);
+    const type = m[1]!.toLowerCase() as "destroy" | "exile";
+    return a?.ref === "target" && b?.ref === "target" ? [{ type, what: a }, { type, what: b }] : null;
+  }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
@@ -67,6 +74,20 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^If (that creature|that permanent|that creature or planeswalker|that planeswalker|an? (?:creature|permanent) dealt damage this way) would die this turn, exile it instead$/i.exec(s))) {
     const what: ObjRef | null = / this way$/.test(m[1]!) ? { ref: "damagedThisWay" } : parseObject(m[1]!.startsWith("that creature") ? "that creature" : "that permanent", ctx);
     return what ? [{ type: "exileIfDies", what }] : null;
+  }
+  // "Target creature can't be regenerated this turn", "It can't be regenerated this turn", "A creature dealt damage this
+  // way can't be regenerated this turn" (CR 701.19c).
+  if ((m = /^(.+?) can't be regenerated this turn$/i.exec(s))) {
+    const what: ObjRef | null = /^(?:an? creature|creatures) dealt damage this way$/i.test(m[1]!) ? { ref: "damagedThisWay" } : parseObject(m[1]!, ctx);
+    return what && (!isGroup(what) || /^creatures dealt/i.test(m[1]!)) ? [{ type: "noRegen", what }] : null;
+  }
+  // "If it's a creature, it can't be regenerated this turn, and if it would die this turn, exile it instead" (Carbonize,
+  // Disintegrate): about the target of "any target", only if it's a creature.
+  if (/^If it's a creature, it can't be regenerated this turn, and if it would die this turn, exile it instead$/i.test(s)) {
+    const i = ctx.targets.length - 1;
+    if (ctx.targets[i]?.kind !== "any") return null;
+    const what: ObjRef = { ref: "target", index: i };
+    return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
   // "~ assigns no combat damage this turn" (CR 510.1): the Laccoliths, Ophidian.
   if ((m = /^(.+?) assigns no combat damage this turn$/i.exec(s))) {

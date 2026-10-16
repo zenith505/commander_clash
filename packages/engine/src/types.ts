@@ -108,6 +108,11 @@ export interface GameObject {
   timestamp: number;
   /** The permanent this Aura or Equipment is attached to. CR 301.5, 303.4 */
   attachedTo?: ObjectId;
+  /**
+   * Only on a snapshot of a permanent that left the battlefield (look back in time, CR 603.10a): what was attached to it,
+   * for "whenever a modified creature you control dies" (TargetSpec.status).
+   */
+  lastAttachments?: ObjectId[];
   /** The player this Aura with "enchant player" is attached to. CR 303.4, 702.5d */
   attachedToPlayer?: PlayerId;
   /** Controller as of the last control check, to notice control changes (summoning sickness, combat). */
@@ -156,6 +161,8 @@ export interface GameObject {
   wasDealtDamage?: true;
   /** "If that creature would die this turn, exile it instead": the turn that replacement lasts for (CR 614.1a). */
   exileIfDiesTurn?: number;
+  /** "It can't be regenerated this turn": the turn its regeneration shields don't apply (CR 701.19c). */
+  noRegenTurn?: number;
   /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
   noCombatDamageTurn?: number;
   /**
@@ -220,6 +227,8 @@ export interface GameObject {
   phased?: { by: PlayerId; indirect?: true; host?: { id: ObjectId; zc: number }; released?: true };
   /** As a spell: the zone it was cast from, how (flashback, escape, ...), and whether buyback was paid. */
   castFrom?: ZoneName;
+  /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
+  castFromHand?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */

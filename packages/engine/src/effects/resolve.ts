@@ -430,6 +430,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "getEnergy":
     case "poison":
     case "becomeMonarch":
+    case "extraLandThisTurn":
     case "ringTempts":
     case "increaseSpeed":
     case "ascend":

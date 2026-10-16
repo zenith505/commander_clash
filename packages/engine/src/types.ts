@@ -343,6 +343,8 @@ export interface Player {
   /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
   combatMana?: number;
   landsPlayedThisTurn: number;
+  /** "You may play an additional land this turn" (CR 305.2a): how many more this turn (`turn`). */
+  extraLands?: { turn: number; n: number };
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;
   speedTurn?: number;

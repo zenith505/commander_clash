@@ -487,7 +487,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     }
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
-    const may = /^[Yy]ou may (?!play the exiled card )(.+)$/.exec(s);
+    // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

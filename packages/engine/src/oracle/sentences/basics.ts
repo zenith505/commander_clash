@@ -177,6 +177,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
+  // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).
+  if ((m = new RegExp(`^You may play (?:an|up to ${NUM}) additional lands? this turn$`, "i").exec(s))) return [{ type: "extraLandThisTurn", n: m[1] ? num(m[1]) : 1 }];
   // The initiative (CR 726), which ventures into Undercity; and venturing into Undercity itself (CR 701.49d). Plain
   // "venture into the dungeon" lets its player pick a dungeon that isn't modeled yet (see oracle/dungeons.ts).
   if (/^(?:You )?take the initiative$/i.test(s)) return dungeonSupported(UNDERCITY) ? [{ type: "takeInitiative", who: { ref: "you" } }] : null;

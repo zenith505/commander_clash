@@ -1963,6 +1963,8 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   let n = 1;
+  const extra = player(s, pid).extraLands;
+  if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
   if (s.activePlayer === pid)
     for (const id of s.battlefield) {
       if (controllerOf(s, obj(s, id)) !== pid) continue;

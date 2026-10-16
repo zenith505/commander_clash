@@ -1157,6 +1157,8 @@ export type Effect =
   | { type: "castFromExileFree" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
+  /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */
+  | { type: "extraLandThisTurn"; n: number }
   /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
   | { type: "becomeSaddled"; what: ObjRef }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */

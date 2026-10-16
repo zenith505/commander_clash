@@ -1473,7 +1473,8 @@ export type Effect =
    * "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
    * among them without paying their mana costs" (Primeval Spawn): `maxMv` each, `totalMv` all together.
    */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount }
+  /** `untilMv`: "exile cards from the top of your library until you exile cards with total mana value 4 or greater" (Improvisation Capstone), instead of `n` cards. */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).

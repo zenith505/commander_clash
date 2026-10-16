@@ -568,7 +568,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const whose = players(s, e.who, ctx)[0];
         if (whose === undefined) return;
         const lib = player(s, whose).library;
-        const ids = lib.slice(0, amountNow(s, e.n, ctx));
+        let ids = lib.slice(0, amountNow(s, e.n, ctx));
+        if (e.untilMv !== undefined) {
+          // A card's mana value with X as 0 (CR 202.3e); lands count 0. All of them if the total never gets there.
+          let total = 0;
+          const at = lib.findIndex((id) => (total += manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost))) >= e.untilMv!);
+          ids = lib.slice(0, at < 0 ? lib.length : at + 1);
+        }
         for (const id of ids) moveObject(s, id, "exile");
         log(s, `${player(s, whose).name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
         sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}) };

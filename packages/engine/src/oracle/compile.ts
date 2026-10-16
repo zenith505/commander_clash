@@ -1,5 +1,5 @@
 import { allEffects } from "../abilities";
-import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility } from "../abilities";
+import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
@@ -244,6 +244,9 @@ function maxSpeedAbility(d: CardDef, text: string, out: CompiledCard): boolean {
   }
   return true;
 }
+
+/** The conditions "~ has flash as long as ..." may have: about the player, so the same with the card in hand. */
+const FLASH_IF: StaticCondition["kind"][] = ["committedCrime", "control", "monarch", "initiative", "graveyardAtLeast", "graveyardTypes"];
 
 export function compile(d: CardDef): CompiledCard {
   const out: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
@@ -990,6 +993,24 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastYourTurn = true;
       continue;
     }
+    // "~ has flash as long as you've committed a crime this turn" (Take for a Ride), "You may cast ~ as though it had
+    // flash if you control a Human" (Bard's Company), "Spell mastery — If there are two or more instant and/or sorcery
+    // cards in your graveyard, you may cast ~ as though it had flash": whether it can be cast at instant speed now (CR
+    // 702.8a, 601.3). Only conditions about the player, which hold the same with the card in hand; on a permanent that
+    // "has flash", the keyword itself would matter on the battlefield too, so those stay out unless it's a spell.
+    const flashIf =
+      /^~ has flash as long as (.+)\.$/.exec(line) ??
+      /^You may cast ~ as though it had flash if (.+)\.$/.exec(line) ??
+      /^(?:(?:Ferocious|Spell mastery) — )?(?:If|As long as) (.+), you may cast ~ as though it had flash\.$/.exec(line);
+    if (flashIf && !/^you pay \{/.test(flashIf[1]!)) {
+      const cond = parseStaticCondition(flashIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      // "This spell has flash" is only while it's a spell; "Colossal Rattlewurm has flash" is on the battlefield too.
+      const permanentHas = /^~ has flash/.test(line) && !/(^|\n)This spell has flash /.test(d.oracleText ?? "") && !d.types.includes("Instant") && !d.types.includes("Sorcery");
+      const aboutPlayer = !!cond && FLASH_IF.includes(cond.kind) && !(cond.kind === "control" && (cond.other || cond.who === "defending"));
+      if (!aboutPlayer || permanentHas || out.flashIf) out.unsupported.push(raw);
+      else out.flashIf = cond!;
+      continue;
+    }
     // Rout: "You may cast ~ as though it had flash if you pay {2} more to cast it." Paying more is the price of casting it
     // any time a sorcery couldn't have been cast (see spellCost).
     const flashCost = /^You may cast ~ as though it had flash if you pay \{(\d+)\} more to cast it\.$/.exec(line);
@@ -1353,7 +1374,7 @@ function checkCastingLinks(out: CompiledCard) {
         delete o.cost;
       }
     }
-    if (o.ref === "sacrificed" && !canSac) bad = true;
+    if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");

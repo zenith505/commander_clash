@@ -35,8 +35,9 @@ const toGraveyard = (s: GameState, pid: PlayerId, def: CardDef) => {
 describe("as long as", () => {
   it("parses the common forms", () => {
     supported(ape, metal, deli, descend, scythe, beebles, cat, gargoyle, knight, kin, wurm);
-    // Flash matters in your hand, where a permanent's static ability doesn't work.
-    unsupported(creature("Flash Test", "This spell has flash as long as you control a Merfolk."));
+    // Flash matters in your hand, where a permanent's static ability doesn't work ("This spell has flash as long as ..."
+    // does: Crashing Tide, Supernatural Rescue).
+    unsupported(creature("Flash Test", "This creature has flash as long as you control a Merfolk."));
     // Each attacking creature has its own defending player.
     unsupported(creature("Tangle Test", "Each creature you control can't be blocked as long as defending player controls an artifact land."));
   });

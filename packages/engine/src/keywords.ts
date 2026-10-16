@@ -92,6 +92,7 @@ export function canonicalKeyword(text: string): string | undefined {
   const p = text.trim().toLowerCase();
   const k = SUPPORTED_LOWER.get(p);
   if (k) return k;
+  if (p === CHOSEN_KEYWORD) return CHOSEN_KEYWORD;
   const m = /^protection from (.+)$/.exec(p);
   if (!m) return undefined;
   const q = m[1]!;
@@ -104,6 +105,8 @@ export function canonicalKeyword(text: string): string | undefined {
 export const CHOSEN_TYPE = "(the chosen creature type)";
 /** "Becomes the basic land type of your choice": filled in with the basic land type chosen as it resolved. */
 export const CHOSEN_LAND_TYPE = "(the chosen basic land type)";
+/** "Gains your choice of menace or lifelink": filled in with the keyword chosen as it resolved. */
+export const CHOSEN_KEYWORD = "(the chosen keyword)";
 /** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };

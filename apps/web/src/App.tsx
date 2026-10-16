@@ -3462,6 +3462,19 @@ function Controls({
         ))}
       </div>
     );
+  if (pending?.kind === "chooseOption" && pending.what === "keyword" && pending.player === HUMAN)
+    return (
+      <div className="controls keyword-pick">
+        <span>
+          <strong>{pending.source}:</strong> choose an ability
+        </span>
+        {pending.options.map((o) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {o}
+          </button>
+        ))}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "basicLandType" && pending.player === HUMAN)
     return (
       <div className="controls color-pick">

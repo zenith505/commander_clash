@@ -1,6 +1,6 @@
 # Roadmap
 
-17,705 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,776 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -66,18 +66,26 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Left from the Field of Ruin, crime, discover and suspect round:
    - Bots never use an "Exile ~" cost (Relic of Progenitus, Feldon's Cane), as with sacrificing their own permanent.
      "Equip—Pay {3} or discard a card" (Bloodthorn Flail) is two equip abilities, one for each cost.
-   - Crime still out: "whenever you commit a crime during your turn" (Overzealous Muscle), Take for a Ride.
-   - Discover still out: "the discovered card" (Hit the Mother Lode), Caparocti Sunborn. "If you cast it" works on enters
-     triggers only (The One Ring's "if you cast it" protection is out).
-   - Suspect still out: "can't become suspected" (Airtight Alibi), "if the sacrificed creature was suspected" (Agency
-     Coroner), "create a token and suspect it" with Case solve lines, "goad all suspected creatures" (Nelly Borca), Hot
-     Pursuit, Frantic Scapegoat, Presumed Dead's granted dies trigger, suspect counters (Investigator's Journal).
    - "Add {B} or {G} for each" (Culling Ritual), Deadly Tempest's "each player loses life equal to the number of creatures
      they controlled that were destroyed this way".
-   - Rules bug to check: `destroyPermanent` (game.ts) counts a noncreature permanent as destroyed for Cobra Trap only if it
-     reached the graveyard. Rest in Peace exiling it instead doesn't undo the destruction (the destroy happened, only the
-     move changed; Fumigate's and Bane of Progress' rulings count such permanents as destroyed); only regeneration
-     replaces it.
+   Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
+   - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
+     (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and
+     Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
+   - Suspect still out: Cases (CR 719: "To solve —", Case of the Stashed Skeleton), "you may suspect one of the other
+     creatures" (Frantic Scapegoat), "as long as ~ remains on the battlefield, that creature is also goaded" (Hot Pursuit),
+     "enters with a number of counters equal to ..." (Investigator's Journal; even "the number of creatures you control"
+     doesn't parse there), Nelly Borca's "you and the controller of those creatures each draw a card".
+   - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek).
+   - Conditional flash still out: "five or more mana values among cards in your graveyard" (Graveyard Shift), "two or more
+     instant and/or sorcery cards in your graveyard" (spell mastery: Swift Reckoning). "~ has flash as long as" on a
+     permanent stays out on purpose (it doesn't work in your hand, CR 113.6e); "This spell has flash" does.
+   - "Your choice of" keywords works once per ability, on "gain(s)"; "It gains your choice of" after another instruction
+     (Hungering Puppetbeast) is out.
+   - "Look at the top N cards. You may put a creature card from among them onto the battlefield" takes one card only;
+     several at once would need them to enter at the same time, which the dig doesn't do yet.
+   - "When ~ dies, return it to the battlefield tapped under its owner's control" parses as a body but the trigger is
+     still rejected; "untapped" works (Presumed Dead).
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
    epic, free casts from hand, timing points, overload leftovers):
    - Overload still out: Dragonshift, Fangs of Kalonia, March of Progress, Winds of Abandon, Mizzix's Mastery (copy an exiled card and
@@ -195,7 +203,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      Maddening Hex), "when enchanted player loses the game" (Vengeance), Cruel Reality's "if the player can't",
      Curse of Oblivion's graveyard exile, decayed Zombie tokens (Restless Dead),
      Overwhelming Splendor, Curse of Silence, Overencumbered, Paradox Haze, Shadow of the Second Sun, Tenuous Truce.
-   - Spree modes that don't parse yet: outlaw groups (Caught in the Crossfire), "search for a basic land or Desert"
+   - Spree modes that don't parse yet: "search for a basic land or Desert"
      and X/X tokens (Dance of the Tumbleweeds), "choose a creature you control. It gains" (Final Showdown),
      "if no other creature has greater power" (Getaway Glamer), "choose target opponent. Whenever ..." (Great Train
      Heist), total mana value (Lively Dirge), "Mount or Vehicle" / "Aura or Equipment" (One Last Job), copying an

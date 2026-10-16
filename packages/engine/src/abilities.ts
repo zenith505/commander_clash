@@ -77,6 +77,11 @@ export type Count =
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
   | { kind: "destroyedThisWay"; filter: TargetSpec }
+  /**
+   * "If the discovered card's mana value is less than 10, ... equal to the difference" (Hit the Mother Lode): `n` minus the
+   * mana value of the card this spell or ability discovered (CR 701.57c), 0 if it's not less or nothing was discovered.
+   */
+  | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
@@ -321,6 +326,8 @@ export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
   | { ref: "target"; index: number; n?: number }
   | { ref: "self" } // the source permanent ("this creature")
+  /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
+  | { ref: "castSpell" }
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
@@ -478,6 +485,8 @@ export type Modification =
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   | { kind: "doesntUntap" }
+  /** "Can't become suspected" (Airtight Alibi, CR 701.60): suspect effects don't apply to it. */
+  | { kind: "cantBeSuspected" }
   /**
    * Ghostly Prison: "Creatures can't attack you unless their controller pays {2} for each creature they control that's
    * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
@@ -1009,7 +1018,7 @@ export type Effect =
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
    * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
    */
-  | { type: "discover"; n: number }
+  | { type: "discover"; n: Amount }
   /**
    * Ripple N as it resolves (CR 702.60a): reveal the top N cards, cast any with the same name as the spell for free,
    * the rest to the bottom in any order. `of`: "cause" when the ripple was given to the spell that triggered it.
@@ -1241,7 +1250,7 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak"; rest: "graveyard" | "bottom" | "shuffle"; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number } }
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak"; rest: "graveyard" | "bottom" | "shuffle"; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
@@ -1264,10 +1273,11 @@ export type Effect =
    * "Choose a creature type." / "Choose a color." while it resolves: later instructions use the
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
    */
-  | { type: "choose"; choice: ChoiceKind; except?: string };
+  | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[] };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
-export type ChoiceKind = "creatureType" | "color" | "basicLandType";
+/** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
+export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead";
@@ -1281,6 +1291,9 @@ export type SpellCondition =
   | { kind: "wonClash" }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
   | { kind: "suspected"; what: ObjRef }
+  /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
+   * existed on the battlefield (CR 608.2h), where being suspected is a designation it had (CR 701.60). */
+  | { kind: "sacrificedSuspected" }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
@@ -2031,6 +2044,8 @@ export interface CompiledCard {
    * its total cost is this much more (CR 601.2f).
    */
   flashCost?: number;
+  /** "This spell has flash as long as you've committed a crime this turn": castable at instant speed while it holds (CR 702.8a). */
+  flashIf?: StaticCondition;
   /** "Cast this spell only if you've cast another spell this turn." (Illusory Angel; CR 601.3) */
   castOnlyAfterAnother?: boolean;
   /**

@@ -7,7 +7,7 @@ import { compileCard } from "../oracle";
 import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
 import { nextRandom } from "../rng";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, spellMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -696,7 +696,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length !== t.cast.nth) return false;
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
-        return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
+        // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
+        const spec = bindChosen(t.cast.spell, o.chosen);
+        return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
       }, undefined, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);

@@ -540,6 +540,8 @@ export interface LastKnown {
   copyKey?: string;
   /** Who controlled it as it last existed: "that creature's controller" after it died (CR 608.2h). */
   controller?: PlayerId;
+  /** It was suspected as it last existed (CR 701.60): "if the sacrificed creature was suspected". */
+  suspected?: true;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
@@ -946,6 +948,8 @@ export interface Chosen {
   color?: Color;
   /** "The basic land type of your choice" (Reef Shaman). */
   landType?: string;
+  /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
+  keyword?: string;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
@@ -990,6 +994,10 @@ export interface Resolving {
    * counts; one that wasn't destroyed (indestructible, regenerated) doesn't (rulings on Fumigate and Bane of Progress).
    */
   destroyed?: { o: GameObject; ch: Characteristics }[];
+  /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
+  countered?: Record<ObjectId, { zc: number; x: number }>;
+  /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */
+  discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
   countersRemoved?: number;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */

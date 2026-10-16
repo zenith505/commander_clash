@@ -103,6 +103,7 @@ export interface Characteristics {
   /** "You may have ~ assign its combat damage as though it weren't blocked." */
   unblockedDamage: boolean;
   doesntUntap: boolean;
+  cantBeSuspected: boolean;
   /** "Can block only creatures with flying" (CR 509.1b). */
   blocksOnlyFlyers: boolean;
   /** "Attacks each combat if able" (CR 508.1d). */
@@ -189,6 +190,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeBlocked: false,
     unblockedDamage: false,
     doesntUntap: false,
+    cantBeSuspected: false,
     blocksOnlyFlyers: false,
     attacksIfAble: false,
     untapsDuringOthers: false,
@@ -768,6 +770,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "doesntUntap":
       c.doesntUntap = true;
+      return;
+    case "cantBeSuspected":
+      c.cantBeSuspected = true;
       return;
     case "untapsDuringOthers":
       c.untapsDuringOthers = true;

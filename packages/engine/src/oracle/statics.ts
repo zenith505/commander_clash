@@ -580,6 +580,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can block only creatures with flying$/.test(rest)) return [{ kind: "blocksOnlyFlyers" }];
   if (/^attacks? each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }];
   if (/^doesn't untap during (?:its controller's|your) untap step$/.test(rest)) return [{ kind: "doesntUntap" }];
+  if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   if (/^loses all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
   // Doran (CR 510.1a as modified), defender (CR 702.3b).
   if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/.test(rest)) return [{ kind: "assignsToughness" }];

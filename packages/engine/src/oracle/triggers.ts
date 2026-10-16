@@ -216,10 +216,16 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
-  const what = m[3]!.replace(/^an? /, "");
+  let what = m[3]!.replace(/^an? /, "");
+  // "A creature spell with power 5 or greater" (Monstrous Vortex): the spell's power on the stack (spellMatches).
+  const pw = / with (power|toughness) (\d+) or (greater|less)$/.exec(what);
+  if (pw) what = what.slice(0, pw.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
-  const spell = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
-  if (!spell || spell.kind !== "spell") return "fail";
+  const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
+  if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
+  const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
+  const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
+  if (pw) what = m[3]!.replace(/^an? /, "");
   // "Whenever you cast a spell, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR
   // 603.4) that can't change once it's cast. A copy wasn't cast, so no mana was spent on it.
   const treasure = /^if mana from a Treasure was spent to cast it, (.+)$/.exec(m[4]!);
@@ -797,6 +803,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[2]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
+  }
+  // "Whenever you commit a crime during your turn" (Overzealous Muscle, CR 700.13): only while it's your turn, whether it
+  // triggers at all, not an intervening if.
+  const crime = /^Whenever you commit a crime during your turn, (.+)$/.exec(line);
+  if (crime) {
+    const body = parseBody(crime[1]!, { selfIt: true });
+    return body ? { event: "youCommitCrime", body, activeIf: { kind: "yourTurn" } } : "fail";
   }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);

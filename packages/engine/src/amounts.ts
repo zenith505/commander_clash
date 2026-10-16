@@ -6,7 +6,7 @@
 
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { defOf } from "./cards";
-import { bindChosen, objectMatches, printedMatches } from "./effects";
+import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./effects";
 import { characteristics, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
@@ -34,6 +34,8 @@ export interface AmountCtx {
   chosen?: Chosen;
   /** For a triggered ability, what its event was about ("that much"). */
   event?: TriggerEventInfo;
+  /** The stack item that triggered it: for a cast trigger, the spell cast. */
+  cause?: string;
   /** How the resolving ability finds the objects and players it names. Static abilities only name themselves and "you". */
   objects?: (ref: ObjRef) => GameObject[];
   players?: (ref: PlayerRef) => PlayerId[];
@@ -100,6 +102,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
+    case "discoveredBelow": {
+      const d = s.resolving?.discovered;
+      return d && d.mv < c.n ? c.n - d.mv : 0;
+    }
     case "destroyedThisWay":
       // As they last existed on the battlefield (CR 608.2h).
       return (s.resolving?.destroyed ?? []).filter(({ o, ch }) => objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)).length;
@@ -162,6 +168,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "power":
     case "toughness":
     case "manaValue": {
+      // "That spell's mana value" in a cast trigger: as it was cast, X included (CR 202.3e), even if it has left the stack.
+      if (c.of.ref === "castSpell") {
+        const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+        return item && c.kind === "manaValue" ? spellManaValue(s, item) : 0;
+      }
       if (c.of.ref === "sacrificed") return Math.max(0, ctx.sacrificed?.[0]?.[c.kind] ?? 0);
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) {
@@ -174,7 +185,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         // On the stack, X is the value chosen for it (CR 202.3e).
         const cost = parseManaCost(defOf(s, o).manaCost);
         const item = o.zone === "stack" ? (s.stack.find((x) => x.objectId === o.id) ?? (s.resolving?.item.objectId === o.id ? s.resolving.item : undefined)) : undefined;
-        return manaValue(cost) + (item?.x ?? 0) * cost.symbols.filter((x) => x.kind === "x").length;
+        // Countered by this spell or ability earlier: as it last existed on the stack.
+        const countered = s.resolving?.countered?.[o.id];
+        const x = item?.x ?? (countered?.zc === (o.zoneChanges ?? 0) ? countered.x : 0);
+        return manaValue(cost) + x * cost.symbols.filter((x) => x.kind === "x").length;
       }
       if (o.zone !== "battlefield") {
         // It left the battlefield on its last move (destroyed by an earlier part of this effect): as it last existed there.
@@ -311,6 +325,8 @@ function describeCount(c: Count): string {
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
+    case "discoveredBelow":
+      return `${c.n} minus the discovered card's mana value`;
     case "destroyedThisWay":
       return `#${c.filter.text} destroyed`;
     case "cardsInGraveyard":

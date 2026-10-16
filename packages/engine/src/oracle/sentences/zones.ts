@@ -174,6 +174,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (!what || !spec || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}) }];
   }
+  // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
+  // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it
+  // became (CR 701.60a).
+  if (ctx.selfCard && (m = /^[Rr]eturn (?:it|~) to the battlefield under (your|its owner's) control( and suspect it)?$/.exec(s)))
+    return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] === "its owner's" ? { owner: true } : {}) }, ...(m[2] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : [])];
   // "When enchanted creature dies, return that card to the battlefield under your control" (False Demise): the card
   // that went to the graveyard, if it's still there (CR 400.7); a token is gone (CR 111.7).
   if ((m = /^Return (that card|it) to the battlefield( tapped)? under (your|its owner's) control$/i.exec(s)) && ctx.subjectLeft) {
@@ -244,6 +249,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // "Until your next turn, those creatures can't block" (Taunt from the Rampart): the same, said first.
+  const front = /^Until your next turn, (.+? can't (?:block|attack|attack or block|be blocked))$/.exec(s);
+  if (front) s = `${front[1]} until your next turn`;
   if ((m = /^(?!.* until end of turn and )(.+?) can't (block|attack|attack or block|be blocked) (this turn|until your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods: Modification[] =

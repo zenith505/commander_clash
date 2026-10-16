@@ -33,6 +33,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter((m[1] ?? m[2])!.replace(/^an? /, ""));
       if (!filter) return null;
       Object.assign(dig, { count: 1, upTo: true, filter, into: "hand" });
+    } else if ((m = /^You may put (an? .+?) from among them onto the battlefield( tapped)?$/.exec(s))) {
+      // "You may put a land card from among them onto the battlefield tapped" (Freestrider Lookout).
+      const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
+      if (!filter) return null;
+      Object.assign(dig, { count: 1, upTo: true, filter, into: "battlefield", ...(m[2] ? { tapped: true } : {}) });
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else return null;

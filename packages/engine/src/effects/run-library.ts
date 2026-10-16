@@ -426,7 +426,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (obj(s, id).zone === "battlefield") r.created!.push(id);
         }
         else if (e.into === "battlefield") {
-          moveObject(s, id, "battlefield", { controller: p.id, ...(e.counters ? { counters: { [e.counters.counter]: e.counters.n } } : {}) });
+          moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: { [e.counters.counter]: e.counters.n } } : {}) });
           if (obj(s, id).zone === "battlefield") r.created!.push(id); // "it" in what follows
         } else p.library = [id, ...p.library.filter((x) => x !== id)];
       }

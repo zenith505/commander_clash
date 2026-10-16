@@ -103,6 +103,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(~'s|its|that creature's|that permanent's|that spell's|the sacrificed (?:creature|artifact|permanent)'s) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
+    if (of?.ref === "castSpell" && kind !== "manaValue") return null;
     return of && count({ kind, of });
   }
   // "Charge counter on ~", "+1/+1 counters on it".
@@ -166,7 +167,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (/^the sacrificed (creature|artifact|permanent)'s$/.test(x)) return ctx ? { ref: "sacrificed" } : null;
   if (!ctx) return x === "its" ? { ref: "self" } : null;
   // "That spell's mana value": the targeted spell (Imp's Mischief).
-  if (x === "that spell's") return ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
+  if (x === "that spell's" && ctx.lastObjectTarget !== undefined) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
+  // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").
+  if (x === "that spell's") return ctx.castSpell ? { ref: "castSpell" } : null;
   if (x === "its" || x === "that creature's" || x === "that permanent's") {
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
     if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };

@@ -76,6 +76,8 @@ export type TriggerSourceEvent =
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "dungeonCompleted"; player: PlayerId }
+  /** A player rolled dice (CR 706): each die that counts (706.6), its natural result and its result. */
+  | { type: "diceRolled"; player: PlayerId; sides: number; dice: { natural: number; result: number }[]; result: number }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
@@ -487,6 +489,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+  } else if (ev.type === "diceRolled") {
+    // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
+    // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").
+    const watch = (o: GameObject) => {
+      add(o, ev.player, (e) => e === "youRollDice", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.result });
+      for (const d of ev.dice)
+        add(o, ev.player, (e, t) => e === "youRollDie" && (t.rolls?.min === undefined || d.result >= t.rolls.min) && (t.rolls?.natural === undefined || d.natural === (t.rolls.natural === "max" ? ev.sides : t.rolls.natural)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: d.result });
+    };
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) watch(o);
+    }
+    // "When you roll a natural 20, return ~ from your graveyard to your hand" (Critical Hit, CR 113.6m).
+    fromGraveyards((o, owner) => owner === ev.player && watch(o));
   } else if (ev.type === "dungeonCompleted") {
     for (const id of s.battlefield) {
       const o = obj(s, id);

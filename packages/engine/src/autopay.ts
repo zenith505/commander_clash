@@ -1,7 +1,7 @@
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, altCost, isTreasure, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, altCost, isTreasure, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
@@ -504,7 +504,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
   // Only the mana that can be spent on this counts (CR 106.6); `restricted` is how much of the pool can't be spent
   // on anything else, such as a Signet's cost. `snow`: how much of it is snow mana (CR 107.4h).
   const start = poolFor(s, pid, use);
-  if (payFromPool(cost, start.pool, extraGeneric, p.life, { snow: start.snow, wantSnow })) return [];
+  if (payFromPool(cost, start.pool, extraGeneric, payableLife(s, pid), { snow: start.snow, wantSnow })) return [];
   const sources = manaSources(s, pid, [...(exclude ? [exclude] : []), ...alsoExclude], use);
   const unrestricted = sources.map((src) => ({ ...src, options: src.options.filter((x) => !x.restricted) }));
   const needColors = namedColors(cost);
@@ -515,7 +515,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
   let used = new Set<ObjectId>();
   const taps: Action[] = [];
   for (let round = 0; round < 8; round++) {
-    const plan = planFree(cost, extraGeneric, p.life, pool, sources, used, undefined, demand, harm, snow, wantSnow);
+    const plan = planFree(cost, extraGeneric, payableLife(s, pid), pool, sources, used, undefined, demand, harm, snow, wantSnow);
     if (plan) return [...taps, ...plan.chosen.map((x) => toAction(pid, x))];
     // Add one mana ability that costs mana: one making a color the cost names first, then the biggest net gain.
     const costed = sources
@@ -531,7 +531,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
       const others = unrestricted.filter((src) => src.id !== x.id);
       const free = { ...pool };
       for (const m of Object.keys(free) as ManaType[]) free[m] -= restricted[m];
-      const pay = planFree(x.cost!, 0, p.life, free, others, used, needColors, demand, undefined, snow);
+      const pay = planFree(x.cost!, 0, payableLife(s, pid), free, others, used, needColors, demand, undefined, snow);
       if (!pay) continue;
       const paid = payFromPool(x.cost!, pay.pool, 0, Infinity, { snow: pay.snow })!;
       const next = paid.pool;
@@ -545,7 +545,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
         if (x.restricted) nextRestricted[m]++;
       }
       const option = { actions: [...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x)], pool: next, snow: nextSnow, restricted: nextRestricted, used: new Set([...pay.used, x.id]) };
-      const done = !!planFree(cost, extraGeneric, p.life, next, sources, option.used, undefined, demand, harm, nextSnow, wantSnow);
+      const done = !!planFree(cost, extraGeneric, payableLife(s, pid), next, sources, option.used, undefined, demand, harm, nextSnow, wantSnow);
       if (!pick || done) pick = option;
       if (done) break;
     }

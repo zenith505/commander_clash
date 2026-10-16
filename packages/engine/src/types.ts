@@ -926,6 +926,8 @@ export interface GameState {
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
+  /** Rules for one player this turn: "you can't lose life this turn" (CR 119.8), "you can't lose the game this turn", "your opponents can't win the game this turn". */
+  turnRules?: TurnRule[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
@@ -1040,6 +1042,12 @@ export interface Chosen {
   secret?: true;
 }
 
+export interface TurnRule {
+  turn: number;
+  player: PlayerId;
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin";
+}
+
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
@@ -1105,6 +1113,8 @@ export interface Resolving {
   did?: boolean;
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   wonClash?: boolean;
+  /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
+  rolled?: { sides: number; naturals: number[]; result: number };
   scratch?: {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)

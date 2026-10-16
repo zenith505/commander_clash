@@ -99,3 +99,6 @@ export function parseSpentReq(what: string): SpentReq | null {
   if ((m = /^mana from an? (artifact|creature)$/.exec(what))) return { from: { [m[1]!]: 1 } };
   return null;
 }
+
+/** A results table's row (CR 706.3a): "1—9 | ...", "20 | ...", "15+ | ...", "9 or less | ...". */
+export const ROLL_ROW = /^(\d+)(?:[—–-](\d+)|(\+)| or (less|more|higher))? \| (.+)$/;

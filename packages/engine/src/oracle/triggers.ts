@@ -664,6 +664,33 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       ifCond: { kind: "damagedBySelfDied" },
       body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "diedDamagedBySelf" }, sacrificeOnLostControl: true }], text: "Put each creature card dealt damage by ~ this turn that died onto the battlefield under your control. Sacrifice it when you lose control of ~." },
     };
+  // Rolling dice (CR 706): "whenever you roll one or more dice" once for each instruction to roll; "whenever you roll a 4
+  // or higher", "when you roll a natural 20", "whenever you roll a die's highest natural result" once for each die that
+  // does (rulings on Mr. House and Netherese Puzzle-Ward). Ignored rolls never happened (706.6).
+  const rolls = /^Whenever you roll one or more dice, (.+)$/.exec(line);
+  if (rolls) {
+    const body = parseBody(rolls[1]!, {});
+    return body ? { event: "youRollDice", body } : "fail";
+  }
+  const die = /^Whenever you roll an? (\d+) or higher, (.+)$/.exec(line) ?? /^When(?:ever)? you roll (a natural (\d+)|a die's highest natural result), (.+)$/.exec(line);
+  if (die) {
+    const natural = /^When/.test(line) && die.length === 4;
+    const what = natural ? (die[2] ? { natural: Number(die[2]) } : { natural: "max" as const }) : { min: Number(die[1]) };
+    let text = die[die.length - 1]!;
+    // Mr. House: "If you rolled 6 or higher, instead [do this]": that die's result (the trigger's event).
+    const instead = /^(.+?)\. If you rolled (\d+) or higher, instead create that token and (an? [^.]+ token)\.$/.exec(text);
+    if (instead) {
+      const base = parseBody(`${instead[1]}.`, {});
+      const more = parseBody(`Create ${instead[3]}.`, {});
+      if (!base || !more || base.targets.length || !/^create an? [^.]+ token$/i.test(instead[1]!)) return "fail";
+      text = text.replace(/\.$/, "");
+      const body = { targets: [], effects: [{ type: "if" as const, cond: { kind: "rollIn" as const, min: Number(instead[2]), event: true as const }, effects: [...structuredClone(base.effects), ...more.effects], otherwise: base.effects }], text: `${text}.` };
+      return { event: "youRollDie", rolls: what, body };
+    }
+    const zone = /\breturn ~ from your graveyard to your hand$/.test(text.replace(/\.$/, "")) ? { zone: "graveyard" as const } : {};
+    const body = parseBody(`${text[0]!.toUpperCase()}${text.slice(1)}`, zone.zone ? { selfCard: true } : {});
+    return body ? { event: "youRollDie", rolls: what, body, ...zone } : "fail";
+  }
   // "This ability triggers only once each turn": once it has triggered this turn, it doesn't again (the object's own
   // count; a new object starts over, CR 400.7).
   const once = /^(.+?) This ability triggers only once each turn\.?$/.exec(line);

@@ -2,7 +2,7 @@ import { allEffects, type Effect, type PayCost, type PunisherOption, type Target
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, obj, player } from "../game";
+import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, obj, payableLife, player } from "../game";
 import { cardIdOf, defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
@@ -137,6 +137,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? !!s.resolving!.did
           : e.cond.kind === "wonClash"
             ? !!s.resolving!.wonClash
+            : e.cond.kind === "rollIn"
+            ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "bargained"
@@ -167,6 +169,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return runBranch(s, holds, holds ? e.effects : (e.otherwise ?? []), ctx);
     }
   }
+}
+
+/** A results table's row (CR 706.3a): no roll, no row. */
+function rollIn(c: { min?: number; max?: number }, result: number | undefined): boolean {
+  return result !== undefined && (c.min === undefined || result >= c.min) && (c.max === undefined || result <= c.max);
 }
 
 /** Is the card the last "reveal the top card of your library" revealed one like this (printed characteristics, in the library)? */
@@ -228,7 +235,7 @@ function targetSpellSpent(s: GameState, ctx: ResolveCtx, i: number): ManaSpent |
 /** Can `pid` pay this now: mana from their pool or untapped sources, life (CR 119.4), energy (CR 107.14)? */
 export function canPayNow(s: GameState, pid: PlayerId, pay: PayCost): boolean {
   const p = player(s, pid);
-  if (pay.life && p.life < pay.life) return false;
+  if (pay.life && payableLife(s, pid) < pay.life) return false;
   if (pay.energy && (p.energy ?? 0) < pay.energy) return false;
   return !pay.mana || canPayFromPool(s, pid, parseManaCost(pay.mana), "other") || !!planMana(s, pid, parseManaCost(pay.mana));
 }

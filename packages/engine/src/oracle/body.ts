@@ -1,6 +1,6 @@
 import { allEffects, refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
+import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
@@ -65,6 +65,9 @@ export interface Ctx {
   /** This sentence defines its own X ("..., where X is ..."): "up to X target ..." isn't the spell's X then. */
   whereX?: boolean;
 }
+
+/** Starts a results table row's marker sentence (see parseBody). */
+const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
 const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
@@ -200,8 +203,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
+  let rowToken: string | undefined;
   const sentences = splitSentences(text.trim())
     .map((x) => x.replace(/\.$/, "").trim())
+    // A results table's row (CR 706.3a): a marker, then its instructions, up to the next row.
+    .flatMap((x) => {
+      const row = ROLL_ROW.exec(x);
+      if (!row) return [x];
+      let fx = row[5]!.replace(/^[A-Z][^—.|]*?! — /, "");
+      // "1—9 | Create a 1/1 red Goblin creature token. 10—19 | Create two of those tokens." (Swarming Goblins)
+      const those = /^Create (two|three|four|five) of those tokens$/.exec(fx);
+      if (those && rowToken) fx = `Create ${those[1]} ${rowToken} tokens`;
+      rowToken = /^Create an? ([^,.]+?) token$/.exec(fx)?.[1] ?? rowToken;
+      return [`${ROW_MARK}${row[1]}|${row[2] ?? (row[3] || row[4] === "more" || row[4] === "higher" ? "+" : row[4] === "less" ? "-" : row[1])}`, fx];
+    })
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
@@ -240,8 +255,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     mayGate = null;
     return true;
   };
+  // The results table row being read: its range, and where its instructions start.
+  let row: { min?: number; max?: number; start: number } | null = null;
+  const closeRow = () => {
+    if (!row) return true;
+    const inner = effects.splice(row.start);
+    if (!inner.length) return false;
+    effects.push({ type: "if", cond: { kind: "rollIn", ...(row.min !== undefined ? { min: row.min } : {}), ...(row.max !== undefined ? { max: row.max } : {}) }, effects: inner });
+    row = null;
+    return true;
+  };
   for (let si = 0; si < sentences.length; si++) {
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    if (s.startsWith(ROW_MARK)) {
+      // Rows only after the roll (CR 706.3b).
+      if (payFirst || dig || !closeGate() || !closeRow() || !allEffects(effects).some((e) => e.type === "roll")) return null;
+      const [a, b] = s.slice(ROW_MARK.length).split("|");
+      row = { start: effects.length, ...(b === "-" ? { max: Number(a) } : b === "+" ? { min: Number(a) } : { min: Number(a), max: Number(b) }) };
+      continue;
+    }
     // "~ gains indestructible until end of turn. Tap it." (Icehide Troll): "it" is the permanent the sentence before was
     // about, when that sentence was about ~ itself and nothing else.
     if (/^(?:Tap|Untap) it$/.test(s) && si > 0 && /^~ (?:gets|gains|has|becomes)\b/.test(sentences[si - 1]!) && !/\btarget\b/.test(sentences[si - 1]!)) s = s.replace(/it$/, "~");
@@ -273,7 +305,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const impulseIf = /^If [^,]+, exile the top /.test(s) ? parseHowCast(s, ctx) : null;
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
-    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them)(?: (this turn|until the end of your next turn))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
+    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
       const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
@@ -941,7 +973,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     effects.push(...fx);
     if (!defineX()) return null;
   }
-  if (payFirst || dig || !closeGate()) return null;
+  if (payFirst || dig || !closeGate() || !closeRow()) return null;
   return effects.length ? { targets: ctx.targets, effects, text } : null;
 }
 
@@ -1354,8 +1386,8 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     [/^(.+?) (gains?|loses?) life equal to (.+)$/i, (m) => `${m[1]} ${m[2]} X life`],
     [/^(.*?)([Dd]raws?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
     [/^(.*?)([Mm]ills?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
-    [/^Put a number of ([+-]1\/[+-]1) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
-    [/^Create a number of (.+) tokens equal to (.+)$/i, (m) => `Create X ${m[1]} tokens`],
+    [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
+    [/^(?:You )?[Cc]reate a number of (.+?) tokens( with [^,]+?)? equal to (.+)$/, (m) => `Create X ${m[1]} tokens${m[2] ?? ""}`],
   ];
   for (const [re, rewrite, group] of forms) {
     const m = re.exec(s);

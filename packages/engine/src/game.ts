@@ -43,6 +43,7 @@ import {
   type Step,
   type ZoneName,
   STARTING_LIFE,
+  type TurnRule,
 } from "./types";
 
 export const COMMANDER_DAMAGE_LIMIT = 21; // CR 903.10a
@@ -1112,7 +1113,7 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
   const choice = entersRulesOf(s, pid, landId).entersTappedChoice;
   if (!choice) return false;
   const p = player(s, pid);
-  if (choice.kind === "payLife") return p.life >= choice.n;
+  if (choice.kind === "payLife") return payableLife(s, pid) >= choice.n;
   return p.hand.some((id) => id !== landId && printedMatches(choice.filter, defOf(s, obj(s, id))));
 }
 
@@ -1144,6 +1145,19 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   fireEvent(s, { type: "lifeGained", player: pid, amount: n });
 }
 
+/** A rule for one player this turn (Courageous Resolve): see GameState.turnRules. */
+const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === rule);
+
+/** Can this player lose life, or does "you can't lose life this turn" stop it (CR 119.8)? */
+export function canLoseLife(s: GameState, pid: PlayerId): boolean {
+  return !turnRule(s, pid, "cantLoseLife");
+}
+
+/** The most life `pid` can pay (CR 119.4): none while they can't lose life (CR 119.8). */
+export function payableLife(s: GameState, pid: PlayerId): number {
+  return canLoseLife(s, pid) ? player(s, pid).life : 0;
+}
+
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
   const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
@@ -1159,6 +1173,8 @@ export function canPreventDamage(s: GameState): boolean {
 /** A player loses life (CR 119.3): from damage (119.2), an effect, or paying life (119.4). One life-loss event. */
 export function loseLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
+  // "You can't lose life this turn" (Courageous Resolve): damage is still dealt, but the life total doesn't change.
+  if (!canLoseLife(s, pid)) return;
   player(s, pid).life -= n;
   if (!(s.lostLifeThisTurn ??= []).includes(pid)) s.lostLifeThisTurn.push(pid);
   fireEvent(s, { type: "lifeLost", player: pid, amount: n });
@@ -1578,6 +1594,7 @@ function startNextTurn(s: GameState) {
   s.voidThisTurn = undefined;
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
+  s.turnRules = undefined;
   s.cantCastThisTurn = undefined;
   s.cantPlayLandsThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
@@ -2721,7 +2738,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
   const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
+  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -3179,7 +3196,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "payLife") {
-      if (p.life < c.n) return `you can't pay ${c.n} life`; // CR 119.4
+      if (c.n && payableLife(s, p.id) < c.n) return `you can't pay ${c.n} life`; // CR 119.4, 119.8
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
@@ -3395,7 +3412,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
-  if (ab.lifeCost && p.life < ab.lifeCost) return `you can't pay ${ab.lifeCost} life`; // CR 119.4
+  if (ab.lifeCost && payableLife(s, p.id) < ab.lifeCost) return `you can't pay ${ab.lifeCost} life`; // CR 119.4, 119.8
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
@@ -3525,7 +3542,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets);
-  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
+  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id))!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -4178,9 +4195,9 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   if (yes && pend.pay) {
     // "You may pay {2}. If you do, ...": paid now, from the mana pool (mana abilities first, CR 605.3a).
     const { mana, life = 0, energy = 0 } = pend.pay;
-    if (p.life < life) throw new RulesError(`you don't have ${life} life to pay`); // CR 119.4
+    if (life && payableLife(s, p.id) < life) throw new RulesError(`you can't pay ${life} life`); // CR 119.4, 119.8
     if ((p.energy ?? 0) < energy) throw new RulesError(`you don't have ${energy} energy`);
-    const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), "other", 0, p.life - life) : null;
+    const paid = mana ? spendFromPool(s, p.id, parseManaCost(mana), "other", 0, payableLife(s, p.id) - life) : null;
     if (mana && !paid) throw new RulesError(`not enough mana in your pool to pay ${mana}`);
     loseLife(s, p.id, (paid?.lifePaid ?? 0) + life);
     p.energy = (p.energy ?? 0) - energy;
@@ -4222,8 +4239,8 @@ function payUnless(s: GameState, p: Player, pay: boolean) {
   if (pay) {
     const life = pend.life ?? 0;
     // You can pay life only if your life total is at least that much (CR 119.4).
-    if (life && p.life < life) throw new RulesError(`you don't have ${life} life to pay`);
-    const paid = spendFromPool(s, p.id, parseManaCost(pend.cost), "other", 0, p.life - life);
+    if (life && payableLife(s, p.id) < life) throw new RulesError(`you can't pay ${life} life`); // CR 119.8
+    const paid = spendFromPool(s, p.id, parseManaCost(pend.cost), "other", 0, payableLife(s, p.id) - life);
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
     loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
@@ -5156,6 +5173,8 @@ export function syncControl(s: GameState) {
  * (`what` "lose") or winning? Only conceding gets past it (rulings).
  */
 export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"): boolean {
+  // "You can't lose the game this turn and your opponents can't win the game this turn" (Courageous Resolve).
+  if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);

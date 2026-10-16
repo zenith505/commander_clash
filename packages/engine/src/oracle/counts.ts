@@ -65,6 +65,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (nb) return parseCount(nb[1]!, ctx, true);
   }
   const count = (c: Count): AmountExpr => ({ count: c });
+  // "Draw cards equal to the result", "where X is the result" (CR 706.2), "the total of those results" (Neverwinter Hydra).
+  if (!each && /^(?:the result|the total of those results)$/i.test(p)) return count({ kind: "rollResult" });
   // Life and hands.
   if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
@@ -104,6 +106,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^colou?rs? of mana spent to cast (~|it)$/i.exec(p)) && (m[1] === "~" || ctx === null || ctx.selfIt || ctx.spell)) return count({ kind: "colorsSpent" });
   // "For each mana from a Treasure spent to cast it" (CR 106.3): the spell's, or its permanent's enters trigger's (compile
   // checks it's one of those).
+  // "For each mana from Treasures spent to activate this ability" (Mr. House): an activated ability's own.
+  if (each && /^mana from Treasures spent to activate this ability$/i.test(p) && ctx?.activated) return count({ kind: "treasureSpent", activated: true });
   if ((m = /^mana from a Treasure (?:that was )?spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it"))) return count({ kind: "treasureSpent" });
   // "For each {S} spent to cast ~", "the amount of {S} spent to cast ~" (CR 107.4h): the spell's, or its permanent's
   // enters trigger's (compile checks it's one of those).

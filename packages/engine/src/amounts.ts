@@ -167,6 +167,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.manaSpent ?? 0;
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
+    case "rollResult":
+      return s.resolving?.rolled?.result ?? ctx.event?.amount ?? 0;
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
@@ -410,6 +412,8 @@ function describeCount(c: Count): string {
       return "mana from Treasures spent";
     case "snowSpent":
       return "{S} spent";
+    case "rollResult":
+      return "the result";
     default:
       return c.kind;
   }

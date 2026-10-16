@@ -103,6 +103,27 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Clash (CR 701.30b): see "If you win, ..." in body.ts.
   if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
+  // Rolling dice (CR 706.1a: "a d20", "N-sided dice"). A modifier in the same instruction ("and add the number of cards
+  // in your hand", 706.2); "plus an additional six-sided die for each mana from Treasures spent to activate this
+  // ability" (Mr. House).
+  if ((m = new RegExp(`^[Rr]oll ${NUMX} (?:d(\\d+)|(\\w+)-sided (?:die|dice))( and ignore the lower roll)?(?: plus an additional (?:d\\d+|\\w+-sided die) for each (.+)| and (add|subtract) (.+))?$`).exec(s))) {
+    const sides = m[2] ? Number(m[2]) : num(m[3]!);
+    const n = amt(m[1]!);
+    if (!sides || (m[4] && n !== 2)) return null;
+    const roll: Extract<Effect, { type: "roll" }> = { type: "roll", sides, ...(n !== 1 ? { n } : {}), ...(m[4] ? { keepHighest: true as const } : {}) };
+    if (m[5]) {
+      const per = n === 1 ? parseCount(m[5], ctx, true) : null;
+      if (!per) return null;
+      roll.n = { ...per, plus: (per.plus ?? 0) + 1 };
+    }
+    if (m[6]) {
+      // A modifier changes one die's result (every card with one rolls one die).
+      const by = n === 1 ? parseCount(m[7]!, ctx) : null;
+      if (!by) return null;
+      roll[m[6] === "add" ? "add" : "subtract"] = by;
+    }
+    return [roll];
+  }
   // Scry and surveil (CR 701.22, 701.25)
   if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
   // "Discover 4" (CR 701.57a): exile until a nonland card with mana value 4 or less, cast it free or put it into your hand.

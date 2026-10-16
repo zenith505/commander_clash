@@ -2,7 +2,7 @@
 // serializable structures, and the engine executes them (see effects.ts). Everything
 // here is data, so abilities can sit on the stack inside GameState.
 
-import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId, SkipWhat } from "./types";
+import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId, SkipWhat, TurnRule } from "./types";
 import type { CopyExcept } from "./copies";
 
 /**
@@ -127,7 +127,9 @@ export type Count =
   /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
   | { kind: "greatestDrawn" }
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
-  | { kind: "treasureSpent" }
+  | { kind: "treasureSpent"; /** "Spent to activate this ability": in an activated ability (compile checks). */ activated?: true }
+  /** "Equal to the result" (CR 706.2): the last roll's result, all its dice added up; in a "whenever you roll" trigger, the roll's. */
+  | { kind: "rollResult" }
   /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
@@ -1239,6 +1241,12 @@ export type Effect =
   | { type: "endure"; what: ObjRef; n: Amount }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
+  /**
+   * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
+   * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
+   * and "equal to the result" read it afterwards (SpellCondition "rollIn", Count "rollResult").
+   */
+  | { type: "roll"; sides: number; n?: Amount; add?: Amount; subtract?: Amount; /** "Ignore the lower roll": keep only the highest one. */ keepHighest?: true }
   | { type: "surveil"; n: Amount } // CR 701.25
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount }
@@ -1386,6 +1394,8 @@ export type Effect =
   | { type: "damageRule"; rule: DamageRuleSpec }
   /** "Players can't gain life this turn", "Your opponents can't gain life this turn" (CR 119.7). */
   | { type: "noLifeGain"; players: "all" | "opponents" }
+  /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
+  | { type: "turnRules"; rules: TurnRule["rule"][] }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
@@ -1482,6 +1492,11 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /**
+   * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
+   * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
+   */
+  | { kind: "rollIn"; min?: number; max?: number; event?: true }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
   | { kind: "suspected"; what: ObjRef }
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
@@ -1651,6 +1666,10 @@ export type TriggerEvent =
   | "selfDealsDamageToCreature"
   | "selfDealsCombatDamageToCreature"
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
+  /** "Whenever you roll one or more dice": once per instruction to roll (CR 706); the event amount is the result. */
+  | "youRollDice"
+  /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
+  | "youRollDie"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
@@ -1735,6 +1754,11 @@ export interface TriggeredAbility {
   cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
+  /**
+   * For "youRollDie": the die's result has to be at least `min` ("a 4 or higher"), or its natural result (CR 706.2) has
+   * to be `natural` ("a natural 20"), or the die's highest one (`natural: "max"`).
+   */
+  rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
   /**
@@ -2358,6 +2382,8 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /** "If you would roll one or more dice, instead roll that many dice plus one and ignore the lowest roll" (Pixie Guide, CR 706.6). */
+  rollAdvantage?: true;
   /**
    * "Sliver spells you cast have cascade", "Instant and sorcery spells you cast from your hand have cascade", "The first
    * spell you cast each turn has cascade" (CR 702.85a): those spells have cascade as they're cast. `first`: the first such

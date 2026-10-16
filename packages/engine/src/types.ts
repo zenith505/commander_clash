@@ -239,6 +239,8 @@ export interface GameObject {
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
   castFromHand?: true;
+  /** It entered from the stack as a resolving permanent spell (not a copy), for "when ~ enters, if you cast it". */
+  wasCast?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
@@ -649,7 +651,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.

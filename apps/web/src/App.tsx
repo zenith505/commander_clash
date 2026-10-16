@@ -3187,6 +3187,10 @@ function Controls({
             <>
               <strong>Miracle:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it stays in your hand.
             </>
+          ) : pending.how === "discover" ? (
+            <>
+              <strong>{pending.source}:</strong> discover. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it goes to your hand.
+            </>
           ) : pending.how === "suspend" ? (
             <>
               <strong>Suspend:</strong> the last time counter is gone. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it stays in exile.

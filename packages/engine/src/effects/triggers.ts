@@ -326,7 +326,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) &&  (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) &&  (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,

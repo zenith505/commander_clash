@@ -175,6 +175,44 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
       return;
     }
+    case "discover": {
+      // CR 701.57a: the mana value of the spell it would be is checked too (701.57a), the card's own for the cards we have.
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.cascade) {
+        const exiled: ObjectId[] = [];
+        let hit: ObjectId | undefined;
+        while (p.library.length) {
+          const id = p.library[0]!;
+          moveObject(s, id, "exile");
+          exiled.push(id);
+          const d = defOf(s, obj(s, id));
+          if (!isType(d, "Land") && manaValue(parseManaCost(d.manaCost)) <= e.n) {
+            hit = id;
+            break;
+          }
+        }
+        sc.cascade = { exiled, ...(hit ? { hit } : {}) };
+        log(s, `${p.name} discovers ${e.n}: exiles ${exiled.length} card${exiled.length === 1 ? "" : "s"}${hit ? `, finding ${defOf(s, obj(s, hit)).name}` : ", finding nothing"}.`);
+        if (hit) {
+          // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
+          s.pending = { kind: "castFree", player: p.id, objectId: hit, source: src, how: "discover" };
+          if (castProblem(s, p.id, hit) === null) return "paused";
+          s.pending = null;
+        }
+      }
+      // Not cast: into its owner's hand (701.57a).
+      const hit = sc.cascade.hit;
+      if (hit && s.objects[hit]?.zone === "exile") {
+        moveObject(s, hit, "hand");
+        log(s, `${p.name} puts ${defOf(s, obj(s, hit)).name} into their hand.`);
+      }
+      const rest = sc.cascade.exiled.filter((id) => id !== hit && s.objects[id]?.zone === "exile");
+      shuffle(s, rest);
+      for (const id of rest) moveObject(s, id, "library"); // to the bottom, in a random order
+      if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+      return;
+    }
     case "ripple": {
       // CR 702.60a. The spell's name as it last existed, even if it has left the stack (CR 608.2h).
       const p = player(s, ctx.controller);

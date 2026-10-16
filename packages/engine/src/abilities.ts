@@ -999,6 +999,11 @@ export type Effect =
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**
+   * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
+   * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
+   */
+  | { type: "discover"; n: number }
+  /**
    * Ripple N as it resolves (CR 702.60a): reveal the top N cards, cast any with the same name as the spell for free,
    * the rest to the bottom in any order. `of`: "cause" when the ripple was given to the spell that triggered it.
    */
@@ -1570,6 +1575,8 @@ export interface TriggeredAbility {
   ifTreasure?: boolean;
   /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
   ifCastFromHand?: boolean;
+  /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
+  ifCast?: true;
   /**
    * A chapter ability "{rN}—[Effect]": "When one or more lore counters are put onto this Saga, if the number of lore
    * counters on it was less than N and became at least N, [effect]" (CR 714.2b).

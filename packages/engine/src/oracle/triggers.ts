@@ -845,6 +845,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifCastFromHand = !fromHand[1];
         body0 = fromHand[2]!;
       }
+      // "When ~ enters, if you cast it, ..." (Geological Appraiser): an intervening if (CR 603.4) on how it got there.
+      let ifCast = false;
+      const wasCast = /^if you cast it, (.+)$/i.exec(body0);
+      if (wasCast) {
+        if (event !== "selfEnters") return "fail" as const;
+        ifCast = true;
+        body0 = wasCast[1]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -887,7 +895,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
         : ("fail" as const);
     }
   }

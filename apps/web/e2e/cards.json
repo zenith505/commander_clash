@@ -355,6 +355,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "01ab7724-1967-4da6-aebd-3729983d6a0e",
+  "name": "Bloodthorn Flail",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +2/+1.\nEquip—Pay {3} or discard a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2e5b8973-4f6e-4abe-bbbe-81fdca784997",
   "name": "Blooming Blast",
   "manaCost": "{1}{R}",
@@ -1328,6 +1358,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f825c98f-a327-440b-8c0d-ebe02e23bfb7",
+  "name": "Field of Ruin",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{2}, {T}, Sacrifice this land: Destroy target nonbasic land an opponent controls. Each player searches their library for a basic land card, puts it onto the battlefield, then shuffles.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d09c9cba-fdd2-479b-ad5d-d05181c3e3f9",
   "name": "Fierce Guardianship",
   "manaCost": "{2}{U}",
@@ -1846,6 +1901,37 @@
   "set": "afr",
   "releasedAt": "2021-07-23",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a1c7cd7a-0795-4135-b787-effeb981d95b",
+  "name": "Hidden Volcano",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Cave",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Cave"
+  ],
+  "oracleText": "This land enters tapped.\n{T}: Add {R}.\n{4}{R}, {T}, Sacrifice this land: Discover 4. Activate only as a sorcery. (Exile cards from the top of your library until you exile a nonland card with mana value 4 or less. Cast it without paying its mana cost or put it into your hand. Put the rest on the bottom in a random order.)",
+  "colors": [],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Discover"
+  ],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3167,6 +3253,28 @@
   "set": "ogw",
   "releasedAt": "2016-01-22",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "6a9c3401-570c-41cb-a605-75dfa57d6ab7",
+  "name": "Relic of Progenitus",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Target player exiles a card from their graveyard.\n{1}, Exile this artifact: Exile all graveyards. Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ala",
+  "releasedAt": "2008-10-03",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

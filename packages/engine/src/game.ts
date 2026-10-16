@@ -698,6 +698,7 @@ export function moveObject(
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
+  o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });

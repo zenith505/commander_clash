@@ -163,7 +163,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
 }
 
 /** Instructions that move a card to or from a library (CR 605.1a): an ability with one isn't a mana ability. */
-const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "shuffleZones", "search", "dig", "impulse", "cascade", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash"]);
+const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "shuffleZones", "search", "dig", "impulse", "cascade", "discover", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash"]);
 /** Instructions that don't: what mana abilities do besides adding mana (Pristine Talisman's life, Glittering Stockpile's counter). */
 const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
 

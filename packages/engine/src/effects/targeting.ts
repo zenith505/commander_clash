@@ -407,7 +407,8 @@ export function noteModesChosen(s: GameState, body: AbilityBody, sourceId: Objec
 /** Is there a valid choice of modes? Spells and activated abilities need at least one mode. */
 export function canChooseModes(s: GameState, body: AbilityBody, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   if (!body.modal) return true;
-  return legalModes(s, body, controller, src, sourceId).filter(Boolean).length >= Math.max(1, body.modal.min);
+  // With "you may choose the same mode more than once" (CR 700.2d), one mode that can be chosen is enough.
+  return legalModes(s, body, controller, src, sourceId).filter(Boolean).length >= (body.modal.repeat ? 1 : Math.max(1, body.modal.min));
 }
 
 /** Why these modes can't be chosen, or null. */

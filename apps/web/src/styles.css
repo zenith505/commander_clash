@@ -424,6 +424,8 @@ button.ghost { background: var(--panel-2); color: var(--text); }
 /* Choosing modes for a modal spell or ability */
 .mode-menu button { max-width: 360px; text-align: left; white-space: normal; }
 .mode-menu button.chosen { background: #c77dff; color: #1a1a1a; }
+.mode-menu .mode-choice { display: inline-flex; gap: 2px; align-items: center; }
+.mode-menu button.less { padding: 6px 8px; }
 .stack-modes { font-size: 12px; color: #d9b8ff; }
 .modal h4 { margin: 10px 0 4px; font-weight: 600; color: #cbb8e8; }
 .arrange-row { min-height: 120px; }

@@ -83,6 +83,12 @@ describe("the same mode more than once (CR 700.2d)", () => {
     expect(b).toBeTruthy();
   });
 
+  it("can be cast with only one mode that can be chosen (no artifact to destroy)", () => {
+    const { s, ap, ids } = setup([fiery]);
+    expect(castProblem(s, ap, ids[0]!)).not.toMatch(/no mode/);
+    expect(castProblem(s, ap, ids[0]!, undefined, [1, 1, 2])).toMatch(/no legal targets/);
+  });
+
   it("exactly three modes, and a list without the instruction still can't repeat", () => {
     const { s, ap, ids } = setup([mystic, plainThree]);
     expect(castProblem(s, ap, ids[0]!, undefined, [2, 2])).toMatch(/choose three modes/);

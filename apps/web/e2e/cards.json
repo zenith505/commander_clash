@@ -391,6 +391,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bf1341dd-41a3-49f6-87ec-63170dde4324",
+  "name": "Boseiju, Who Endures",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {G}.\nChannel — {1}{G}, Discard this card: Destroy target artifact, enchantment, or nonbasic land an opponent controls. That player may search their library for a land card with a basic land type, put it onto the battlefield, then shuffle. This ability costs {1} less to activate for each legendary creature you control.",
+  "colors": [],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Channel"
+  ],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "36cd2364-d113-47d1-b2c4-b088d9eb88dd",
   "name": "Brainstorm",
   "manaCost": "{U}",
@@ -638,6 +669,35 @@
   "set": "akh",
   "releasedAt": "2017-04-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0895c9b7-ae7d-4bb3-af17-3b75deb50a25",
+  "name": "Command Tower",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "frc",
+  "releasedAt": "2026-10-02",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3633,6 +3693,38 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ac2dd694-d2f1-4025-8400-12332bdc882a",
+  "name": "Takenuma, Abandoned Mire",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {B}.\nChannel — {3}{B}, Discard this card: Mill three cards, then return a creature or planeswalker card from your graveyard to your hand. This ability costs {1} less to activate for each legendary creature you control.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Mill",
+   "Channel"
+  ],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

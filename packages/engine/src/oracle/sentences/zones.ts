@@ -100,6 +100,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = parseSearchFilter(m[1]!);
     return filter === null ? null : [{ type: "randomFromGraveyard", dest: "hand", ...(filter ? { filter } : {}) }];
   }
+  // "Return a creature or planeswalker card from your graveyard to your hand" (Takenuma), "return up to two instant
+  // and/or sorcery cards ...": chosen as it resolves, not targeted.
+  if ((m = /^[Rr]eturn (an?|one|two|three|up to one|up to two|up to three) (.+?) from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {
+    const filter = parseSearchFilter(m[2]!.replace(/ and\/or /g, " or "));
+    const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
+    if (filter === null || !Number.isInteger(n) || n < 1) return null;
+    return [{ type: "returnFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
+  }
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
   if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];
   if ((m = /^Put the top card of your graveyard on (top|the bottom) of your library$/i.exec(s))) return [{ type: "putInLibrary", what: { ref: "graveyardEnd", who: { ref: "you" } }, position: m[1] === "top" ? "top" : "bottom" }];

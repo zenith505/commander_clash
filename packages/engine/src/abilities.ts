@@ -159,6 +159,8 @@ export interface TargetSpec {
   /** Or one of these subtypes instead of one of `types`: "creature or Vehicle". */
   orSubtypes?: string[];
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
+  /** "Artifact, enchantment, or nonbasic land": it also fits one of these (each alternative with its own qualities). */
+  anyOf?: TargetSpec[];
   keywords?: string[]; // "creature with flying"
   notKeywords?: string[]; // "creature without flying"
   power?: Range; // "with power 4 or greater"
@@ -837,6 +839,11 @@ export type Effect =
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
    */
   | { type: "randomFromGraveyard"; filter?: TargetSpec; dest: "hand" | "creatureOrExile" }
+  /**
+   * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
+   * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
+   */
+  | { type: "returnFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1212,7 +1219,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef }
   /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
@@ -1635,6 +1642,8 @@ export interface ActivatedAbility {
   zone?: "hand" | "graveyard";
   /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
+  /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */
+  costLess?: Amount;
   /** It's a cycling ability (CR 702.29a, 702.29f): discarding this card to pay for it is cycling it. */
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */

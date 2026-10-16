@@ -717,6 +717,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "returnFromGraveyard": {
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.found) {
+        const cards = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        const max = Math.min(e.n, cards.length);
+        if (!max) return;
+        const kind = e.filter?.text ?? "card";
+        const what = e.n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: true };
+        return "paused";
+      }
+      const found = sc.found.filter((id) => p.graveyard.includes(id));
+      if (found.length) log(s, `${p.name} returns ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard to their hand.`);
+      for (const id of found) moveObject(s, id, "hand");
+      return;
+    }
     case "reorderGraveyard": {
       const p = player(s, ctx.controller);
       if (e.random) {

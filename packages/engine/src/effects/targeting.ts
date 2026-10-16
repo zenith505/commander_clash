@@ -34,6 +34,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
   if (spec.supertypes?.some((t) => !c.supertypes.includes(t))) return false;
   if (spec.notSupertypes?.some((t) => c.supertypes.includes(t))) return false;
+  if (spec.anyOf && !spec.anyOf.some((a) => objectMatches(s, a, o, controller, false, src, chars, view))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
@@ -142,6 +143,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.colorCount && !colorCountIs(spec.colorCount, d.colors.length)) return false;
   if (spec.supertypes?.some((x) => !d.supertypes.includes(x))) return false;
   if (spec.notSupertypes?.some((x) => d.supertypes.includes(x))) return false;
+  if (spec.anyOf && !spec.anyOf.some((a) => printedMatches(a, d))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   if (spec.chosen === "type" || spec.chosen === "color" || spec.counter) return false;

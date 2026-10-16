@@ -17,6 +17,17 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
+  // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
+  // player" after "target ... an opponent controls" (Boseiju) is that permanent's controller. Last known information
+  // says who controlled it if it's gone by then (CR 608.2h).
+  if ((m = /^(Its controller|That creature's controller|That permanent's controller|That player) may search their library for (.+)$/.exec(s))) {
+    const who = m[1] === "That player" ? (ctx.lastPlayerTarget === undefined && ctx.lastObjectTarget !== undefined ? { ref: "targetController" as const, index: ctx.lastObjectTarget } : null) : parsePlayer(m[1]!.toLowerCase(), ctx);
+    if (!who || / your /.test(m[2]!)) return null;
+    const fx = parseSearch(`Search your library for ${m[2]!.replace(/ their hand\b/, " your hand")}`);
+    if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
+    return [{ type: "eachMay", who, text: `search their library for ${m[2]!}`, effects: [{ ...fx[0]!, who: { ref: "choseThisWay" } }] }];
+  }
   // "For each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their
   // choice or discards a card" (Rottenmouth Viper): each player makes all the choices, then they all happen (rulings).
   if ((m = /^[Ff]or each ([a-z+\/0-9-]+) counter on (?:it|~), (.+)$/.exec(s)) && (ctx.selfIt || /on ~,/.test(s))) {

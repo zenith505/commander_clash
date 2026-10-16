@@ -105,6 +105,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
+  // "Create two 1/1 colorless Spirit creature tokens. They gain haste until end of turn": the tokens just created.
+  if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
@@ -439,6 +441,21 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
   const typeWords = alts.map((alt) => alt.trim().split(/\s+/).filter((w) => TYPE_WORDS[w]).length);
   if (typeWords.some((n) => n > 1) && alts.length > 1) return null;
   const allTypes = typeWords[0]! > 1 ? alts[0]!.trim().split(/\s+/).filter((w) => TYPE_WORDS[w]).map((w) => TYPE_WORDS[w]!) : null;
+  // "Artifact, enchantment, or nonbasic land" (Boseiju, Who Endures): each alternative has one card type, and some have a
+  // quality of their own. The object must fit one of them (TargetSpec.anyOf); `types` stays their card types.
+  // A quality only on the first one ("nontoken artifact or creature") may be meant for them all, so that isn't read this way.
+  const quality = (a: string) => a.trim().split(/\s+/).some((w) => !TYPE_WORDS[w]);
+  const leading = quality(alts[0] ?? "") && !alts.slice(1).every(quality);
+  if (alts.length > 1 && typeWords.every((n) => n === 1) && alts.some(quality) && !leading && !inGraveyard && !isSpell && !extra.token && !extra.status && extra.commander === undefined) {
+    const anyOf: TargetSpec[] = [];
+    for (const alt of alts) {
+      const sub = parseTargetPhrase(alt);
+      if (sub?.kind !== "object" || sub.controller || sub.tapped !== undefined || sub.combat || sub.anyOf) return null;
+      anyOf.push(sub);
+    }
+    const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];
+    return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
+  }
   for (const alt of alts) {
     const words = alt.trim().split(/\s+/);
     for (let i = 0; i < words.length; i++) {

@@ -242,7 +242,7 @@ function ruleCovers(s: GameState, r: DamageRule, to: Rec): boolean {
 function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, controller: PlayerId): boolean {
   const o = src.ref ? s.objects[src.ref.object] : undefined;
   if (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === src.ref!.zc) return objectMatches(s, spec, o, controller, false);
-  if (spec.combat || spec.counter || spec.tapped !== undefined || spec.token !== undefined || spec.power || spec.toughness || spec.manaValue || spec.supertypes || spec.notSupertypes || spec.chosen) return false;
+  if (spec.combat || spec.counter || spec.tapped !== undefined || spec.token !== undefined || spec.power || spec.toughness || spec.manaValue || spec.supertypes || spec.notSupertypes || spec.anyOf || spec.chosen) return false;
   const kw = (k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.types?.length && !spec.types.some((t) => src.types.includes(t)) && !spec.orSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.allTypes?.some((t) => !src.types.includes(t)) || spec.notTypes?.some((t) => src.types.includes(t))) return false;

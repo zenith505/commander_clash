@@ -2397,7 +2397,7 @@ function chooseManifest(s: GameState, pid: PlayerId, cards: string[], max: numbe
   return [...cards].sort((a, b) => score(b) - score(a)).slice(0, max);
 }
 
-/** Cycle (CR 702.29a) lands we don't need and spells we're far from casting. */
+/** Cycle (CR 702.29a) lands we don't need and spells we're far from casting, or use their channel abilities and the like. */
 function chooseCycling(s: GameState, pid: PlayerId): Action[] | null {
   const lands = s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
   for (const id of player(s, pid).hand) {
@@ -2407,8 +2407,12 @@ function chooseCycling(s: GameState, pid: PlayerId): Action[] | null {
     if (!useless) continue;
     const abilities = abilitiesOf(s, o).activated;
     for (let i = 0; i < abilities.length; i++) {
-      if (abilities[i]!.zone !== "hand") continue;
-      const plan = planActivate(s, pid, id, i);
+      const ab = abilities[i]!;
+      if (ab.zone !== "hand" || doesNothingNow(s, id, ab.body)) continue;
+      // Channel and the like aim at something: only with a good target (an opponent's permanent to destroy).
+      const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
+      if (ab.body.targets.length && !targets) continue;
+      const plan = planActivate(s, pid, id, i, targets ?? undefined);
       if (plan) return plan;
     }
   }

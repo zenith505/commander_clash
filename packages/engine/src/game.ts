@@ -3260,10 +3260,10 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
  */
 export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
   const cost = parseManaCost(ab.manaCost);
-  if (!ab.equip) return cost;
-  let less = 0;
+  if (!ab.equip && !ab.costLess) return cost;
+  let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
-  for (const id of s.battlefield) {
+  for (const id of ab.equip ? s.battlefield : []) {
     const src = obj(s, id);
     const mods = compileCard(defOf(s, src)).equipLess;
     if (!mods) continue;

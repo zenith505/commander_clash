@@ -2762,7 +2762,9 @@ function LibrarySearch({
               ? `${pending.source}: put ${pending.what} ${dig.to}`
               : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
-                : `${pending.source}: search your library for ${pending.what}`}
+                : pending.fromGraveyard
+                  ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to your hand`
+                  : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
             {" "}
@@ -2775,7 +2777,7 @@ function LibrarySearch({
                 : `Found ${found.length} of ${pending.max}.`}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {found.length || pending.min > 0 ? "Done" : dig || pending.fromHand ? "Take none" : "Find nothing"}
+            {found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">
@@ -2815,7 +2817,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>Your library</h4>}
+          {!dig && <h4>{pending.fromGraveyard ? "Your graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {

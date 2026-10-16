@@ -313,7 +313,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // CR 701.23: look through the library for matching cards. With a stated quality ("a basic land
       // card") a player may find fewer than asked for, even none (701.23b); asked simply for "a card"
       // or "two cards", they must find as many as they can (701.23d).
-      const p = player(s, ctx.controller);
+      const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (pid === undefined || player(s, pid).lost) return;
+      const p = player(s, pid);
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       const filter = e.filter?.named === "~" ? { ...e.filter, named: src } : e.filter;

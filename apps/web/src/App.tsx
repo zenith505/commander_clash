@@ -2079,6 +2079,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Suspected
           </span>
         )}
+        {o.solved && (
+          <span className="chip other" title="Solved: this Case's Solved ability works now. It stays solved until it leaves the battlefield.">
+            Solved
+          </span>
+        )}
         {o.classLevel !== undefined && (
           <span className="chip other" title={`This Class is level ${o.classLevel}: it has the abilities of level ${o.classLevel} and below.`}>
             Level {o.classLevel}

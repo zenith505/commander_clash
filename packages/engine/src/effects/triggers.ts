@@ -81,6 +81,8 @@ export type TriggerSourceEvent =
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
   | { type: "becameMonstrous"; id: ObjectId; x: number }
   | { type: "becameLevel"; id: ObjectId; level: number }
+  /** A Case became solved (CR 719.3a), under `controller`. */
+  | { type: "solved"; id: ObjectId; controller: PlayerId }
   /** An attacker was exerted as it attacked (CR 701.43d). */
   | { type: "exerted"; id: ObjectId; /** By its "you may exert ~ as it attacks" (its "when you do" is linked to that, CR 607.2h). */ attacking?: true }
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */

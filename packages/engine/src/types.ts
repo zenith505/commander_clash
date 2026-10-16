@@ -164,6 +164,8 @@ export interface GameObject {
   suspected?: number;
   /** A Class's level (CR 716.2a-b), a designation it keeps until it leaves the battlefield; unset is level 1 (716.2d). */
   classLevel?: number;
+  /** A Case's solved designation (CR 719.3b), kept until it leaves the battlefield; not a copiable value. */
+  solved?: true;
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
   saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
@@ -730,6 +732,12 @@ export interface TurnLog {
   toGraveyard?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
   discards?: { player: PlayerId; cards: string[] }[];
+  /** Cards put into graveyards from anywhere, anyone's, counted by each card type they had there (Case of the Gorgon's Kiss). */
+  toGraveyardTypes?: Record<string, number>;
+  /** Life each player gained in total (Case of the Uneaten Feast). */
+  lifeGained?: Record<number, number>;
+  /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
+  damageSources?: Record<number, string[]>;
 }
 
 /**

@@ -125,6 +125,13 @@ export function parseBecomes(text: string): Modification[] | null {
     rest = (m[1] ?? m[2])!;
     still = true;
   }
+  // "Becomes a 0/0 Bird creature with flying in addition to its other types" (Case of the Filched Falcon): it keeps its
+  // card types and subtypes (CR 205.1b).
+  let addition = false;
+  if ((m = /^(.+?) in addition to its other types$/i.exec(rest)) && !still) {
+    rest = m[1]!;
+    addition = true;
+  }
   // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
   if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
@@ -157,7 +164,10 @@ export function parseBecomes(text: string): Modification[] | null {
     else if (CREATURE_TYPES.has(w)) subtypes.push(w);
     else return null;
   }
-  if (types.join(" ") === "Artifact Creature") {
+  if (addition) {
+    if (!types.length && !subtypes.length) return null;
+    out.push({ kind: "addTypes", types, subtypes });
+  } else if (types.join(" ") === "Artifact Creature") {
     // "Becomes an artifact creature" keeps its other card types and subtypes; "a Golem artifact
     // creature" keeps them too, except that its creature types are replaced (CR 205.1b).
     out.push({ kind: "addTypes", types, subtypes: [] });

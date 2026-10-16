@@ -6,6 +6,7 @@ import { replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { parseGrants } from "./grants";
+import { parseSearchFilter } from "./search";
 
 /** What "~ enters tapped unless ..." waits for (CR 614.1d). */
 export function parseEntersCondition(text: string): EntersCondition | null {
@@ -258,6 +259,17 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
+  if (/^you have no cards in hand$/.test(text)) return { kind: "noneInHand", filter: { kind: "card", text: "card" } };
+  // The Cases' "To solve" conditions (CR 719.3a), about this turn.
+  if ((m = new RegExp(`^${NUM} or more (creature|artifact|enchantment|land|instant|sorcery) cards were put into graveyards from anywhere this turn$`).exec(text)))
+    return { kind: "cardsToGraveyard", n: num(m[1]!), types: [capital(m[2]!)] };
+  if ((m = new RegExp(`^${NUM} or more sources you controlled dealt damage this turn$`).exec(text))) return { kind: "sourcesDealtDamage", n: num(m[1]!) };
+  if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
+    const filter = parseSearchFilter(`${m[2]!.replace(/ and /g, " or ")} card`);
+    return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
+  }
+  if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };
+  if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
@@ -666,6 +678,13 @@ function parseIsA(phrase: string, only: boolean): Modification[] | null {
   let rest = m[1]!;
   let pt: [number, number] | undefined;
   const grants: Modification[] = [];
+  // "Is a 4/4 Gorgon creature with deathtouch": its base power and toughness (layer 7b, CR 613.4b).
+  const lead = /^(\d+)\/(\d+) (.+ creature\b.*)$/.exec(rest);
+  if (lead) {
+    pt = [Number(lead[1]), Number(lead[2])];
+    rest = lead[3]!;
+  }
+  if (lead && /with base power/.test(rest)) return null;
   if ((m = /^(.+?) with base power and toughness (\d+)\/(\d+)(?: and (?:has )?(.+))?$/.exec(rest))) {
     pt = [Number(m[2]), Number(m[3])];
     if (m[4]) {
@@ -752,6 +771,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (also) {
     const types = also[1]!.replace(/,? and /, ", ").split(", ");
     return types.every((t) => CREATURE_TYPES.has(t)) ? { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: types, supertypes: [] }], text: line } : null;
+  }
+  // "~ is a 4/4 Gorgon creature with deathtouch and lifelink in addition to its other types" (Case of the Gorgon's Kiss,
+  // solved): types (layer 4), abilities (6) and base power and toughness (7b), CR 613.1.
+  const isA = /^~ is (an? \d+\/\d+ .+ in addition to its other types)$/.exec(text);
+  if (isA) {
+    const mods = parseIsA(isA[1]!, false);
+    return mods ? { affects: { kind: "self" }, mods, text: line } : null;
   }
   const cda = parseDefinedPT(text);
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };

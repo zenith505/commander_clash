@@ -110,6 +110,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       fireEvent(s, { type: "becameLevel", id: o.id, level: e.n });
       return;
     }
+    case "solve": {
+      // "This Case becomes solved" (CR 719.3a-b): the same object only (CR 400.7); it stays solved until it leaves.
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o || o.zone !== "battlefield" || (ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) !== ctx.sourceZc) || o.solved) return;
+      o.solved = true;
+      invalidateCharacteristics(s); // its "Solved" abilities
+      log(s, `${defOf(s, o).name} is solved.`);
+      fireEvent(s, { type: "solved", id: o.id, controller: controllerOf(s, o) });
+      return;
+    }
     case "becomeSaddled":
       // Only permanents can become saddled (CR 702.171b).
       for (const o of objects(s, e.what, ctx)) {

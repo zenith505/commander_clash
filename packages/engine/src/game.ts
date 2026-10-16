@@ -666,6 +666,7 @@ export function moveObject(
   o.monstrous = undefined;
   o.suspected = undefined; // CR 701.60a
   o.classLevel = undefined; // CR 716.2b
+  o.solved = undefined; // CR 719.3b
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
@@ -748,6 +749,8 @@ export function moveObject(
   if (to === "graveyard" && !o.isToken && !o.spellCopy) {
     const yards = ((s.turnLog ??= {}).toGraveyard ??= {});
     yards[o.owner] = (yards[o.owner] ?? 0) + 1;
+    const types = (s.turnLog.toGraveyardTypes ??= {});
+    for (const t of defOf(s, o).types) types[t] = (types[t] ?? 0) + 1;
   }
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
@@ -1067,6 +1070,8 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   player(s, pid).life += n;
   const gained = ((s.turnLog ??= {}).gainedLife ??= []);
   if (!gained.includes(pid)) gained.push(pid);
+  const total = (s.turnLog.lifeGained ??= {});
+  total[pid] = (total[pid] ?? 0) + n;
   fireEvent(s, { type: "lifeGained", player: pid, amount: n });
 }
 

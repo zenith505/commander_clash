@@ -133,7 +133,7 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Case", "Room", "Siege"];
+const UNSUPPORTED_SUBTYPES = ["Room", "Siege"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
@@ -213,22 +213,21 @@ export function normalizeSelf(d: CardDef): string {
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case)\b/g, "~");
   return t;
 }
 
 /**
- * A max speed ability's ability, added to `out` with the condition: one static, triggered, activated or mana ability
- * and nothing else. False if it's anything else, or a static ability that already has a condition.
+ * A max speed ability's ability (CR 702.178a), added to `out` with the condition: one static, triggered, activated or
+ * mana ability and nothing else. False if it's anything else, or a static ability that already has a condition.
  */
-function maxSpeedAbility(d: CardDef, text: string, out: CompiledCard): boolean {
+function conditionalAbility(d: CardDef, text: string, out: CompiledCard, cond: StaticCondition): boolean {
   const inner = compile({ ...d, oracleText: text });
   const base = compile({ ...d, oracleText: "" });
   if (inner.unsupported.length) return false;
   const lists = ["triggers", "activated", "mana", "statics"] as const;
   const rest = (c: CompiledCard) => JSON.stringify(Object.entries(c).filter(([k]) => !(lists as readonly string[]).includes(k)).sort(([a], [b]) => a.localeCompare(b)));
   if (rest(inner) !== rest(base) || lists.some((k) => base[k].length)) return false;
-  const cond = { kind: "maxSpeed" } as const;
   const [kind, ...more] = lists.flatMap((k) => inner[k].map(() => k));
   if (!kind || more.length) return false;
   if (kind === "statics") {
@@ -243,6 +242,19 @@ function maxSpeedAbility(d: CardDef, text: string, out: CompiledCard): boolean {
     out.activated.push({ ...ab, activateIf: cond });
   }
   return true;
+}
+
+/** A Case's "To solve — [Condition]" as its end step trigger (CR 719.3a), or null if the condition isn't understood. */
+function solveTrigger(d: CardDef, text: string): TriggeredAbility | null {
+  const lower = text.replace(/^[A-Z](?=[a-z' ])/, (c) => c.toLowerCase());
+  // "Three or more creatures attacked this turn" (Case of the Gateway Express): it's checked in your end step, and only
+  // the active player declares attackers (CR 508.1), so they're the creatures you attacked with.
+  const attacked = new RegExp(`^${NUM} or more creatures attacked this turn$`).exec(lower);
+  const cond: StaticCondition | null = attacked ? { kind: "attackedWith", n: num(attacked[1]!) } : parseStaticCondition(lower, { affects: { kind: "self" }, mods: [], text: "" });
+  if (!cond) return null;
+  const t = compile({ ...d, subtypes: [], oracleText: "At the beginning of your end step, ~ becomes solved." }).triggers[0];
+  if (!t || t.ifCond) return null;
+  return { ...t, ifCond: { kind: "allOf", conds: [cond, { kind: "solved", not: true }] }, body: { ...t.body, text: `To solve — ${text}.` } };
 }
 
 /** The conditions "~ has flash as long as ..." may have: about the player, so the same with the card in hand. */
@@ -369,7 +381,24 @@ export function compile(d: CardDef): CompiledCard {
     // "Max speed — [Ability]": "As long as your speed is 4, this object has '[Ability]'" (CR 702.178a).
     const maxSpeed = /^Max speed — (.+)$/.exec(line);
     if (maxSpeed) {
-      if (!maxSpeedAbility(d, maxSpeed[1]!, out)) out.unsupported.push(raw);
+      if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
+      continue;
+    }
+    // Cases (CR 719.3): "To solve — [Condition]" means "At the beginning of your end step, if [condition] and this Case is
+    // not solved, this Case becomes solved", checked as it triggers and as it resolves (603.4, rulings); "Solved —
+    // [Ability]" is that ability only while it's solved (702.169).
+    const toSolve = d.subtypes.includes("Case") && /^To solve — (.+)\.$/.exec(line);
+    if (toSolve) {
+      const t = solveTrigger(d, toSolve[1]!);
+      if (t) out.triggers.push(t);
+      else out.unsupported.push(raw);
+      continue;
+    }
+    const solved = d.subtypes.includes("Case") && /^Solved — (.+)$/.exec(line);
+    if (solved) {
+      // Like a Class level's abilities: each kind of ability (static, triggered, activated, from the top) made conditional.
+      const part = { header: "Solved", cond: { kind: "solved" as const }, lines: [solved[1]!] };
+      if (!addStriation(part, out, (l) => compile({ ...d, oracleText: l, keywords: [] }), compile({ ...d, oracleText: "", keywords: [] }))) out.unsupported.push(raw);
       continue;
     }
     // Loyalty abilities (CR 606): "+1: ...", "−2: ...", "0: ...", "−X: ...". Given in quotes, they're bracketed

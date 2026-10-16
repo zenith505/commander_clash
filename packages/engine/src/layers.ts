@@ -563,6 +563,21 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "suspected":
       return (src.suspected !== undefined) !== !!cond.not; // CR 701.60
+    case "solved":
+      return !!src.solved !== !!cond.not; // CR 719.3b
+    case "cardsToGraveyard":
+      return Math.min(...cond.types.map((t) => s.turnLog?.toGraveyardTypes?.[t] ?? 0)) >= cond.n;
+    case "sourcesDealtDamage":
+      return (s.turnLog?.damageSources?.[you]?.length ?? 0) >= cond.n;
+    case "castCount":
+      return (s.castThisTurn ?? []).filter((c) => c.player === you && printedMatches(cond.filter, s.cards[c.card]!)).length >= cond.n;
+    case "colorsAmong": {
+      const colors = new Set<Color>();
+      for (const c of chars.values()) if (c.controller === you) for (const k of c.colors) colors.add(k);
+      return colors.size >= cond.n;
+    }
+    case "lifeGainedThisTurn":
+      return (s.turnLog?.lifeGained?.[you] ?? 0) >= cond.n;
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {

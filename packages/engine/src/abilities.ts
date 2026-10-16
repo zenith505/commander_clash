@@ -718,6 +718,18 @@ export type StaticCondition =
   | { kind: "attackedThisTurn" }
   /** "If you've committed a crime this turn" (CR 700.13). */
   | { kind: "committedCrime" }
+  /** A Case's solved designation (CR 719.3b): "Solved — [ability]" (702.169); `not`: a "To solve" trigger's "this Case is not solved" (719.3a). */
+  | { kind: "solved"; not?: true }
+  /** "Three or more creature cards were put into graveyards from anywhere this turn": cards, anyone's, with all of `types` (as cards in the graveyard). */
+  | { kind: "cardsToGraveyard"; n: number; types: string[] }
+  /** "Three or more sources you controlled dealt damage this turn": different sources, as the objects they were (CR 400.7), controlled by you as they dealt it. */
+  | { kind: "sourcesDealtDamage"; n: number }
+  /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
+  | { kind: "castCount"; n: number; filter: TargetSpec }
+  /** "There are five colors among permanents you control" (CR 105.2). */
+  | { kind: "colorsAmong"; n: number }
+  /** "You've gained 5 or more life this turn": in total. */
+  | { kind: "lifeGainedThisTurn"; n: number }
   /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
@@ -1195,6 +1207,8 @@ export type Effect =
   | { type: "becomeSaddled"; what: ObjRef }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
   | { type: "classLevel"; n: number }
+  /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
+  | { type: "solve" }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */

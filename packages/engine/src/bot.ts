@@ -3,7 +3,7 @@ import { topGraveyardCards } from "./graveyard";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   livingPlayers,
@@ -208,6 +208,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
+    if (pend.kind === "chooseOption" && pend.what === "punisher") return [{ type: "chooseOption", player: pid, choice: choosePunisher(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
     // What an Aura entering without being cast enchants (CR 303.4f): one of ours if it only helps, an opponent's otherwise.
     if (pend.kind === "chooseOption" && pend.what === "enchant") {
@@ -835,10 +836,6 @@ function chooseForetell(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
-/**
- * Which room to venture into, or which dungeon to start (CR 701.49): damage and bodies first, the counters only with a
- * creature to put them on, goad only with an opponent's creature to goad.
- */
 /** "Tap or untap target permanent": what's best for us about the permanent it's about. */
 function tapOrUntapChoice(s: GameState, pid: PlayerId, options: string[]): string {
   const pend = s.pending;
@@ -850,11 +847,55 @@ function tapOrUntapChoice(s: GameState, pid: PlayerId, options: string[]): strin
   return options.includes("neither") ? "neither" : ours ? "untap" : "tap";
 }
 
+/**
+ * Which room to venture into, or which dungeon to start (CR 701.49): damage and bodies first, the counters only with a
+ * creature to put them on, goad or "can't attack" only with an opponent's creature. Of the dungeons, the shortest one
+ * that helps only us; Tomb of Annihilation's rooms hurt us too, and Oubliette costs us a card and three permanents.
+ */
 function chooseRoom(s: GameState, pid: PlayerId, options: string[]): string {
   const creatures = (mine: boolean) => s.battlefield.some((id) => objIsType(s, obj(s, id), "Creature") && (controllerOf(s, obj(s, id)) === pid) === mine);
-  const score = (room: string) =>
-    ({ "Trap!": 5, Catacombs: 4, Forge: creatures(true) ? 4 : 0, Stash: 3, Archives: 3, "Lost Well": 2, Arena: creatures(false) ? 2 : 0 })[room] ?? 1;
-  return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  const scores: Record<string, number> = {
+    "Lost Mine of Phandelver": 3,
+    "Dungeon of the Mad Mage": 2,
+    "Tomb of Annihilation": 1,
+    "Trap!": 5,
+    Catacombs: 4,
+    Forge: creatures(true) ? 4 : 0,
+    Stash: 3,
+    Archives: 3,
+    "Lost Well": 2,
+    Arena: creatures(false) ? 2 : 0,
+    "Goblin Lair": 3,
+    "Mine Tunnels": 3,
+    Storeroom: creatures(true) ? 3 : 0,
+    "Dark Pool": 3,
+    "Fungi Cavern": creatures(false) ? 2 : 0,
+    "Goblin Bazaar": 3,
+    "Twisted Caverns": creatures(false) ? 2 : 0,
+    "Runestone Caverns": 3,
+    "Muiral's Graveyard": 4,
+    "Veils of Fear": 2,
+    Oubliette: 0,
+  };
+  return [...options].sort((a, b) => (scores[b] ?? 1) - (scores[a] ?? 1))[0]!;
+}
+
+/**
+ * A punisher (see its effect): sacrifice a token if that's allowed; low on life, anything but the penalty; with cards to
+ * spare, discard one; otherwise take the life loss.
+ */
+function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string {
+  const pu = s.resolving?.scratch?.punish;
+  if (!pu) return "none";
+  const p = player(s, pid);
+  const lose = pu.lose ?? 3;
+  const ways = options.filter((o) => o !== "none").map((o) => ({ o, w: pu.options[Number(o)]! }));
+  const sac = ways.find(({ w }) => "sacrifice" in w && pickOptions(s, { filter: w.sacrifice }, pid).some((id) => obj(s, id).isToken && !objIsType(s, obj(s, id), "Creature")));
+  if (sac) return sac.o;
+  const discard = ways.find(({ w }) => "discard" in w);
+  if (p.life - lose <= 5) return (discard ?? ways[0])?.o ?? "none";
+  if (discard && "discard" in discard.w && p.hand.length - discard.w.discard >= 4) return discard.o;
+  return "none";
 }
 
 /**

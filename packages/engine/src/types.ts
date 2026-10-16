@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
 import type { DamageEvent } from "./damage";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
@@ -167,11 +167,12 @@ export interface GameObject {
   noCombatDamageTurn?: number;
   /**
    * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
-   * while it's still the same object (`zc`), until the end of this turn or of their next turn. A warped card
+   * while it's still the same object (`zc`), until the end of this turn or of their next turn, or ("exiled") for as
+   * long as it stays exiled. A warped card
    * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
    * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery.
    */
-  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "warp" | "plot" | "foretell"; turn: number };
+  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell"; turn: number };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
    * spell it's cast as, for "if this spell was foretold".
@@ -658,7 +659,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "castFromHand" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -923,6 +924,8 @@ export interface Resolving {
   damagedThisWay?: ObjectId[];
   /** Players its damage effects dealt damage to, for "players dealt damage this way". */
   playersDamagedThisWay?: PlayerId[];
+  /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
+  drawnThisWay?: ObjectId[];
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
   discarded?: Record<PlayerId, number>;
   /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */
@@ -951,6 +954,11 @@ export interface Resolving {
     mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)
     mayers?: PlayerId[]; // and those who chose to
     mayStep?: number; // how many of its instructions are done
+    /** A punisher (see its effect): players still to choose, what each chose (an option's index or "none"), the round. */
+    punish?: { queue: PlayerId[]; picked: Record<string, string>; round: number; times: number; options: PunisherOption[]; lose?: number };
+    punished?: PlayerId[]; // those who did none of its options, this round
+    /** "Sacrifice an artifact, a creature, and a land": players still to pick, the slot being picked, the picks so far. */
+    slots?: { queue: PlayerId[]; slot: number; picked: Record<string, ObjectId[]> };
     paid?: boolean; // the answer to "unless that player pays ..."
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
     paidBy?: PlayerId[]; // and those who paid

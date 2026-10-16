@@ -62,12 +62,14 @@ export function parseToken(power: number, toughness: number, desc: string, withT
     else if (CREATURE_TYPES.has(w)) subtypes.push(w);
     else return null;
   }
-  // 'with "Sacrifice ~: Add {C}."': an ability of its own (CR 111.3).
-  const quoted = withText && /^"(.+)"$/.exec(withText);
-  if (quoted && !compileQuoted(quoted[1]!)) return null;
-  const keywords = withText && !quoted ? parseKeywordList(withText) : [];
+  // 'with "Sacrifice ~: Add {C}."': an ability of its own (CR 111.3); 'with flying, haste, and "When this creature dies,
+  // ..."': keywords and then one.
+  const quoted = withText && /^(?:(.+?),? and )?"([^"]+)"$/.exec(withText);
+  if (quoted && !compileQuoted(quoted[2]!)) return null;
+  const kwText = quoted ? quoted[1] : withText;
+  const keywords = kwText ? parseKeywordList(kwText) : [];
   if (!keywords || !subtypes.length) return null;
-  return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(quoted ? { abilities: quoted[1]! } : {}) };
+  return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(quoted ? { abilities: quoted[2]! } : {}) };
 }
 
 /** Token and counter doublers (CR 614.1a): Parallel Lives, Doubling Season, Hardened Scales, Xorn. */

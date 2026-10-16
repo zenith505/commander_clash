@@ -3190,6 +3190,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a53baf90-8d0c-4900-9f24-893ad31628ec",
+  "name": "Secret Door",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Artifact Creature — Wall",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender\n{4}{U}: Venture into the dungeon. Activate only as a sorcery. (Enter the first room or advance to the next room.)",
+  "power": "0",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Defender",
+   "Venture into the dungeon"
+  ],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dffc6785-31b0-487c-b9a0-980bca39753d",
   "name": "Security Rhox",
   "manaCost": "{2}{R}{G}",
@@ -3875,6 +3909,39 @@
   "set": "kld",
   "releasedAt": "2016-09-30",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1ce7b966-2a10-4250-8c0d-525e73efe2f4",
+  "name": "Veteran Dungeoneer",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "When this creature enters, venture into the dungeon. (Enter the first room or advance to the next room.)",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Venture into the dungeon"
+  ],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

@@ -64,7 +64,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
@@ -156,10 +156,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(s);
-    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them) (this turn|until the end of your next turn))$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
+    // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
+    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them)(?: (this turn|until the end of your next turn))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
     if (exTop && playIt) {
-      const when = (playIt[1] ?? playIt[2])!.toLowerCase();
-      effects.push({ type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: /next turn/.test(when) ? "nextTurn" : "thisTurn" });
+      const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
+      effects.push({ type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next turn/.test(when) ? "nextTurn" : "thisTurn" });
       si++;
       continue;
     }
@@ -185,6 +186,22 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       effects.push({ type: "revealTopToHand", ...(life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
       if (life) si++;
+      continue;
+    }
+    // "Repeat this process once" after a punisher (Remorseless Punishment); "Repeat the following process X times" before
+    // one (Torment of Hailfire): the whole process again, the same players each time (rulings).
+    if (/^Repeat this process once$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "punisher" || prev.times !== undefined) return null;
+      effects[effects.length - 1] = { ...prev, times: 2 };
+      continue;
+    }
+    const repeat = new RegExp(`^Repeat the following process ${NUMX} times$`).exec(s);
+    if (repeat) {
+      const next = sentences[si + 1] ? attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx)) : null;
+      if (next?.length !== 1 || next[0]!.type !== "punisher" || si + 2 !== sentences.length) return null;
+      effects.push({ ...next[0]!, times: amt(repeat[1]!) });
+      si++;
       continue;
     }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
@@ -426,10 +443,21 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const inner = parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e))) return null;
+      // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one).
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
       effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
+      continue;
+    }
+    // "You lose 2 life unless you control another Pirate": the instruction happens only if the condition is false as it
+    // resolves (CR 608.2c).
+    const unlessState = !ifState ? /^(.+) unless ([^,]+)$/.exec(s) : null;
+    const unlessCond = unlessState && !/^(it|~|they|that player|its controller|he or she)\b/.test(unlessState[2]!) ? parseStaticCondition(unlessState[2]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    if (unlessState && unlessCond) {
+      const inner = parseOne(unlessState[1]!, ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: unlessCond }, effects: [], otherwise: inner });
       continue;
     }
     if (ifState && stateCond) {

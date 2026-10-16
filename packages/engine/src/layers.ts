@@ -405,6 +405,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "monarch":
       return s.monarch === you;
+    case "initiative":
+      return s.initiative === you;
+    case "completedDungeon": {
+      const done = s.players[you]?.completedDungeons ?? [];
+      return (cond.name ? done.includes(cond.name) : done.length > 0) !== !!cond.not;
+    }
     case "fullParty":
       return partySize(s, you, (o) => chars.get(o.id)) === 4;
     case "controlCommander":

@@ -808,6 +808,10 @@ export function compile(d: CardDef): CompiledCard {
       out.lifeFloor = Number(floor[1]);
       continue;
     }
+    if (line === "Room abilities of dungeons you own trigger an additional time.") {
+      out.roomsTwice = true;
+      continue;
+    }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
       out.drawTwoInstead = true;
       continue;

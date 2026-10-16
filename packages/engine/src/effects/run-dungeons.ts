@@ -1,9 +1,11 @@
 import type { Effect } from "../abilities";
 import { log, player } from "../game";
-import { invalidateCharacteristics } from "../layers";
+import { controllerOf, invalidateCharacteristics } from "../layers";
+import { abilitiesOf } from "../cards";
 import { DUNGEONS, INITIATIVE, UNDERCITY, dungeonByName, dungeonDef, type Dungeon } from "../oracle";
 import type { GameState, Player, PlayerId } from "../types";
 import { ResolveCtx, players } from "./resolve";
+import { fireEvent } from "./triggers";
 
 /** Venturing into the dungeon (CR 701.49) and taking the initiative (CR 726). */
 export function runDungeonsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -62,14 +64,19 @@ function enterRoom(s: GameState, p: Player, d: Dungeon, room: number) {
   s.cards[def.oracleId] ??= def;
   p.dungeon = { name: d.name, room };
   log(s, `${p.name} moves their venture marker into ${d.rooms[room]!.name}.`);
-  s.triggerQueue.push({ sourceId: "", sourceCardId: def.oracleId, controller: p.id, index: room });
+  // Hama Pashar: once more for each permanent of theirs with "room abilities of dungeons you own trigger an additional
+  // time" (CR 603.2d; rulings on Dungeon Delver: each one adds one).
+  const more = s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === p.id && abilitiesOf(s, s.objects[id]!).roomsTwice).length;
+  for (let i = 0; i <= more; i++) s.triggerQueue.push({ sourceId: "", sourceCardId: def.oracleId, controller: p.id, index: room });
 }
 
 function completeDungeon(s: GameState, p: Player) {
   const name = p.dungeon!.name;
   p.dungeon = undefined;
   (p.completedDungeons ??= []).push(name);
+  invalidateCharacteristics(s); // "as long as you've completed a dungeon"
   log(s, `${p.name} completes ${name}.`);
+  fireEvent(s, { type: "dungeonCompleted", player: p.id });
 }
 
 /**

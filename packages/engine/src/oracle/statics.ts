@@ -259,6 +259,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
+  if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
+  if (/^you've completed a dungeon$/.test(text)) return { kind: "completedDungeon" }; // CR 309.7
+  if ((m = /^you (have|haven't) completed (Lost Mine of Phandelver|Dungeon of the Mad Mage|Tomb of Annihilation|Undercity)$/.exec(text)))
+    return { kind: "completedDungeon", name: m[2]!, ...(m[1] === "haven't" ? { not: true as const } : {}) };
   if (/^you have a full party$/.test(text)) return { kind: "fullParty" }; // CR 700.8a
   // CR 903.3: whoever's commander it is (rulings on Fierce Guardianship).
   if (/^you control a commander$/.test(text)) return { kind: "controlCommander" };

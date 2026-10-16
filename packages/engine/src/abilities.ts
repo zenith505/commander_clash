@@ -2199,6 +2199,12 @@ export interface CompiledCard {
   beginOnBattlefield?: boolean;
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
+  /**
+   * "If you tap a permanent for mana, it produces twice as much of that mana instead" (Mana Reflection; three times,
+   * Nyxbloom Ancient): a replacement effect on the mana a mana ability with {T} in its cost produces (CR 106.12b,
+   * 614.1a), the factor it multiplies by. Several multiply together (rulings).
+   */
+  tapManaTimes?: number;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */

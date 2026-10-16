@@ -847,6 +847,11 @@ export function compile(d: CardDef): CompiledCard {
       out.doubleLifeGain = true;
       continue;
     }
+    const tapTimes = /^If you tap a permanent for mana, it produces (twice|three times) as much of that mana instead\.$/.exec(line);
+    if (tapTimes) {
+      out.tapManaTimes = (out.tapManaTimes ?? 1) * (tapTimes[1] === "twice" ? 2 : 3);
+      continue;
+    }
     const plusLife = /^If you would gain life, you gain that much life plus (\d+) instead\.$/.exec(line);
     if (plusLife) {
       out.lifeGainPlus = (out.lifeGainPlus ?? 0) + Number(plusLife[1]);

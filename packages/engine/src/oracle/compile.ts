@@ -1,5 +1,5 @@
 import { allEffects } from "../abilities";
-import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec } from "../abilities";
+import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
@@ -1042,6 +1042,15 @@ export function compile(d: CardDef): CompiledCard {
     // with that quality; "Equip—Pay 3 life.", "Equip—Sacrifice a creature." (a cost that isn't mana, CR 702.6a).
     const equipQ = /^Equip (?!planeswalker\b)((?:[A-Za-z]+,? (?:or )?)*?[A-Za-z]+) ((?:\{[^}]+\})+)$/.exec(line);
     const equipCost = /^Equip—(.+?)\.( Activate only once each turn\.)?$/.exec(line);
+    // "Equip—Pay {3} or discard a card." (Bloodthorn Flail): one equip ability with a choice of costs, made as it's
+    // activated (CR 602.2b, 601.2b). It's compiled as one equip ability per cost, which is the same choice from the menu.
+    const equipOr = equipCost && !equipCost[2] ? /^Pay ((?:\{[^}]+\})+) or (discard (?:a|one) card)$/.exec(equipCost[1]!) : null;
+    if (equipOr && d.subtypes.includes("Equipment")) {
+      const acts = [equipOr[1]!, "Discard a card"].map((c) => parseActivated(`${c}: Attach ~ to target creature you control. Activate only as a sorcery.`));
+      if (acts.some((a) => !a || a === "fail")) out.unsupported.push(raw);
+      else acts.forEach((a, i) => out.activated.push({ ...(a as ActivatedAbility), text: i === 0 ? `Equip—Pay ${equipOr[1]!}.` : "Equip—Discard a card.", equip: true }));
+      continue;
+    }
     if ((equipQ || equipCost) && d.subtypes.includes("Equipment")) {
       const q = equipQ?.[1];
       const what = !q ? "creature" : /\bcreature\b/.test(q) ? q : q === "commander" ? "commander creature" : `${q} creature`;

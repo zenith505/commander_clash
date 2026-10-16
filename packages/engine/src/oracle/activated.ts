@@ -21,7 +21,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -120,6 +120,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // discarding it is part of the cost (CR 602.2b, 701.9a).
   const fromHand = /Discard ~/.test(costs);
   if (fromHand && (tap || fromYard || /Sacrifice ~|Exert ~|Remove |on ~/.test(costs))) return "fail";
+  // "{1}, Exile ~: Exile all graveyards. Draw a card." (Relic of Progenitus): exiling the permanent itself is part of the
+  // cost, paid as it's activated (CR 602.2b, 601.2h), like sacrificing it but into exile.
+  const exileOwn = costs.split(", ").includes("Exile ~");
+  if (exileOwn && (fromYard || fromHand || /Sacrifice ~/.test(costs))) return "fail";
   const manaCost = symbols
     .filter((x) => x !== "T")
     .map((x) => `{${x}}`)
@@ -131,7 +135,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
   // libraries isn't compiled.
   const mana = manaAbilityKind(body);
-  if (mana === "fail" || (mana === "mana" && fromHand)) return "fail";
+  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
   return {
@@ -143,6 +147,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     body,
     text: raw,
     ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf ? {} : { exileSelf: true }) } : {}),
+    ...(exileOwn ? { exileSelf: true } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(maxPerTurn ? { maxPerTurn } : {}),

@@ -974,6 +974,12 @@ export interface Resolving {
   discarded?: Record<PlayerId, number>;
   /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */
   exiledPowers?: number[];
+  /**
+   * The permanents its destroy instructions destroyed so far while this resolves, as they last existed on the
+   * battlefield ("for each creature destroyed this way"): one that went elsewhere instead of its owner's graveyard still
+   * counts; one that wasn't destroyed (indestructible, regenerated) doesn't (rulings on Fumigate and Bane of Progress).
+   */
+  destroyed?: { o: GameObject; ch: Characteristics }[];
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
   countersRemoved?: number;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
@@ -1029,6 +1035,8 @@ export interface Resolving {
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     found?: ObjectId[]; // the cards a library search found
+    searchQueue?: PlayerId[]; // players still to search, in APNAP order ("each player searches their library", CR 101.4)
+    searchedBy?: { pid: PlayerId; found: ObjectId[] }[]; // the cards each player who has searched found, in that order
     flickered?: { id: ObjectId; zc: number }[]; // cards a flicker exiled, to return once Auras' hosts are chosen
     playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)

@@ -75,6 +75,8 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true }
   /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
   | { kind: "greatestPowerExiled" }
+  /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
+  | { kind: "destroyedThisWay"; filter: TargetSpec }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
@@ -1662,7 +1664,7 @@ export interface ActivatedAbility {
   lifeCost?: number;
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
-  /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a). */
+  /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */
   exileSelf?: boolean;
   /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
   costs?: AdditionalCost[];

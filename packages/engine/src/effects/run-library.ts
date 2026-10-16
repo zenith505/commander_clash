@@ -312,14 +312,20 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "search": {
       // CR 701.23: look through the library for matching cards. With a stated quality ("a basic land
       // card") a player may find fewer than asked for, even none (701.23b); asked simply for "a card"
-      // or "two cards", they must find as many as they can (701.23d).
-      const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
-      if (pid === undefined || player(s, pid).lost) return;
-      const p = player(s, pid);
+      // or "two cards", they must find as many as they can (701.23d). "Each player searches their library" (Field of
+      // Ruin): each player chooses in APNAP order, then the cards are put where they go at the same time (CR 101.4).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       const filter = e.filter?.named === "~" ? { ...e.filter, named: src } : e.filter;
-      if (!sc.found) {
+      const who = e.who ? (e.who.ref === "eachPlayer" ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
+      const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
+      const searchedBy = (sc.searchedBy ??= []);
+      if (sc.found && queue.length) {
+        searchedBy.push({ pid: queue.shift()!, found: sc.found });
+        sc.found = undefined;
+      }
+      if (queue.length) {
+        const p = player(s, queue[0]!);
         const n = (sc.n ??= amountNow(s, e.n, ctx));
         // They've searched, found something or not (Archive Trap rulings).
         const searched = ((s.turnLog ??= {}).searched ??= []);
@@ -343,24 +349,39 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       // An Aura found for the battlefield: its controller chooses what it enchants as it enters (CR 303.4f); with nothing
       // to enchant it stays in the library (303.4g), and is shuffled with it.
-      const dest = (i: number) => (i > 0 && e.others ? e.others : e.dest);
-      const hosts = chooseAuraHosts(s, sc.found.filter((_, i) => dest(i).zone === "battlefield").map((id) => ({ o: obj(s, id), under: p.id })), src);
+      const searchers = searchedBy.map((x) => x.pid);
+      const foundBy = (pid: PlayerId) => searchedBy.find((x) => x.pid === pid)!.found;
+      const dest = (pid: PlayerId, id: ObjectId) => (foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.dest);
+      const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
+      const hosts = chooseAuraHosts(s, onto, src);
       if (hosts === "paused") return "paused";
-      const found = sc.found.filter((id, i) => dest(i).zone !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
-      p.library = p.library.filter((id) => !found.includes(id));
-      shuffle(s, p.library);
-      const names = found.map((id) => defOf(s, obj(s, id)).name);
-      // Found cards aren't revealed unless the effect says so (CR 701.23e).
-      const shown = e.reveal || e.dest.zone === "battlefield" ? ` (${names.join(", ")})` : "";
-      log(s, `${p.name} searches their library${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}, and shuffles.`);
-      found.forEach((id) => {
-        const to = dest(sc.found!.indexOf(id));
+      const moves: { pid: PlayerId; id: ObjectId }[] = [];
+      for (const pid of searchers) {
+        const p = player(s, pid);
+        const found = foundBy(pid).filter((id) => dest(pid, id).zone !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
+        p.library = p.library.filter((id) => !found.includes(id));
+        const names = found.map((id) => defOf(s, obj(s, id)).name);
+        // Found cards aren't revealed unless the effect says so (CR 701.23e).
+        const shown = e.reveal || e.dest.zone === "battlefield" ? ` (${names.join(", ")})` : "";
+        log(s, `${p.name} searches their library${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 ? "" : ", and shuffles"}.`);
+        for (const id of found) moves.push({ pid, id });
+        if (searchers.length === 1) shuffle(s, p.library);
+      }
+      for (const { pid, id } of moves) {
+        const p = player(s, pid);
+        const to = dest(pid, id);
         if (to.zone === "libraryTop") {
           obj(s, id).zone = "library";
           p.library.unshift(id);
-        } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: p.id, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id) });
+        } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id) });
         else moveObject(s, id, to.zone);
-      });
+      }
+      // "Then shuffles": after the cards are put onto the battlefield, each player who searched (CR 701.23, 701.20).
+      if (searchers.length > 1)
+        for (const pid of searchers) {
+          shuffle(s, player(s, pid).library);
+          log(s, `${player(s, pid).name} shuffles their library.`);
+        }
       return;
     }
     case "dig": {

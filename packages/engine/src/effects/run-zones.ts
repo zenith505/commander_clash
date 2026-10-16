@@ -503,7 +503,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "destroy":
-      for (const o of objects(s, e.what, ctx)) destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen, ctx.controller);
+      for (const o of objects(s, e.what, ctx)) {
+        // As it last existed, for "for each creature destroyed this way" (CR 608.2h).
+        const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) };
+        if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push(before);
+      }
       return;
     case "regenerate":
       for (const o of objects(s, e.what, ctx)) {

@@ -100,6 +100,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
+    case "destroyedThisWay":
+      // As they last existed on the battlefield (CR 608.2h).
+      return (s.resolving?.destroyed ?? []).filter(({ o, ch }) => objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)).length;
     case "discardedThisWay": {
       const counts = Object.values(s.resolving?.discarded ?? {});
       return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
@@ -308,6 +311,8 @@ function describeCount(c: Count): string {
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
+    case "destroyedThisWay":
+      return `#${c.filter.text} destroyed`;
     case "cardsInGraveyard":
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":

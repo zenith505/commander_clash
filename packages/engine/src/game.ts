@@ -860,6 +860,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
+  if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
   if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
@@ -3944,6 +3945,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       invalidateCharacteristics(s);
       return;
     }
+    if (pend.what === "anchor") {
+      if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
+      o.chosen = { ...o.chosen, anchor: choice };
+      log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
+      invalidateCharacteristics(s);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "readAhead") {
       // Read ahead: it enters with the chosen number of lore counters (CR 702.155b, 714.3b).
       const n = Number(choice);
@@ -3968,7 +3977,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor") throw new RulesError("nothing to choose");
   if (pend.what === "topOrBottom") {
     if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
     (r.scratch ??= {}).topOrBottom = choice;
@@ -4171,6 +4180,12 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
+      return true;
+    }
+    if (c.what === "anchor") {
+      // "As ~ enters, choose Khans or Dragons" (CR 614.12b).
+      const words = compileCard(defOf(s, o)).entersAnchor ?? [];
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "anchor", options: words, objectId: o.id, prompt: `choose ${words.join(" or ")}` };
       return true;
     }
     if (c.what === "readAhead") {

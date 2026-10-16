@@ -184,15 +184,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
-      (s.nextCast ??= []).push({
-        controller: ctx.controller,
-        filter: e.filter,
-        sourceId: id ?? "",
-        sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
-        body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
-        turn: s.turn,
-        ...(e.cascade ? { cascade: true as const } : {}),
-      });
+      for (const caster of e.who ? players(s, e.who, ctx) : [ctx.controller])
+        (s.nextCast ??= []).push({
+          controller: caster,
+          filter: e.filter,
+          sourceId: id ?? "",
+          sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
+          body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
+          turn: s.turn,
+          ...(e.cascade ? { cascade: true as const } : {}),
+        });
       return;
     }
     case "cascade": {

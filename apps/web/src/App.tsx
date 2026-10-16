@@ -3448,7 +3448,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "anchor") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -3608,7 +3608,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && pending.what === "color")
+  if (pending?.kind === "chooseOption" && pending.what === "color" && pending.player === HUMAN)
     return (
       <div className="controls color-pick">
         <span>

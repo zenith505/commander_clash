@@ -72,6 +72,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
   if (each && /^opponent(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
+  if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });

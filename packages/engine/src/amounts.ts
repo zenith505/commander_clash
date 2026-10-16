@@ -174,6 +174,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
+      if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
     case "opponentsAttacked": {
       const a = s.players[ctx.controller]?.attackedPlayers;
@@ -371,7 +372,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return c.opponents ? "#opponents" : "#players";
+      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}`;
     case "diedThisTurn":
       return "#creatures that died this turn";
     case "tokensCreatedThisTurn":

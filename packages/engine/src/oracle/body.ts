@@ -9,6 +9,7 @@ import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
 import { parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseSearchFilter } from "./search";
+import { parseManaSpend } from "./mana-abilities";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -399,6 +400,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       if (!added.length || si === 0 || /[Ss]pend this mana only|can't be spent/.test(sentences[si - 1]!)) return null;
       for (const e of added) e.keep = "turn";
+      continue;
+    }
+    // "Add {U}{R}. Spend this mana only to cast instant and sorcery spells" (Abstract Paintmage, CR 106.6): the mana the
+    // sentence before added.
+    if (/^Spend this mana only /.test(s)) {
+      const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
+      const only = parseManaSpend(`${s}.`);
+      if (!added.length || !only || added.some((e) => e.only)) return null;
+      for (const e of added) e.only = only;
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3).

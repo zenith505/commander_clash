@@ -596,6 +596,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (src.suspected !== undefined) !== !!cond.not; // CR 701.60
     case "solved":
       return !!src.solved !== !!cond.not; // CR 719.3b
+    case "anchor":
+      return src.chosen?.anchor === cond.word; // CR 614.12b
     case "cardsToGraveyard":
       return Math.min(...cond.types.map((t) => s.turnLog?.toGraveyardTypes?.[t] ?? 0)) >= cond.n;
     case "sourcesDealtDamage":

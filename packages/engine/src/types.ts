@@ -1057,6 +1057,8 @@ export interface Chosen {
   player?: PlayerId;
   /** "Secretly choose an opponent" (Guardian Archon): only its controller knows who, until it's revealed. */
   secret?: true;
+  /** "As ~ enters, choose Khans or Dragons": the anchor word chosen (CR 614.12b). */
+  anchor?: string;
 }
 
 export interface TurnRule {

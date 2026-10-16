@@ -157,7 +157,8 @@ export type Count =
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
-  | { kind: "players"; opponents?: true }
+  /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
+  | { kind: "players"; opponents?: true; lostLife?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -804,6 +805,8 @@ export type StaticCondition =
   | { kind: "committedCrime" }
   /** A Case's solved designation (CR 719.3b): "Solved — [ability]" (702.169); `not`: a "To solve" trigger's "this Case is not solved" (719.3a). */
   | { kind: "solved"; not?: true }
+  /** "[Anchor word] — [ability]": as long as that word was chosen as it entered (CR 614.12b, the Sieges). */
+  | { kind: "anchor"; word: string }
   /** "Three or more creature cards were put into graveyards from anywhere this turn": cards, anyone's, with all of `types` (as cards in the graveyard). */
   | { kind: "cardsToGraveyard"; n: number; types: string[] }
   /** "Three or more sources you controlled dealt damage this turn": different sources, as the objects they were (CR 400.7), controlled by you as they dealt it. */
@@ -1150,7 +1153,8 @@ export type Effect =
   | { type: "encore" }
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true }
+  /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
@@ -1288,7 +1292,18 @@ export type Effect =
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
    * stack (CR 605.1, 605.5a). `chosen` adds that much mana of the color chosen just before (a "choose" effect). */
   /** `times`: "Add {R} for each card in target opponent's hand" (Jeska's Will). */
-  | { type: "addMana"; mana?: string; chosen?: number; times?: Amount; /** "Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4). */ keep?: "turn" }
+  | {
+      type: "addMana";
+      mana?: string;
+      chosen?: number;
+      times?: Amount;
+      /** "Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4). */
+      keep?: "turn";
+      /** Who adds it: "target player adds", "that player adds" (CR 106.4); the controller if absent. */
+      who?: PlayerRef;
+      /** "Spend this mana only to cast instant and sorcery spells" after it (CR 106.6). */
+      only?: ManaSpend;
+    }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
   | { type: "cantBlockRule"; filter: TargetSpec }
@@ -1480,14 +1495,14 @@ export type Effect =
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
   | { type: "playerGains"; keywords: string[] }
-  | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[] };
+  | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
 export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -1675,6 +1690,8 @@ export type TriggerEvent =
   /** "At the beginning of each of your postcombat main phases": every main phase but the first (CR 505.1a); see `secondMain`. */
   | "yourPostcombatMain"
   | "eachPostcombatMain"
+  /** "At the beginning of each of your main phases": precombat and postcombat ones, added ones too (CR 505.1). */
+  | "yourMain"
   | "selfAttacksOrBlocks" // Whenever ~ attacks or blocks
   | "eachEndStep" // At the beginning of the end step (every turn's)
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
@@ -2274,6 +2291,8 @@ export interface CompiledCard {
   entersChoose?: { what: ChoiceKind; except?: string }[];
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
+  /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */
+  entersAnchor?: string[];
   /**
    * Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
    * judged by the abilities it would have on the battlefield (614.12): under Humility it enters (rulings).

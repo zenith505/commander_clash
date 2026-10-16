@@ -194,12 +194,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // spell you cast this turn each have cascade" (Smoldering Stagecoach): the spell gains cascade as it's cast and it
   // triggers then; each such effect is an instance of its own (rulings, CR 702.85c).
   // TARDIS's "and you may planeswalk": only in a Planechase game; in any other, nothing happens (CR 701.31a, rulings).
-  if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? you cast this turn (?:has|each have) cascade(?: and you may planeswalk)?$/.exec(s)) && !!m[2] === /each have/.test(s)) {
+  // "Target player adds two mana of any one color. The next spell they cast this turn has cascade" (Bigger on the Inside):
+  // the targeted player's next spell (rulings: the effect applies to it as they start casting it).
+  if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? (you|they) cast this turn (?:has|each have) cascade(?: and you may planeswalk)?$/.exec(s)) && !!m[2] === /each have/.test(s)) {
+    const who: PlayerRef | null = m[3] === "you" ? null : ctx.lastPlayerTarget !== undefined && !ctx.targets[ctx.lastPlayerTarget]?.many ? { ref: "target", index: ctx.lastPlayerTarget } : null;
+    if (m[3] === "they" && !who) return null;
     const out: Effect[] = [];
     for (const w of [m[1]!, m[2]].filter((x): x is string => !!x)) {
       const filter = parseTargetPhrase(w);
       if (filter?.kind !== "spell") return null;
-      out.push({ type: "nextCast", filter, effects: [], text: `the next ${w} you cast this turn has cascade`, cascade: true });
+      out.push({ type: "nextCast", filter, effects: [], text: `the next ${w} ${m[3]} cast this turn has cascade`, cascade: true, ...(who ? { who } : {}) });
     }
     return out;
   }

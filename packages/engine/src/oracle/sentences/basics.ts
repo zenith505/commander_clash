@@ -192,6 +192,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const times = parseCount(m[2]!, ctx, true);
     return times && [{ type: "addMana", mana: m[1]!, times }];
   }
+  // "Add an amount of {R} equal to ~'s power" (Molten-Core Maestro): counted as it resolves.
+  if ((m = /^[Aa]dd an amount of (\{[WUBRGC]\}) equal to (.+)$/.exec(s))) {
+    const times = parseCount(m[2]!, ctx);
+    return times && [{ type: "addMana", mana: m[1]!, times }];
+  }
   if ((m = new RegExp(`^[Aa]dd ${NUM} mana of any (one )?color$`).exec(s)) && (num(m[1]!) === 1 || m[2])) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: num(m[1]!) }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];

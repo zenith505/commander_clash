@@ -205,6 +205,12 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
+    // "Put a +1/+1 counter on ~ and it can't be blocked this turn" (Sahagin): two instructions, both about ~.
+    .flatMap((x) => {
+      // Not under a leading condition ("If you do, put ... and it gains menace"): the condition is for both.
+      const m = /^If /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
+      return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+    })
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;
@@ -245,12 +251,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
-    const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(s);
+    // Under a condition about how it was cast (Elemental Mascot's "If five or more mana was spent to cast that spell, exile
+    // the top card of your library. You may play that card until the end of your next turn."), both sentences are.
+    const impulseIf = /^If [^,]+, exile the top /.test(s) ? parseHowCast(s, ctx) : null;
+    const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
     const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them)(?: (this turn|until the end of your next turn))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
-      effects.push({ type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next turn/.test(when) ? "nextTurn" : "thisTurn" });
+      const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
+      effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
       si++;
       continue;
     }

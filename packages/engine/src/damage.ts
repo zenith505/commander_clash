@@ -10,7 +10,7 @@ import { evalAmount } from "./amounts";
 import { putCounters } from "./counters";
 import { fireEvent } from "./effects";
 import { objectMatches, playerProtectedFrom } from "./effects/targeting";
-import { canPreventDamage, gainLife, log, loseLife, obj, player, turnOrderFrom, useShieldCounter } from "./game";
+import { canPreventDamage, gainLife, log, loseLife, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
@@ -204,7 +204,9 @@ type ShieldOp =
   | { kind: "preventAll"; srcName: string; toName: string; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource }
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
-  | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean };
+  | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
+  /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
+  | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string };
 
 interface ShieldPlan {
   ask?: ShieldQuestion;
@@ -457,6 +459,25 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       }
       incoming.push(e);
     }
+    // Khârn the Betrayer (CR 615.5, 615.12): the damage dealt to it at the same time is prevented, and an opponent of its
+    // controller's choice gains control of it, also when it can't be prevented (then the damage is dealt too). Applied
+    // after the effects above, and once for damage dealt to it at the same time.
+    const betrayer = "object" in to && incoming.length && abilitiesOf(s, obj(s, to.object)).betrayer ? obj(s, to.object) : undefined;
+    if (betrayer) {
+      const me = controllerOf(s, betrayer);
+      const opps = turnOrderFrom(s, me).filter((p) => p !== me);
+      if (opps.length) {
+        // A bot gives it to the opponent with the most life (the first option).
+        const ranked = [...opps].sort((a, b) => player(s, b).life - player(s, a).life);
+        const i = choose({ player: me, prompt: `${toName}: which opponent gains control of it?`, labels: ranked.map((p) => player(s, p).name) });
+        if (i === null) return { ask, ops, final };
+        ops.push({ kind: "betrayer", id: betrayer.id, to: ranked[i]!, prevented: preventing, toName });
+        if (preventing) {
+          for (const e of incoming) ops.push({ kind: "preventAll", srcName: e.src.name, toName });
+          incoming = [];
+        }
+      }
+    }
     // The same source's damage arriving by two routes is one amount to choose from.
     const merged = new Map<string, DamageEvent>();
     for (const e of incoming) {
@@ -636,6 +657,16 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         if (colorsOk(r.dealBack, op.src)) back.push({ cardId: r.cardId, controller: r.controller, to: op.src.controller, n: op.n });
       }
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
+    else if (op.kind === "betrayer") {
+      // A new controller each time it applies, each one noticed (rulings: the ability triggers once each time).
+      const o = obj(s, op.id);
+      if (o.zone !== "battlefield") continue;
+      syncControl(s);
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: op.to, sourceName: op.toName, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
+      invalidateCharacteristics(s);
+      log(s, `${player(s, op.to).name} gains control of ${op.toName}.`);
+      syncControl(s);
+    }
     else if (op.kind === "prevent" && op.rule) {
       const r = s.damageRules?.find((x) => x.id === op.rule);
       log(s, `${op.n} damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.card ? ` (${op.card})` : ""}.`);

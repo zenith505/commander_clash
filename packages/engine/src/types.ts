@@ -198,9 +198,22 @@ export interface GameObject {
    * while it's still the same object (`zc`), until the end of this turn or of their next turn, or ("exiled") for as
    * long as it stays exiled. A warped card
    * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
-   * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery.
+   * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery. "yourNextTurn": until
+   * that player's next turn begins (Three Wishes); "source": while `source` stays on the battlefield (Intet).
    */
-  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell"; turn: number };
+  mayPlay?: {
+    player: PlayerId;
+    zc: number;
+    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source";
+    turn: number;
+    source?: { id: ObjectId; zc: number };
+    /** "Without paying its mana cost" (CR 118.9). */
+    free?: true;
+    /** "Mana of any type can be spent to cast it" (CR 609.4b). */
+    anyType?: true;
+    /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
+    castOnly?: true;
+  };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
    * spell it's cast as, for "if this spell was foretold".
@@ -536,6 +549,15 @@ export interface DelayedTrigger {
   controller: PlayerId;
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };
+  /**
+   * `lostControl` only: what its instructions are about, when that isn't the object watched ("Sacrifice it when you lose
+   * control of ~", Krovikan Vampire): it triggers even if the watched object left the battlefield (Khârn rulings).
+   */
+  about?: { id: ObjectId; zc: number };
+  /** `lostControl` with `about`: `controller` has controlled the watched object since this was made (Seraph rulings). */
+  held?: true;
+  /** `lostControl`: it lasts only until the end of this turn ("When you lose control of that Equipment this turn"). */
+  thisTurn?: number;
   body: AbilityBody;
   /** Made during an end step, "the next end step" is the following turn's (CR 603.7c doesn't fire it in the same step). */
   turn: number;
@@ -793,6 +815,13 @@ export interface TurnLog {
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
   lifeGained?: Record<number, number>;
+  /** Life each player lost in total, paid life included (CR 119.4): "the total amount of life your opponents have lost this turn". */
+  lifeLost?: Record<number, number>;
+  /**
+   * Creatures that died this turn having been dealt damage that turn: the card in the graveyard (`id`, `zc`) and the
+   * permanents that dealt it damage (Krovikan Vampire's "if a creature dealt damage by ~ this turn died").
+   */
+  diedDamaged?: { id: ObjectId; zc: number; by: ObjectId[] }[];
   /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
   damageSources?: Record<number, string[]>;
 }
@@ -894,6 +923,8 @@ export interface GameState {
   attackersThisTurn?: number;
   /** Combat phases begun this turn: "if it's the first combat phase of the turn" (CR 506.1, 500.8). */
   combatsThisTurn?: number;
+  /** Main phases begun this turn: "your second main phase" is the second (CR 505.1b). */
+  mainPhasesThisTurn?: number;
   /**
    * The combat phase whose declare blockers step began (the turn and which combat of it): "only during combat after
    * blockers are declared" can't be used in a combat that skipped that step (CR 506.8f).
@@ -912,6 +943,8 @@ export interface GameState {
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
+  /** Rules for one player this turn: "you can't lose life this turn" (CR 119.8), "you can't lose the game this turn", "your opponents can't win the game this turn". */
+  turnRules?: TurnRule[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
@@ -1026,6 +1059,12 @@ export interface Chosen {
   secret?: true;
 }
 
+export interface TurnRule {
+  turn: number;
+  player: PlayerId;
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin";
+}
+
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
@@ -1091,6 +1130,8 @@ export interface Resolving {
   did?: boolean;
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   wonClash?: boolean;
+  /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
+  rolled?: { sides: number; naturals: number[]; result: number };
   scratch?: {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
@@ -1137,6 +1178,7 @@ export interface Resolving {
     newTarget?: TargetChoice; // "change the target of target spell": the new one, chosen as this resolves (CR 115.7a)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
+    untilNonland?: { hit?: ObjectId; caster: PlayerId }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
     found?: ObjectId[]; // the cards a library search found

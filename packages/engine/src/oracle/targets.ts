@@ -6,6 +6,8 @@ import { Ctx, addTarget } from "./body";
 
 /** Creature types with a hyphen, by how they read lowercased ("assembly-worker"). */
 const HYPHENATED = new Map([...CREATURE_TYPES].filter((ty) => ty.includes("-")).map((ty) => [ty.toLowerCase(), ty]));
+// The one creature type of two words (CR 205.3m), read as one word: "a Time Lord", "Time Lords you control".
+HYPHENATED.set("time-lord", "Time Lord");
 
 /** Spell and enchantment subtypes a filter can name: "Spirit or Arcane spell", "a Cartouche you control" (CR 205.3h, 205.3k). */
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
@@ -144,6 +146,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (ctx.selfIt && /^it$/i.test(x)) return { ref: "self" };
     if (ctx.selfCard && /^it$/i.test(x)) return { ref: "selfCard" };
     return ctx.subject && /^that creature$/i.test(x) ? { ref: "subject" } : null;
+  }
+  // "Choose target creature you control and target Equipment. Gain control of that Equipment ... Attach it to the chosen
+  // creature." (Stolen Uniform): the one target of that kind.
+  const named = /^(?:that (Equipment|Aura|Vehicle)|the chosen (creature))$/.exec(x);
+  if (named) {
+    const at = ctx.targets.flatMap((t, i) => (t.kind === "object" && (named[1] ? t.subtypes?.includes(named[1]) : t.types?.includes("Creature")) ? [i] : []));
+    return at.length === 1 ? { ref: "target", index: at[0]! } : null;
   }
   // "Put a +1/+1 counter on target creature you control, then it fights target creature you don't control. ... the
   // creature you control gains indestructible" (Outmuscle): the one target described that way.
@@ -371,6 +380,7 @@ export const OUTLAW_TYPES = ["Assassin", "Mercenary", "Pirate", "Rogue", "Warloc
 export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** "with power X or less" may be the X announced (TargetSpec.xRange). */ x?: boolean } = {}): TargetSpec | null {
   let p = phrase.trim().toLowerCase();
   const text = `target ${p}`;
+  p = p.replace(/\btime lords?\b/g, "time-lord");
   const extra: Partial<TargetSpec> = {};
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
   const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:the chosen|that) (creature type|type|color)/.exec(p);

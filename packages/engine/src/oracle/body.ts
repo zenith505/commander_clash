@@ -1,10 +1,10 @@
-import { allEffects, refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
+import { allEffects, refCovers, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
+import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
-import { parseDig, parseSentence } from "./sentence";
+import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
 import { parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
@@ -66,6 +66,9 @@ export interface Ctx {
   whereX?: boolean;
 }
 
+/** Starts a results table row's marker sentence (see parseBody). */
+const ROW_MARK = "\u0001";
+
 /** Effects that can stop a resolution to wait for a player's choice. */
 const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
@@ -123,6 +126,108 @@ function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: E
   }
   const effect: Effect = { type: "if", cond: { kind: "revealedIs", filter, ...(first[1] ? { not: true as const } : {}) }, effects: then, ...(otherwise ? { otherwise } : {}) };
   return { effect, next };
+}
+
+/**
+ * "Exile the top three cards of your library face down. You may look at those cards for as long as they remain exiled.
+ * Until your next turn, you may play those cards." (Three Wishes), "look at the top card of that player's library, then
+ * exile it face down. You may play that card for as long as it remains exiled, and mana of any type can be spent to cast
+ * that spell" (Gonti), "Target opponent exiles the top X cards of their library face down. You may look at and play
+ * those cards for as long as they remain exiled." (Outrageous Robbery): the exile and what may be done with the cards,
+ * which only the player who exiled them may look at (CR 406.3). Null if the sentence isn't such an exile, or if it's one
+ * with no permission after it (Duplicity's, read elsewhere).
+ */
+function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
+  const s = sentences[at]!;
+  const LIB = "(your|that player's|target player's|target opponent's|each opponent's|each player's)";
+  const head =
+    new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of ${LIB} library face down$`).exec(s) ??
+    new RegExp(`^(?:[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library and exile (?:it|that card|those cards) face down)$`).exec(s);
+  const look = !head && new RegExp(`^[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library$`).exec(s);
+  const lookThen = look && /^Exile (?:it|that card|those cards|them) face down$/.test(sentences[at + 1] ?? "");
+  const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
+  if (!head && !lookThen && !they) return null;
+  let next = at + (lookThen ? 2 : 1);
+  const m = head ?? (lookThen ? look : null);
+  const count = m ? m[1]! : they![2]!;
+  const n = count === "card" ? 1 : amt(new RegExp(`^${NUMX} cards$`).exec(count)![1]!);
+  // Not yet: whose library is read last, after the permission is known to be there (it may add a target).
+  const whose = m ? (m[m.length - 1] === "your" ? "you" : m[m.length - 1]!.replace(/'s$/, "")) : they![1]!;
+  let seen = false;
+  let play: FaceDownPlay | undefined;
+  let upkeepGraveyard = false;
+  const ANY = "(?:mana of any type can be spent to cast (?:it|them|that spell|those spells)|you may spend mana as though it were mana of any type to cast (?:it|them|that spell|those spells))";
+  for (;;) {
+    const t = sentences[next];
+    if (t === undefined) break;
+    if (/^You may look at (?:it|that card|those cards|them) for as long as (?:it remains|they remain) exiled$/.test(t)) seen = true;
+    else {
+      const may = new RegExp(`^You may (look at and )?(play|cast) (?:it|that card|those cards|them)( without paying (?:its mana cost|their mana costs))? (for as long as (?:it remains|they remain) exiled|this turn|for as long as ~ remains on the battlefield)(?:, and ${ANY})?$`).exec(t);
+      const until = /^Until your next turn, you may play (?:it|that card|those cards|them)$/.exec(t);
+      if ((may || until) && !play) {
+        play = { until: until ? "yourNextTurn" : /this turn/.test(may![4]!) ? "thisTurn" : /~ remains/.test(may![4]!) ? "source" : "exiled" };
+        if (may?.[1]) seen = true;
+        if (may?.[2] === "cast") play.castOnly = true;
+        if (may?.[3]) play.free = true;
+        if (may && new RegExp(ANY).test(t)) play.anyType = true;
+        // "For as long as ~ remains on the battlefield": a permanent's ability only.
+        if (play.until === "source" && ctx.spell) return "fail";
+      } else if (play && /^(?:If you cast a spell this way, you may spend mana as though it were mana of any type to cast it|Mana of any type can be spent to cast (?:a spell this way|that spell|it))$/.test(t)) play.anyType = true;
+      else if (play?.until === "yourNextTurn" && /^At the beginning of your next upkeep, put any of those cards you didn't play into your graveyard$/.test(t) && whose === "you") upkeepGraveyard = true;
+      else break;
+    }
+    next++;
+  }
+  if (!play && !seen) return null;
+  // A face-down card nobody may look at: Duplicity's, without the look (read as a plain sentence).
+  const who = parsePlayer(whose, ctx);
+  if (!who) return "fail";
+  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}) };
+  return { effect, next };
+}
+
+/**
+ * "Exile cards from the top of your library until you exile a nonland card. You may cast that card without paying its
+ * mana cost." (Sarevok's Tome), "Target opponent exiles cards ... until they exile a nonland card. Until end of turn, you
+ * may cast that card without paying its mana cost." (Stolen Goods), "Shuffle your library, then reveal cards from the top
+ * of it until you reveal a nonland card. Exile that card and put the rest on the bottom of your library in a random
+ * order. You may cast the exiled card without paying its mana cost." (Creative Technique), "Reveal cards ... until you
+ * reveal a nonland card, then put all cards revealed this way into your hand" (Treasure Hunt), and Transforming
+ * Flourish's "If that permanent is destroyed this way, its controller exiles ..., then they may cast that card without
+ * paying its mana cost". Null when it isn't one of these; any other use of the found card leaves the line unsupported.
+ */
+function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
+  // "Shuffle your library, then reveal ...", "..., then put all cards revealed this way ...": split at ", then" by now.
+  const shuffleFirst = /^[Ss]huffle your library$/.test(sentences[at]!);
+  const s = sentences[shuffleFirst ? at + 1 : at] ?? "";
+  const reveal = (shuffleFirst ? /^Reveal cards from the top of it until you reveal a nonland card$/ : /^[Rr]eveal cards from the top of your library until you reveal a nonland card$/).test(s);
+  const exile = !shuffleFirst && /^[Ee]xile cards from the top of your library until you exile a nonland card$/.test(s);
+  const they = shuffleFirst ? null : /^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s);
+  const flourish = !shuffleFirst && /^If that (?:permanent|creature) is destroyed this way, its controller exiles cards from the top of their library until they exile a nonland card, then they may cast that card without paying its mana cost$/.test(s);
+  if (!reveal && !exile && !they && !flourish) return null;
+  if (flourish) {
+    if (ctx.targets.length !== 1) return "fail";
+    const inner: Effect = { type: "exileUntilNonland", who: { ref: "targetController", index: 0 }, then: "castFree", ownerCasts: true };
+    return { effect: { type: "if", cond: { kind: "destroyedThisWay" }, effects: [inner] }, next: at + 1 };
+  }
+  if (reveal && !shuffleFirst && sentences[at + 1] === "Put all cards revealed this way into your hand") return { effect: { type: "exileUntilNonland", reveal: true, then: "hand" }, next: at + 2 };
+  let next = (shuffleFirst ? at + 1 : at) + 1;
+  if (reveal) {
+    if (sentences[next] !== "Exile that card and put the rest on the bottom of your library in a random order") return null;
+    next++;
+  }
+  const cast = sentences[next] ?? "";
+  const then: Extract<Effect, { type: "exileUntilNonland" }>["then"] | undefined = /^You may cast (?:that card|it|the exiled card) without paying its mana cost$/.test(cast)
+    ? "castFree"
+    : /^Until end of turn, you may cast that card without paying its mana cost$/.test(cast)
+      ? "freeThisTurn"
+      : /^You may cast that card this turn$/.test(cast)
+        ? "thisTurn"
+        : undefined;
+  if (!then) return null;
+  const who = they ? parsePlayer(they[1]!, ctx) : undefined;
+  if (they && !who) return "fail";
+  return { effect: { type: "exileUntilNonland", ...(who ? { who } : {}), ...(reveal ? { reveal: true as const } : {}), ...(shuffleFirst ? { shuffleFirst: true as const } : {}), then }, next: next + 1 };
 }
 
 /** One thing done with the revealed card ("put it into your hand", "you may put it into your graveyard"), or "draw a card". */
@@ -200,8 +305,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
+  let rowToken: string | undefined;
   const sentences = splitSentences(text.trim())
     .map((x) => x.replace(/\.$/, "").trim())
+    // A results table's row (CR 706.3a): a marker, then its instructions, up to the next row.
+    .flatMap((x) => {
+      const row = ROLL_ROW.exec(x);
+      if (!row) return [x];
+      let fx = row[5]!.replace(/^[A-Z][^—.|]*?! — /, "");
+      // "1—9 | Create a 1/1 red Goblin creature token. 10—19 | Create two of those tokens." (Swarming Goblins)
+      const those = /^Create (two|three|four|five) of those tokens$/.exec(fx);
+      if (those && rowToken) fx = `Create ${those[1]} ${rowToken} tokens`;
+      rowToken = /^Create an? ([^,.]+?) token$/.exec(fx)?.[1] ?? rowToken;
+      return [`${ROW_MARK}${row[1]}|${row[2] ?? (row[3] || row[4] === "more" || row[4] === "higher" ? "+" : row[4] === "less" ? "-" : row[1])}`, fx];
+    })
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
@@ -240,8 +357,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     mayGate = null;
     return true;
   };
+  // The results table row being read: its range, and where its instructions start.
+  let row: { min?: number; max?: number; start: number } | null = null;
+  const closeRow = () => {
+    if (!row) return true;
+    const inner = effects.splice(row.start);
+    if (!inner.length) return false;
+    effects.push({ type: "if", cond: { kind: "rollIn", ...(row.min !== undefined ? { min: row.min } : {}), ...(row.max !== undefined ? { max: row.max } : {}) }, effects: inner });
+    row = null;
+    return true;
+  };
   for (let si = 0; si < sentences.length; si++) {
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    if (s.startsWith(ROW_MARK)) {
+      // Rows only after the roll (CR 706.3b).
+      if (payFirst || dig || !closeGate() || !closeRow() || !allEffects(effects).some((e) => e.type === "roll")) return null;
+      const [a, b] = s.slice(ROW_MARK.length).split("|");
+      row = { start: effects.length, ...(b === "-" ? { max: Number(a) } : b === "+" ? { min: Number(a) } : { min: Number(a), max: Number(b) }) };
+      continue;
+    }
     // "~ gains indestructible until end of turn. Tap it." (Icehide Troll): "it" is the permanent the sentence before was
     // about, when that sentence was about ~ itself and nothing else.
     if (/^(?:Tap|Untap) it$/.test(s) && si > 0 && /^~ (?:gets|gains|has|becomes)\b/.test(sentences[si - 1]!) && !/\btarget\b/.test(sentences[si - 1]!)) s = s.replace(/it$/, "~");
@@ -267,13 +401,28 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       for (const e of added) e.keep = "turn";
       continue;
     }
+    // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3).
+    const faceDown = parseFaceDownPlay(sentences, si, ctx);
+    if (faceDown === "fail") return null;
+    if (faceDown) {
+      effects.push(faceDown.effect);
+      si = faceDown.next - 1;
+      continue;
+    }
+    const untilNonland = parseUntilNonland(sentences, si, ctx);
+    if (untilNonland === "fail") return null;
+    if (untilNonland) {
+      effects.push(untilNonland.effect);
+      si = untilNonland.next - 1;
+      continue;
+    }
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
     // Under a condition about how it was cast (Elemental Mascot's "If five or more mana was spent to cast that spell, exile
     // the top card of your library. You may play that card until the end of your next turn."), both sentences are.
     const impulseIf = /^If [^,]+, exile the top /.test(s) ? parseHowCast(s, ctx) : null;
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
-    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them)(?: (this turn|until the end of your next turn))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
+    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
       const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
@@ -289,6 +438,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
     const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
     const castAmong = castAmongHead && /^You may cast any number of spells(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Improvisation Capstone: "Exile cards from the top of your library until you exile cards with total mana value 4 or
+    // greater."
+    const untilMv = /^Exile cards from the top of your library until you exile cards with total mana value (\d+) or greater$/.exec(s);
+    if (untilMv && /^You may cast any number of spells from among them without paying their mana costs\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, untilMv: Number(untilMv[1]) });
+      si++;
+      continue;
+    }
     if (castAmongHead && castAmong && (castAmongHead[2] || castAmongHead[3] || afterShuffle)) {
       const n = castAmongHead[1] ?? castAmongHead[4]!;
       const whose = castAmongHead[2] ? (castAmongHead[2] === "your" ? "you" : castAmongHead[2] === "their" ? "that player" : castAmongHead[2].replace(/'s$/, "")) : castAmongHead[3] ?? "you";
@@ -462,6 +619,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         continue;
       }
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      // "You may pay {2}{U}. If you do, exile the top card of your library face down. You may look at that card ... You
+      // may play that card ..." (Intet): the exile and its permissions depend on the payment.
+      const paidFaceDown = parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
+      if (paidFaceDown === "fail") return null;
+      if (paidFaceDown) {
+        effects.push({ type: "may", effects: [paidFaceDown.effect], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${sentences.slice(si, si + paidFaceDown.next).join(". ").replace(/^If you do, /, "")}` });
+        payFirst = null;
+        si += paidFaceDown.next - 1;
+        continue;
+      }
       // "If you do, create a 2/2 black Zombie Berserker creature token, then attach ~ to it": both parts depend
       // on the payment, in order.
       const inner =
@@ -718,6 +885,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects[effects.length - 1] = { ...prev, look: true };
       continue;
     }
+    // "Put target creature card from a graveyard onto the battlefield under your control. That creature is a black Zombie in
+    // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
+    // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).
+    const isAlso = /^That creature is (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
+    if (isAlso) {
+      const prev = effects[effects.length - 1];
+      const mods = parseBecomes(isAlso[1]!);
+      if (prev?.type !== "putOntoBattlefield" || !mods || (prev.what.ref === "target" && prev.what.n) || prev.alsoMods) return null;
+      prev.alsoMods = mods;
+      continue;
+    }
+    // "Sacrifice the creature when you lose control of ~" (Seraph): about the permanent the card just put onto the
+    // battlefield became, a delayed trigger watching ~ (CR 603.7).
+    if (/^Sacrifice (?:it|the creature|that creature) when you lose control of ~$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "putOntoBattlefield" || prev.sacrificeOnLostControl || prev.owner) return null;
+      prev.sacrificeOnLostControl = true;
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -922,7 +1108,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     effects.push(...fx);
     if (!defineX()) return null;
   }
-  if (payFirst || dig || !closeGate()) return null;
+  if (payFirst || dig || !closeGate() || !closeRow()) return null;
   return effects.length ? { targets: ctx.targets, effects, text } : null;
 }
 
@@ -1335,8 +1521,8 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     [/^(.+?) (gains?|loses?) life equal to (.+)$/i, (m) => `${m[1]} ${m[2]} X life`],
     [/^(.*?)([Dd]raws?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
     [/^(.*?)([Mm]ills?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
-    [/^Put a number of ([+-]1\/[+-]1) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
-    [/^Create a number of (.+) tokens equal to (.+)$/i, (m) => `Create X ${m[1]} tokens`],
+    [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
+    [/^(?:You )?[Cc]reate a number of (.+?) tokens( with [^,]+?)? equal to (.+)$/, (m) => `Create X ${m[1]} tokens${m[2] ?? ""}`],
   ];
   for (const [re, rewrite, group] of forms) {
     const m = re.exec(s);

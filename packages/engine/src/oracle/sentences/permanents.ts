@@ -56,10 +56,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // of (CR 603.7): it taps when the control effect ends or another player takes it (rulings).
   // Ogre Geargrabber: "When you lose control of that Equipment, unattach it" (CR 701.3d), from whatever it's attached to
   // then, for any reason it's lost (rulings).
-  if ((m = /^When you lose control of (the creature|the artifact|it|that creature|that artifact|that Equipment), (tap|unattach) it$/i.exec(s))) {
-    const of = /Equipment$/.test(m[1]!) ? (ctx.lastObjectTarget !== undefined ? { ref: "target" as const, index: ctx.lastObjectTarget } : null) : parseObject(m[1]!.replace(/^the /i, "that "), ctx) ?? parseObject("it", ctx);
-    const tap = m[2]!.toLowerCase() === "tap";
-    return of?.ref === "target" ? [{ type: "delayed", when: "lostControl", of, effects: [tap ? { type: "tap", what: { ref: "subject" } } : { type: "unattach", what: { ref: "subject" } }], text: `${m[2]!.toLowerCase()} it` }] : null;
+  // Stolen Uniform: "When you lose control of that Equipment this turn, if it's attached to a creature you control,
+  // unattach it": for the rest of this turn only, as control ends in the cleanup step too (rulings).
+  if ((m = /^When you lose control of (the creature|the artifact|it|that creature|that artifact|that Equipment)( this turn)?, (if it's attached to a creature you control, )?(tap|unattach) it$/i.exec(s))) {
+    const equipment = /Equipment$/.test(m[1]!);
+    const of = equipment ? (ctx.spell ? parseObject(m[1]!, ctx) : ctx.lastObjectTarget !== undefined ? { ref: "target" as const, index: ctx.lastObjectTarget } : null) : parseObject(m[1]!.replace(/^the /i, "that "), ctx) ?? parseObject("it", ctx);
+    const tap = m[4]!.toLowerCase() === "tap";
+    if (m[3] && tap) return null;
+    return of?.ref === "target"
+      ? [{ type: "delayed", when: "lostControl", of, effects: [tap ? { type: "tap", what: { ref: "subject" } } : { type: "unattach", what: { ref: "subject" }, ...(m[3] ? { ifAttachedToYours: true as const } : {}) }], text: `${m[3] ?? ""}${m[4]!.toLowerCase()} it`, ...(m[2] ? { thisTurn: true as const } : {}) }]
+      : null;
   }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
@@ -235,6 +241,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?)( until end of turn)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
+  }
+  // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.
+  if ((m = /^Gain control of (that Equipment)( until end of turn)?$/.exec(s)) && ctx.spell) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
   // "Gain control of all creatures until end of turn", "... all creatures target opponent controls", "... all artifacts
   // your opponents control": the permanents that match as it resolves, locked in then (CR 611.2c).

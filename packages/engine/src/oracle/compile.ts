@@ -6,12 +6,12 @@ import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
-import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT } from "./words";
+import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
 import { parseTrigger } from "./triggers";
-import { parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
+import { KEYWORD_WORDS, parseActivated, parseLoyalty, stripAbilityWord } from "./activated";
 import { parseBody, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { parseGroup, parseTargetPhrase } from "./targets";
@@ -257,6 +257,11 @@ function solveTrigger(d: CardDef, text: string): TriggeredAbility | null {
   return { ...t, ifCond: { kind: "allOf", conds: [cond, { kind: "solved", not: true }] }, body: { ...t.body, text: `To solve — ${text}.` } };
 }
 
+/** The ability words (CR 207.2c), before a line of an instant or sorcery. */
+const SPELL_ABILITY_WORD = new RegExp(
+  `^(?:${["Adamant", "Addendum", "Alliance", "Battalion", "Bloodrush", "Celebration", "Channel", "Chroma", "Cohort", "Constellation", "Converge", "Council's dilemma", "Coven", "Delirium", "Descend 4", "Descend 8", "Disappear", "Domain", "Eerie", "Eminence", "Enrage", "Fateful hour", "Fathomless descent", "Ferocious", "Flurry", "Formidable", "Grandeur", "Hellbent", "Heroic", "Imprint", "Infusion", "Inspired", "Join forces", "Kinship", "Landfall", "Lieutenant", "Magecraft", "Metalcraft", "Morbid", "Opus", "Pack tactics", "Paradox", "Parley", "Radiance", "Raid", "Rally", "Renew", "Repartee", "Revolt", "Secret council", "Spell mastery", "Strive", "Survival", "Sweep", "Tempting offer", "Threshold", "Undergrowth", "Valiant", "Vivid", "Void", "Will of the council"].join("|")}) — `,
+);
+
 /** The conditions "~ has flash as long as ..." may have: about the player, so the same with the card in hand. */
 const FLASH_IF: StaticCondition["kind"][] = ["committedCrime", "control", "monarch", "initiative", "graveyardAtLeast", "graveyardTypes"];
 
@@ -292,6 +297,7 @@ export function compile(d: CardDef): CompiledCard {
         return "Choose one —";
       }),
   );
+  if (!d.keywords.includes("Station")) joinRollTables(all);
   // Leveler and station cards (CR 711, 721): the striations' abilities are compiled after the rest, each with its condition.
   const striated = striations(d, all);
   if (striated === "fail") out.unsupported.push("(a striated text box that doesn't read as levels or station symbols)");
@@ -312,6 +318,13 @@ export function compile(d: CardDef): CompiledCard {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
     let line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
+    // An instant's or sorcery's ability word ("Spell mastery — If ...", CR 207.2c): no rules meaning either.
+    if (isSpell) line = line.replace(SPELL_ABILITY_WORD, "");
+    // An ability word (CR 207.2c) or a flavor word (Khârn's "Berzerker — ", CR 207.2d) before a static or replacement
+    // ability: no rules meaning. Not a keyword written with a dash ("Boast — ", CR 702), a chapter number ("II — ", CR
+    // 714.2b) or a modal choice.
+    const word = !isSpell ? /^([A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
+    if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!)) line = line.slice(word[0].length);
     if (!line) continue;
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
@@ -936,6 +949,28 @@ export function compile(d: CardDef): CompiledCard {
     // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
     const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have cascade\.$/.exec(line);
     const firstCascade = /^The first spell you cast (from exile )?each turn( that mana from a Treasure was spent to cast)? has cascade\.$/.exec(line);
+    if (/^Commander spells you cast have cascade\.$/.test(line)) {
+      (out.spellsHaveCascade ??= []).push({ commander: true, text: line });
+      continue;
+    }
+    const xCascade = /^During your turn, spells you cast from your hand with mana value X or less have cascade, where X is (.+)\.$/.exec(stripAbilityWord(line));
+    if (xCascade) {
+      const maxMv = parseCount(xCascade[1]!, null);
+      if (!maxMv) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      (out.spellsHaveCascade ??= []).push({ from: "hand", yourTurn: true, maxMv, text: line });
+      continue;
+    }
+    // Delirium: "This spell has cascade as long as there are four or more card types among cards in your graveyard"
+    // (Bloodbraid Marauder): it has cascade as it's cast, so cascade triggers, only while that's true (CR 702.85a).
+    const cascadeIf = /^~ has cascade as long as (.+)\.$/.exec(stripAbilityWord(line));
+    if (cascadeIf) {
+      const cond = parseStaticCondition(cascadeIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || !conditionalAbility(d, "Cascade", out, cond)) out.unsupported.push(raw);
+      continue;
+    }
     if (giveCascade || firstCascade) {
       let filter: TargetSpec | undefined;
       if (giveCascade && (giveCascade[1] || giveCascade[3])) {
@@ -962,6 +997,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
+      continue;
+    }
+    // Pixie Guide, Wyll, Barbarian Class: a replacement effect on your rolls (CR 614.1a); the ignored roll never happened (706.6).
+    if (/^If you would roll one or more dice, instead roll that many dice plus one and ignore the lowest roll\.$/.test(line)) {
+      out.rollAdvantage = true;
       continue;
     }
     // Pilots: "~ saddles Mounts and crews Vehicles as though its power were 2 greater", "... using its toughness rather
@@ -1072,6 +1112,10 @@ export function compile(d: CardDef): CompiledCard {
     // The Phantom creatures' prevention shield (CR 615): see dealDamage.
     if (line === "If damage would be dealt to ~, prevent that damage. Remove a +1/+1 counter from ~.") {
       out.phantom = true;
+      continue;
+    }
+    if (line === "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control of it.") {
+      out.betrayer = true;
       continue;
     }
     if (line === "Cast ~ only if you've cast another spell this turn.") {
@@ -1564,7 +1608,8 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.triggers.some((t) => t.event !== "selfEnters" && t.event !== "castSpell" && spentIn(t.body)) || spentIn(out.statics) || spentIn(out.activated)) bad = true;
   // Mana from Treasures spent (CR 106.3) is known for a spell, its permanent's enters trigger, and an activated ability.
   const treasureIn = (v: unknown) => /"kind":"treasure(?:Spent)?"/.test(JSON.stringify(v ?? null));
-  if (out.triggers.some((t) => t.event !== "selfEnters" && treasureIn(t.body)) || treasureIn(out.statics) || JSON.stringify(out.activated ?? null).includes('"kind":"treasureSpent"')) bad = true;
+  if (out.triggers.some((t) => t.event !== "selfEnters" && treasureIn(t.body)) || treasureIn(out.statics) || JSON.stringify(out.activated ?? null).includes('"kind":"treasureSpent"}')) bad = true;
+  if (/"kind":"treasureSpent","activated"/.test(JSON.stringify([out.spell, out.triggers, out.statics]))) bad = true;
   // Mana from snow sources spent (CR 107.4h): a spell's or its permanent's enters trigger's; Boreal Outrider's "of that
   // spell's colors" only in a cast trigger's condition.
   const snowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"snowSpent"');
@@ -1638,6 +1683,24 @@ function modesThen(modesLine: string, tail: string): AbilityBody | null {
   const then = parseBody(tail, { spell: true });
   if (!body?.modal || body.modal.max !== 1 || body.modal.repeat || !then || then.modal || then.targets.length || body.effects.length || body.targets.length) return null;
   return { ...body, text: `${body.text} ${then.text}`, modal: { ...body.modal, modes: body.modal.modes.map((m) => ({ ...m, effects: [...m.effects, ...structuredClone(then.effects)], text: `${m.text} ${then.text}` })) } };
+}
+
+/**
+ * A results table is part of the ability with the instruction to roll (CR 706.3b): its rows join that line, before an
+ * "Activate only ..." restriction. parseBody reads them as "if the result was in this range" (SpellCondition "rollIn").
+ */
+function joinRollTables(lines: string[]): void {
+  for (let i = 1; i < lines.length; i++) {
+    if (!ROLL_ROW.test(lines[i]!.trim())) continue;
+    let head = i - 1;
+    while (head > 0 && ROLL_ROW.test(lines[head]!.trim())) head--;
+    if (!/\broll\b/i.test(lines[head]!)) continue;
+    const prev = lines[i - 1]!;
+    const restriction = / Activate only [^.]+\.(?: Activate only [^.]+\.)*$/.exec(prev);
+    lines[i - 1] = restriction ? `${prev.slice(0, restriction.index)} ${lines[i]!.trim()}${restriction[0]}` : `${prev} ${lines[i]!.trim()}`;
+    lines.splice(i, 1);
+    i--;
+  }
 }
 
 /**

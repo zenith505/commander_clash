@@ -157,6 +157,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} can't play lands this turn.`);
       }
       return;
+    case "turnRules":
+      for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule });
+      log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : "'s opponents can't win the game")).join(",")} this turn.`);
+      return;
     case "noLifeGain":
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
       log(s, `${src}: ${e.players === "all" ? "players" : `${player(s, ctx.controller).name}'s opponents`} can't gain life this turn.`);

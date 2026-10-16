@@ -2600,6 +2600,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3246eff5-8739-469f-a401-e5de927dd6bb",
+  "name": "Khârn the Betrayer",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Astartes Berserker",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Astartes",
+   "Berserker"
+  ],
+  "oracleText": "Berzerker — Khârn the Betrayer attacks or blocks each combat if able.\nSigil of Corruption — When you lose control of Khârn the Betrayer, draw two cards.\nThe Betrayer — If damage would be dealt to Khârn the Betrayer, prevent that damage and an opponent of your choice gains control of it.",
+  "power": "5",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Berzerker",
+   "Sigil of Corruption",
+   "The Betrayer"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d69b1e68-8d8e-460b-9eb4-6a68be886197",
   "name": "Kodama of the West Tree",
   "manaCost": "{2}{G}",
@@ -3607,6 +3644,35 @@
   ],
   "keywords": [
    "Entwine"
+  ],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1818324c-2738-42e2-a78b-63abf325d8e9",
+  "name": "Razorgrass Screen",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact Creature — Wall",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender (This creature can't attack.)\nThis creature blocks each combat if able.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Defender"
   ],
   "commanderLegal": "legal",
   "set": "5dn",

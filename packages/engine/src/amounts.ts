@@ -155,6 +155,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
     case "party":
       return partySize(s, ctx.controller, view);
+    case "opponentsLifeLost":
+      return Object.entries(s.turnLog?.lifeLost ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":
       return (ctx.kicked ?? []).filter((i) => c.which === undefined || i === c.which).length;
     case "wasKicked":
@@ -167,6 +169,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.manaSpent ?? 0;
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
+    case "rollResult":
+      return s.resolving?.rolled?.result ?? ctx.event?.amount ?? 0;
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
@@ -380,6 +384,8 @@ function describeCount(c: Count): string {
       return "#times you've cast your commander";
     case "party":
       return "#creatures in your party";
+    case "opponentsLifeLost":
+      return "life your opponents lost this turn";
     case "devotion":
       return "devotion";
     case "attachedToSelf":
@@ -410,6 +416,8 @@ function describeCount(c: Count): string {
       return "mana from Treasures spent";
     case "snowSpent":
       return "{S} spent";
+    case "rollResult":
+      return "the result";
     default:
       return c.kind;
   }

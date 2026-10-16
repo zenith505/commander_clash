@@ -8,7 +8,8 @@ import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, Ob
 import { RulesError } from "../types";
 import { spentMeets } from "../mana";
 import { nextRandom } from "../rng";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, spellMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
+import { evalAmount } from "../amounts";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -23,6 +24,8 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
   end: ["yourEndStep", "eachEndStep"],
   beginCombat: ["yourBeginCombat", "eachBeginCombat"], // CR 507.1
   endCombat: ["yourEndCombat", "eachEndCombat"], // "at end of combat" (CR 511.2)
+  main1: ["yourFirstMain", "eachFirstMain"], // CR 505.1a
+  main2: ["yourPostcombatMain", "eachPostcombatMain"],
 };
 
 /** Who controls the permanent `o` is attached to, if it's attached to one on the battlefield. */
@@ -76,6 +79,8 @@ export type TriggerSourceEvent =
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "dungeonCompleted"; player: PlayerId }
+  /** A player rolled dice (CR 706): each die that counts (706.6), its natural result and its result. */
+  | { type: "diceRolled"; player: PlayerId; sides: number; dice: { natural: number; result: number }[]; result: number }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
@@ -111,7 +116,7 @@ export type TriggerSourceEvent =
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
-  | { type: "step"; step: "upkeep" | "draw" | "main1" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -487,6 +492,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+  } else if (ev.type === "diceRolled") {
+    // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
+    // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").
+    const watch = (o: GameObject) => {
+      add(o, ev.player, (e) => e === "youRollDice", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.result });
+      for (const d of ev.dice)
+        add(o, ev.player, (e, t) => e === "youRollDie" && (t.rolls?.min === undefined || d.result >= t.rolls.min) && (t.rolls?.natural === undefined || d.natural === (t.rolls.natural === "max" ? ev.sides : t.rolls.natural)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: d.result });
+    };
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) watch(o);
+    }
+    // "When you roll a natural 20, return ~ from your graveyard to your hand" (Critical Hit, CR 113.6m).
+    fromGraveyards((o, owner) => owner === ev.player && watch(o));
   } else if (ev.type === "dungeonCompleted") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -916,7 +935,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
   }
@@ -1015,9 +1034,31 @@ const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : com
 export function checkLostControl(s: GameState) {
   for (const d of [...(s.delayed ?? [])]) {
     if (d.when !== "lostControl") continue;
+    // "This turn" is over (Stolen Uniform).
+    if (d.thisTurn !== undefined && d.thisTurn !== s.turn) {
+      s.delayed = s.delayed!.filter((x) => x !== d);
+      continue;
+    }
     const o = s.objects[d.subject.id];
     const here = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === d.subject.zc;
-    if (here && controllerOf(s, o) === d.controller) continue;
+    // What it would sacrifice is gone (CR 400.7): nothing left to do.
+    const it = d.about && s.objects[d.about.id];
+    if (d.about && !(it && it.zone === "battlefield" && (it.zoneChanges ?? 0) === d.about.zc)) {
+      s.delayed = s.delayed!.filter((x) => x !== d);
+      continue;
+    }
+    if (here && controllerOf(s, o) === d.controller) {
+      d.held = true;
+      continue;
+    }
+    if (d.about) {
+      // "Sacrifice it when you lose control of ~" (Krovikan Vampire): ~ leaving counts too (Khârn rulings); one you
+      // haven't controlled since it was made can't be lost yet, or ever once it's gone (Seraph rulings).
+      if (here && !d.held) continue;
+      s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.held) s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about, body: d.body });
+      continue;
+    }
     s.delayed = s.delayed!.filter((x) => x !== d);
     if (here) s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
   }
@@ -1137,6 +1178,9 @@ function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: 
     if (controllerOf(s, o) !== you) continue;
     for (const g of abilitiesOf(s, o).spellsHaveCascade ?? []) {
       if (g.from && spell.castFrom !== g.from) continue;
+      if (g.commander && !spell.isCommander) continue;
+      if (g.yourTurn && s.activePlayer !== you) continue;
+      if (g.maxMv !== undefined && spellManaValue(s, item) > evalAmount(s, g.maxMv, { controller: you, sourceId: o.id })) continue;
       if (g.treasure && !spell.treasureSpent) continue;
       if (g.filter && !spellMatches(s, g.filter, item)) continue;
       // "The first spell you cast each turn ...": this one is the first of its kind this turn (it's already counted).

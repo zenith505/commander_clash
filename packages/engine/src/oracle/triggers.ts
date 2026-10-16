@@ -58,6 +58,11 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of your draw step, (.+)$/, "yourDrawStep"],
   [/^At the beginning of each player's draw step, (.+)$/, "eachDrawStep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
+  // Main phases (CR 505.1a): the first one is the precombat main phase, every other one a postcombat main phase.
+  [/^At the beginning of (?:your (?:first|precombat) main phase|each of your precombat main phases), (.+)$/, "yourFirstMain"],
+  [/^At the beginning of each player's (?:first|precombat) main phase, (.+)$/, "eachFirstMain"],
+  [/^At the beginning of (?:your postcombat main phase|each of your postcombat main phases), (.+)$/, "yourPostcombatMain"],
+  [/^At the beginning of each postcombat main phase, (.+)$/, "eachPostcombatMain"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
@@ -655,6 +660,42 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || !t.cast?.treasure || /\b(it|that spell|that player)\b/.test(orActivates[2]!)) return "fail";
     return { ...t, cast: { ...t.cast, orActivates: true } };
   }
+  // Krovikan Vampire: "At the beginning of each end step, if a creature dealt damage by ~ this turn died, put that card
+  // onto the battlefield under your control. Sacrifice it when you lose control of ~." Every such card still in a
+  // graveyard as it resolves, even one that died in response (rulings); an intervening if (CR 603.4).
+  if (/^At the beginning of each end step, if a creature dealt damage by ~ this turn died, put that card onto the battlefield under your control\. Sacrifice it when you lose control of ~\.$/.test(line))
+    return {
+      event: "eachEndStep",
+      ifCond: { kind: "damagedBySelfDied" },
+      body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "diedDamagedBySelf" }, sacrificeOnLostControl: true }], text: "Put each creature card dealt damage by ~ this turn that died onto the battlefield under your control. Sacrifice it when you lose control of ~." },
+    };
+  // Rolling dice (CR 706): "whenever you roll one or more dice" once for each instruction to roll; "whenever you roll a 4
+  // or higher", "when you roll a natural 20", "whenever you roll a die's highest natural result" once for each die that
+  // does (rulings on Mr. House and Netherese Puzzle-Ward). Ignored rolls never happened (706.6).
+  const rolls = /^Whenever you roll one or more dice, (.+)$/.exec(line);
+  if (rolls) {
+    const body = parseBody(rolls[1]!, {});
+    return body ? { event: "youRollDice", body } : "fail";
+  }
+  const die = /^Whenever you roll an? (\d+) or higher, (.+)$/.exec(line) ?? /^When(?:ever)? you roll (a natural (\d+)|a die's highest natural result), (.+)$/.exec(line);
+  if (die) {
+    const natural = /^When/.test(line) && die.length === 4;
+    const what = natural ? (die[2] ? { natural: Number(die[2]) } : { natural: "max" as const }) : { min: Number(die[1]) };
+    let text = die[die.length - 1]!;
+    // Mr. House: "If you rolled 6 or higher, instead [do this]": that die's result (the trigger's event).
+    const instead = /^(.+?)\. If you rolled (\d+) or higher, instead create that token and (an? [^.]+ token)\.$/.exec(text);
+    if (instead) {
+      const base = parseBody(`${instead[1]}.`, {});
+      const more = parseBody(`Create ${instead[3]}.`, {});
+      if (!base || !more || base.targets.length || !/^create an? [^.]+ token$/i.test(instead[1]!)) return "fail";
+      text = text.replace(/\.$/, "");
+      const body = { targets: [], effects: [{ type: "if" as const, cond: { kind: "rollIn" as const, min: Number(instead[2]), event: true as const }, effects: [...structuredClone(base.effects), ...more.effects], otherwise: base.effects }], text: `${text}.` };
+      return { event: "youRollDie", rolls: what, body };
+    }
+    const zone = /\breturn ~ from your graveyard to your hand$/.test(text.replace(/\.$/, "")) ? { zone: "graveyard" as const } : {};
+    const body = parseBody(`${text[0]!.toUpperCase()}${text.slice(1)}`, zone.zone ? { selfCard: true } : {});
+    return body ? { event: "youRollDie", rolls: what, body, ...zone } : "fail";
+  }
   // "This ability triggers only once each turn": once it has triggered this turn, it doesn't again (the object's own
   // count; a new object starts over, CR 400.7).
   const once = /^(.+?) This ability triggers only once each turn\.?$/.exec(line);
@@ -766,6 +807,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     }
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
+  }
+  // "At the beginning of your second main phase": the turn's second main phase, a postcombat one (CR 505.1a-b).
+  const second = /^At the beginning of your second main phase, (.+)$/.exec(line);
+  if (second) {
+    const t = parseTrigger(`At the beginning of your postcombat main phase, ${second[1]}`);
+    return t && t !== "fail" ? { ...t, secondMain: true } : "fail";
   }
   // "At the beginning of each opponent's upkeep, ~ deals 1 damage to that player": an "each upkeep" trigger that
   // triggers only on its controller's opponents' turns; "that player" is the active player.
@@ -994,7 +1041,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);

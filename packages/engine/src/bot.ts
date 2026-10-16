@@ -59,6 +59,7 @@ import {
   madnessCastOf,
   auraHostFor,
   auraHostKey,
+  payableLife,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -475,7 +476,7 @@ export function wardCosts(s: GameState, pid: PlayerId, targets: TargetChoice[]):
  * Could `payer` pay what a "counter unless" asks, with the mana sources they have now?
  */
 function canPayUnless(s: GameState, payer: PlayerId, unless: UnlessPays, pid: PlayerId, sourceId: ObjectId, x: number): boolean {
-  if (unless.life && player(s, payer).life < unless.life) return false;
+  if (unless.life && payableLife(s, payer) < unless.life) return false;
   const n = unless.generic === undefined ? 0 : evalAmount(s, unless.generic, { controller: pid, sourceId, x });
   return !!planMana(s, payer, parseManaCost(unlessCost(unless.cost, n)));
 }

@@ -387,8 +387,11 @@ function turnLogSummary(t: TurnLog | undefined) {
     toGraveyard: capped(t.toGraveyard ?? {}),
     // The Cases count to three (sources, creature cards) and to 5 life.
     toGraveyardTypes: capped(t.toGraveyardTypes ?? {}),
+    diedDamaged: Math.min(t.diedDamaged?.length ?? 0, TURN_LOG_CAP),
     damageSources: capped(Object.fromEntries(Object.entries(t.damageSources ?? {}).map(([k, v]) => [k, v.length]))),
     lifeGained: Object.fromEntries(Object.entries(t.lifeGained ?? {}).map(([k, v]) => [k, Math.min(v, LIFE_CAP)])),
+    // Counted with no cap (Neheb, the Eternal's mana), like the life totals themselves.
+    lifeLost: t.lifeLost,
   };
 }
 

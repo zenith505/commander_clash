@@ -2,7 +2,7 @@
 // serializable structures, and the engine executes them (see effects.ts). Everything
 // here is data, so abilities can sit on the stack inside GameState.
 
-import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId, SkipWhat } from "./types";
+import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId, SkipWhat, TurnRule } from "./types";
 import type { CopyExcept } from "./copies";
 
 /**
@@ -15,6 +15,14 @@ export type Amount = number | AmountExpr;
 /** +1/+1, -1/-1, stun (CR 122.1d), shield (122.1c), and named counters with no rules of their own: charge, spore, oil, ... */
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade" | (string & {});
+
+/** How the cards an exileFaceDown effect exiled may be played (see GameObject.mayPlay). */
+export interface FaceDownPlay {
+  until: "thisTurn" | "exiled" | "yourNextTurn" | "source";
+  free?: true;
+  anyType?: true;
+  castOnly?: true;
+}
 
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
 /** "populate": create a token that's a copy of the picked creature token (CR 701.36). */
@@ -95,6 +103,8 @@ export type Count =
   | { kind: "speed" }
   /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
   | { kind: "party" }
+  /** "The total amount of life your opponents have lost this turn", "for each 1 life your opponents have lost this turn" (CR 119.3). */
+  | { kind: "opponentsLifeLost" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
@@ -127,7 +137,9 @@ export type Count =
   /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
   | { kind: "greatestDrawn" }
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
-  | { kind: "treasureSpent" }
+  | { kind: "treasureSpent"; /** "Spent to activate this ability": in an activated ability (compile checks). */ activated?: true }
+  /** "Equal to the result" (CR 706.2): the last roll's result, all its dice added up; in a "whenever you roll" trigger, the roll's. */
+  | { kind: "rollResult" }
   /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
@@ -393,7 +405,12 @@ export type ObjRef =
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
    * of target player's graveyard is a creature card, put that card ...": the top card, only if it matches.
    */
-  | { ref: "graveyardEnd"; who: PlayerRef; filter?: TargetSpec; bottom?: true; only?: true };
+  | { ref: "graveyardEnd"; who: PlayerRef; filter?: TargetSpec; bottom?: true; only?: true }
+  /**
+   * Krovikan Vampire's "that card": each creature card that died this turn after the source dealt it damage that turn,
+   * while it's still that card in the graveyard (rulings: once it leaves, the game loses track of it).
+   */
+  | { ref: "diedDamagedBySelf" };
 
 /** Which player(s) an effect touches. */
 export type PlayerRef =
@@ -644,6 +661,8 @@ export interface StaticAbility {
  */
 export type StaticCondition =
   | { kind: "graveyardAtLeast"; n: number }
+  /** Krovikan Vampire: "if a creature dealt damage by ~ this turn died" (see TurnLog.diedDamaged). */
+  | { kind: "damagedBySelfDied" }
   /** A number compared to fixed bounds: "as long as your devotion to black is less than five" (Theros gods, CR 700.5). */
   | { kind: "amount"; amount: Amount; min?: number; max?: number }
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
@@ -881,7 +900,13 @@ export type Effect =
    * `hand`, all cards from your hand; `handCard`, one card you choose from your hand (Gustha's Scepter). `look`: its
    * controller may look at them while they remain exiled; otherwise nobody may (Duplicity rulings).
    */
-  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: number; look?: true }
+  /**
+   * Cards exiled face down (CR 406.3): only its controller may look at them, if `look` (Gustha's Scepter) or if they may
+   * play them (`play`: Three Wishes, Gonti, Outrageous Robbery). `who`: whose library ("the top card of that player's
+   * library"); yours by default. `upkeepGraveyard`: "At the beginning of your next upkeep, put any of those cards you
+   * didn't play into your graveyard" (Three Wishes).
+   */
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true }
   /**
    * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
@@ -989,6 +1014,15 @@ export type Effect =
       atEndStep?: "exile" | "sacrifice";
       /** "With a +1/+1 counter on it" (Undying Malice): counters it enters with (CR 614.1c). */
       counters?: Record<string, number>;
+      /**
+       * "Sacrifice it when you lose control of ~" (Krovikan Vampire, Seraph): a delayed trigger watching ~ (`true`: this
+       * ability's source, if it's on the battlefield) for each permanent put there (CR 603.7).
+       */
+      sacrificeOnLostControl?: true | { id: ObjectId; zc: number };
+      /** "That creature is a black Zombie in addition to its other colors and types": an effect on the permanent from then on (CR 611.2c). */
+      alsoMods?: Modification[];
+      /** "Put that card onto the battlefield ... at the beginning of the next end step" (Seraph): a delayed trigger for each card (CR 603.7). */
+      atNextEndStep?: true;
     }
   /**
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
@@ -1082,7 +1116,8 @@ export type Effect =
    * of combat"), instead of the source.
    */
   /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard"; of?: ObjRef }
+  /** `thisTurn`: "When you lose control of that Equipment this turn" (Stolen Uniform): only until the turn ends. */
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard"; of?: ObjRef; thisTurn?: true }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1135,6 +1170,15 @@ export type Effect =
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**
+   * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
+   * card" (then that card is exiled and the rest go on the bottom in a random order, or all of them go into your hand):
+   * `who` has the library (default you). `then`: "castFree", that player (`ownerCasts`) or you may cast it now without
+   * paying its mana cost; "freeThisTurn" / "thisTurn", you may cast it this turn (for free), with its usual timing;
+   * "hand", every revealed card into your hand (Treasure Hunt). A card not cast stays in exile, and so do the other
+   * exiled cards.
+   */
+  | { type: "exileUntilNonland"; who?: PlayerRef; reveal?: true; shuffleFirst?: true; then: "castFree" | "freeThisTurn" | "thisTurn" | "hand"; ownerCasts?: true }
+  /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
    * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
    */
@@ -1156,8 +1200,8 @@ export type Effect =
    * Equipment you control to target creature you control", Brass Squire).
    */
   | { type: "attach"; what: ObjRef; source?: ObjRef }
-  /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to. */
-  | { type: "unattach"; what: ObjRef }
+  /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to; `ifAttachedToYours`: "if it's attached to a creature you control" (Stolen Uniform). */
+  | { type: "unattach"; what: ObjRef; ifAttachedToYours?: true }
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
   | { type: "transformSelf" }
   /** Reconfigure's "Unattach this permanent" (CR 702.151a, 701.3d). */
@@ -1222,6 +1266,12 @@ export type Effect =
   | { type: "endure"; what: ObjRef; n: Amount }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
+  /**
+   * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
+   * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
+   * and "equal to the result" read it afterwards (SpellCondition "rollIn", Count "rollResult").
+   */
+  | { type: "roll"; sides: number; n?: Amount; add?: Amount; subtract?: Amount; /** "Ignore the lower roll": keep only the highest one. */ keepHighest?: true }
   | { type: "surveil"; n: Amount } // CR 701.25
   /** "Look at the top N cards of [a player's] library, then put them back in any order": the controller orders them. */
   | { type: "orderTop"; who: PlayerRef; n: Amount }
@@ -1369,6 +1419,8 @@ export type Effect =
   | { type: "damageRule"; rule: DamageRuleSpec }
   /** "Players can't gain life this turn", "Your opponents can't gain life this turn" (CR 119.7). */
   | { type: "noLifeGain"; players: "all" | "opponents" }
+  /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
+  | { type: "turnRules"; rules: TurnRule["rule"][] }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
@@ -1421,7 +1473,8 @@ export type Effect =
    * "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
    * among them without paying their mana costs" (Primeval Spawn): `maxMv` each, `totalMv` all together.
    */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount }
+  /** `untilMv`: "exile cards from the top of your library until you exile cards with total mana value 4 or greater" (Improvisation Capstone), instead of `n` cards. */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -1465,6 +1518,13 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
+  | { kind: "destroyedThisWay" }
+  /**
+   * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
+   * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
+   */
+  | { kind: "rollIn"; min?: number; max?: number; event?: true }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
   | { kind: "suspected"; what: ObjRef }
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
@@ -1609,6 +1669,12 @@ export type TriggerEvent =
   | "eachBeginCombat" // At the beginning of each combat
   | "yourEndCombat" // At end of combat on your turn
   | "eachEndCombat" // At end of combat (CR 511.2)
+  /** "At the beginning of your first (precombat) main phase": only the turn's first main phase is one (CR 505.1a). */
+  | "yourFirstMain"
+  | "eachFirstMain" // "At the beginning of each player's first main phase" ("that player" is the active player)
+  /** "At the beginning of each of your postcombat main phases": every main phase but the first (CR 505.1a); see `secondMain`. */
+  | "yourPostcombatMain"
+  | "eachPostcombatMain"
   | "selfAttacksOrBlocks" // Whenever ~ attacks or blocks
   | "eachEndStep" // At the beginning of the end step (every turn's)
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
@@ -1634,6 +1700,10 @@ export type TriggerEvent =
   | "selfDealsDamageToCreature"
   | "selfDealsCombatDamageToCreature"
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
+  /** "Whenever you roll one or more dice": once per instruction to roll (CR 706); the event amount is the result. */
+  | "youRollDice"
+  /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
+  | "youRollDie"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
@@ -1718,6 +1788,11 @@ export interface TriggeredAbility {
   cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
+  /**
+   * For "youRollDie": the die's result has to be at least `min` ("a 4 or higher"), or its natural result (CR 706.2) has
+   * to be `natural` ("a natural 20"), or the die's highest one (`natural: "max"`).
+   */
+  rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
   /**
@@ -1832,6 +1907,8 @@ export interface TriggeredAbility {
   hostControllersUpkeep?: true;
   /** "At the beginning of each opponent's upkeep / draw step / end step": an "each" step trigger only on an opponent's turn. */
   opponentsTurn?: true;
+  /** "At the beginning of your second main phase": the turn's second main phase only, not later ones (CR 505.1b). */
+  secondMain?: true;
   /** "At the beginning of enchanted player's upkeep": an "each" step trigger only on the turn of the player this Aura enchants. */
   enchantedPlayersTurn?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
@@ -2062,6 +2139,8 @@ export interface CostMod {
   turn?: "yours" | "notYours";
   /** "Spells you cast from your graveyard". */
   fromGraveyard?: boolean;
+  /** "Spells you cast but don't own" (Gonti, Canny Acquisitor). */
+  notOwned?: true;
   /** "The first creature spell you cast each turn", "the second spell you cast each turn": only the nth matching spell. */
   nth?: number;
   /** Only while this holds: a Class level's (CR 716.2a). */
@@ -2258,6 +2337,11 @@ export interface CompiledCard {
    * of damage is prevented, and one counter removed per damage event, even when there's none left to remove.
    */
   phantom?: boolean;
+  /**
+   * Khârn the Betrayer: "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control
+   * of it" (CR 615.5): the control change happens right away, also when the damage can't be prevented (615.12).
+   */
+  betrayer?: true;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /**
@@ -2336,13 +2420,20 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /** "If you would roll one or more dice, instead roll that many dice plus one and ignore the lowest roll" (Pixie Guide, CR 706.6). */
+  rollAdvantage?: true;
   /**
    * "Sliver spells you cast have cascade", "Instant and sorcery spells you cast from your hand have cascade", "The first
    * spell you cast each turn has cascade" (CR 702.85a): those spells have cascade as they're cast. `first`: the first such
    * spell its controller cast this turn, counting ones before this permanent was there; `fromHand` / `fromExile`: cast
    * from there; `treasure`: "that mana from a Treasure was spent to cast" (CR 106.3).
    */
-  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; text: string }[];
+  /**
+   * `commander`: "Commander spells you cast have cascade" (Flamekin Herald), a commander card cast as a spell (CR 903.3);
+   * `yourTurn` and `maxMv`: "During your turn, spells you cast from your hand with mana value X or less have cascade,
+   * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
+   */
+  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
   /**

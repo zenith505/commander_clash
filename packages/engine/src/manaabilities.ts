@@ -4,7 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
-import { abilityProblem, obj, player, tapAbilitySick, tapCostCandidates } from "./game";
+import { abilityProblem, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -230,7 +230,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, o.id, pid)) return `${name}'s ability can't be activated now`; // CR 602.5b
   const p = player(s, pid);
-  if (ab.lifeCost && p.life < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4
+  if (ab.lifeCost && payableLife(s, pid) < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4, 119.8
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, parseManaCost(ab.manaCost), { ability: o })) return "not enough mana";

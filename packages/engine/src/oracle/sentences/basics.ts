@@ -118,6 +118,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (ref === "subject") return [{ type: "delayed", when, each: "subject", effects: inner, text: m[1]! }];
     // The Locust God: "When ~ dies, return it to its owner's hand at the beginning of the next end step": about the card
     // in the graveyard now; if it leaves there first, it stays where it went (rulings).
+    // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step": the card in
+    // the graveyard now, if it's still there then (rulings).
+    if (ref === "subjectCard" && when === "nextEndStep" && inner.length === 1 && inner[0]!.type === "putOntoBattlefield") return [{ ...inner[0]!, atNextEndStep: true }];
     if (ref === "selfCard") return [{ type: "delayed", when, each: "selfCard", effects: JSON.parse(JSON.stringify(inner).replace(/\{"ref":"selfCard"\}/g, '{"ref":"subjectCard"}')) as Effect[], text: m[1]! }];
     if (ref !== "self") return null;
     // The delayed trigger is about the source as it is now: if it leaves, it's a new object (CR 400.7).
@@ -235,6 +238,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return to ? [{ type: "preventNext", n: amt(m[1]!), to }] : null;
   }
   if (/^Prevent all combat damage that would be dealt this turn$/i.test(s)) return [{ type: "preventCombatDamage" }];
+  // "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn"
+  // (Courageous Resolve; CR 119.8, 104.3), "You can't lose the game this turn and your opponents can't win the game this turn".
+  if (/^(?:you can't (?:lose life|lose the game) this turn(?:,? and |, )?)+(?:your opponents can't win the game this turn)?$/i.test(s) && /\bthis turn$/.test(s)) {
+    const rules: Extract<Effect, { type: "turnRules" }>["rules"] = [];
+    if (/you can't lose life this turn/i.test(s)) rules.push("cantLoseLife");
+    if (/you can't lose the game this turn/i.test(s)) rules.push("cantLoseGame");
+    if (/your opponents can't win the game this turn/i.test(s)) rules.push("opponentsCantWin");
+    return [{ type: "turnRules", rules }];
+  }
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
   // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller

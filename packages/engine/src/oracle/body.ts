@@ -1,6 +1,7 @@
 import { refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, isGroup, WHEEL } from "./words";
+import { num, NUMX, X, amt, isGroup, keywordOf, WHEEL } from "./words";
+import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
@@ -540,6 +541,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (/^Until end of turn, /.test(s)) s = `${s.replace(/^Until end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
     // "Target creature you control gains protection from the color of your choice until end of turn": the
     // color is chosen as it resolves (CR 608.2d), after the target was chosen on casting.
+    // "Target creature gains your choice of menace or lifelink until end of turn", "... flying, vigilance, deathtouch, or
+    // haste": one of those keywords, chosen as it resolves (CR 608.2d).
+    const choiceOf = / (gains?|gain) your choice of ((?:[a-z ]+, )*[a-z ]+,? or [a-z ]+?)(?= until end of turn\b| and |$)/.exec(s);
+    if (choiceOf) {
+      const options = choiceOf[2]!.split(/,? or |, /).map((w) => keywordOf(w));
+      // One such choice per ability: it's kept for the rest of the resolution.
+      if (options.length < 2 || options.some((k) => !k || k === CHOSEN_PROTECTION) || effects.some((x) => x.type === "choose" && x.choice === "keyword")) return null;
+      effects.push({ type: "choose", choice: "keyword", options: options as string[] });
+      s = s.replace(choiceOf[0]!, ` ${choiceOf[1]} ${CHOSEN_KEYWORD}`);
+    }
     if (/ gains? protection from the color of your choice\b/.test(s)) {
       effects.push({ type: "choose", choice: "color" });
       s = s.replace("the color of your choice", "the chosen color");

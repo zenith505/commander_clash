@@ -946,6 +946,8 @@ export interface Chosen {
   color?: Color;
   /** "The basic land type of your choice" (Reef Shaman). */
   landType?: string;
+  /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
+  keyword?: string;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

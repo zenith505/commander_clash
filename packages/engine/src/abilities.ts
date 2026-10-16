@@ -1271,10 +1271,11 @@ export type Effect =
    * "Choose a creature type." / "Choose a color." while it resolves: later instructions use the
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
    */
-  | { type: "choose"; choice: ChoiceKind; except?: string };
+  | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[] };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
-export type ChoiceKind = "creatureType" | "color" | "basicLandType";
+/** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
+export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead";

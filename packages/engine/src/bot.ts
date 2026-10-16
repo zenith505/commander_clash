@@ -1652,8 +1652,21 @@ function guessChosen(s: GameState, pid: PlayerId, card: CardDef): Chosen | undef
  * they have most of. Otherwise our own most common creature type, or the color we use most (for
  * mana, the colors our commander needs).
  */
+/**
+ * "Gains your choice of menace or lifelink": on our own turn what helps it attack (damage and evasion), on an
+ * opponent's what keeps it alive or wins a block.
+ */
+function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
+  const ours = ["Double strike", "Flying", "Deathtouch", "Indestructible", "Trample", "Menace", "First strike", "Lifelink", "Hexproof", "Haste", "Vigilance", "Reach"];
+  const theirs = ["Indestructible", "Hexproof", "Deathtouch", "First strike", "Double strike", "Lifelink", "Reach", "Flying", "Vigilance", "Trample", "Menace", "Haste"];
+  const order = s.activePlayer === pid ? ours : theirs;
+  const rank = (k: string) => (order.indexOf(k) < 0 ? order.length : order.indexOf(k));
+  return [...options].sort((a, b) => rank(a) - rank(b))[0]!;
+}
+
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
   if (what === "basicLandType") return chooseLandType(s, pid, options);
+  if (what === "keyword") return chooseKeyword(s, pid, options);
   const c = card ? compileCard(card) : undefined;
   // Protection from the chosen color is against what opponents have, above all the spell or ability
   // that's about to resolve against us.

@@ -117,6 +117,7 @@ export function choiceOptions(what: ChoiceKind | EntersOption, except?: string):
 export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice: string): Chosen {
   if (what === "creatureType") return { ...chosen, type: choice };
   if (what === "basicLandType") return { ...chosen, landType: choice };
+  if (what === "keyword") return { ...chosen, keyword: choice };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };
 }

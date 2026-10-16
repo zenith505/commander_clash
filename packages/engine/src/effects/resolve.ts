@@ -493,6 +493,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "regenerate":
     case "exile":
     case "returnLinked":
+    case "exileFaceDown":
+    case "moveLinked":
     case "playLinked":
     case "cipher":
     case "haunt":

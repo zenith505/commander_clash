@@ -2466,9 +2466,10 @@ function Seat({
 
 function ZoneTop({ s, o, count, onHover }: { s: GameState; o: GameObject | undefined; count: number; onHover: (d: CardDef | null) => void }) {
   if (!o) return <div className="zone-empty">empty</div>;
-  // Someone else's foretold card is face down (CR 702.143a); a hideaway card, to those who haven't controlled its permanent (CR 702.75a).
+  // Someone else's foretold card is face down (CR 702.143a); a hideaway card, to those who haven't controlled its permanent
+  // (CR 702.75a); a card exiled face down by Duplicity or Gustha's Scepter, to those who may not look (CR 406.3).
   if (o.foretold && o.owner !== HUMAN) return <CardBack count={count} label="Foretold" />;
-  if (o.hiddenExile && !o.hiddenExile.seen.includes(HUMAN)) return <CardBack count={count} label="Hideaway" />;
+  if (o.hiddenExile && !o.hiddenExile.seen.includes(HUMAN)) return <CardBack count={count} label={o.hiddenExile.label ?? "Hideaway"} />;
   const d = cardOf(s, o.id);
   return (
     <div className="card" data-obj={o.id} {...hoverProps(d, onHover)}>
@@ -2514,7 +2515,7 @@ function ZoneViewer({
             if (s.objects[id]!.foretold && s.objects[id]!.owner !== HUMAN) return <CardBack key={id} label="Foretold" />;
             // Exiled face down with hideaway: only players who controlled its permanent may look (CR 702.75a).
             const hidden = s.objects[id]!.hiddenExile;
-            if (hidden && !hidden.seen.includes(HUMAN)) return <CardBack key={id} label="Hideaway" />;
+            if (hidden && !hidden.seen.includes(HUMAN)) return <CardBack key={id} label={hidden.label ?? "Hideaway"} />;
             return (
               <div
                 key={id}

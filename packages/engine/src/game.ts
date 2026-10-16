@@ -5092,7 +5092,9 @@ function syncControl(s: GameState) {
     }
     if (o.seenController === undefined) o.seenController = now;
     else if (o.seenController !== now) {
+      const was = o.seenController;
       o.seenController = now;
+      fireEvent(s, { type: "controlChanged", id: o.id, from: was });
       loseRingBearer(s, o.id); // CR 701.54a
       o.controlledSinceTurn = s.turn;
       if (o.attacking !== undefined || o.blocking !== undefined) {

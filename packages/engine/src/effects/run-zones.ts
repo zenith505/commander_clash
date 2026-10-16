@@ -747,6 +747,66 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "exileFaceDown": {
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      let ids: ObjectId[];
+      if (e.from === "handCard") {
+        if (!sc.faceDownPick) {
+          if (!p.hand.length) return;
+          sc.faceDownPick = true;
+          delete sc.found;
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: [...p.hand], min: 1, max: 1, dig: { looked: [...p.hand], to: "to exile face down", rest: "stay in your hand" }, hand: p.id };
+          return "paused";
+        }
+        sc.faceDownPick = undefined;
+        ids = (sc.found ?? []).filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === p.id);
+      } else ids = e.from === "hand" ? [...p.hand] : p.library.slice(0, e.n ?? 1);
+      const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
+      const done: ObjectId[] = [];
+      for (const id of ids) {
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        if (o.zone !== "exile") continue;
+        // Face down: only its controller may look, and only if the ability says so (CR 406.3).
+        o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look ? [p.id] : [], label: "Face down" };
+        if (ctx.sourceId) ((s.linkedExile ??= {})[key] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        done.push(id);
+      }
+      s.resolving!.faceDownExiled = [...(s.resolving!.faceDownExiled ?? []), ...done];
+      const n = done.length;
+      log(s, `${p.name} exiles ${n === 1 ? "a card" : `${n} cards`} ${e.from === "top" ? "from the top of their library" : "from their hand"} face down with ${src}.`);
+      if (e.look && n) log(s, `You exiled ${done.map((id) => defOf(s, obj(s, id)).name).join(", ")} face down with ${src}.`, p.id);
+      return;
+    }
+    case "moveLinked": {
+      // Linked to the source as it is (an activated ability, a control change) or, after it left the battlefield, as it
+      // was (CR 607.2a, 400.7).
+      const zc = ctx.sourceZc ?? 0;
+      const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
+      const sc = (s.resolving!.scratch ??= {});
+      const linked = (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
+      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)));
+      const p = player(s, ctx.controller);
+      if (e.one) {
+        if (!sc.linkedPick) {
+          if (!cards.length) return;
+          sc.linkedPick = true;
+          delete sc.found;
+          const ids = cards.map((c) => c.id);
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card exiled with " + src, cards: ids, min: 1, max: 1, dig: { looked: ids, to: e.dest === "hand" ? "into your hand" : "into its owner's graveyard", rest: "stay exiled" } };
+          return "paused";
+        }
+        sc.linkedPick = undefined;
+        cards = cards.filter((c) => sc.found?.includes(c.id));
+      }
+      if (!cards.length) return;
+      if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
+      else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
+      for (const c of cards) moveObject(s, c.id, e.dest);
+      if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
+      return;
+    }
     case "returnLinked": {
       // The leaves ability triggered after the source moved, so the object it links to is the one before (CR 400.7).
       const key = `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;

@@ -877,6 +877,18 @@ export type Effect =
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
   | { type: "returnLinked"; dest: "battlefield" | "hand" }
   /**
+   * Cards exiled face down, linked to the source (CR 406.3, 607.2a): `top`, the top `n` of your library (Duplicity);
+   * `hand`, all cards from your hand; `handCard`, one card you choose from your hand (Gustha's Scepter). `look`: its
+   * controller may look at them while they remain exiled; otherwise nobody may (Duplicity rulings).
+   */
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: number; look?: true }
+  /**
+   * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
+   * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
+   * not those exiled earlier in this resolution).
+   */
+  | { type: "moveLinked"; dest: "hand" | "graveyard"; one?: true; yours?: true; other?: true }
+  /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
    */
@@ -1531,6 +1543,11 @@ export type TriggerEvent =
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
+  /**
+   * "When you lose control of ~" (Duplicity, Gustha's Scepter): it left the battlefield (looking back, CR 603.10a) or
+   * another player gained control of it; the player who lost control controls the trigger (Khârn rulings).
+   */
+  | "selfLostControl"
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter

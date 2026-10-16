@@ -1490,6 +1490,15 @@ function provokeGood(s: GameState, attacker: GameObject, target: GameObject): bo
   return (power(s, attacker) >= toughness(s, target) || deadly(attacker)) && power(s, target) < toughness(s, attacker) && !deadly(target);
 }
 
+/** Cards `pid` owns exiled with this permanent (any of its linked exile piles, CR 607.2a). */
+function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId): number {
+  if (!sourceId) return 0;
+  return Object.entries(s.linkedExile ?? {})
+    .filter(([k]) => k.startsWith(`${sourceId}@`))
+    .flatMap(([, v]) => v)
+    .filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && s.objects[l.id]!.owner === pid).length;
+}
+
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
@@ -1498,6 +1507,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // smaller loss (only asked when it can be done).
   if (e.keep && e.otherwise?.some((x) => (x.type === "sacrifice" || x.type === "exile") && x.what.ref === "self") && e.effects.every((x) => x.type === "discard" || x.type === "pick")) return true;
   if (e.keep && e.otherwise?.length === 1 && e.otherwise[0]!.type === "discard" && e.effects.length === 1 && e.effects[0]!.type === "discard") return true;
+  // Duplicity: swap our hand for the cards exiled with it when that's at least as many cards.
+  if (e.effects.length === 1 && e.effects[0]!.type === "exileFaceDown" && e.effects[0]!.from === "hand") return linkedOwned(s, r.item.sourceId, pid) >= player(s, pid).hand.length;
   const provoke = e.effects.find((x) => x.type === "mustBlockSource");
   if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
     const t = r.item.targets?.[provoke.what.index];
@@ -1889,6 +1900,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
+      // Gustha's Scepter: bots don't hide cards from their hand, so there's nothing to take back either.
+      if (ab.body.effects.some((e) => e.type === "exileFaceDown" || (e.type === "moveLinked" && !linkedOwned(s, id, pid)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)

@@ -64,6 +64,8 @@ export type TriggerSourceEvent =
   /** `sacrificed`: its controller sacrificed it (CR 701.21a). */
   /** An Aura or Equipment that stays on the battlefield became unattached from `host` (moved, or unattached). */
   | { type: "unattached"; id: ObjectId; host: ObjectId }
+  /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
+  | { type: "controlChanged"; id: ObjectId; from: PlayerId }
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
@@ -365,6 +367,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
     locked = null;
+  } else if (ev.type === "controlChanged") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, ev.from, (e) => e === "selfLostControl");
   } else if (ev.type === "unattached") {
     const o = s.objects[ev.id];
     const host = s.objects[ev.host];
@@ -385,7 +390,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       ev.controller,
       (e, t) =>
         (((e === "selfDies" && ev.wasCreature) || e === "selfToGraveyard") && ev.to === "graveyard" && !(t.ifNoCounter && (ev.counters[t.ifNoCounter] ?? 0) > 0)) ||
-        e === "selfLeaves",
+        e === "selfLeaves" ||
+        e === "selfLostControl",
       withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers,
       undefined,
       undefined,

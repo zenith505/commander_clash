@@ -74,6 +74,9 @@ const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
   e.type === "collectEvidence" ||
+  // "You may exile all cards from your hand face down. If you do, ..." (Duplicity): even an empty hand (rulings on
+  // exiling or discarding your hand, Herigast).
+  (e.type === "exileFaceDown" && e.from === "hand") ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
@@ -706,6 +709,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       });
       if (!reflexive || reflexive.modal) return null;
       effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
+    // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."
+    if (/^You may look at it for as long as it remains exiled$/i.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exileFaceDown" || prev.from !== "handCard") return null;
+      effects[effects.length - 1] = { ...prev, look: true };
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);

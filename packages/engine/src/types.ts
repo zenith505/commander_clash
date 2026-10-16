@@ -286,7 +286,7 @@ export interface GameObject {
    * Exiled face down by hideaway (CR 702.75a): only players who controlled `by`, the permanent that exiled it, may look
    * at it (`seen`). Gone when it changes zones.
    */
-  hiddenExile?: { by: ObjectId; seen: PlayerId[] };
+  hiddenExile?: { by: ObjectId; seen: PlayerId[]; /** What its back says ("Face down"); hideaway's by default. */ label?: string };
   /** Cards exiled encoded on this permanent with cipher (CR 702.99b-c), as they are in exile. Gone when it leaves. */
   encoded?: { id: ObjectId; zc: number }[];
   /**
@@ -1065,6 +1065,8 @@ export interface Resolving {
   destroyed?: { o: GameObject; ch: Characteristics }[];
   /** The permanents its exile instructions exiled so far while this resolves, as they last existed ("exiled this way"). */
   exiled?: { o: GameObject; ch: Characteristics }[];
+  /** The cards exiled face down so far (exileFaceDown), for Duplicity's "all other cards you own exiled with ~". */
+  faceDownExiled?: ObjectId[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
   countered?: Record<ObjectId, { zc: number; x: number }>;
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
@@ -1150,6 +1152,10 @@ export interface Resolving {
      * "You may cast any number of spells ... from among them" (Primeval Spawn): the exiled cards, the total mana value
      * still allowed, the card last offered, the cards not cast when offered, and the card picked ("none" to stop).
      */
+    /** exileFaceDown: a hand card is being chosen. */
+    faceDownPick?: true;
+    /** moveLinked with `one`: the card is being chosen. */
+    linkedPick?: true;
     castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose

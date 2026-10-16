@@ -761,22 +761,38 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.faceDownPick = undefined;
         ids = (sc.found ?? []).filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === p.id);
-      } else ids = e.from === "hand" ? [...p.hand] : p.library.slice(0, e.n ?? 1);
+      } else if (e.from === "hand") ids = [...p.hand];
+      else {
+        const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
+        ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => player(s, pid).library.slice(0, n));
+      }
       const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
       const done: ObjectId[] = [];
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
         if (o.zone !== "exile") continue;
-        // Face down: only its controller may look, and only if the ability says so (CR 406.3).
-        o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look ? [p.id] : [], label: "Face down" };
+        // Face down: only its controller may look, if the ability says so or lets them play it (CR 406.3; rulings on
+        // Gonti: "you may look at and play").
+        o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look || e.play ? [p.id] : [], label: "Face down" };
         if (ctx.sourceId) ((s.linkedExile ??= {})[key] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        // The permission belongs to this object only (CR 400.7), and to the player who exiled it, whoever controls the
+        // source later (rulings on Gonti).
+        if (e.play) {
+          const { until, ...how } = e.play;
+          const source = until === "source" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {};
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until, turn: s.turn, ...how, ...source };
+        }
+        if (e.upkeepGraveyard)
+          addDelayed(s, "yourNextUpkeep", p.id, o, { targets: [], effects: [{ type: "putInGraveyard", what: { ref: "subjectCard" } }], text: "Put that card, if you didn't play it, into its owner's graveyard." }, ctx.sourceDef.oracleId);
         done.push(id);
       }
       s.resolving!.faceDownExiled = [...(s.resolving!.faceDownExiled ?? []), ...done];
       const n = done.length;
-      log(s, `${p.name} exiles ${n === 1 ? "a card" : `${n} cards`} ${e.from === "top" ? "from the top of their library" : "from their hand"} face down with ${src}.`);
-      if (e.look && n) log(s, `You exiled ${done.map((id) => defOf(s, obj(s, id)).name).join(", ")} face down with ${src}.`, p.id);
+      const owners = [...new Set(done.map((id) => obj(s, id).owner))];
+      const whose = owners.length === 1 && owners[0] === p.id ? "their" : owners.map((pid) => `${player(s, pid).name}'s`).join(" and ");
+      log(s, `${p.name} exiles ${n === 1 ? "a card" : `${n} cards`} ${e.from === "top" ? `from the top of ${whose} library` : "from their hand"} face down with ${src}${e.play ? `, and may ${e.play.castOnly ? "cast" : "play"} ${n === 1 ? "it" : "them"}` : ""}.`);
+      if ((e.look || e.play) && n) log(s, `You exiled ${done.map((id) => defOf(s, obj(s, id)).name).join(", ")} face down with ${src}.`, p.id);
       return;
     }
     case "moveLinked": {

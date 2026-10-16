@@ -2009,6 +2009,12 @@ export function checkAscend(s: GameState) {
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "exile" || o.mayPlay?.player !== pid || o.mayPlay.zc !== (o.zoneChanges ?? 0)) return false;
+  const m = o.mayPlay;
+  // "Until your next turn" (Three Wishes): over once that turn begins.
+  if (m.until === "yourNextTurn" && s.activePlayer === pid && s.turn > m.turn) return false;
+  // "For as long as Intet remains on the battlefield": that object (CR 400.7).
+  if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
+  if (m.castOnly && isType(defOf(s, o), "Land")) return false;
   // A warped or plotted card: only on a later turn (CR 702.185a, 702.170d), and only cast, not played as a land.
   return !castOnlyFromExile(o) || (s.turn > o.mayPlay.turn && !isType(defOf(s, o), "Land"));
 }
@@ -2441,13 +2447,19 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
   // increases (CR 118.9d, 601.2f).
   const madness = madnessCastOf(s, pid, o.id);
-  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o))) return { cost: parseManaCost(kickCost), extra: Math.max(0, mods.more - mods.less) };
+  // Cast from exile with "mana of any type can be spent to cast it" (CR 609.4b): each mana symbol but snow and
+  // Phyrexian ones can be paid with any type, so it's generic.
+  const exiled = o.zone === "exile" && !how.via && mayPlayFromExile(s, o, pid) ? o.mayPlay : undefined;
+  const anyType = (c: ParsedCost): ParsedCost => (exiled?.anyType ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
+  // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
+  const freeFromExile = !!exiled?.free && !how.faceDown && !how.alt;
+  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o)) || freeFromExile) return { cost: anyType(parseManaCost(kickCost)), extra: Math.max(0, mods.more - mods.less) };
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
   // So do evoke, dash, bestow and madness (CR 702.74a, 702.109a, 702.103a, 702.35a).
   const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt, s, pid)?.mana ?? d.manaCost);
-  const mana = parseManaCost(base + kickCost);
+  const mana = anyType(parseManaCost(base + kickCost));
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
@@ -2488,6 +2500,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : false) continue;
       if (m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
+      if (m.notOwned && o.owner === pid) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
       const { manaValue: range, ...rest } = m.filter;
       if (!printedMatches(rest, d)) continue;

@@ -1,4 +1,4 @@
-import { allEffects, refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
+import { allEffects, refCovers, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
@@ -125,6 +125,64 @@ function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: E
     next++;
   }
   const effect: Effect = { type: "if", cond: { kind: "revealedIs", filter, ...(first[1] ? { not: true as const } : {}) }, effects: then, ...(otherwise ? { otherwise } : {}) };
+  return { effect, next };
+}
+
+/**
+ * "Exile the top three cards of your library face down. You may look at those cards for as long as they remain exiled.
+ * Until your next turn, you may play those cards." (Three Wishes), "look at the top card of that player's library, then
+ * exile it face down. You may play that card for as long as it remains exiled, and mana of any type can be spent to cast
+ * that spell" (Gonti), "Target opponent exiles the top X cards of their library face down. You may look at and play
+ * those cards for as long as they remain exiled." (Outrageous Robbery): the exile and what may be done with the cards,
+ * which only the player who exiled them may look at (CR 406.3). Null if the sentence isn't such an exile, or if it's one
+ * with no permission after it (Duplicity's, read elsewhere).
+ */
+function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
+  const s = sentences[at]!;
+  const LIB = "(your|that player's|target player's|target opponent's|each opponent's|each player's)";
+  const head =
+    new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of ${LIB} library face down$`).exec(s) ??
+    new RegExp(`^(?:[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library and exile (?:it|that card|those cards) face down)$`).exec(s);
+  const look = !head && new RegExp(`^[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library$`).exec(s);
+  const lookThen = look && /^Exile (?:it|that card|those cards|them) face down$/.test(sentences[at + 1] ?? "");
+  const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
+  if (!head && !lookThen && !they) return null;
+  let next = at + (lookThen ? 2 : 1);
+  const m = head ?? (lookThen ? look : null);
+  const count = m ? m[1]! : they![2]!;
+  const n = count === "card" ? 1 : amt(new RegExp(`^${NUMX} cards$`).exec(count)![1]!);
+  // Not yet: whose library is read last, after the permission is known to be there (it may add a target).
+  const whose = m ? (m[m.length - 1] === "your" ? "you" : m[m.length - 1]!.replace(/'s$/, "")) : they![1]!;
+  let seen = false;
+  let play: FaceDownPlay | undefined;
+  let upkeepGraveyard = false;
+  const ANY = "(?:mana of any type can be spent to cast (?:it|them|that spell|those spells)|you may spend mana as though it were mana of any type to cast (?:it|them|that spell|those spells))";
+  for (;;) {
+    const t = sentences[next];
+    if (t === undefined) break;
+    if (/^You may look at (?:it|that card|those cards|them) for as long as (?:it remains|they remain) exiled$/.test(t)) seen = true;
+    else {
+      const may = new RegExp(`^You may (look at and )?(play|cast) (?:it|that card|those cards|them)( without paying (?:its mana cost|their mana costs))? (for as long as (?:it remains|they remain) exiled|this turn|for as long as ~ remains on the battlefield)(?:, and ${ANY})?$`).exec(t);
+      const until = /^Until your next turn, you may play (?:it|that card|those cards|them)$/.exec(t);
+      if ((may || until) && !play) {
+        play = { until: until ? "yourNextTurn" : /this turn/.test(may![4]!) ? "thisTurn" : /~ remains/.test(may![4]!) ? "source" : "exiled" };
+        if (may?.[1]) seen = true;
+        if (may?.[2] === "cast") play.castOnly = true;
+        if (may?.[3]) play.free = true;
+        if (may && new RegExp(ANY).test(t)) play.anyType = true;
+        // "For as long as ~ remains on the battlefield": a permanent's ability only.
+        if (play.until === "source" && ctx.spell) return "fail";
+      } else if (play && /^(?:If you cast a spell this way, you may spend mana as though it were mana of any type to cast it|Mana of any type can be spent to cast (?:a spell this way|that spell|it))$/.test(t)) play.anyType = true;
+      else if (play?.until === "yourNextTurn" && /^At the beginning of your next upkeep, put any of those cards you didn't play into your graveyard$/.test(t) && whose === "you") upkeepGraveyard = true;
+      else break;
+    }
+    next++;
+  }
+  if (!play && !seen) return null;
+  // A face-down card nobody may look at: Duplicity's, without the look (read as a plain sentence).
+  const who = parsePlayer(whose, ctx);
+  if (!who) return "fail";
+  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}) };
   return { effect, next };
 }
 
@@ -297,6 +355,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       if (!added.length || si === 0 || /[Ss]pend this mana only|can't be spent/.test(sentences[si - 1]!)) return null;
       for (const e of added) e.keep = "turn";
+      continue;
+    }
+    // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3).
+    const faceDown = parseFaceDownPlay(sentences, si, ctx);
+    if (faceDown === "fail") return null;
+    if (faceDown) {
+      effects.push(faceDown.effect);
+      si = faceDown.next - 1;
       continue;
     }
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
@@ -494,6 +560,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         continue;
       }
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      // "You may pay {2}{U}. If you do, exile the top card of your library face down. You may look at that card ... You
+      // may play that card ..." (Intet): the exile and its permissions depend on the payment.
+      const paidFaceDown = parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
+      if (paidFaceDown === "fail") return null;
+      if (paidFaceDown) {
+        effects.push({ type: "may", effects: [paidFaceDown.effect], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${sentences.slice(si, si + paidFaceDown.next).join(". ").replace(/^If you do, /, "")}` });
+        payFirst = null;
+        si += paidFaceDown.next - 1;
+        continue;
+      }
       // "If you do, create a 2/2 black Zombie Berserker creature token, then attach ~ to it": both parts depend
       // on the payment, in order.
       const inner =

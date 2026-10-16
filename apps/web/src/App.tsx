@@ -2558,7 +2558,7 @@ function ZoneViewer({
               <div
                 key={id}
                 className={`card big${pickable ? " playable" : ""}`}
-                title={pickable ? `Click to ${view.zone === "exile" ? "play" : "cast or use"} it from your ${view.zone}` : view.zone === "exile" && s.objects[id]!.mayPlay?.player === HUMAN ? "You may play this card for now" : undefined}
+                title={pickable ? `Click to ${view.zone === "exile" ? "play" : "cast or use"} it from ${view.pid === HUMAN ? "your " : ""}${view.zone}` : view.zone === "exile" && s.objects[id]!.mayPlay?.player === HUMAN ? "You may play this card for now" : undefined}
                 onClick={pickable ? () => onPick(id) : undefined}
                 {...hoverProps(d, onHover)}
               >
@@ -2569,8 +2569,8 @@ function ZoneViewer({
                   </span>
                 )}
                 {view.zone === "exile" && hidden && (
-                  <span className="zone-tag" title="Exiled face down with hideaway: only you can see it.">
-                    hideaway
+                  <span className="zone-tag" title={`Exiled face down${hidden.label ? "" : " with hideaway"}: ${hidden.seen.length === 1 ? "only you" : "you"} can see it.`}>
+                    {hidden.label ? hidden.label.toLowerCase() : "hideaway"}
                   </span>
                 )}
                 {view.zone === "exile" && !!s.objects[id]!.counters.time && (

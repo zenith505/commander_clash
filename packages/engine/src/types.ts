@@ -198,9 +198,22 @@ export interface GameObject {
    * while it's still the same object (`zc`), until the end of this turn or of their next turn, or ("exiled") for as
    * long as it stays exiled. A warped card
    * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
-   * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery.
+   * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery. "yourNextTurn": until
+   * that player's next turn begins (Three Wishes); "source": while `source` stays on the battlefield (Intet).
    */
-  mayPlay?: { player: PlayerId; zc: number; until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell"; turn: number };
+  mayPlay?: {
+    player: PlayerId;
+    zc: number;
+    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source";
+    turn: number;
+    source?: { id: ObjectId; zc: number };
+    /** "Without paying its mana cost" (CR 118.9). */
+    free?: true;
+    /** "Mana of any type can be spent to cast it" (CR 609.4b). */
+    anyType?: true;
+    /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
+    castOnly?: true;
+  };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
    * spell it's cast as, for "if this spell was foretold".

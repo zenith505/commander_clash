@@ -16,6 +16,14 @@ export type Amount = number | AmountExpr;
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade" | (string & {});
 
+/** How the cards an exileFaceDown effect exiled may be played (see GameObject.mayPlay). */
+export interface FaceDownPlay {
+  until: "thisTurn" | "exiled" | "yourNextTurn" | "source";
+  free?: true;
+  anyType?: true;
+  castOnly?: true;
+}
+
 /** What happens to permanents a player picks as an effect resolves: sacrificed, returned to hand, or given counters. */
 /** "populate": create a token that's a copy of the picked creature token (CR 701.36). */
 /** "reveal": amplify's cards revealed from the hand as a permanent enters (CR 702.38a). */
@@ -890,7 +898,13 @@ export type Effect =
    * `hand`, all cards from your hand; `handCard`, one card you choose from your hand (Gustha's Scepter). `look`: its
    * controller may look at them while they remain exiled; otherwise nobody may (Duplicity rulings).
    */
-  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: number; look?: true }
+  /**
+   * Cards exiled face down (CR 406.3): only its controller may look at them, if `look` (Gustha's Scepter) or if they may
+   * play them (`play`: Three Wishes, Gonti, Outrageous Robbery). `who`: whose library ("the top card of that player's
+   * library"); yours by default. `upkeepGraveyard`: "At the beginning of your next upkeep, put any of those cards you
+   * didn't play into your graveyard" (Three Wishes).
+   */
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true }
   /**
    * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
@@ -2103,6 +2117,8 @@ export interface CostMod {
   turn?: "yours" | "notYours";
   /** "Spells you cast from your graveyard". */
   fromGraveyard?: boolean;
+  /** "Spells you cast but don't own" (Gonti, Canny Acquisitor). */
+  notOwned?: true;
   /** "The first creature spell you cast each turn", "the second spell you cast each turn": only the nth matching spell. */
   nth?: number;
   /** Only while this holds: a Class level's (CR 716.2a). */

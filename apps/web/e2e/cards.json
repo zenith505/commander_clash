@@ -3589,6 +3589,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "068b3692-411b-44d4-a7e9-005262760cfc",
+  "name": "Sacrifice",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nAdd an amount of {B} equal to the sacrificed creature's mana value.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4538ec2c-867e-412b-b6e3-a57f8e29ba84",
   "name": "Scrabbling Claws",
   "manaCost": "{1}",
@@ -4333,6 +4362,35 @@
   "set": "avr",
   "releasedAt": "2012-05-04",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "986f510c-e2ec-423e-a443-51a169939558",
+  "name": "Tomb Fortress",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\n{T}: Add {B}.\n{2}{B}{B}{B}, {T}, Exile this land: Mill four cards, then return a creature card from your graveyard to the battlefield. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

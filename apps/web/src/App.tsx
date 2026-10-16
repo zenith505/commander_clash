@@ -2804,7 +2804,7 @@ function LibrarySearch({
                 : pending.fromGraveyard === "exile"
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from your graveyard`
                   : pending.fromGraveyard
-                  ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to your hand`
+                  ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to ${pending.fromGraveyard === "battlefield" ? "the battlefield" : "your hand"}`
                   : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">

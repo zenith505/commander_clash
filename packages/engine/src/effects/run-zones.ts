@@ -736,7 +736,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const p = player(s, pid);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.found) {
-        const cards = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        // Only permanent cards can be put onto the battlefield (CR 110.4b).
+        const cards = p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
         const max = Math.min(e.n, cards.length);
         if (!max) return;
         const kind = e.filter?.text ?? "card";
@@ -745,6 +746,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
+      if (e.dest === "battlefield") {
+        // An Aura's controller chooses what it enchants as it enters (CR 303.4f), or it stays in the graveyard (303.4g).
+        const hosts = chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src);
+        if (hosts === "paused") return "paused";
+        const ids = found.filter((id) => !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
+        if (ids.length) log(s, `${p.name} returns ${ids.map((id) => defOf(s, obj(s, id)).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} from their graveyard to the battlefield${e.tapped ? ", tapped" : ""}.`);
+        enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: { ...e.counters } } : {}), ...hosts.get(id) })));
+        return;
+      }
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) moveObject(s, id, e.dest ?? "hand");

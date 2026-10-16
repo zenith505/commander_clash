@@ -410,7 +410,14 @@ export function compile(d: CardDef): CompiledCard {
       else out.activated.push(bindThisAbility(ab, line));
       continue;
     }
-    const manaAb = parseManaAbility(line);
+    // "Exhaust — [Cost]: Add ..." is a mana ability that can be activated only once (CR 702.177a, 605.1a).
+    const exhaust = /^Exhaust — (.+)$/.exec(line);
+    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(line);
+    if (manaAb && exhaust) {
+      if (manaAb.oncePerTurn) out.unsupported.push(raw);
+      else out.mana.push({ ...manaAb, text: line, onceEver: true });
+      continue;
+    }
     if (manaAb) {
       out.mana.push(manaAb);
       continue;

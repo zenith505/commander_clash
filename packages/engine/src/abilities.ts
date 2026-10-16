@@ -1925,6 +1925,8 @@ export interface ManaAbility {
   skipNextUntap?: boolean;
   /** "Activate only once each turn." (CR 602.5b) */
   oncePerTurn?: boolean;
+  /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object: see GameObject.activatedEver. */
+  onceEver?: true;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */

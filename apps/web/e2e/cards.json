@@ -77,6 +77,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "23be5c68-6530-474d-b677-551da4745b3c",
+  "name": "Assassin Initiate",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Assassin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Assassin"
+  ],
+  "oracleText": "{1}: This creature gains your choice of flying, deathtouch, or lifelink until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "acr",
+  "releasedAt": "2024-07-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "34e05dc1-35af-402d-96ae-e249b3738493",
   "name": "Augur il-Vec",
   "manaCost": "{1}{W}",
@@ -2502,6 +2533,36 @@
   "set": "clu",
   "releasedAt": "2024-02-23",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4fe8316a-9cff-43e9-a1d5-993a0c9daf3a",
+  "name": "Lifelink",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature has lifelink. (Damage dealt by the creature also causes its controller to gain that much life.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

@@ -540,6 +540,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "recruit":
     case "skipUntap":
     case "counters":
+    case "distribute":
     case "lastKnownCounters":
     case "endure":
     case "moveCounter":

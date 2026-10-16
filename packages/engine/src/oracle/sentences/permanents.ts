@@ -4,6 +4,7 @@ import type { Effect, ObjRef } from "../../abilities";
 import { NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
 import { pickFilter, parseObject, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
+import { parseCount } from "../counts";
 import { parseChanges } from "../sentence";
 import { parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
@@ -193,6 +194,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
     ctx.lastTargets = { index: first, n };
     return [{ type: "counters", what: { ref: "target", index: first, n }, counter: counterKind(m[2]!), n: total, divided: true }];
+  }
+  // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
+  // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it
+  // resolves (CR 608.2d).
+  if ((m = new RegExp(`^Distribute (?:${NUMX}|a number of) ${COUNTER} counters (?:equal to (.+?) )?among any number of (.+?) you control$`, "i").exec(s))) {
+    if (!m[1] === !m[3]) return null;
+    const filter = pickFilter(m[4]!);
+    const n = m[3] ? parseCount(m[3], ctx) : amt(m[1]!);
+    return filter && n ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[4]!} you control` } }] : null;
   }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);

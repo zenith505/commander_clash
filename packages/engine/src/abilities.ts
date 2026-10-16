@@ -1009,6 +1009,12 @@ export type Effect =
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
   | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true }
+  /**
+   * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
+   * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
+   * chosen one getting at least one.
+   */
+  | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
   | { type: "sacrifice"; what: ObjRef; byController?: true }

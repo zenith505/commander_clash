@@ -721,6 +721,8 @@ export type PendingDecision =
    * (CR 702.82a): any number of them.
    */
   | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** For "keep": the player whose permanents these are, when someone else chooses for them (Mythos of Snapdax). */ of?: PlayerId }
+  /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
+  | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string }
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
   /**
    * A copy of a spell may get new targets (CR 707.10c): keep them all, or choose new legal ones. `copyOf` is the
@@ -1104,6 +1106,7 @@ export interface Resolving {
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
+    distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
     found?: ObjectId[]; // the cards a library search found
     searchQueue?: PlayerId[]; // players still to search, in APNAP order ("each player searches their library", CR 101.4)
     searchedBy?: { pid: PlayerId; found: ObjectId[] }[]; // the cards each player who has searched found, in that order
@@ -1168,6 +1171,8 @@ export type Action =
   | { type: "orderGraveyard"; player: PlayerId; order: ObjectId[] }
   /** Answer to searchLibrary: the cards found (first = the one for `firstTo`). */
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
+  /** Answer to a distribute decision: how many counters each permanent gets (left out: none). */
+  | { type: "distribute"; player: PlayerId; parts: Record<ObjectId, number> }
   /** Answer to pickPermanents. */
   | { type: "pickPermanents"; player: PlayerId; ids: ObjectId[] }
   /** Answer to chooseOption: one of its options. */

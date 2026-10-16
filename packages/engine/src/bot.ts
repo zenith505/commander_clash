@@ -144,6 +144,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
+    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
@@ -1388,6 +1389,26 @@ function chooseRingBearer(s: GameState, pid: PlayerId, options: ObjectId[]): Obj
  * Which of our permanents to sacrifice or return to hand: the least valuable. Returning a land, a
  * tapped one that's already been used this turn, and not the one that asked for it if we can help it.
  */
+/**
+ * Distributing counters among our own permanents: harmful ones all on the least useful one; +1/+1 counters first to
+ * creatures they lift to power 4 (what "for each creature you control with power 4 or greater" counts), the nearest
+ * first, the rest on the best creature.
+ */
+function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], total: number, counter: CounterKind): Record<ObjectId, number> {
+  const byWorth = [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+  if (harmfulCounter(counter)) return { [byWorth[byWorth.length - 1]!]: total };
+  const parts: Record<ObjectId, number> = {};
+  let left = total;
+  if (counter === "+1/+1")
+    for (const { id, need } of options.map((id) => ({ id, need: 4 - power(s, obj(s, id)) })).filter((x) => x.need > 0).sort((a, b) => a.need - b.need)) {
+      if (need > left) break;
+      parts[id] = need;
+      left -= need;
+    }
+  if (left > 0) parts[byWorth[0]!] = (parts[byWorth[0]!] ?? 0) + left;
+  return parts;
+}
+
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.

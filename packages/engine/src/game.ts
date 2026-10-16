@@ -363,6 +363,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "pickPermanents":
       pickPermanents(s, p, action.ids);
       break;
+    case "distribute":
+      distributeChosen(s, p, action.parts);
+      break;
     case "chooseMay":
       chooseMay(s, p, action.yes);
       break;
@@ -3721,6 +3724,21 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
   s.pending = null;
+  continueResolution(s);
+}
+
+/** How a "distribute" effect's counters are divided (CR 608.2d): all of them, among the permanents offered. */
+function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, number>) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "distribute" || pend.player !== p.id || !r) throw new RulesError("nothing to distribute");
+  const given = Object.entries(parts).filter(([, n]) => n !== 0);
+  if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`distribute the counters among the ${pend.what}`);
+  const sum = given.reduce((a, [, n]) => a + n, 0);
+  if (sum !== pend.total) throw new RulesError(`distribute all ${pend.total} ${pend.counter} counters`);
+  r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
+  s.pending = null;
+  log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
   continueResolution(s);
 }
 

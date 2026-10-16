@@ -1,6 +1,6 @@
 # Roadmap
 
-16,984 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,066 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -28,6 +28,17 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
      them" and several cards don't. Named legendary tokens (Tuktuk the Explorer's "create Tuktuk the Returned, a
      legendary 5/5 ... token") aren't parsed.
+   Left from the timing restrictions/surge/spectacle/overload round (`npm run blockers` used to hide every spell
+   keyword line; it now shows them, so these are newly visible):
+   - Overload still out: Teleportal, Chemister's Trick, Dragonshift, Counterflux, Fangs of Kalonia, March of Progress,
+     Winds of Abandon, Mizzix's Mastery, Break the Ice, Rise and Shine, Spectacular Showdown, Eldritch Immunity (their
+     "each" lines), Street Spasm ({X}{X} overload cost). Fall of the Titans' Surge {X}{R}.
+   - Spell keywords now listed as blockers: Splice onto Arcane, Awaken, Miracle, Harmonize, Undaunted, Paradigm, Epic,
+     Demonstrate, Gravestorm, Buyback with a cost that isn't mana, Expertise's free cast, "tap or untap target"
+     (Jolt, Twiddle).
+   - Timing still out: "before blockers are declared" without "during combat", "after combat", "before the combat
+     damage step", "before attackers are declared" alone, "only if defending player controls ..." (Arcum's Sleigh),
+     Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it".
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
@@ -145,7 +156,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    creature type with it". Left from the additional-combat round: "at the beginning of that combat" and "each combat
    this turn" delayed triggers (Moraug, World at War, Full Throttle), "only the chosen creatures / land creatures can
    attack during that combat phase" (Last Night Together, Bumi), "skips their next combat phase" (Stonehorn Dignitary,
-   False Peace, Moment of Silence), "cast only during combat" (Savage Beating, Take the Bait), "attacks for the first
+   False Peace, Moment of Silence), Take the Bait's "after this phase" extra combat, "attacks for the first
    time each turn" on creatures other than the source and group attack triggers (Desert Were-Worm, Akki Battle Squad,
    Éomer), Raphael's "deals combat damage to a player for the first time each turn", "untap it and all Samurai you
    control" (Godo), Moraug's "for each time it has attacked this turn"; "it can't be blocked this combat" (Ma Chao),
@@ -197,7 +208,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   are still unsupported. Bots don't read ahead past chapter I.
 - Alternative costs: bots never use Fist of Suns' {W}{U}{B}{R}{G} or the Shoals (an X spell for an
   alternative cost), never cast Invigorate (no combat-trick logic for alternative costs), and use the other
-  alternative costs only when they can't pay the mana cost. The game remembers only some of what happened in a turn
+  alternative costs only when they can't pay the mana cost (surge and spectacle whenever allowed; overload when hitting
+  each of them is worth clearly more than the best single target). The game remembers only some of what happened in a turn
   (`GameState.turnLog`: searches, permanents entering, destructions by an opponent, creatures dealing damage to a
   player, life gained, cards put into a graveyard); more "this turn" conditions need more of it.
 - Elesh Norn, Mother of Machines' "triggers an additional time" (its other ability, Torpor Orb's for opponents, works).

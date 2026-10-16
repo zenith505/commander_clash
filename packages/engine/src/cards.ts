@@ -1,6 +1,6 @@
 import type { CompiledCard, ManaAbility, TriggeredAbility } from "./abilities";
 import { characteristics, printedKeywords, type PTPart } from "./layers";
-import { compileCard, compileGranted } from "./oracle";
+import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 
@@ -57,8 +57,22 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   if (o.faceDown) return withWard(o) ? FACE_DOWN_WARD : FACE_DOWN;
   const d = s.cards[copiedId(o)];
   if (!d) throw new Error(`missing card def ${copiedId(o)}`);
-  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : d;
+  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : o.overloaded ? overloadedDef(d) : d;
 };
+
+const overloaded = new Map<string, CardDef>();
+
+/**
+ * An overloaded spell (CR 702.96a, 612): its text with every instance of the word "target" changed to "each", outside
+ * the overload ability itself, so it has no targets (702.96b). Its mana cost doesn't change (rulings).
+ */
+export function overloadedDef(d: CardDef): CardDef {
+  const hit = overloaded.get(d.oracleId);
+  if (hit) return hit;
+  const out: CardDef = { ...d, oracleId: `${d.oracleId}|overloaded`, oracleText: overloadedText(d.oracleText) };
+  overloaded.set(d.oracleId, out);
+  return out;
+}
 
 const prototyped = new Map<string, CardDef>();
 

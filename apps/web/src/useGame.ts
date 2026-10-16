@@ -27,6 +27,7 @@ import {
   graveyardWays,
   waitingOn,
   RulesError,
+  timedCondition,
   type Action,
   type CardDef,
   type GameState,
@@ -179,6 +180,27 @@ function hasInstantPlay(s: GameState): boolean {
 }
 
 /**
+ * A spell or ability that can be used only at this time and can be paid for now (CR 506.8, 602.5b): "Cast this spell
+ * only during the declare attackers step and only if you've been attacked this step", "Activate only during your
+ * upkeep", from your hand, the battlefield or your graveyard (Eternal Dragon).
+ */
+function hasTimedPlay(s: GameState): boolean {
+  const me = s.players[HUMAN]!;
+  for (const id of me.hand) if (timedCondition(compileCard(cardOf(s, id)).castOnly) && planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
+  for (const id of [...s.battlefield, ...me.graveyard]) {
+    const o = obj(s, id);
+    if (o.zone === "battlefield" ? controllerOf(s, o) !== HUMAN : o.owner !== HUMAN) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (!timedCondition(ab.activateIf) || (ab.zone === "graveyard") !== (o.zone === "graveyard") || doesNothingNow(s, id, ab.body)) continue;
+      if (planActivate(s, HUMAN, id, i)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * How the human handles priority:
  * - "hold": stop whenever a response could matter and you have mana up, even with no
  *   playable card, so opponents can't read your hand from how fast you pass (the default).
@@ -223,6 +245,8 @@ function shouldAutoPass(s: GameState, mode: PriorityMode, stops: ReadonlySet<Ste
   // (the active player gets priority first in each step, CR 117.3a).
   if (s.activePlayer === HUMAN && s.step === "declareBlockers" && s.stack.length === 0 && hasInstantPlay(s)) return false;
   if (mode === "auto") return true;
+  // Something usable only now, like "Activate only during your upkeep": stop for it.
+  if (s.stack.length === 0 && hasTimedPlay(s)) return false;
   const inCombat = (s.step === "declareBlockers" || s.step === "declareAttackers") &&
     (s.activePlayer === HUMAN || s.battlefield.some((id) => obj(s, id).attacking === HUMAN));
   const top = s.stack[s.stack.length - 1];

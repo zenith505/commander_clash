@@ -743,13 +743,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifGift = true;
         body0 = gifted[1]!;
       }
-      // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a).
-      let ifSneaked = false;
-      const sneaked = /^if (?:its|his|her|their) sneak cost was paid, (.+)$/i.exec(body0);
-      if (sneaked) {
+      // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a), "if its surge cost was paid" (702.117a),
+      // "if its spectacle cost was paid" (702.137a).
+      let ifAlt: "sneak" | "surge" | "spectacle" | undefined;
+      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle) cost was paid, (.+)$/i.exec(body0);
+      if (altPaid) {
         if (event !== "selfEnters") return "fail" as const;
-        ifSneaked = true;
-        body0 = sneaked[1]!;
+        ifAlt = altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle";
+        body0 = altPaid[2]!;
       }
       let text = self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
@@ -768,7 +769,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifSneaked ? { ifSneaked } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
         : ("fail" as const);
     }
   }

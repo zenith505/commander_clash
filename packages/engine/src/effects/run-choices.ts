@@ -136,6 +136,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"
             ? gifteeOf(s, ctx) !== undefined
+            : e.cond.kind === "altPaid"
+            ? (s.resolving!.item.kind === "spell" ? s.objects[s.resolving!.item.objectId ?? ""]?.castAlt : ctx.event?.castAlt) === e.cond.alt
             : e.cond.kind === "state"
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)
             : kickedMatches(ctx.kicked, e.cond);

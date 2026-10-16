@@ -5,7 +5,7 @@ import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseAdditionalCost } from "./keyword-abilities";
 import { pickFilter } from "./targets";
-import { parseActivateCondition } from "./statics";
+import { parseOnlyClauses } from "./statics";
 
 /** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
 const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
@@ -63,37 +63,30 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let effectText = m[2]!;
   let sorcerySpeed = false;
   let oncePerTurn = false;
-  // Timing restrictions (CR 602.5b): "Activate only as a sorcery", "... only once each turn", or both.
-  const limit = / Activate only (as a sorcery|once each turn|as a sorcery and only once each turn)\.$/.exec(effectText);
-  if (limit) {
-    sorcerySpeed = limit[1]!.includes("sorcery");
-    oncePerTurn = limit[1]!.includes("once");
-    effectText = effectText.slice(0, limit.index);
-  }
-  // "Activate no more than twice each turn." (CR 602.5b)
   let maxPerTurn: number | undefined;
-  const most = / Activate no more than (twice|three times) each turn\.$/.exec(effectText);
-  if (most) {
-    maxPerTurn = most[1] === "twice" ? 2 : 3;
-    effectText = effectText.slice(0, most.index);
-  }
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
   let activateIf: ActivatedAbility["activateIf"];
-  // "Activate only during your turn[, before attackers are declared]." (CR 602.5b)
-  const turn = / Activate only during your turn(, before attackers are declared)?( and only once each turn)?\.$/.exec(effectText);
-  if (turn) {
-    activateIf = { kind: turn[1] ? "beforeAttackers" : "yourTurn" };
-    if (turn[2]) oncePerTurn = true;
-    effectText = effectText.slice(0, turn.index);
-  }
-  const onlyIf = / Activate only if ([^.]+?)( and only once each turn| and only as a sorcery)?\.$/.exec(effectText);
-  if (onlyIf) {
-    if (activateIf) return "fail";
-    if (onlyIf[2] === " and only once each turn") oncePerTurn = true;
-    if (onlyIf[2] === " and only as a sorcery") sorcerySpeed = true;
-    activateIf = parseActivateCondition(onlyIf[1]!) ?? undefined;
-    if (!activateIf) return "fail";
-    effectText = effectText.slice(0, onlyIf.index);
+  for (let found = true; found; ) {
+    found = false;
+    // "Activate no more than twice each turn." (CR 602.5b)
+    const most = / Activate no more than (twice|three times) each turn\.$/.exec(effectText);
+    if (most && !maxPerTurn) {
+      maxPerTurn = most[1] === "twice" ? 2 : 3;
+      effectText = effectText.slice(0, most.index);
+      found = true;
+    }
+    // Restrictions (CR 602.5b, 506.8g): "Activate only as a sorcery", "... only once each turn", "... only during your
+    // upkeep", "... only during your turn and only if an opponent lost life this turn", in any combination.
+    const only = / Activate only ([^.]+)\.$/.exec(effectText);
+    if (only && !activateIf && !sorcerySpeed && !oncePerTurn) {
+      const clauses = parseOnlyClauses(only[1]!);
+      if (!clauses) return "fail";
+      sorcerySpeed = !!clauses.sorcery;
+      oncePerTurn = !!clauses.once;
+      activateIf = clauses.cond;
+      effectText = effectText.slice(0, only.index);
+      found = true;
+    }
   }
   const life = /Pay (\d+) life/.exec(costs);
   const energy = energyIn(costs);

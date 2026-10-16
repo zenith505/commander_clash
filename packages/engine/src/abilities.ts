@@ -691,7 +691,29 @@ export type StaticCondition =
    */
   | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
-  | { kind: "allOf"; conds: StaticCondition[] };
+  | { kind: "allOf"; conds: StaticCondition[] }
+  /**
+   * "Cast ~ only during combat", "Activate only during your upkeep" (CR 506.8, 601.3, 602.5b): the part of the turn
+   * it may be cast or activated in; `turn`: "your" or "an opponent's" (upkeep, end step, combat, declare attackers step).
+   */
+  | { kind: "during"; window: TimingWindow; turn?: "you" | "opponent" }
+  /**
+   * "Only if you've been attacked this step", with "during the declare attackers step": a creature declared as an
+   * attacker this step attacks you, not only planeswalkers you control (rulings on Heavy Fog).
+   */
+  | { kind: "attackedThisStep" };
+
+/** A restriction naming a part of the turn (CR 506.8, 602.5b): "only during your upkeep", "only during combat". */
+export const timedCondition = (c: StaticCondition | undefined): boolean =>
+  !!c && (c.kind === "during" || c.kind === "attackedThisStep" || ((c.kind === "allOf" || c.kind === "anyOf") && c.conds.some(timedCondition)));
+
+/**
+ * When a restricted spell or ability may be used (CR 506.8): "upkeep", "end" (end step), "afterUpkeep" (the steps after
+ * the upkeep), "combat" (any step of a combat phase, 506.8c), "combatBeforeBlocks" (beginning of combat and declare
+ * attackers), "combatAfterBlocks" (once blockers are declared, 506.8f: not in a combat whose declare blockers step was
+ * skipped), and the steps "declareAttackers", "declareBlockers" and "endCombat", once their turn-based actions are done.
+ */
+export type TimingWindow = "upkeep" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat";
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
@@ -1176,6 +1198,8 @@ export type SpellCondition =
   | { kind: "teamwork" }
   /** "If the gift was promised" (CR 702.174b, k). */
   | { kind: "gift" }
+  /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
+  | { kind: "altPaid"; alt: "surge" | "spectacle" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition };
 
@@ -1434,8 +1458,8 @@ export interface TriggeredAbility {
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */
   ifEvoked?: boolean;
-  /** "When ~ enters, if his sneak cost was paid" (CR 702.190a). */
-  ifSneaked?: boolean;
+  /** "When ~ enters, if his sneak cost was paid" (CR 702.190a), "if its surge / spectacle cost was paid" (702.117a, 702.137a). */
+  ifAlt?: "sneak" | "surge" | "spectacle";
   /** Ravenous's "if X is 5 or more" (CR 702.156a): the X of the spell it was (CR 107.3m), which can't change. */
   ifX?: number;
   /** Casualty's "if a casualty cost was paid for it" (CR 702.153a). */
@@ -1737,7 +1761,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak";
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
@@ -1861,6 +1885,12 @@ export interface CompiledCard {
   flashCost?: number;
   /** "Cast this spell only if you've cast another spell this turn." (Illusory Angel; CR 601.3) */
   castOnlyAfterAnother?: boolean;
+  /**
+   * "Cast this spell only during combat", "... only during the declare attackers step and only if you've been attacked
+   * this step" (CR 506.8, 601.3): checked as it's proposed, also when it's cast during another's resolution (rulings:
+   * only timing based on its card type is ignored then).
+   */
+  castOnly?: StaticCondition;
   /**
    * "Each player can't cast more than one spell each turn" (Rule of Law), "... one noncreature spell": counting every
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).

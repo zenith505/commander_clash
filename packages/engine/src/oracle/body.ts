@@ -572,6 +572,8 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
   { re: "the gift wasn't promised", cond: { kind: "gift" }, not: true },
+  { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
+  { re: "~'s spectacle cost was paid", cond: { kind: "altPaid", alt: "spectacle" } },
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },
   { re: "mana from a Treasure was spent to activate this ability", cond: { kind: "treasure" }, activatedOnly: true, noTargets: true },

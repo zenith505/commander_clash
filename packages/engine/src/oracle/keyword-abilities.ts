@@ -218,6 +218,20 @@ export function parseCostKeyword(
   // Freerunning [cost] (CR 702.173a); "Freerunning—Return a blue creature ..." and {X} costs aren't modeled.
   if ((m = /^Freerunning ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) ? { alt: { kind: "freerunning", mana: m[1]! } } : "fail";
   if (/^Freerunning\b/.test(line)) return "fail";
+  // Surge [cost] (CR 702.117a): if you've cast another spell this turn (no teammates here); spectacle [cost] (702.137a):
+  // if an opponent lost life this turn. Alternative costs, so not with an {X} the mana cost doesn't have.
+  if ((m = /^(Surge|Spectacle) ((?:\{[^}]+\})+)$/.exec(line))) {
+    if (!plainMana(m[2]!) || (/\{X\}/.test(m[2]!) && !/\{X\}/.test(d.manaCost))) return "fail";
+    return m[1] === "Surge" ? { alt: { kind: "surge", mana: m[2]!, if: { kind: "castAnother" } } } : { alt: { kind: "spectacle", mana: m[2]!, if: { kind: "opponentLostLife" } } };
+  }
+  if (/^(Surge|Spectacle)\b/.test(line)) return "fail";
+  // Overload [cost] (CR 702.96a): an alternative cost for an instant or sorcery; compile checks its "each" text.
+  if ((m = /^Overload ((?:\{[^}]+\})+)$/.exec(line))) {
+    // An overload cost with {X} (Street Spasm) waits: how X is paid twice isn't modeled.
+    if (!plainMana(m[1]!) || !d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return "fail";
+    return { alt: { kind: "overload", mana: m[1]! } };
+  }
+  if (/^Overload\b/.test(line)) return "fail";
   // Sneak [cost] (CR 702.190a): during your declare blockers step, cast it for [cost] and by returning an unblocked
   // attacker you control to its owner's hand; a permanent spell enters tapped and attacking (702.190b).
   if ((m = /^Sneak ((?:\{[^}]+\})+)$/.exec(line)))

@@ -88,6 +88,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
   else if ((m = /^(~ .+?) if it devoured a creature$/.exec(text))) [statement, cond] = [m[1], "it devoured a creature"];
+  // Nimble Brigand: "~ can't be blocked if you've committed a crime this turn": the same as "as long as" (CR 700.13).
+  else if ((m = /^(~ .+?) if (you've committed a crime this turn)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   if (!statement || !cond) return null;
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
   const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
@@ -275,6 +277,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^you (have|don't have) the city's blessing$/.exec(text))) return { kind: "citysBlessing", ...(m[1] === "don't have" ? { not: true as const } : {}) }; // CR 702.131c
   if (/^(?:~|it) devoured a creature$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "devoured" };
   if (/^you attacked(?: with (?:a|one or more) creatures?)? this turn$/.test(text)) return { kind: "attackedThisTurn" };
+  if (/^you've committed a crime this turn$/.test(text)) return { kind: "committedCrime" }; // CR 700.13
   if (/^you control three or more creatures with different powers$/.test(text)) return { kind: "coven" };
   if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };

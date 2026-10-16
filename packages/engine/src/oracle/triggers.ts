@@ -48,6 +48,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
+  [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
+  [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
@@ -578,7 +580,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["castSpell", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+const YARD_EVENTS: TriggerEvent[] = ["castSpell", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).

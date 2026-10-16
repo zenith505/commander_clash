@@ -4,7 +4,7 @@ import { checkAscend, describeTargets, draw, log, obj, opponents, pairable, pair
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
-import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
+import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
 import { nextRandom } from "../rng";
 import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
@@ -709,6 +709,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "targeted") {
     // Each permanent becomes the target once, however many of the item's targets name it.
     const item = s.stack.find((x) => x.id === ev.stackId);
+    // Committing a crime (CR 700.13): casting a spell, activating an ability or putting a triggered ability on the stack
+    // that targets an opponent, a permanent, spell or ability an opponent controls, or a card in an opponent's graveyard.
+    // Once for the spell or ability, however many of its targets do.
+    if (item && isCrime(s, item)) {
+      const criminal = item.controller;
+      player(s, criminal).crimeTurn = s.turn;
+      const that = { player: criminal };
+      const crime = (o: GameObject, wc: PlayerId) => add(o, wc, (e) => (e === "youCommitCrime" && wc === criminal) || (e === "opponentCommitsCrime" && wc !== criminal), undefined, ev.stackId, undefined, undefined, undefined, undefined, that);
+      for (const id of s.battlefield) crime(obj(s, id), controllerOf(s, obj(s, id)));
+      fromGraveyards(crime);
+    }
     const seen = new Set<ObjectId>();
     for (const t of item?.targets ?? []) {
       if (t.kind !== "object" || seen.has(t.id)) continue;
@@ -1017,6 +1028,25 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });
+}
+
+/** Whether this spell or ability, as it's put on the stack, makes its controller commit a crime (CR 700.13). */
+function isCrime(s: GameState, item: StackItem): boolean {
+  const you = item.controller;
+  return (item.targets ?? []).some((t) => {
+    if (t.kind === "player") return t.id !== you;
+    if (t.kind === "stack") {
+      const target = s.stack.find((x) => x.id === t.id);
+      return !!target && target.controller !== you;
+    }
+    if (t.kind !== "object") return false;
+    const o = s.objects[t.id];
+    if (!o) return false;
+    if (o.zone === "battlefield") return controllerOf(s, o) !== you;
+    if (o.zone === "graveyard") return o.owner !== you;
+    if (o.zone === "stack") return o.controller !== you;
+    return false;
+  });
 }
 
 /** Stands in as the "source" of speed's inherent triggered ability, which has none (CR 702.179d). */

@@ -447,6 +447,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
+    case "committedCrime":
+      return s.players[you]?.crimeTurn === s.turn;
     case "coven": {
       const powers = new Set<number>();
       for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) powers.add(c.power);

@@ -372,6 +372,8 @@ export interface Player {
   firstDrawStepDraw?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
+  /** The turn this player last committed a crime (CR 700.13), for "if you've committed a crime this turn". */
+  crimeTurn?: number;
   /**
    * The creatures this player declared as attackers this turn ("id@zoneChanges"): one declared in two combats counts once,
    * one put onto the battlefield attacking not at all (Windbrisk Heights rulings).

@@ -702,6 +702,8 @@ export type StaticCondition =
   | { kind: "opponentPoison"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
+  /** "If you've committed a crime this turn" (CR 700.13). */
+  | { kind: "committedCrime" }
   /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
@@ -1423,6 +1425,9 @@ export type TriggerEvent =
   | "youCollectEvidence"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
+  /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
+  | "youCommitCrime"
+  | "opponentCommitsCrime"
   /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */

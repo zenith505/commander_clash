@@ -804,6 +804,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = state && parseBody(st[2]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
   }
+  // "Whenever you commit a crime during your turn" (Overzealous Muscle, CR 700.13): only while it's your turn, whether it
+  // triggers at all, not an intervening if.
+  const crime = /^Whenever you commit a crime during your turn, (.+)$/.exec(line);
+  if (crime) {
+    const body = parseBody(crime[1]!, { selfIt: true });
+    return body ? { event: "youCommitCrime", body, activeIf: { kind: "yourTurn" } } : "fail";
+  }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);
     if (m) {

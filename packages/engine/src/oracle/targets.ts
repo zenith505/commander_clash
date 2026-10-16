@@ -259,6 +259,7 @@ export const PERMANENT_TYPES = ["Artifact", "Battle", "Creature", "Enchantment",
 
 const PLURAL_TYPES: Record<string, string> = {
   creatures: "creature",
+  outlaws: "outlaw", // CR 700.12
   artifacts: "artifact",
   enchantments: "enchantment",
   lands: "land",
@@ -322,6 +323,9 @@ export function parseCardTarget(p: string, ctx: Ctx, owner?: "you"): ObjRef | nu
   }
   return what;
 }
+
+/** The creature types that make an object an outlaw (CR 700.12). */
+export const OUTLAW_TYPES = ["Assassin", "Mercenary", "Pirate", "Rogue", "Warlock"];
 
 /** Parse the words after "target": "nonblack creature an opponent controls", "artifact or enchantment", "spell", ... */
 export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** "with power X or less" may be the X announced (TargetSpec.xRange). */ x?: boolean } = {}): TargetSpec | null {
@@ -456,11 +460,20 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
+  let outlaw = false;
   for (const alt of alts) {
     const words = alt.trim().split(/\s+/);
     for (let i = 0; i < words.length; i++) {
       const w = words[i]!;
-      if (w === "suspected") {
+      if (w === "outlaw") {
+        // "Outlaw": Assassin, Mercenary, Pirate, Rogue and/or Warlock (CR 700.12), any of them; alone among subtypes.
+        if (alts.length > 1 || subtypes.length) return null;
+        subtypes.push(...OUTLAW_TYPES);
+        outlaw = true;
+      } else if (w === "non-outlaw") {
+        if (alts.length > 1 || notSubtypes.length) return null;
+        notSubtypes.push(...OUTLAW_TYPES);
+      } else if (w === "suspected") {
         // "Suspected creature" (CR 701.60).
         if (alts.length > 1 || extra.suspected) return null;
         extra.suspected = true;
@@ -494,6 +507,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
       else return null;
     }
   }
+  if (outlaw && subtypes.length !== OUTLAW_TYPES.length) return null;
   // "red or green creature" means a creature that's red or green. Mixing colors with several
   // different type alternatives ("red creature or green artifact") isn't modeled.
   if (colors.length && alts.filter((a) => a.split(/\s+/).some((w) => TYPE_WORDS[w])).length > 1) return null;

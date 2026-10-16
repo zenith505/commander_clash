@@ -2039,6 +2039,8 @@ export interface CompiledCard {
    * its total cost is this much more (CR 601.2f).
    */
   flashCost?: number;
+  /** "This spell has flash as long as you've committed a crime this turn": castable at instant speed while it holds (CR 702.8a). */
+  flashIf?: StaticCondition;
   /** "Cast this spell only if you've cast another spell this turn." (Illusory Angel; CR 601.3) */
   castOnlyAfterAnother?: boolean;
   /**

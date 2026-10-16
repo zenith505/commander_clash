@@ -197,9 +197,13 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   return true;
 }
 
-/** A spell's mana value on the stack: its mana cost's, with X as chosen for it (CR 202.3e), or 0 face down (CR 708.2). */
+/**
+ * A spell's mana value on the stack: its mana cost's, with X as chosen for it (CR 202.3e), or 0 face down (CR 708.2).
+ * Gone from the stack (countered): as it last existed there (CR 113.7a), from its `castItems` snapshot.
+ */
 export function spellManaValue(s: GameState, item: StackItem): number {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
+  if (item.castMv !== undefined && o?.zone !== "stack") return item.castMv;
   if (!o || o.faceDown) return 0;
   const cost = parseManaCost(defOf(s, o).manaCost);
   return manaValue(cost) + (cost.hasX ? (item.x ?? 0) * xCount(cost) : 0);

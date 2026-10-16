@@ -147,12 +147,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "cascade": {
-      // CR 702.85a. The spell's mana value is its own, even if it has left the stack by now (last known information).
+      // CR 702.85a. The spell's mana value is its own, even if it has left the stack by now: as it last existed there
+      // (CR 113.7a), its X included (CR 202.3e). A countered spell's cascade still resolves (rulings).
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.cascade) {
-        // On the stack, its mana value counts the X chosen for it (CR 202.3e).
-        const spell = ctx.cause !== undefined ? s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") : undefined;
+        const spell = ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") ?? s.castItems?.[ctx.cause]) : undefined;
         const limit = spell ? spellManaValue(s, spell) : manaValue(parseManaCost(ctx.sourceDef.manaCost));
         const exiled: ObjectId[] = [];
         let hit: ObjectId | undefined;

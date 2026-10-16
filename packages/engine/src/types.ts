@@ -480,6 +480,11 @@ export interface StackItem {
   sourceUntaps?: number;
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
+  /**
+   * In `castItems` only: the spell's mana value as it was put on the stack, X included (CR 202.3e), for when it has left
+   * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
+   */
+  castMv?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
   /** For its permanent's enters trigger: how many colors of mana were spent to cast it (converge, CR 207.2c). */

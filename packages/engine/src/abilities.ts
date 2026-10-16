@@ -125,7 +125,11 @@ export type Count =
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
-  | { kind: "stationPower" };
+  | { kind: "stationPower" }
+  /** How many players took a punisher's penalty this time (Acererak's "for each opponent, you create ... unless"). */
+  | { kind: "punished" }
+  /** 1 while the condition holds, else 0: "Add {G}{G}. If you've completed a dungeon, add six {G} instead." */
+  | { kind: "stateIf"; cond: StaticCondition };
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
@@ -1108,7 +1112,8 @@ export type Effect =
    * "You may [do something]": the controller chooses as it resolves whether to do it
    * (CR 608.2d). Its targets were still chosen when it was put on the stack (CR 603.3d).
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean }
+  /** `once`: "Do this only once each turn" (CR 603.2h): see GameObject.triggeredThisTurn. */
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean }
   /**
    * "Each player may discard their hand and draw five cards" (Will of the Jeskai): each of them decides in APNAP order,
    * knowing the earlier answers (CR 101.4), then `effects` happen to those who chose to ({ ref: "choseThisWay" }).
@@ -1123,7 +1128,8 @@ export type Effect =
    * Bolas, the Deceiver and Court of Ambition). A player may always choose none. `times`: "Repeat this process X times",
    * each time all the way through (rulings on Torment of Hailfire).
    */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount }
+  /** `picks`: "for each blight counter on it, ... unless" (Rottenmouth Viper): each player chooses that many times first. */
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -1437,6 +1443,8 @@ export type TriggerEvent =
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
+  oncePerTurn?: boolean;
   /**
    * For "selfBecomesTarget" / "permanentBecomesTarget": `spell`, "of a spell" (not an ability); `by`, "a spell or ability
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).

@@ -881,21 +881,49 @@ function chooseRoom(s: GameState, pid: PlayerId, options: string[]): string {
 }
 
 /**
- * A punisher (see its effect): sacrifice a token if that's allowed; low on life, anything but the penalty; with cards to
- * spare, discard one; otherwise take the life loss.
+ * A punisher (see its effect): the cheapest way out. Each option and the penalty get a cost in life points: life lost
+ * weighs more the closer it brings us to 0 (and taking lethal is never chosen while there's another way); a card in
+ * hand is worth a few life (a spare land little); a permanent its worth; a token for the punisher's controller about
+ * a creature's worth; a payment its mana, if we can pay it.
  */
 function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string {
   const pu = s.resolving?.scratch?.punish;
   if (!pu) return "none";
   const p = player(s, pid);
-  const lose = pu.lose ?? 3;
-  const ways = options.filter((o) => o !== "none").map((o) => ({ o, w: pu.options[Number(o)]! }));
-  const sac = ways.find(({ w }) => "sacrifice" in w && pickOptions(s, { filter: w.sacrifice }, pid).some((id) => obj(s, id).isToken && !objIsType(s, obj(s, id), "Creature")));
-  if (sac) return sac.o;
-  const discard = ways.find(({ w }) => "discard" in w);
-  if (p.life - lose <= 5) return (discard ?? ways[0])?.o ?? "none";
-  if (discard && "discard" in discard.w && p.hand.length - discard.w.discard >= 4) return discard.o;
-  return "none";
+  const made = pu.made[pid] ?? [];
+  // Already picked this round (Rottenmouth Viper's several picks): not offered again.
+  const takenDiscards = made.reduce((n, m) => {
+    const o = pu.options[Number(m)];
+    return n + (o && "discard" in o ? o.discard : 0);
+  }, 0);
+  const takenSacs = made.filter((m) => pu.options[Number(m)] && "sacrifice" in pu.options[Number(m)]!).length;
+  // The life still to be lost this round from the "neither" picks already made.
+  const lose = pu.lose ?? 0;
+  const life = p.life - lose * made.filter((m) => m === "none").length;
+  const lifeCost = (n: number) => (n >= life ? 1000 : n * (1 + 15 / Math.max(1, life - n)));
+  const penalty = pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : 4;
+  const handCost = (n: number) => {
+    const cards = chooseDiscards(s, pid, takenDiscards + n).slice(takenDiscards);
+    if (cards.length < n) return Infinity;
+    return cards.reduce((t, id) => t + (isType(defOf(s, obj(s, id)), "Land") ? (lands(s, pid) >= 6 ? 1.5 : 5) : 4 + Math.min(3, mv(s, id) / 2)), 0);
+  };
+  const cost = (o: string): number => {
+    if (o === "none") return penalty;
+    const w = pu.options[Number(o)];
+    if (!w) return Infinity;
+    if ("discard" in w) return handCost(w.discard);
+    if ("sacrifice" in w) {
+      const worths = pickOptions(s, { filter: w.sacrifice }, pid)
+        .map((id) => obj(s, id))
+        .filter((x) => !x.isCommander)
+        .map((x) => (objIsType(s, x, "Land") ? (lands(s, pid) >= 7 ? 2 : 6) : worth(s, pid, x)))
+        .sort((a, b) => a - b);
+      return worths[takenSacs] ?? Infinity;
+    }
+    const mana = (w.pay.generic === undefined ? 0 : typeof w.pay.generic === "number" ? w.pay.generic : 3) + manaValue(parseManaCost(w.pay.cost));
+    return availableMana(s, pid) >= mana ? mana / 2 + (w.pay.life ?? 0) : Infinity;
+  };
+  return [...options].sort((a, b) => cost(a) - cost(b) || (a === "none" ? -1 : b === "none" ? 1 : 0))[0] ?? "none";
 }
 
 /**

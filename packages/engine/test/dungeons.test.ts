@@ -241,3 +241,84 @@ describe("venture into the dungeon (CR 701.49)", () => {
     expect(tokens(s, ap1, "Faerie Dragon Token")).toHaveLength(0);
   });
 });
+
+// Real oracle text (Scryfall).
+const dungeoneersPack = card("Dungeoneer's Pack", "Artifact", "{3}", { keywords: ["Treasure"], oracleText: "This artifact enters tapped.\n{2}, {T}, Sacrifice this artifact: You take the initiative, gain 3 life, draw a card, and create a Treasure token. Activate only as a sorcery. (A Treasure token is an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")" });
+const imoen = card("Imoen, Mystic Trickster", "Legendary Creature — Human Rogue Wizard", "{2}{U}", { power: "2", toughness: "3", keywords: ["Choose a background", "Ward"], oracleText: "Ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nAt the beginning of your end step, if you have the initiative, draw a card. Draw another card if you've completed a dungeon.\nChoose a Background (You can have a Background as a second commander.)" });
+const safana = card("Safana, Calimport Cutthroat", "Legendary Creature — Human Rogue", "{2}{B}", { power: "3", toughness: "2", keywords: ["Choose a background", "Treasure", "Menace"], oracleText: "Menace\nAt the beginning of your end step, if you have the initiative, create a Treasure token. Create three of those tokens instead if you've completed a dungeon.\nChoose a Background (You can have a Background as a second commander.)" });
+const undermountainAdventurer = card("Undermountain Adventurer", "Creature — Giant Warrior", "{3}{G}", { power: "3", toughness: "4", keywords: ["Vigilance"], oracleText: "Vigilance\nWhen this creature enters, you take the initiative.\n{T}: Add {G}{G}. If you've completed a dungeon, add six {G} instead." });
+const tombOfHorrorsAdventurer = card("Tomb of Horrors Adventurer", "Creature — Elf Monk", "{5}{U}", { power: "4", toughness: "4", oracleText: "When this creature enters, you take the initiative.\nWhenever you cast your second spell each turn, copy it. If you've completed a dungeon, copy that spell twice instead. You may choose new targets for the copies. (A copy of a permanent spell becomes a token.)" });
+const rilsaRael = card("Rilsa Rael, Kingpin", "Legendary Creature — Human Rogue", "{3}{U}{B}", { power: "2", toughness: "5", keywords: ["Deathtouch"], oracleText: "Deathtouch\nWhen Rilsa Rael enters, you take the initiative.\nWhenever you attack, target attacking creature gains deathtouch until end of turn. If you've completed a dungeon, that creature also gets +5/+0 and gains first strike and menace until end of turn." });
+
+describe("completed dungeons inside effects; Dungeoneer's Pack", () => {
+  it("parses", () => supported(dungeoneersPack, imoen, safana, undermountainAdventurer, tombOfHorrorsAdventurer, rilsaRael));
+
+  it("Dungeoneer's Pack: the initiative, 3 life, a card and a Treasure, in that order", () => {
+    const { s: s0, ap } = setup([]);
+    const pack = putOnBattlefield(s0, ap, dungeoneersPack);
+    const hand = s0.players[ap]!.hand.length;
+    const s = settle(activate(s0, ap, pack, 0));
+    expect(s.initiative).toBe(ap);
+    expect(s.players[ap]!.dungeon?.name).toBe("Undercity"); // taking the initiative ventures into Undercity (CR 726.2)
+    expect(s.players[ap]!.life).toBe(43);
+    // The card, and Undercity's Secret Entrance puts a basic land card into the hand.
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(tokens(s, ap, "Treasure Token")).toHaveLength(1);
+    expect(s.objects[pack]!.zone).toBe("graveyard");
+  });
+
+  it("Imoen and Safana: with the initiative, one card and one Treasure; after a completed dungeon, two cards and three Treasures", () => {
+    for (const done of [false, true]) {
+      const { s: s0, ap } = setup([]);
+      putOnBattlefield(s0, ap, imoen);
+      putOnBattlefield(s0, ap, safana);
+      s0.initiative = ap;
+      if (done) s0.players[ap]!.completedDungeons = ["Lost Mine of Phandelver"];
+      const before = passUntil(s0, "end", ap);
+      const hand = before.players[ap]!.hand.length;
+      const s = settle(before);
+      expect(s.players[ap]!.hand.length).toBe(hand + (done ? 2 : 1));
+      expect(tokens(s, ap, "Treasure Token")).toHaveLength(done ? 3 : 1);
+    }
+  });
+
+  it("Undermountain Adventurer: {G}{G}, or six {G} after a completed dungeon", () => {
+    for (const done of [false, true]) {
+      const { s: s0, ap } = setup([]);
+      const u = putOnBattlefield(s0, ap, undermountainAdventurer);
+      if (done) s0.players[ap]!.completedDungeons = ["Tomb of Annihilation"];
+      const s = act(s0, { type: "activateMana", player: ap, objectId: u, mana: "G" });
+      expect(s.players[ap]!.manaPool.G).toBe(done ? 6 : 2);
+    }
+  });
+
+  it("Tomb of Horrors Adventurer: the second spell is copied once, or twice after a completed dungeon", () => {
+    for (const done of [false, true]) {
+      const { s: s0, ap, ids } = setup([divination, divination]);
+      putOnBattlefield(s0, ap, tombOfHorrorsAdventurer);
+      if (done) s0.players[ap]!.completedDungeons = ["Dungeon of the Mad Mage"];
+      let s = settle(cast(s0, ap, ids[0]!));
+      const hand = s.players[ap]!.hand.length;
+      s = settle(cast(s, ap, ids[1]!));
+      // The Divination left the hand; it and its copies each draw two.
+      expect(s.players[ap]!.hand.length).toBe(hand - 1 + 2 * (done ? 3 : 2));
+    }
+  });
+
+  it("Rilsa Rael: deathtouch for the target attacker; after a completed dungeon also +5/+0, first strike and menace", () => {
+    for (const done of [false, true]) {
+      const { s: s0, ap, opp } = setup([]);
+      putOnBattlefield(s0, ap, rilsaRael);
+      const b = putOnBattlefield(s0, ap, bear());
+      if (done) s0.players[ap]!.completedDungeons = ["Lost Mine of Phandelver"];
+      let s = passUntil(s0, "declareAttackers", ap);
+      s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+      s = settle(s, (x) => (x.pending?.kind === "chooseTargets" ? { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b }] } : undefined));
+      const c = characteristics(s, s.objects[b]!);
+      expect(c.keywords).toContain("Deathtouch");
+      expect(c.power).toBe(done ? 7 : 2);
+      expect(c.keywords.includes("First strike")).toBe(done);
+      expect(c.keywords.includes("Menace")).toBe(done);
+    }
+  });
+});

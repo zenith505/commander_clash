@@ -228,7 +228,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
-      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount)))
+      if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text)) return;
+      const once = t.body.effects[0];
+      if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
+      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount))) {
+        if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
         s.triggerQueue.push({
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
           // An ability an effect gave it isn't on its card, so the trigger carries what it does.
@@ -246,6 +250,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ...(colorsSpent ? { colorsSpent } : {}),
           ...(event ? { event } : {}),
         });
+      }
     });
   };
   /**
@@ -886,6 +891,15 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
     added = true;
   }
   return added;
+}
+
+/** A trigger of a permanent that just left the battlefield (CR 603.10a): it's about the object it was there. */
+const lookingBack = (o: GameObject, zone: TriggeredAbility["zone"]) => o.zone !== "battlefield" && zone !== "graveyard" && (o.zoneChanges ?? 0) > 0;
+
+/** Whether this object's "only once each turn" ability (by its text, or "do:" and its may's) was used this turn. */
+export function onceUsed(o: GameObject, zone: TriggeredAbility["zone"], text: string): boolean {
+  const zc = lookingBack(o, zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0);
+  return !!o.triggeredThisTurn?.includes(`${zc}|${text}`);
 }
 
 const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : compileCard(s.cards[t.sourceCardId]!).triggers[t.index]);

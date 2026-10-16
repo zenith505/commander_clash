@@ -273,3 +273,120 @@ describe("X unless [condition]", () => {
     expect(s.players[ap]!.hand.length).toBe(hand + 1 - 1);
   });
 });
+
+// Real oracle text (Scryfall).
+const acererak = card("Acererak the Archlich", "Legendary Creature — Zombie Wizard", "{2}{B}", { power: "5", toughness: "5", keywords: ["Venture into the dungeon"], oracleText: "When Acererak enters, if you haven't completed Tomb of Annihilation, return Acererak to its owner's hand and venture into the dungeon.\nWhenever Acererak attacks, for each opponent, you create a 2/2 black Zombie creature token unless that player sacrifices a creature of their choice." });
+const demandingDragon = card("Demanding Dragon", "Creature — Dragon", "{3}{R}{R}", { power: "5", toughness: "5", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, it deals 5 damage to target opponent unless that player sacrifices a creature of their choice." });
+const soulBarrier = card("Soul Barrier", "Enchantment", "{2}{U}", { oracleText: "Whenever an opponent casts a creature spell, this enchantment deals 2 damage to that player unless they pay {2}." });
+// Rottenmouth Viper's trigger, without its additional cost (not supported yet).
+const viperTrigger = card("Rottenmouth Viper", "Creature — Elemental Snake", "{5}{B}", { power: "6", toughness: "6", oracleText: "Whenever this creature enters or attacks, put a blight counter on it. Then for each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their choice or discards a card." });
+
+describe("more punishers", () => {
+  it("parse", () => supported(acererak, demandingDragon, soulBarrier, viperTrigger));
+
+  it("Acererak: a Zombie for each opponent who doesn't sacrifice a creature, all made after the sacrifices", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const [o1, o2, o3] = opponents(s0, ap) as [PlayerId, PlayerId, PlayerId];
+    const a = putOnBattlefield(s0, ap, acererak);
+    const b1 = putOnBattlefield(s0, o1, bear());
+    const b3 = putOnBattlefield(s0, o3, bear());
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] });
+    const seen: { pid: PlayerId; labels: string[] }[] = [];
+    s = settle(s, punish((pid, labels) => (pid === o1 ? "Sacrifice a creature" : none(labels)), seen));
+    // The opponent with no creature isn't asked.
+    expect(seen.map((x) => x.pid)).toEqual([o1, o3]);
+    expect(seen[1]!.labels).toEqual(["Sacrifice a creature", "Take the penalty"]);
+    expect(s.objects[b1]!.zone).toBe("graveyard");
+    expect(s.objects[b3]!.zone).toBe("battlefield");
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.objects[id]!.isToken)).toHaveLength(2);
+    void o2;
+  });
+
+  it("Demanding Dragon: 5 damage to the target opponent unless they sacrifice a creature", () => {
+    for (const sacrifice of [false, true]) {
+      const { s: s0, ap, ids, opp } = setup([demandingDragon]);
+      const b = putOnBattlefield(s0, opp, bear());
+      let s = run(s0, planCast(s0, ap, ids[0]!));
+      s = settle(s, (x) =>
+        x.pending?.kind === "chooseTargets" ? { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } : punish((_, labels) => (sacrifice ? "Sacrifice a creature" : none(labels)))(x),
+      );
+      expect(s.players[opp]!.life).toBe(sacrifice ? 40 : 35);
+      expect(s.objects[b]!.zone).toBe(sacrifice ? "graveyard" : "battlefield");
+    }
+  });
+
+  it("Soul Barrier: an opponent's creature spell costs them 2 damage unless they pay {2}", () => {
+    const { s: s0, ap, ids, opp } = setup([bear(), bear()]);
+    putOnBattlefield(s0, opp, soulBarrier);
+    const payUnless = (x: GameState) => (x.pending?.kind === "payUnless" ? null : undefined);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)), payUnless);
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: ap, cost: "{2}" });
+    s = settle(act(s, { type: "payUnless", player: ap, pay: false }));
+    expect(s.players[ap]!.life).toBe(38);
+    s = settle(run(s, planCast(s, ap, ids[1]!)), payUnless);
+    s = settle(run(s, [...planMana(s, ap, parseManaCost("{2}"))!, { type: "payUnless", player: ap, pay: true }]));
+    expect(s.players[ap]!.life).toBe(38);
+  });
+
+  it("Rottenmouth Viper: one choice per blight counter, then everything at once; 4 life for each \"neither\"", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const [o1, o2, o3] = opponents(s0, ap) as [PlayerId, PlayerId, PlayerId];
+    const v = putOnBattlefield(s0, ap, viperTrigger);
+    s0.objects[v]!.counters.blight = 2; // one more as it attacks: three choices each
+    const b1 = putOnBattlefield(s0, o1, bear());
+    const b2 = putOnBattlefield(s0, o2, bear());
+    const hand1 = s0.players[o1]!.hand.length;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: v, defender: opp }] });
+    const seen: { pid: PlayerId; labels: string[] }[] = [];
+    // o1: sacrifice, discard, neither. o2: sacrifice the only permanent, then it can't be offered again. o3: neither.
+    s = settle(s, punish((pid, labels) => {
+      const mine = seen.filter((x) => x.pid === pid).length;
+      if (pid === o1) return [labels[0]!, "Discard a card", none(labels)][mine - 1]!;
+      if (pid === o2) return labels[0]!.startsWith("Sacrifice") ? labels[0]! : none(labels);
+      return none(labels);
+    }, seen));
+    expect(s.objects[v]!.counters.blight).toBe(3);
+    expect(seen.map((x) => x.pid)).toEqual([o1, o1, o1, o2, o2, o2, o3, o3, o3]);
+    expect(seen[4]!.labels).toEqual(["Discard a card", "Lose 4 life"]); // the bear was already picked
+    expect(s.objects[b1]!.zone).toBe("graveyard");
+    expect(s.objects[b2]!.zone).toBe("graveyard");
+    expect(s.players[o1]!.hand.length).toBe(hand1 - 1);
+    expect(s.players[o1]!.life).toBe(36);
+    expect(s.players[o2]!.life).toBe(32);
+    expect(s.players[o3]!.life).toBe(28);
+  });
+});
+
+describe("bots facing a punisher", () => {
+  it("give up a spare Treasure, discard rather than drop low, and otherwise take 3 life at 40", () => {
+    const { s: s0, ap, ids } = setup([tormentOfHailfire]);
+    const [o1, o2, o3] = opponents(s0, ap) as [PlayerId, PlayerId, PlayerId];
+    const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
+    const t = putOnBattlefield(s0, o1, treasure);
+    s0.objects[t]!.isToken = true;
+    s0.players[o2]!.life = 4;
+    const hand2 = s0.players[o2]!.hand.length;
+    const hand3 = s0.players[o3]!.hand.length;
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 1)));
+    expect(s.objects[t]?.zone ?? "gone").not.toBe("battlefield");
+    expect(s.players[o1]!.life).toBe(40);
+    expect(s.players[o2]!.life).toBe(4);
+    expect(s.players[o2]!.hand.length).toBe(hand2 - 1);
+    expect(s.players[o3]!.life).toBe(37);
+    expect(s.players[o3]!.hand.length).toBe(hand3);
+  });
+
+  it("with lands to spare, discard a land card from hand instead of losing life", () => {
+    const { s: s0, ap, ids } = setup([tormentOfHailfire]);
+    const [o1] = opponents(s0, ap) as [PlayerId];
+    for (let i = 0; i < 7; i++) putOnBattlefield(s0, o1, swamp);
+    const lands = (x: GameState) => x.players[o1]!.hand.filter((id) => x.cards[x.objects[id]!.cardId]!.typeLine.includes("Land")).length;
+    const before = lands(s0);
+    expect(before).toBeGreaterThan(0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 1)));
+    expect(s.players[o1]!.life).toBe(40);
+    expect(lands(s)).toBe(before - 1);
+  });
+});

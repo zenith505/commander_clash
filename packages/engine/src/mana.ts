@@ -53,7 +53,7 @@ export interface Payment {
  * symbols first so a greedy pass doesn't spend mana a later symbol needed.
  * Phyrexian symbols fall back to 2 life when `life` allows.
  */
-export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool; want?: Partial<Record<Color, number>> } = {}): Payment | null {
+export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>> } = {}): Payment | null {
   if (!cost.supported) return null;
   const p = { ...pool };
   // `prefer`: mana to spend before the rest where there's a choice (mana that can only be spent on this, CR 106.6).
@@ -80,8 +80,11 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   // `want`: how much of each color the spell hopes was spent on it ("if {U} was spent to cast ~", adamant): the caster
   // chooses which mana pays (CR 601.2h), so a hybrid or generic part takes those colors while they're short.
   const wanting = (c: Color) => (opts.want?.[c] ?? 0) > pool[c] - p[c];
+  // `avoid`: what spending each color would cost the caster (Rolling Spoil's "if {B} was spent", hurting them now): kept
+  // for last, the least costly first.
+  const harm = (c: ManaType) => (c === "C" ? 0 : (opts.avoid?.[c] ?? 0));
   for (const opts of hybrids) {
-    const best = opts.filter((c) => p[c] > 0).sort((a, b) => Number(wanting(b)) - Number(wanting(a)) || pref[b] - pref[a] || p[b] - p[a])[0];
+    const best = opts.filter((c) => p[c] > 0).sort((a, b) => Number(wanting(b)) - Number(wanting(a)) || harm(a) - harm(b) || pref[b] - pref[a] || p[b] - p[a])[0];
     if (!best) return null;
     spend(best);
   }
@@ -102,7 +105,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     const fresh = COLORS.find((c) => p[c] > 0 && wanting(c)) ?? (opts.spreadColors ? COLORS.filter((c) => p[c] > 0 && !spent(c))[0] : undefined);
     const preferred = kinds.filter((c) => pref[c] > 0 && p[c] > 0).sort((a, b) => pref[b] - pref[a])[0];
     const from: ManaType | undefined =
-      fresh ?? preferred ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => p[b] - p[a])[0] as ManaType | undefined));
+      fresh ?? preferred ?? (p.C > 0 ? "C" : (COLORS.filter((c) => p[c] > 0).sort((a, b) => harm(a) - harm(b) || p[b] - p[a])[0] as ManaType | undefined));
     if (!from) return null;
     spend(from);
     generic--;
@@ -201,17 +204,3 @@ export function spentMeets(spent: ManaSpent | undefined, req: import("./abilitie
   return !req.total || total >= req.total;
 }
 
-/**
- * How much of each color to spend on a spell whose text hopes some was spent (`wantSpent`): the colors it names, and for
- * "three mana of the same color" the color there's most of in `pool`.
- */
-export function wantedColors(reqs: import("./abilities").SpentReq[] | undefined, pool: ManaPool): Partial<Record<Color, number>> | undefined {
-  if (!reqs?.length) return undefined;
-  const want: Partial<Record<Color, number>> = {};
-  const add = (c: Color, n: number) => (want[c] = Math.max(want[c] ?? 0, n));
-  for (const r of reqs) {
-    for (const [c, n] of Object.entries(r.colors ?? {})) add(c as Color, n ?? 1);
-    if (r.sameColor) add([...COLORS].sort((a, b) => pool[b] - pool[a])[0]!, r.sameColor);
-  }
-  return want;
-}

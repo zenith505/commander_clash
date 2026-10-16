@@ -12,6 +12,15 @@ import { ringTempts } from "./run-ring";
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "skip": {
+      const words = { untap: "untap step", draw: "draw step", combat: "combat phase", turn: "turn" }[e.skip];
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        for (let i = 0; i < e.n; i++) (p.skips ??= []).push({ what: e.skip, ...(e.thisTurn ? { turn: s.turn } : {}) });
+        log(s, `${p.name} will skip their next ${e.n > 1 ? `${e.n} ${words}s` : words}${e.thisTurn ? " this turn" : ""}.`);
+      }
+      return;
+    }
     case "extraTurn":
       // CR 500.7: taken directly after this turn; the most recently created first.
       for (const pid of players(s, e.who, ctx)) {
@@ -119,6 +128,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn.`);
       }
       return;
+    case "cantPlayLands":
+      for (const pid of players(s, e.who, ctx)) {
+        (s.cantPlayLandsThisTurn ??= []).push({ player: pid, turn: s.turn, source: src });
+        log(s, `${player(s, pid).name} can't play lands this turn.`);
+      }
+      return;
     case "noLifeGain":
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
       log(s, `${src}: ${e.players === "all" ? "players" : `${player(s, ctx.controller).name}'s opponents`} can't gain life this turn.`);
@@ -143,7 +158,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const queue = (sc.drawQueue ??= players(s, e.who, ctx));
       while (queue.length) {
         const pid = queue.shift()!;
-        const n = amountNow(s, e.n, ctx);
+        const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
         log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
         if (!draw(s, pid, n)) return "paused";
       }
@@ -221,7 +236,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "gainLife":
       for (const pid of players(s, e.who, ctx)) {
-        const n = amountNow(s, e.n, ctx);
+        const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
         if (!n) continue;
         gainLife(s, pid, n);
         log(s, `${player(s, pid).name} gains ${n} life.`);
@@ -230,7 +245,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "loseLife": {
       let total = 0;
       for (const pid of players(s, e.who, ctx)) {
-        const n = amountNow(s, e.n, ctx);
+        const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
         if (n <= 0) continue;
         loseLife(s, pid, n);
         total += n;

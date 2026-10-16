@@ -107,7 +107,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Multikicker: "for each time it was kicked", "the number of times ~ was kicked" (CR 702.33d).
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
-  if ((m = /^(~'s|its|that creature's|that permanent's|that spell's|the sacrificed (?:creature|artifact|permanent)'s) (power|toughness|mana value)$/i.exec(p))) {
+  if ((m = /^(~'s|its|that creature's|the creature's|that permanent's|that spell's|the spell's|the sacrificed (?:creature|artifact|permanent)'s) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
@@ -174,9 +174,11 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (/^the sacrificed (creature|artifact|permanent)'s$/.test(x)) return ctx ? { ref: "sacrificed" } : null;
   if (!ctx) return x === "its" ? { ref: "self" } : null;
   // "That spell's mana value": the targeted spell (Imp's Mischief).
-  if (x === "that spell's" && ctx.lastObjectTarget !== undefined) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
+  if ((x === "that spell's" || x === "the spell's") && ctx.lastObjectTarget !== undefined) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
   // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").
   if (x === "that spell's") return ctx.castSpell ? { ref: "castSpell" } : null;
+  // "The creature's power" after "that creature's controller" (Boros Fury-Shield): the creature targeted.
+  if (x === "the creature's") return ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" ? { ref: "target", index: ctx.lastObjectTarget } : null;
   if (x === "its" || x === "that creature's" || x === "that permanent's") {
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
     if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };

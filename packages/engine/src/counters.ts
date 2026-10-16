@@ -3,7 +3,7 @@
 
 import type { CountMod, TokenSpec } from "./abilities";
 import { abilitiesOf } from "./cards";
-import { controllerOf, characteristics } from "./layers";
+import { controllerOf, characteristics, invalidateCharacteristics, keywordOfCounter } from "./layers";
 import type { GameObject, GameState, PlayerId } from "./types";
 import { fireEvent } from "./effects";
 
@@ -57,6 +57,11 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
   const m = countersToPut(s, o, kind, n, entering);
   if (m > 0) {
     o.counters[kind] = (o.counters[kind] ?? 0) + m;
+    // Each counter of that kind gets a new timestamp (CR 613.7c); a keyword counter's matters in layer 6.
+    if (keywordOfCounter(kind)) {
+      (o.counterTimestamps ??= {})[kind] = s.nextTimestamp++;
+      invalidateCharacteristics(s);
+    }
     fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m });
   }
   return m;

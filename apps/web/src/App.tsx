@@ -129,6 +129,16 @@ import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, ne
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
 import { ManaCost, ManaPoolView, RulesText } from "./Mana";
 
+/** A player's pending "skip your next ..." effects (CR 614.10), e.g. "next 2 turns, next draw step". */
+function skipsText(skips: NonNullable<GameState["players"][number]["skips"]>): string {
+  const words = { turn: "turn", untap: "untap step", draw: "draw step", combat: "combat phase" } as const;
+  return (["turn", "untap", "draw", "combat"] as const)
+    .map((w) => [w, skips.filter((k) => k.what === w).length] as const)
+    .filter(([, n]) => n)
+    .map(([w, n]) => `next ${n > 1 ? `${n} ${words[w]}s` : words[w]}${skips.some((k) => k.what === w && k.turn !== undefined) ? " this turn" : ""}`)
+    .join(", ");
+}
+
 /** Each seat's color for targeting arrows and stack labels. */
 const PLAYER_COLORS = ["#c77dff", "#ff9f43", "#4cc9f0", "#ff5d8f"];
 const playerColor = (pid: PlayerId) => PLAYER_COLORS[pid % PLAYER_COLORS.length]!;
@@ -2307,6 +2317,11 @@ function Seat({
             ◌ Phased out {phasedOut.length}
           </span>
         )}
+        {p.skips?.length ? (
+          <span className="muted" title={`Will skip: ${skipsText(p.skips)}.`}>
+            ⏭ Skips {skipsText(p.skips)}
+          </span>
+        ) : null}
         {(p.energy ?? 0) > 0 && (
           <span className="energy" title={`${p.energy} energy counter${p.energy === 1 ? "" : "s"}, spent to pay {E} costs.`}>
             ⚡ {p.energy}

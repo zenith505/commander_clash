@@ -40,7 +40,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
       const hurts = ["destroy", "exile", "bounce", "tap", "skipUntap", "phaseOut", "damage", "putInLibrary"].includes(e.type) || (e.type === "counters" && harmfulCounter(e.counter)) || (e.type === "continuous" && modsAreHarmful(e.mods));
       if (hurts) mark(group.of.index, group.of.n);
     }
-    if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "exileGraveyard") && e.who.ref === "target") mark(e.who.index, e.who.n);
+    if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "exileGraveyard" || e.type === "cantCast" || e.type === "cantPlayLands") && e.who.ref === "target") mark(e.who.index, e.who.n);
     if (e.type === "counterSpell") mark(e.index);
     // Haunt: the card does something again when the haunted creature dies, which an opponent's creature does when
     // it's removed or blocked, without costing its owner anything.

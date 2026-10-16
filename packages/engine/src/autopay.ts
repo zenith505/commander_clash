@@ -3,6 +3,7 @@ import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAb
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, activationCost, altCost, isTreasure, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
+import { hopeValues, spendPlan } from "./value";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
 import type { SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
@@ -151,7 +152,7 @@ function scarcity(sources: Source[], used: Set<ObjectId>, demand: Map<ManaType, 
  * symbol from the least flexible source that makes it, then hybrid, then generic, keeping
  * sources that make the colors in `avoid` for last.
  */
-function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid = new Set<ManaType>(), demand = new Map<ManaType, number>()) {
+function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid = new Set<ManaType>(), demand = new Map<ManaType, number>(), harm: Partial<Record<Color, number>> = {}) {
   const pool = { ...pool0 };
   const used = new Set(used0);
   const chosen: Option[] = [];
@@ -170,6 +171,7 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
   // Colored mana the cost names: of two ways to use one source (Fertile Ground's "GW" and "GU"), the one adding more of it.
   const named = namedColors(cost);
   const useful = (x: Option) => x.adds.filter((m) => named.has(m)).length;
+  const harmOf = (m: ManaType) => (m === "C" ? 0 : (harm[m] ?? 0));
   const free = (pred: (x: Option) => boolean) => {
     const loss = scarcity(sources, used, demand);
     return sources
@@ -189,11 +191,12 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
   for (const sym of cost.symbols) {
     if (sym.kind !== "hybrid") continue;
     const opts = sym.options as ManaType[];
-    let have = opts.find((c) => reserved[c] > 0);
-    if (!have) {
-      const x = free((o) => o.adds.some((m) => opts.includes(m)));
+    let have = opts.find((c) => reserved[c] > 0 && !harmOf(c)) ?? opts.find((c) => reserved[c] > 0);
+    if (!have || harmOf(have)) {
+      // A color whose spending hurts the caster (`harm`, see spendPlan) only when no other will do.
+      const x = free((o) => o.adds.some((m) => opts.includes(m) && !harmOf(m))) ?? (have ? undefined : free((o) => o.adds.some((m) => opts.includes(m))));
       if (x) take(x);
-      have = opts.find((c) => reserved[c] > 0);
+      have = opts.filter((c) => reserved[c] > 0).sort((a, b) => harmOf(a) - harmOf(b))[0];
     }
     if (have) reserved[have]--;
   }
@@ -207,6 +210,7 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
       .sort(
         (a, b) =>
           a.x.penalty - b.x.penalty ||
+          a.x.adds.reduce((n, m) => n + harmOf(m), 0) - b.x.adds.reduce((n, m) => n + harmOf(m), 0) ||
           Number(a.x.adds.some((m) => avoid.has(m))) - Number(b.x.adds.some((m) => avoid.has(m))) ||
           b.x.adds.length - a.x.adds.length ||
           Number(b.x.mana === "C") - Number(a.x.mana === "C") ||
@@ -271,12 +275,15 @@ export function planCast(
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
   const pool = poolFor(s, pid, use).pool;
   const rainbow = compileCard(d).countsColors && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
-  // "If {U} was spent to cast ~", adamant: ask for those colors where its generic or hybrid mana allows, as many as can be.
-  const wanted = compileCard(d).wantSpent && !payFromPool(cost, pool, extra, player(s, pid).life) ? wantCosts(cost, extra, compileCard(d).wantSpent!) : [];
+  // "If {U} was spent to cast ~", adamant: ask for those colors where its generic or hybrid mana allows, as many as can be,
+  // when that helps; where it hurts (Rolling Spoil's -1/-1 to their own creatures), keep those colors off it instead.
+  const hopes = compileCard(d).wantSpent && !payFromPool(cost, pool, extra, player(s, pid).life) ? hopeValues(s, pid, d) : [];
+  const wanted = wantCosts(cost, extra, hopes.filter((h) => h.value > 0).map((h) => h.req));
+  const avoid = spendPlan(s, pid, d, pool).avoid;
   let taps: Action[] | null = null;
-  for (const r of wanted) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
+  for (const r of wanted) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use, avoid))) break;
   if (!taps) for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
-  taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use);
+  taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use, avoid);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
   // So when the cost depends on the board, don't sacrifice permanents for its mana.
@@ -318,6 +325,7 @@ function rainbowCosts(cost: ParsedCost, extra: number, pool: ManaPool): { cost: 
  * every hope met first, then fewer. Paying that, castSpell's payment spends those colors (payFromPool's `want`).
  */
 function wantCosts(cost: ParsedCost, extra: number, reqs: SpentReq[]): { cost: ParsedCost; extra: number }[] {
+  if (!reqs.length) return [];
   const g = splitGeneric(cost, extra);
   // Each hope as the ways to meet it: "three mana of the same color" is any one color three times.
   const ways = reqs.map((r): Partial<Record<Color, number>>[] => (r.sameColor ? COLORS.map((c) => ({ ...r.colors, [c]: Math.max(r.sameColor!, r.colors?.[c] ?? 0) })) : [r.colors ?? {}]));
@@ -463,7 +471,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
  * that cost nothing come first; when they aren't enough, abilities that cost mana and make
  * more of it or a color we lack (a Signet: "{1}, {T}: Add {W}{U}") are paid for and added.
  */
-export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = [], use: ManaUse = "other"): Action[] | null {
+export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = [], use: ManaUse = "other", harm?: Partial<Record<Color, number>>): Action[] | null {
   const p = player(s, pid);
   // Only the mana that can be spent on this counts (CR 106.6); `restricted` is how much of the pool can't be spent
   // on anything else, such as a Signet's cost.
@@ -478,7 +486,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
   let used = new Set<ObjectId>();
   const taps: Action[] = [];
   for (let round = 0; round < 8; round++) {
-    const plan = planFree(cost, extraGeneric, p.life, pool, sources, used, undefined, demand);
+    const plan = planFree(cost, extraGeneric, p.life, pool, sources, used, undefined, demand, harm);
     if (plan) return [...taps, ...plan.chosen.map((x) => toAction(pid, x))];
     // Add one mana ability that costs mana: one making a color the cost names first, then the biggest net gain.
     const costed = sources
@@ -504,7 +512,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
         if (x.restricted) nextRestricted[m]++;
       }
       const option = { actions: [...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x)], pool: next, restricted: nextRestricted, used: new Set([...pay.used, x.id]) };
-      const done = !!planFree(cost, extraGeneric, p.life, next, sources, option.used, undefined, demand);
+      const done = !!planFree(cost, extraGeneric, p.life, next, sources, option.used, undefined, demand, harm);
       if (!pick || done) pick = option;
       if (done) break;
     }

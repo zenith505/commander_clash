@@ -1,4 +1,4 @@
-import type { Effect, PayCost, PunisherOption } from "../abilities";
+import type { Effect, PayCost, PunisherOption, TargetSpec } from "../abilities";
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
@@ -6,7 +6,7 @@ import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, 
 import { cardIdOf, defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
-import { choiceOptions, pickOptions, printedMatches } from "./targeting";
+import { choiceOptions, objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, gifteeOf, evidenceCollected } from "./resolve";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
@@ -125,8 +125,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
     case "if": {
-      // How it was cast doesn't change while it resolves, so this can be checked again on resuming.
-      const holds =
+      // Checked once, as the instruction is reached (CR 608.2c): resuming after a choice inside it keeps the answer (a
+      // draw can change "if you have no cards in hand").
+      const held = s.resolving!.scratch?.ifs?.[ifDepth];
+      const holds = held ? held.holds :
         e.cond.kind === "youDid"
           ? !!s.resolving!.did
           : e.cond.kind === "wonClash"
@@ -141,6 +143,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (ctx.treasureSpent ?? 0) > 0
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
+            : e.cond.kind === "targetIs"
+            ? objects(s, { ref: "target", index: e.cond.index }, ctx).some((o) => o.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, o, ctx.controller, false))
             : e.cond.kind === "teamwork"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"
@@ -154,10 +158,47 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "state"
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)
             : kickedMatches(ctx.kicked, e.cond);
-      const branch = holds ? e.effects : (e.otherwise ?? []);
-      for (const inner of branch) if (runEffect(s, inner, ctx) === "paused") return "paused";
-      return;
+      return runBranch(s, holds, holds ? e.effects : (e.otherwise ?? []), ctx);
     }
+  }
+}
+
+/** How many "if" instructions are running inside one another right now: each keeps its place in `scratch.ifs`. */
+let ifDepth = 0;
+
+/** Scratch that belongs to the instructions around an "if", kept between the instructions inside it. */
+const OUTER_SCRATCH = ["may", "mayQueue", "mayers", "mayStep", "punish", "punished", "paid", "payQueue", "paidBy", "ifs"] as const;
+
+/**
+ * An "if"'s instructions in order, each done once, also when one waits on a player: "If you control a blue creature,
+ * draw a card, then discard a card" (Statute of Denial) resumes at the discard, not the draw (CR 608.2c). Between two of
+ * them, what the finished one kept for its own choices goes, so the next one starts afresh.
+ */
+function runBranch(s: GameState, holds: boolean, branch: Effect[], ctx: ResolveCtx): "paused" | void {
+  const r = s.resolving!;
+  const d = ifDepth++;
+  try {
+    for (;;) {
+      const sc = (r.scratch ??= {});
+      const ifs = (sc.ifs ??= []);
+      const at = (ifs[d] ??= { holds, step: 0 });
+      if (at.step >= branch.length) break;
+      if (runEffect(s, branch[at.step]!, ctx) === "paused") return "paused";
+      if (at.step + 1 < branch.length) {
+        const kept: NonNullable<typeof r.scratch> = {};
+        for (const k of OUTER_SCRATCH) if (sc[k] !== undefined) (kept as Record<string, unknown>)[k] = sc[k];
+        r.scratch = kept;
+      }
+      at.step++;
+    }
+    // Done: a later "if" at this depth starts afresh.
+    const ifs = r.scratch?.ifs;
+    if (ifs) {
+      ifs.length = d;
+      if (!d) r.scratch!.ifs = undefined;
+    }
+  } finally {
+    ifDepth--;
   }
 }
 

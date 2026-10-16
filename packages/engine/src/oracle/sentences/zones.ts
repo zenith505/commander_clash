@@ -161,7 +161,8 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }
-  if ((m = /^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?$/i.exec(s))) {
+  // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?(?: with (?:an additional|a) (${COUNTER}) counter on it)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control.
     const underYou = !!m[4];
@@ -171,8 +172,8 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const spec = ctx.targets[i];
     // Only permanent cards can be put onto the battlefield (CR 110.4b); an Aura's controller chooses what it enchants as it
     // enters (CR 303.4f).
-    if (!what || !spec || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
-    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}) }];
+    if (!what || !spec || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)) || (m[5] && (what.ref !== "target" || what.n))) return null;
+    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[5] ? { counters: { [counterKind(m[5])]: 1 } } : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it

@@ -10,13 +10,14 @@ import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
-import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, wantedColors, type ParsedCost } from "./mana";
+import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
 import { addMana, canPayFromPool, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES, type SourceQuality } from "./keywords";
+import { spendPlan } from "./value";
 import {
   COLORS,
   RulesError,
@@ -35,6 +36,7 @@ import {
   type ObjectId,
   type Player,
   type PlayerId,
+  type SkipWhat,
   type Step,
   type ZoneName,
   STARTING_LIFE,
@@ -576,6 +578,11 @@ export function moveObject(
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
+  // A finality counter: "If this permanent would be put into a graveyard from the battlefield, exile it instead" (CR 122.1h).
+  if (fromZone === "battlefield" && to === "graveyard" && (o.counters.finality ?? 0) > 0) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead (finality counter).`);
+  }
   o.exileIfDiesTurn = undefined;
   o.noRegenTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
@@ -703,6 +710,7 @@ export function moveObject(
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   o.counters = {};
+  o.counterTimestamps = undefined;
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
   o.attacking = undefined;
@@ -1509,6 +1517,12 @@ function startNextTurn(s: GameState) {
       if (order[i] === s.activePlayer || began.size >= order.length) break;
     }
   }
+  // "Skip your next turn" (CR 614.10): that turn doesn't happen; the one after it is next.
+  if (takeSkip(s, s.activePlayer, "turn")) {
+    log(s, `${player(s, s.activePlayer).name} skips their turn.`);
+    s.extraTurn = extra;
+    return startNextTurn(s);
+  }
   s.extraTurn = extra;
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
   const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
@@ -1518,7 +1532,12 @@ function startNextTurn(s: GameState) {
   }
   releasePhased(s, began);
   s.turn++;
-  for (const p of s.players) p.landsPlayedThisTurn = 0;
+  for (const p of s.players) {
+    p.landsPlayedThisTurn = 0;
+    // "Skips their next combat phase this turn" with that turn over.
+    if (p.skips) p.skips = p.skips.filter((k) => k.turn === undefined || k.turn >= s.turn);
+    if (!p.skips?.length) p.skips = undefined;
+  }
   for (const o of Object.values(s.objects)) {
     o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
     o.triggeredThisTurn = undefined;
@@ -1540,6 +1559,7 @@ function startNextTurn(s: GameState) {
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
   s.cantCastThisTurn = undefined;
+  s.cantPlayLandsThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
@@ -1568,12 +1588,33 @@ function untapStep(s: GameState, keep: ObjectId[]): void {
   return advanceStep(s);
 }
 
+/**
+ * Use up one of `pid`'s "skip your next ..." (CR 614.10): true if this one is skipped. A skip waits for the next
+ * occurrence that hasn't started; two skips skip the next two (614.10a).
+ */
+function takeSkip(s: GameState, pid: PlayerId, what: SkipWhat): boolean {
+  const p = player(s, pid);
+  const i = p.skips?.findIndex((k) => k.what === what && (k.turn === undefined || k.turn === s.turn)) ?? -1;
+  if (i < 0) return false;
+  p.skips!.splice(i, 1);
+  if (!p.skips!.length) p.skips = undefined;
+  return true;
+}
+
 /** Enter a step, perform its turn-based actions, and give the active player priority if the step has priority. */
 function beginStep(s: GameState, step: Step): void {
   s.step = step;
   s.passedInSuccession = [];
   s.priority = s.activePlayer;
   const ap = s.activePlayer;
+  // "Skip your next untap step / draw step" replaces the whole step (CR 614.10); a skipped combat phase goes straight to
+  // what comes after it.
+  const skipped = step === "untap" || step === "draw" ? step : step === "beginCombat" ? "combat" : undefined;
+  if (skipped && takeSkip(s, ap, skipped)) {
+    log(s, `${player(s, ap).name} skips their ${{ untap: "untap step", draw: "draw step", combat: "combat phase" }[skipped]}.`);
+    if (skipped === "combat") s.step = "endCombat";
+    return advanceStep(s);
+  }
   switch (step) {
     case "untap": {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
@@ -2010,6 +2051,8 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
 
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
+  // "Can't play lands this turn" wins over anything that lets them (CR 101.2).
+  if (s.cantPlayLandsThisTurn?.some((c) => c.player === pid && c.turn === s.turn)) return 0;
   let n = 1;
   const extra = player(s, pid).extraLands;
   if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
@@ -2049,6 +2092,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
 function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }) {
   const left = (o.counters[rc.counter] ?? 0) - rc.n;
   o.counters[rc.counter] = left;
+  invalidateCharacteristics(s);
   if (left === 0 && rc.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
 }
 
@@ -2608,8 +2652,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
-  const want = wantedColors(compileCard(d).wantSpent, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst, ...(want ? { want } : {}) })!;
+  // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
+  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
+  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst, ...hopes })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);

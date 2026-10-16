@@ -56,6 +56,8 @@ export interface ResolveCtx {
   sourceUntaps?: number;
   /** The creature type or color chosen as it resolves, or else as its source entered. */
   chosen?: Chosen;
+  /** The player an instruction for each player is being done to now (PlayerRef "eachOne"). */
+  eachOne?: PlayerId;
 }
 
 export type Resolution = "fizzled" | "done" | "paused";
@@ -310,6 +312,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.attachedToPlayer : lk && lk.zc === ctx.sourceZc ? lk.attachedToPlayer : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "eachOne":
+      return ctx.eachOne !== undefined ? [ctx.eachOne] : [];
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? []).filter((p) => !player(s, p).lost);
     case "punished":
@@ -435,6 +439,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "preventCombatDamage":
     case "noLifeGain":
     case "cantCast":
+    case "cantPlayLands":
     case "noPrevention":
     case "pumpPerBlocker":
     case "draw":
@@ -454,6 +459,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "fight":
     case "bite":
     case "extraTurn":
+    case "skip":
     case "addPhases":
     case "loseGame":
     case "winGame":

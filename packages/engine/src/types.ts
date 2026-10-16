@@ -126,6 +126,8 @@ export interface GameObject {
   damage: number;
   deathtouchDamage: boolean;
   counters: Record<string, number>;
+  /** When keyword counters of each kind were last put on it (CR 613.7c): their effect's timestamp in layer 6. */
+  counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
   /** A copy of a spell (CR 707.10): not a card; it ceases to exist off the stack (707.10a), or becomes a token (608.3f). */
@@ -341,6 +343,11 @@ export interface RestrictedMana {
 export interface Player {
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
+  /**
+   * "Skip your next untap step / draw step / combat phase / turn" (CR 614.10): each entry skips one, the next to happen;
+   * `turn`: only during that turn ("skips their next combat phase this turn").
+   */
+  skips?: { what: SkipWhat; turn?: number }[];
   id: PlayerId;
   name: string;
   life: number;
@@ -855,6 +862,8 @@ export interface GameState {
   resumeStep?: Step;
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string }[];
+  /** Players who can't play lands this turn (Moonhold), and what said so. */
+  cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
@@ -943,6 +952,9 @@ export interface GameState {
  * made for it so far. No player gets priority and state-based actions aren't checked until
  * it finishes (CR 608.2, 704.3).
  */
+/** What a player can be made to skip (CR 614.10). */
+export type SkipWhat = "untap" | "draw" | "combat" | "turn";
+
 export interface MulliganState {
   /** Mulligans each player has taken so far. */
   taken: Record<string, number>;
@@ -1036,6 +1048,8 @@ export interface Resolving {
     mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)
     mayers?: PlayerId[]; // and those who chose to
     mayStep?: number; // how many of its instructions are done
+    /** The "if"s running, outermost first: whether each one's condition held as it was reached, and its instructions done. */
+    ifs?: { holds: boolean; step: number }[];
     /** A punisher (see its effect): players still to choose, what each chose (an option's index or "none"), the round. */
     punish?: {
       queue: PlayerId[];

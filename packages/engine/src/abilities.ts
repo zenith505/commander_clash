@@ -2,7 +2,7 @@
 // serializable structures, and the engine executes them (see effects.ts). Everything
 // here is data, so abilities can sit on the stack inside GameState.
 
-import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId } from "./types";
+import type { Color, FaceDownKind, ManaType, ObjectId, PlayerId, SkipWhat } from "./types";
 import type { CopyExcept } from "./copies";
 
 /**
@@ -396,7 +396,12 @@ export type PlayerRef =
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
-  | { ref: "damagedThisWay" };
+  | { ref: "damagedThisWay" }
+  /**
+   * "They" in "Each player loses 1 life for each creature they control" (Stronghold Discipline): the player the instruction
+   * is being done to, one at a time.
+   */
+  | { ref: "eachOne" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -1280,6 +1285,8 @@ export type Effect =
    * is the kind of spell.
    */
   | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec }
+  /** "Target player can't play lands this turn" (Moonhold): no land plays for them until the turn ends (CR 305.2, 101.2). */
+  | { type: "cantPlayLands"; who: PlayerRef }
   /** "Damage can't be prevented this turn" (CR 615.12). */
   | { type: "noPrevention" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
@@ -1301,6 +1308,8 @@ export type Effect =
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
   /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
   | { type: "extraTurn"; who: PlayerRef; n: number; loseAtEnd?: true }
+  /** "Target player skips their next combat phase", "you skip your next two turns" (CR 614.10); `thisTurn`: only this turn. */
+  | { type: "skip"; who: PlayerRef; skip: SkipWhat; n: number; thisTurn?: true }
   /**
    * "After this phase, there is an additional combat phase [followed by an additional main phase]" (CR 500.8): `after`
    * "main" or "combat" for "after this main/combat phase", which adds nothing in another phase.
@@ -1372,7 +1381,9 @@ export type SpellCondition =
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
   | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
-  | { kind: "state"; cond: StaticCondition };
+  | { kind: "state"; cond: StaticCondition }
+  /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
+  | { kind: "targetIs"; index: number; filter: TargetSpec };
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>

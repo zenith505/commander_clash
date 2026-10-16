@@ -1108,6 +1108,8 @@ export interface Resolving {
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
     found?: ObjectId[]; // the cards a library search found
+    /** "Each player puts a creature card from their graveyard onto the battlefield" (Exhume): players still to choose, and the cards chosen so far. */
+    yardPicks?: { queue: PlayerId[]; picked: Record<string, ObjectId[]> };
     searchQueue?: PlayerId[]; // players still to search, in APNAP order ("each player searches their library", CR 101.4)
     searchedBy?: { pid: PlayerId; found: ObjectId[] }[]; // the cards each player who has searched found, in that order
     flickered?: { id: ObjectId; zc: number }[]; // cards a flicker exiled, to return once Auras' hosts are chosen

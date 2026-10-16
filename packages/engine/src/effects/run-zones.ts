@@ -181,6 +181,42 @@ function sacrificeEach(s: GameState, e: Extract<Effect, { type: "sacrificeEach" 
 }
 
 /**
+ * "Each player puts a creature card from their graveyard onto the battlefield" (Exhume, Crypt Champion): not targeted,
+ * so chosen as it resolves; the active player first, then the others in turn order, each knowing the choices before
+ * theirs; a player with none does nothing; then all of them enter at the same time, each under its owner's control
+ * (CR 101.4, 110.2a, rulings).
+ */
+function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromGraveyard" }>, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const yp = (sc.yardPicks ??= { queue: apnap(s, players(s, e.who!, ctx)), picked: {} });
+  while (yp.queue.length) {
+    const pid = yp.queue[0]!;
+    const p = player(s, pid);
+    if (sc.found) {
+      yp.picked[pid] = sc.found.filter((id) => p.graveyard.includes(id));
+      sc.found = undefined;
+      yp.queue.shift();
+      continue;
+    }
+    const cards = p.lost ? [] : p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && isPermanentCard(defOf(s, obj(s, id))));
+    const max = Math.min(e.n, cards.length);
+    // Nothing to choose between: those are the ones.
+    if (!e.upTo && cards.length <= e.n) {
+      yp.picked[pid] = cards;
+      yp.queue.shift();
+      continue;
+    }
+    const kind = e.filter?.text ?? "card";
+    s.pending = { kind: "searchLibrary", player: pid, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : max, max, fromGraveyard: "battlefield" };
+    return "paused";
+  }
+  sc.yardPicks = undefined;
+  const moves = Object.entries(yp.picked).flatMap(([pid, ids]) => ids.filter((id) => s.objects[id]?.zone === "graveyard").map((id) => ({ id, pid: Number(pid) as PlayerId })));
+  for (const { id, pid } of moves) log(s, `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
+  enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: pid, ...(e.tapped ? { tapped: true } : {}) })));
+}
+
+/**
  * "Each player chooses an artifact, a creature, an enchantment, and a land from among the permanents they control, then
  * sacrifices the rest" (see the keepRest effect): the active player first, then the others in turn order, each knowing
  * the choices before theirs (CR 101.4, rulings); then all the rest are sacrificed at the same time.
@@ -791,6 +827,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "chooseFromGraveyard": {
+      if (e.who?.ref === "eachPlayer") return eachFromGraveyard(s, e, ctx, src);
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
       if (pid === undefined || player(s, pid).lost) return;
       const p = player(s, pid);

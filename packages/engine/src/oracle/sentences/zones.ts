@@ -110,6 +110,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   }
   // "Return a creature card from your graveyard to the battlefield" (Summon Undead), "... tapped" (Port of Karfell), "... with
   // a finality counter on it" (Charnel Serenade): chosen as it resolves, not targeted, under your control (CR 110.2a).
+  // "Each player puts a creature card from their graveyard onto the battlefield" (Exhume), "... a creature card with mana
+  // value 3 or less ..." (Crypt Champion): each chooses one of their own as it resolves. Only creature cards, so no Aura
+  // needs something to enchant.
+  if ((m = /^[Ee]ach player puts an? (creature card(?: with mana value \d+ or less)?) from their graveyard onto the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    if (!filter || !filter.types?.includes("Creature")) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
+  }
   if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
     // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
     // as it resolves.

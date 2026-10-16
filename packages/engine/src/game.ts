@@ -1168,7 +1168,7 @@ export function useShieldCounter(s: GameState, o: GameObject, what: string): boo
 /**
  * Destroy a permanent (CR 701.8): indestructible ones aren't (CR 702.12b), and a
  * regeneration shield replaces it (CR 701.19a): damage is removed, it's tapped, and it
- * leaves combat. Returns true if it went to the graveyard.
+ * leaves combat. Returns true if it was destroyed, wherever a replacement effect then sent it.
  */
 export function destroyPermanent(s: GameState, o: GameObject, message: string, noRegen = false, /** The controller of the spell or ability destroying it (Cobra Trap). */ by?: PlayerId): boolean {
   if (objHasKeyword(s, o, "Indestructible")) return false;
@@ -1201,8 +1201,10 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   const noncreature = !objIsType(s, o, "Creature");
   const controller = controllerOf(s, o);
   moveObject(s, o.id, "graveyard");
-  // Destroyed only if it got there: a replacement that exiles it instead means it wasn't (CR 614.6).
-  if (by !== undefined && noncreature && o.zone === "graveyard") ((s.turnLog ??= {}).destroyed ??= []).push({ controller, by });
+  // Destroyed even when a replacement (Rest in Peace, "exile it instead") sends it elsewhere: that replaces only where it
+  // goes (CR 614.6), not the destruction (Fumigate's and Bane of Progress' rulings). Only regeneration, a shield counter
+  // or umbra armor replace the destruction itself, and they returned above.
+  if (by !== undefined && noncreature) ((s.turnLog ??= {}).destroyed ??= []).push({ controller, by });
   return true;
 }
 

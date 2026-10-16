@@ -158,6 +158,20 @@ describe("Traps that look back over the turn", () => {
     expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)).toHaveLength(4);
   });
 
+  it("Cobra Trap: a permanent destroyed but exiled instead by a replacement still was destroyed (Fumigate, Bane of Progress rulings)", () => {
+    const { s: s0, ap, ids, opp } = setup([cobra]);
+    const ring = putOnBattlefield(s0, ap, solRing);
+    // "If it would leave the battlefield, exile it instead" (the unearth replacement): only where it goes changes.
+    s0.objects[ring]!.exileIfLeaves = "battlefield";
+    let s = oppCasts(s0, opp, shatter, [{ kind: "object", id: ring }]);
+    expect(s.objects[ring]!.zone).toBe("exile");
+    s = untilPriority(s, ap);
+    tapAll(s, ap);
+    putOnBattlefield(s, ap, card("Forest", "Basic Land — Forest"));
+    s = passAll(run(s, planCast(s, ap, ids[0]!, undefined, undefined, "auto", undefined, alt)));
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)).toHaveLength(4);
+  });
+
   it("Inferno Trap: two different creatures, not one twice and not a spell", () => {
     const { s: s0, ap, ids, opp } = setup([inferno]);
     const [p1, p2] = [putOnBattlefield(s0, opp, pyromancer()), putOnBattlefield(s0, opp, pyromancer())];

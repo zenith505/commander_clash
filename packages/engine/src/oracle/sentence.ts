@@ -153,6 +153,13 @@ export function parseBecomes(text: string): Modification[] | null {
   if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
+  // "A 2/2 creature with all creature types" (Mutavault), "with vigilance and all creature types" (Faceless Haven): every
+  // creature type, like changeling (CR 702.73a), in the type-changing layer.
+  let everyType = false;
+  if ((m = /^(.+?) with (?:(.+?),? and )?all creature types$/i.exec(rest))) {
+    rest = m[2] ? `${m[1]} with ${m[2]}` : m[1]!;
+    everyType = true;
+  }
   // "A 3/3 Elemental creature with haste", "... with vigilance, indestructible, and haste": it also gains those.
   const grants: Modification[] = [];
   if ((m = /^(.+?) with (?!base power and toughness )(.+)$/i.exec(rest))) {
@@ -192,6 +199,10 @@ export function parseBecomes(text: string): Modification[] | null {
   } else if (types.length) out.push(still ? { kind: "addTypes", types, subtypes } : { kind: "setTypes", types, subtypes });
   else if (subtypes.length && !still) out.push({ kind: "setSubtypes", subtypes });
   else if (still) return null;
+  if (everyType) {
+    if (!types.includes("Creature") || subtypes.length) return null;
+    out.push({ kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true });
+  }
   if (colors.length || /colorless/i.test(rest)) out.push({ kind: "setColors", colors });
   if (pt) out.push({ kind: "setPT", power: pt[0], toughness: pt[1] });
   out.push(...grants);

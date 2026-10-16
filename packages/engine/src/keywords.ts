@@ -25,6 +25,10 @@ export const SUPPORTED_KEYWORDS = [
   "Forestwalk",
   "Mountainwalk",
   "Plainswalk",
+  // Landwalk with a supertype (CR 702.14a, c): a land with it ("snow landwalk"), or without it ("nonbasic landwalk").
+  "Snow landwalk",
+  "Legendary landwalk",
+  "Nonbasic landwalk",
   "Horsemanship", // CR 702.31b: can't be blocked except by creatures with horsemanship
   "Phasing", // CR 702.26a: phases out and in during its controller's untap step
   "Skulk", // CR 702.118b: can't be blocked by creatures with greater power

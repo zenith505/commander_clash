@@ -232,7 +232,7 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   return true;
 }
 
-const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
+const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
 
 /** Hexproof or shroud a player has from a permanent they control ("You have hexproof"). */
 export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shroud" | undefined {

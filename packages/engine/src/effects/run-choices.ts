@@ -1,4 +1,4 @@
-import type { Effect, PayCost, PunisherOption, TargetSpec } from "../abilities";
+import { allEffects, type Effect, type PayCost, type PunisherOption, type TargetSpec } from "../abilities";
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
@@ -36,7 +36,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           s.pending = { kind: "collectEvidence", player: ctx.controller, n: e.effects[0]!.n, source: src };
           return "paused";
         } else {
-          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: e.text.replace(/~/g, src), source: src, ...(e.pay ? { pay: e.pay } : {}), ...(e.keep ? { keep: true } : {}) };
+          // About the card "reveal/look at the top card" found: it's named, and shown (the controller has seen it).
+          const rv = s.resolving?.revealed;
+          const card = rv && allEffects(e.effects).some((x) => "what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed") ? s.objects[rv.id] : undefined;
+          const prompt = card ? e.text.replace("the revealed card", defOf(s, card).name) : e.text;
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(e.keep ? { keep: true } : {}) };
           return "paused";
         }
       }

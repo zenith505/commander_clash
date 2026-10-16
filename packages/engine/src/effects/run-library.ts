@@ -37,7 +37,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const p = player(s, ctx.controller);
       const id = p.library[0];
       s.resolving!.revealed = id ? { id, zc: s.objects[id]!.zoneChanges ?? 0 } : undefined;
-      if (id) log(s, `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
+      if (id) log(s, e.look ? `${p.name} looks at the top card of their library.` : `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
+      return;
+    }
+    case "revealRevealed": {
+      const rv = s.resolving?.revealed;
+      const o = rv && s.objects[rv.id];
+      if (o && (o.zoneChanges ?? 0) === rv.zc) log(s, `${player(s, ctx.controller).name} reveals ${defOf(s, o).name}.`);
       return;
     }
     case "revealTopToHand": {

@@ -69,7 +69,7 @@ export const WHEEL = /^(?:.+? )?discards? (?:all the cards in )?(?:your|their|hi
  * white mana", "at least three mana of the same color" (adamant), "five or more mana" / "at least four mana" (opus),
  * "no mana", "no colored mana". `SPENT` matches the phrase, `SPENT_TO_CAST` it with what was cast.
  */
-export const SPENT = "((?:\\{[WUBRGC]\\})+|\\{S\\}(?: of any of that spell's colors)?|at least \\w+ (?:white|blue|black|red|green|colorless) mana|at least \\w+ mana of the same color|at least \\w+ mana|\\w+ or more mana|no(?: colored)? mana)";
+export const SPENT = "((?:\\{[WUBRGC]\\})+|\\{S\\}(?: of any of that spell's colors)?|at least \\w+ (?:white|blue|black|red|green|colorless) mana|at least \\w+ mana of the same color|at least \\w+ mana|\\w+ or more mana from creatures|\\w+ or more mana|mana from an? (?:artifact|creature)|no(?: colored)? mana)";
 export const SPENT_TO_CAST = `${SPENT} was spent to cast (~|it|that spell)`;
 
 export function parseSpentReq(what: string): SpentReq | null {
@@ -94,5 +94,8 @@ export function parseSpentReq(what: string): SpentReq | null {
     return Number.isFinite(n) ? { total: n } : null;
   }
   if ((m = /^no( colored)? mana$/.exec(what))) return { none: m[1] ? "colored" : "mana" };
+  // "If three or more mana from creatures was spent" (Inga and Esika), "if mana from an artifact was spent" (CR 106.3).
+  if ((m = /^(\w+) or more mana from creatures$/.exec(what))) return Number.isFinite(num(m[1]!)) ? { from: { creature: num(m[1]!) } } : null;
+  if ((m = /^mana from an? (artifact|creature)$/.exec(what))) return { from: { [m[1]!]: 1 } };
   return null;
 }

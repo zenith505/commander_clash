@@ -69,6 +69,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
   }
+  // "Target creature blocks target creature this turn if able" (Rimehorn Aurochs): the first must block the second if
+  // able; if it can't, it's free to block as it likes (rulings).
+  if (/^Target creature blocks target creature this turn if able$/.test(s)) {
+    const what = parseObject("target creature", ctx);
+    const attacker = what && parseObject("target creature", ctx);
+    return what?.ref === "target" && attacker?.ref === "target" ? [{ type: "mustBlockSource", what, attacker, thisTurn: true }] : null;
+  }
   // "Target creature blocks this turn if able": any attacking creature (CR 509.1c).
   if ((m = /^(target .+?|it|that creature|each creature(?: your opponents control)?) blocks this turn if able$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

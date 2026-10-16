@@ -436,6 +436,13 @@ function parseAffected(subject: string): Affects | null {
   // "Commander creatures you control get +2/+2", "Commanders you control have ward {2}" (CR 903.3): any player's.
   if (/^Commanders? (?:creatures )?you control$/.test(x))
     return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };
+  // "Other snow and Zombie creatures you control" (Narfi): creatures that are snow or Zombies; a snow Zombie gets it once
+  // (rulings).
+  const either = /^(Other )?snow and ([A-Z][a-z]+) creatures you control$/.exec(x);
+  if (either && CREATURE_TYPES.has(either[2]!)) {
+    const anyOf: TargetSpec[] = [{ kind: "object", supertypes: ["Snow"], text: "snow creature" }, { kind: "object", subtypes: [either[2]!], text: `${either[2]} creature` }];
+    return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `snow and ${either[2]} creature` } };
+  }
   let m = /^(Other )?((?:[A-Z]?[a-z]+ )*?)creatures (you control|your opponents control)$/i.exec(x);
   if (m) {
     const words = m[2]!.trim().split(/\s+/).filter(Boolean);

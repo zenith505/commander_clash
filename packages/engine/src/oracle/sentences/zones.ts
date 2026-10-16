@@ -5,7 +5,7 @@ import { NUM, COUNTER, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
-import { parseStaticCondition, parseUntargetable } from "../statics";
+import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -263,6 +263,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const mods: Modification[] =
       m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : m[2] === "be blocked" ? [{ kind: "cantBeBlocked" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
     return what ? [{ type: "continuous", what, mods, duration: m[3] === "this turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
+  // "~ can't be blocked this turn except by snow creatures" (Rime Transfusion), "can't be blocked by Walls this turn": the
+  // static ability's evasion (CR 509.1b), until end of turn.
+  if ((m = /^(.+?) can't be blocked (this turn except by .+|by .+? this turn)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what && parseStaticMods(`can't be blocked ${m[2]!.replace(/^this turn (except by .+)$/, "$1").replace(/ this turn$/, "")}`);
+    return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }
   // "Target creature can't be the target of spells or abilities your opponents control this turn" (Vines of Vastwood): the
   // opponents of whoever controls the effect, its spell's controller (rulings on Vines of Vastwood).

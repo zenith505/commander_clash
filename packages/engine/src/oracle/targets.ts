@@ -4,6 +4,9 @@ import type { Color } from "../types";
 import { num, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
 import { Ctx, addTarget } from "./body";
 
+/** Creature types with a hyphen, by how they read lowercased ("assembly-worker"). */
+const HYPHENATED = new Map([...CREATURE_TYPES].filter((ty) => ty.includes("-")).map((ty) => [ty.toLowerCase(), ty]));
+
 /** Spell and enchantment subtypes a filter can name: "Spirit or Arcane spell", "a Cartouche you control" (CR 205.3h, 205.3k). */
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure"];
@@ -422,6 +425,10 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
       extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };
     }
     p = p.slice(0, m.index);
+  } else if ((m = / with an? (even|odd) mana value$/.exec(p))) {
+    // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
+    extra.manaValue = { parity: m[1] as "even" | "odd" };
+    p = p.slice(0, m.index);
   } else if ((m = / (with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     const kws = parseKeywordList(m[2]!);
     if (!kws || kws.length !== 1) return null;
@@ -533,6 +540,8 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
       // "Nonlegendary attacking creature": attacking after a supertype.
       else if ((w === "attacking" || w === "blocking") && alts.length === 1 && !extra.combat) extra.combat = w;
       else if (CREATURE_TYPES.has(capital(w)) || BASIC_TYPES.includes(capital(w)) || OTHER_SUBTYPES.includes(capital(w))) subtypes.push(capital(w));
+      // A hyphenated creature type: "Assembly-Worker".
+      else if (w.includes("-") && HYPHENATED.has(w)) subtypes.push(HYPHENATED.get(w)!);
       else if (COLOR_WORDS[w]) colors.push(COLOR_WORDS[w]!);
       else if ((w === "multicolored" || w === "monocolored" || w === "colorless") && alts.length === 1 && !extra.colorCount) extra.colorCount = w;
       else if (SUPERTYPE_WORDS[w]) supertypes.push(SUPERTYPE_WORDS[w]!);

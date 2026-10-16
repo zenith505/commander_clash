@@ -93,7 +93,7 @@ const checkableMay = (e: Effect) =>
  * `next`: the sentence after the last one used.
  */
 function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
-  const first = /^If (?:it's|that card is) (not |)(an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "");
+  const first = /^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? "");
   if (!first) return null;
   const filter = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
   const then = filter && revealedAction(first[3]!, ctx);
@@ -124,6 +124,9 @@ function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: E
 
 /** One thing done with the revealed card ("put it into your hand", "you may put it into your graveyard"), or "draw a card". */
 function revealedAction(text: string, ctx: Ctx): Effect[] | null {
+  // "You may reveal it and put it into your hand" (Frost Augur): a card only looked at is revealed as it's put there.
+  const shown = /^you may reveal it and put it into your hand$/.test(text);
+  if (shown) return [{ type: "may", effects: [{ type: "revealRevealed" }, { type: "bounce", what: { ref: "revealed" } }], text: "reveal the revealed card and put it into your hand" }];
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
     // Not about the card: "draw a card" (Track Down, Thrasios).
@@ -283,6 +286,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "{1}: Look at the top card of your library." (Brutal Deceiver): only as the last instruction, so nothing after it
     // refers to the card.
     const lookTop = /^[Ll]ook at the top card of (your|target player's|target opponent's) library$/.exec(s);
+    // "Look at the top card of your library. If it's a snow card, you may reveal it and put it into your hand" (Frost
+    // Augur; Scrying Sheets: you can't reveal a card that isn't snow, and needn't reveal one that is, rulings).
+    if (lookTop?.[1] === "your" && /^If (?:it's|that card is) /.test(sentences[si + 1] ?? "")) {
+      const r = parseRevealedIf(sentences, si + 1, ctx);
+      if (!r) return null;
+      effects.push({ type: "revealTop", look: true }, r.effect);
+      si = r.next - 1;
+      continue;
+    }
     if (lookTop && si === sentences.length - 1) {
       const who = parsePlayer(lookTop[1] === "your" ? "you" : lookTop[1]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
@@ -795,8 +807,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     }
     // "It's still a land." keeps the land type a "becomes a creature" effect would replace (CR 205.1a).
     if (/^(?:It's still an? (land|artifact|enchantment)|They're still (?:lands|artifacts|enchantments))$/i.test(s)) {
-      const last = [...effects].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes"));
+      const last = [...effects].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes" || (x.kind === "addTypes" && x.types.includes("Creature"))));
       if (!last || last.type !== "continuous") return null;
+      // "Becomes a 2/2 Assembly-Worker artifact creature" already keeps its card types (CR 205.1b).
       last.mods = last.mods.map((x) => (x.kind === "setTypes" ? { kind: "addTypes", types: x.types, subtypes: x.subtypes } : x));
       continue;
     }
@@ -827,7 +840,8 @@ export function parsePayCost(text: string): PayCost | null {
     return Number.isFinite(n) ? { energy: n } : null;
   }
   if ((m = /^(\d+) life$/.exec(text))) return { life: Number(m[1]) };
-  if ((m = /^((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRG])\})+)(?: and (\d+) life)?$/.exec(text))) return { mana: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
+  // {S}: mana from a snow source (CR 107.4h), as in "Cumulative upkeep {S}".
+  if ((m = /^((?:\{(?:\d+|[WUBRGCS]|[WUBRG]\/[WUBRG])\})+)(?: and (\d+) life)?$/.exec(text))) return { mana: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
   return null;
 }
 

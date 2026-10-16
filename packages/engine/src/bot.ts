@@ -123,7 +123,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.clash) return [{ type: "chooseMay", player: pid, yes: !wantOnTop(s, pid, pend.card!) }];
     // "Each player may discard their hand and draw five cards": when that's more cards than we'd throw away.
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
-    if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? millExplored(s, pid, pend.card) : wantsMay(s, pid) }];
+    if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {
       // Pay for ward whenever we can: the spell or ability was worth casting.
@@ -1417,6 +1417,18 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
 
 /** Explore revealed a nonland card: keep it on top if we could cast it soon, otherwise mill it. */
+/**
+ * "You may put it into your hand / onto the battlefield" about the card "reveal/look at the top card" found: yes. Undefined
+ * when it isn't that, or it's about getting rid of the card (into the graveyard, on the bottom), decided like a mill.
+ */
+function revealedMay(s: GameState, card: string): boolean | undefined {
+  const r = s.resolving;
+  if (r?.revealed?.id !== card) return undefined;
+  const may = allEffects(r.body.effects).find((e) => e.type === "may" && e.effects.some((x) => "what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed"));
+  if (may?.type !== "may") return undefined;
+  return may.effects.some((x) => x.type === "bounce" || x.type === "putOntoBattlefield") ? true : undefined;
+}
+
 function millExplored(s: GameState, pid: PlayerId, card: string): boolean {
   const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
   return manaValue(parseManaCost(defOf(s, obj(s, card)).manaCost)) > lands + 1;

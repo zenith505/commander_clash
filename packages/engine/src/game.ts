@@ -4550,6 +4550,8 @@ export function provokerOf(s: GameState, b: GameObject): GameObject | undefined 
 }
 
 const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Island", Forestwalk: "Forest", Mountainwalk: "Mountain", Plainswalk: "Plains" };
+/** Landwalk with a supertype (CR 702.14c): a land with it, or (`non`) without it. */
+const SUPERTYPE_WALK: Record<string, { supertype: string; non?: true }> = { "Snow landwalk": { supertype: "Snow" }, "Legendary landwalk": { supertype: "Legendary" }, "Nonbasic landwalk": { supertype: "Basic", non: true } };
 
 /**
  * Why `blocker` can't block `attacker` on its own, or null. Covers evasion and blocking
@@ -4584,6 +4586,10 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
       if (has(a, kw) && s.battlefield.some((id) => { const l = obj(s, id); return controllerOf(s, l) === defender && characteristics(s, l).subtypes.includes(land); }))
+        return `${a.name} has ${kw.toLowerCase()}`; // CR 702.14c
+  if (defender !== undefined)
+    for (const [kw, w] of Object.entries(SUPERTYPE_WALK))
+      if (has(a, kw) && s.battlefield.some((id) => { const l = obj(s, id); const c = characteristics(s, l); return controllerOf(s, l) === defender && c.types.includes("Land") && c.supertypes.includes(w.supertype) !== !!w.non; }))
         return `${a.name} has ${kw.toLowerCase()}`; // CR 702.14c
   return null;
 }

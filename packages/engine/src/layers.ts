@@ -616,6 +616,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       if (cond.is === "saddled") return !!src.saddled; // CR 702.171b
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
+      if (cond.is === "onBattlefield") return src.zone === "battlefield";
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");
       if (cond.is === "enchanted") return attached.some(aura);
@@ -709,6 +710,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       for (const t of m.types) if (!c.types.includes(t)) c.types.push(t);
       for (const t of m.subtypes) if (!c.subtypes.includes(t)) c.subtypes.push(t);
       for (const t of m.supertypes ?? []) if (!c.supertypes.includes(t)) c.supertypes.push(t);
+      if (m.allCreatureTypes) c.allCreatureTypes = true;
       return;
     case "setTypes": {
       // The new card types replace the old, but an instant or sorcery stays one (CR 205.1a). Subtypes of

@@ -879,6 +879,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifCastFromHand = !fromHand[1];
         body0 = fromHand[2]!;
       }
+      // "When ~ enters, if it's on the battlefield, ..." (Stalking Yeti): an intervening if (CR 603.4), so the ability does
+      // nothing once it has left.
+      let onField = false;
+      const here = /^if it's on the battlefield, (.+)$/i.exec(body0);
+      if (here) {
+        if (event !== "selfEnters") return "fail" as const;
+        onField = true;
+        body0 = here[1]!;
+      }
       // "When ~ enters, if you cast it, ..." (Geological Appraiser): an intervening if (CR 603.4) on how it got there.
       let ifCast = false;
       const wasCast = /^if you cast it, (.+)$/i.exec(body0);
@@ -929,7 +938,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

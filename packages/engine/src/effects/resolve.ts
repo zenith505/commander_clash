@@ -581,6 +581,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTop":
     case "revealTopToHand":
     case "revealTop":
+    case "revealRevealed":
     case "discard":
     case "takeFromHand":
     case "scry":

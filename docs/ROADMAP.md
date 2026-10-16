@@ -1,6 +1,6 @@
 # Roadmap
 
-16,708 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,769 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -16,11 +16,19 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
-   Left from the haunt/Aura-host round:
-   - Auras put onto the battlefield without being cast now ask what they enchant (CR 303.4f) for returns from the
-     graveyard, searches, "put onto the battlefield" and "from your hand"; returns from exile and "until ~ leaves"
-     still pick the host themselves (`auraHostFor`). Still out: Calix, Estrid, Push the Limit, Academy Rector's "you
+   Left from the haunt/Aura-host rounds:
+   - Auras put onto the battlefield without being cast ask what they enchant (CR 303.4f), returns from exile and
+     "until ~ leaves" included. An "until ~ leaves" Aura is placed after the instruction or state-based-action pass
+     that made the source leave, not mid-instruction. Still out: Calix, Estrid, Push the Limit, Academy Rector's "you
      may exile it. If you do", Mount/Vehicle groups.
+   - Auras that transform: Lignify (the Kindred type), Witness Protection and Honest Work (a new name), Frozen in Ice
+     ("can't become untapped"), Withercrown (granted upkeep trigger with "unless you sacrifice"), Swift
+     Reconfiguration (Vehicle with crew), enchant unions with a subtype (In Too Deep, Sugar Coat, Puppet Crafting).
+   - "Whenever a creature you control attacks" bodies still out: Hellrider ("the player or planeswalker it's
+     attacking"), Ingris ("that creature deals 1 damage": the attacker as the source), Silumgar ("creatures defending
+     player controls"), Shared Animosity, Kestia ("an enchanted creature or enchantment creature"), Kitsune Ace (a
+     modal trigger about "that Vehicle"). Commanders: Drillworks Mole ("up to one target commander creature"),
+     Subjugate the Hobbits ("each noncommander creature with mana value 3 or less").
    Left from the filter lands/divided damage/X costs round:
    - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate, Pollen Remedy (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
@@ -348,8 +356,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Mana: "add N mana in any combination of colors" from a spell or trigger; mana that stays ("until end of turn, you don't lose this mana");
   Rite of Flame's count. Bots cast rituals only when the mana lets them cast a card they couldn't otherwise.
 - Other "cast this spell only ..." restrictions (only "if you've cast another spell this turn" is supported).
-- Land types (CR 305.7): copy effects of lands under a land-type effect; "doesn't untap" for one
-  enchanted permanent with "loses all abilities" (Stop Cold); Winter Orb ("players can't untap more than one land").
+- Land types (CR 305.7): copy effects of lands under a land-type effect; Winter Orb ("players can't untap more than one land").
 - Granted flashback is only "until end of turn" with the card's mana cost (Snapcaster Mage, Past in Flames); a
   static grant (Lier, Disciple of the Drowned) and Mission Briefing's "you may cast it this turn" are not modeled.
 

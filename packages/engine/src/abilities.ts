@@ -1134,7 +1134,13 @@ export type Effect =
    * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped".
    */
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped"; notSource?: boolean; whileControlled?: true }
-  | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
+  /**
+   * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
+   * Equipment you control to target creature you control", Brass Squire).
+   */
+  | { type: "attach"; what: ObjRef; source?: ObjRef }
+  /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to. */
+  | { type: "unattach"; what: ObjRef }
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
   | { type: "transformSelf" }
   /** Reconfigure's "Unattach this permanent" (CR 702.151a, 701.3d). */

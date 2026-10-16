@@ -567,6 +567,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "continuous":
     case "playerGains":
     case "attach":
+    case "unattach":
     case "unattachSelf":
     case "transformSelf":
       return runPermanentsEffect(s, e, ctx, src);

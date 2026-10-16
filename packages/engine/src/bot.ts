@@ -1914,7 +1914,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
-        if (!targets) continue;
+        if (!targets || pointlessAttach(s, body, targets, id)) continue;
         const costs = abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
         plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x, costs);
@@ -1926,6 +1926,19 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/** "Attach target Equipment you control to target creature you control" (Brass Squire) where it already is, or with no Equipment chosen. */
+function pointlessAttach(s: GameState, body: AbilityBody, targets: TargetChoice[], sourceId: ObjectId): boolean {
+  const e = body.effects.find((x) => x.type === "attach" && x.source);
+  if (e?.type !== "attach" || e.source?.ref !== "target") return false;
+  const pick = (r: typeof e.what) => {
+    const c = r.ref === "target" ? targets[r.index] : r.ref === "self" ? { kind: "object" as const, id: sourceId } : undefined;
+    return c && !Array.isArray(c) && c.kind === "object" ? c.id : undefined;
+  };
+  const eq = pick(e.source);
+  const host = pick(e.what);
+  return !eq || !host || s.objects[eq]?.attachedTo === host;
 }
 
 /**

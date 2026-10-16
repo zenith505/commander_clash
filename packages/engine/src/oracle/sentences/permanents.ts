@@ -54,9 +54,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Ray of Command: "When you lose control of the creature, tap it." A delayed trigger about the creature it took control
   // of (CR 603.7): it taps when the control effect ends or another player takes it (rulings).
-  if ((m = /^When you lose control of (the creature|the artifact|it|that creature|that artifact), tap it$/i.exec(s))) {
-    const of = parseObject(m[1]!.replace(/^the /i, "that "), ctx) ?? parseObject("it", ctx);
-    return of?.ref === "target" ? [{ type: "delayed", when: "lostControl", of, effects: [{ type: "tap", what: { ref: "subject" } }], text: "tap it" }] : null;
+  // Ogre Geargrabber: "When you lose control of that Equipment, unattach it" (CR 701.3d), from whatever it's attached to
+  // then, for any reason it's lost (rulings).
+  if ((m = /^When you lose control of (the creature|the artifact|it|that creature|that artifact|that Equipment), (tap|unattach) it$/i.exec(s))) {
+    const of = /Equipment$/.test(m[1]!) ? (ctx.lastObjectTarget !== undefined ? { ref: "target" as const, index: ctx.lastObjectTarget } : null) : parseObject(m[1]!.replace(/^the /i, "that "), ctx) ?? parseObject("it", ctx);
+    const tap = m[2]!.toLowerCase() === "tap";
+    return of?.ref === "target" ? [{ type: "delayed", when: "lostControl", of, effects: [tap ? { type: "tap", what: { ref: "subject" } } : { type: "unattach", what: { ref: "subject" } }], text: `${m[2]!.toLowerCase()} it` }] : null;
   }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {

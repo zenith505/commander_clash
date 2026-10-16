@@ -257,6 +257,24 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // that creature"). If ~ has left the battlefield, or can't legally be attached, it
   // stays where it is (CR 701.3b).
   if (/^Attach ~ to (?:it|that creature)$/i.test(s) && ctx.lastCreated && !ctx.spell) return [{ type: "attach", what: { ref: "created" } }];
+  // "Attach target Equipment you control to target creature you control" (Brass Squire), "attach up to one target
+  // Equipment you control to ~" (Cloud), "... to that creature" (Kemba: the creature that entered), Magnetic Theft's
+  // "Attach target Equipment to target creature" (CR 701.3a). Either target illegal: the Equipment doesn't move (rulings).
+  if ((m = /^Attach ((?:up to one )?target Equipment\b(?:(?! to ).)*) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
+    const pronoun = !/\btarget\b/i.test(m[2]!);
+    if (pronoun && ctx.spell) return null;
+    const hostFirst = pronoun ? parseObject(m[2]!, ctx) : null;
+    const source = parseObject(m[1]!, ctx);
+    const what = hostFirst ?? (pronoun ? null : parseObject(m[2]!, ctx));
+    if (source?.ref !== "target" || source.n || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref)) return null;
+    return [{ type: "attach", what, source }];
+  }
+  // "Gain control of target Equipment an opponent controls until end of turn. Attach it to ~." (Ogre Geargrabber)
+  if ((m = /^Attach (?:it|that Equipment) to (~|him|her)$/i.exec(s)) && !ctx.spell && ctx.lastObjectTarget !== undefined) {
+    const t = ctx.targets[ctx.lastObjectTarget];
+    if (t?.kind !== "object" || !t.subtypes?.includes("Equipment")) return null;
+    return [{ type: "attach", what: { ref: "self" }, source: { ref: "target", index: ctx.lastObjectTarget } }];
+  }
   // "When ~ enters, attach it to target creature you control." (CR 701.3)
   if ((m = /^Attach (?:~|it) to (target .+)$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[1]!, ctx);

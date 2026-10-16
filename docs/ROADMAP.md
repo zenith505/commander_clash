@@ -1,6 +1,6 @@
 # Roadmap
 
-18,322 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,346 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -87,10 +87,9 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
      Auras" (Anti-Magic Aura), Wall of Shadows.
    Left from the snow-mana rounds (snow mana, mana that remembers its source, "was spent", sacrifice the rest):
-   - "Was spent to cast" still out on its own words: Primeval Spawn ("if ~ would enter and it wasn't cast"), Satoru's
-     batch trigger, Rain of Riches (cascade for a spell Treasure mana was spent on), Vazi and Shadow the Hedgehog (mana
-     spent to activate an ability, split second granted to spells). Autopay doesn't try to spend mana from creatures
-     for Inga and Esika, or a single color for Steel Exemplar.
+   - "Was spent to cast" still out on its own words: Primeval Spawn ("if ~ would enter and it wasn't cast", a
+     replacement effect on entering, and "spells with total mana value 10 or less" from exiled cards). Autopay doesn't
+     try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar.
    - Snow: all 45 legal {S} cards are supported. Mana Reflection and Nyxbloom Ancient multiply mana as a replacement
      effect while a {T} mana ability resolves (CR 106.12b); other "produces ... instead" replacements (Contamination,
      Infernal Darkness, Pulse of Llanowar) are out.
@@ -103,18 +102,32 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      spell's own count, and cards blocked on other lines (Tayam, Tyvar, Sauron, Incarnation Technique's demonstrate).
    Left from the round after Cataclysm (distribute, step-by-step becomes, Cover of Winter, flavor words, Threaten,
    Balancing Act, exhaust and boast):
-   - Distributing counters as it resolves works for "among any number of creatures you control"; still out: Feast of
-     the Victorious Dead ("that many" creatures that died), Crashing Wave (waterbend {X}, stun counters among tapped
-     creatures your opponents control).
-   - "Becomes" without a duration works on ~ itself; still out: Figure of Fable ("protection from each of your
-     opponents"), Tenth District Hero ("named Mileva").
-   - Threaten's "untap ... and gain control of it" works; still out: Ray of Command and Magus of the Unseen ("When you
-     lose control of ..., tap it"), Temporary Insanity's target filter, Spinal Embrace (sacrifice "if you do").
-   - Exhaust and boast abilities work (CR 702.177a, 702.142a); still out: exhaust mana abilities (Loot, the
-     Pathfinder), "as long as you haven't activated an exhaust ability this turn" (Elvish Refueler, 702.177b), and the
-     "whenever you boast / activate an exhaust ability" triggers.
+   - Distributing counters as it resolves works for "among any number of creatures you control"; still out: Crashing
+     Wave (waterbend {X}, stun counters among tapped creatures your opponents control).
+   - "Becomes" without a duration works on ~ itself; still out: Tenth District Hero ("named Mileva").
+   - Threaten's "untap ... and gain control of it" works; still out: Temporary Insanity's target filter, Spinal
+     Embrace (sacrifice "if you do").
+   - Exhaust and boast abilities work, exhaust mana abilities too (CR 702.177a, 702.142a); still out: "as long as you
+     haven't activated an exhaust ability this turn" (Elvish Refueler, 702.177b), and the "whenever you boast /
+     activate an exhaust ability" triggers.
    - Gained abilities in quotes that end a sentence before "until end of turn" (`gains "... draw a card." until end of
      turn`) are split in two by the sentence splitter, so such cards stay out.
+   Left from the round after Balancing Act (exhaust mana, protection from players, "when you lose control of", granted
+   cascade, abilities being activated, tokens created this turn):
+   - Protection from a player (CR 702.16k) works for "each of your opponents" and "the chosen player" chosen as it
+     enters; still out: Guardian Archon ("secretly choose"), Courageous Resolve, and "you and target permanent you
+     control each gain protection from".
+   - "When you lose control of ..., tap it" works (delayed, 603.7); other "when you lose control of" lines are out
+     (Duplicity, Gustha's Scepter, Khârn, Ogre Geargrabber, Stolen Uniform, Krovikan Vampire's "sacrifice it when").
+   - Cascade given to spells works (Maelstrom Nexus, Rain of Riches, The First Sliver and 4 more); still out: "the next
+     noncreature spell you cast this turn has cascade" (Dark Apostle, Sloppity Bilepiper, Smoldering Stagecoach, TARDIS,
+     Bigger on the Inside), Flamekin Herald (commander spells), Abaddon, Bloodbraid Marauder. A countered X spell's
+     cascade falls back to its printed mana value.
+   - "The number of tokens you created this turn" works as an amount; still out as the X of a look (Ellyn Harbreeze).
+     "Mana from Treasures spent to activate this ability" as an amount (Mr. House) is out.
+   - "Whenever a player activates an ability that isn't a mana ability" works; "an ability of an artifact they
+     control" (Avalanche of Sector 7, which counts mana abilities too) and Artifact Possession are still out.
+   - Courageous Resolve: "gains protection from each of your opponents until end of turn" and "you can't lose the game".
    Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
    counters):
    - Keyword and +1/+1 counters count on cards in other zones (CR 122.1b), but printed-card filters (a card in a
@@ -330,7 +343,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   Memory Vampire, Tenth District Hero, Deadly Cover-Up).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's
   "enters with an additional +1/+1 counter" (that static family isn't supported), Alchemist's Talent (Classes aren't
-  supported), Rain of Riches, Vazi, Mr. House, Coin of Mastery (mana from an artifact source).
+  supported), Mr. House, Coin of Mastery (mana from an artifact source).
 - Sagas (CR 714) and read ahead (702.155) work for 35 of 209; still out: the 29 double-faced Sagas (transform after
   the last chapter), and chapters with lines not parsed yet ("for as long as ~ remains on the battlefield", "until your
   next turn", triggers that last "this turn", "you and target opponent each ..."). Classes, Cases, Rooms and Sieges
@@ -378,7 +391,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   or leaves the battlefield" triggers (Candlekeep Sage, Cryogen Relic), Veteran Soldier's "tapped and attacking that
   opponent", Faceless One. The sample decks have one commander each; two commanders (partners or a Background) work
   in the engine and `sample-decks.json` (`secondCommander`) but no sample deck uses them yet.
-- Split second granted or conditional (Samut, Molten Disaster's "if it was kicked", Shadow the Hedgehog).
+- Split second conditional on a kicker (Molten Disaster's "if it was kicked"); Shadow the Hedgehog's "if mana from an
+  artifact was spent" works.
 - Exploit granted to other creatures (Colonel Autumn, Henry Wu), "the exploited creature", "if it exploited that
   creature"; devour on tokens (Dragon Broodmother), "the number of Goblins it devoured".
 - City's blessing text: "those creatures get +2/+2 instead", "half the creatures they control", "has hexproof and

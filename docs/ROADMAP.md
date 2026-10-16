@@ -1,6 +1,6 @@
 # Roadmap
 
-17,618 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,705 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -20,10 +20,10 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Role cards still out on other lines: reflexive "When you do, create a ... Role" (Curse of the Werefox, Merry
      Bards, Spellbook Vendor), Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
      enchanted creature or enchantment creature"), Seeds of Innocence-style "the controller of each of those".
-   - "Can't be regenerated" still out: "for each creature destroyed this way" (Decree of Pain), Purge ("artifact
+   - "Can't be regenerated" still out: Purge ("artifact
      creature or black creature"), Mageta ("except for ~"), The Abyss ("of their choice"), Scorching Lava (kicked
      "that creature"), Whippoorwill, Runesword.
-   - Equip still out: "Equip—Pay {3} or discard a card", equip planeswalker, "Equip worthy"; bots never use an equip
+   - Equip still out: equip planeswalker, "Equip worthy"; bots never use an equip
      cost that sacrifices a creature (Demonmail Hauberk), only the human player does.
    - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
      them" and several cards don't.
@@ -52,20 +52,32 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Unless" conditions still out: "an opponent has 10 or less life" (Vampire Lacerator) and other conditions the
      static parser doesn't read.
    Left from the batch triggers, channel and graveyard round:
-   - Channel and "Discard this card" abilities work from the hand; "Equip—Pay {3} or discard a card" still doesn't.
-     "That player may search" works for one player; "each player searches their library" (Field of Ruin, Avatar of
-     Growth) and "that many basic land cards" (Settle the Wreckage) don't.
+   - "That many basic land cards" (Settle the Wreckage) is still out.
    - "You may cast this card from your graveyard" works with a condition or extra costs; still out: "or from exile"
      (Squee, the Immortal), "but not from anywhere else" (Haakon), "if a creature not named ~ died this turn"
      (Ebondeath), "and/or" in its cost (Demilich), "rather than paying its mana cost" (Worldheart Phoenix, Scourge of
      Nel Toth), "using its blitz / bestow / mutate / warp ability".
    - Exiling from a graveyard: one player's choice works; "each player exiles a card from their graveyard" (Augusta),
-     "any player may" (Carrion Rats), "If it's a creature card" after it (Graveyard Shovel), and Relic of Progenitus'
-     "{1}, Exile ~" cost are out.
+     "any player may" (Carrion Rats), and "If it's a creature card" after it (Graveyard Shovel) are out.
    - Triggers still out: "When ~ enters and whenever ..." (Exuberant Fuseling), "another creature you control or a land
      you control" (Long Feng), "they create a Treasure token" (Pain Distributor), "Players can't play lands"
      (Territorial Dispute). "Return a card from your graveyard to your hand" inside modes (Gix's Command, Kairi) and
      "You return ..." (Dark Intimations, Cruel Ultimatum) are out.
+   Left from the Field of Ruin, crime, discover and suspect round:
+   - Bots never use an "Exile ~" cost (Relic of Progenitus, Feldon's Cane), as with sacrificing their own permanent.
+     "Equip—Pay {3} or discard a card" (Bloodthorn Flail) is two equip abilities, one for each cost.
+   - Crime still out: "whenever you commit a crime during your turn" (Overzealous Muscle), Take for a Ride.
+   - Discover still out: "the discovered card" (Hit the Mother Lode), Caparocti Sunborn. "If you cast it" works on enters
+     triggers only (The One Ring's "if you cast it" protection is out).
+   - Suspect still out: "can't become suspected" (Airtight Alibi), "if the sacrificed creature was suspected" (Agency
+     Coroner), "create a token and suspect it" with Case solve lines, "goad all suspected creatures" (Nelly Borca), Hot
+     Pursuit, Frantic Scapegoat, Presumed Dead's granted dies trigger, suspect counters (Investigator's Journal).
+   - "Add {B} or {G} for each" (Culling Ritual), Deadly Tempest's "each player loses life equal to the number of creatures
+     they controlled that were destroyed this way".
+   - Rules bug to check: `destroyPermanent` (game.ts) counts a noncreature permanent as destroyed for Cobra Trap only if it
+     reached the graveyard. Rest in Peace exiling it instead doesn't undo the destruction (the destroy happened, only the
+     move changed; Fumigate's and Bane of Progress' rulings count such permanents as destroyed); only regeneration
+     replaces it.
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
    epic, free casts from hand, timing points, overload leftovers):
    - Overload still out: Dragonshift, Fangs of Kalonia, March of Progress, Winds of Abandon, Mizzix's Mastery (copy an exiled card and

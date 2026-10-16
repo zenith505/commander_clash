@@ -28,6 +28,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
     return [{ type: "eachMay", who, text: `search their library for ${m[2]!}`, effects: [{ ...fx[0]!, who: { ref: "choseThisWay" } }] }];
   }
+  // "Each player searches their library for a basic land card, puts it onto the battlefield, then shuffles" (Field of
+  // Ruin, Avatar of Growth): each player chooses in APNAP order, then the cards go there at the same time (CR 101.4).
+  if ((m = /^[Ee]ach player searches their library for (.+?), puts (it|them|that card|those cards) (onto the battlefield(?: tapped)?|into their hand), then shuffles$/.exec(s))) {
+    const fx = parseSearch(`Search your library for ${m[1]!}, put ${m[2]!} ${m[3]!.replace(/ their hand$/, " your hand")}, then shuffle`);
+    if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
+    return [{ ...fx[0]!, who: { ref: "eachPlayer" } }];
+  }
   // "For each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their
   // choice or discards a card" (Rottenmouth Viper): each player makes all the choices, then they all happen (rulings).
   if ((m = /^[Ff]or each ([a-z+\/0-9-]+) counter on (?:it|~), (.+)$/.exec(s)) && (ctx.selfIt || /on ~,/.test(s))) {

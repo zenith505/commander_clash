@@ -38,6 +38,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
+  // "Draw a card for each creature destroyed this way" (Decree of Pain), "for each permanent destroyed this way", "the
+  // number of enchantments destroyed this way": what this spell's or ability's destroy instructions destroyed.
+  if ((m = /^(.+?) destroyed this way$/i.exec(p)) && !/\b(you|your|that|they|their)\b/i.test(m[1]!)) {
+    const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return { count: { kind: "destroyedThisWay", filter: { ...spec, text: m[1]! } } };
+  }
   // "The greatest power among creature cards exiled this way" (Szat's Will, after exiling graveyards).
   if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.

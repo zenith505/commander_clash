@@ -664,6 +664,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
+  o.suspected = undefined; // CR 701.60a
   o.classLevel = undefined; // CR 716.2b
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104
@@ -698,6 +699,7 @@ export function moveObject(
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
+  o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
@@ -3376,7 +3378,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
-  if (ab.exileSelf) moveObject(s, id, "exile"); // scavenge (CR 702.97a)
+  // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
+  if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
   const stackId = `s${s.nextId++}`;
   const item: StackItem = {
     id: stackId,

@@ -6,7 +6,7 @@ import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
-import { parsePlayer } from "./targets";
+import { parseObject, parsePlayer } from "./targets";
 import { parseSearchFilter } from "./search";
 
 export interface Ctx {
@@ -397,10 +397,30 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push({ type: "if", cond: { kind: "wonClash" }, effects: inner });
       continue;
     }
+    // "If it's suspected, exile it. Otherwise, suspect it." (Agrus Kos), "If ~ is suspected, put a +1/+1 counter on it"
+    // (Repeat Offender): the object as the instruction is done (CR 701.60).
+    const ifSuspected = /^If (it's|~ is|that creature is) suspected, (.+)$/.exec(s);
+    if (ifSuspected) {
+      // Repeat Offender's "If ~ is suspected, put a +1/+1 counter on it. Otherwise, suspect it.": "it" is ~, named last.
+      if (ifSuspected[1] === "~ is" && ctx.lastObjectTarget === undefined && !ctx.spell) ctx.selfIt = true;
+      const what = parseObject(ifSuspected[1] === "it's" ? "it" : ifSuspected[1] === "~ is" ? "~" : "that creature", ctx);
+      const inner = what && !isGroup(what) && parseOne(ifSuspected[2]!.charAt(0).toUpperCase() + ifSuspected[2]!.slice(1), ctx);
+      if (!what || !inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "suspected", what }, effects: inner });
+      continue;
+    }
+    // "Creatures your opponents control get -2/-0 until end of turn. If any of them are suspected, they're no longer
+    // suspected." (Eliminate the Impossible): the same group.
+    if (/^If any of them are suspected, they're no longer suspected$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "continuous" || prev.what.ref !== "each") return null;
+      effects.push({ type: "suspect", what: prev.what, no: true });
+      continue;
+    }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "if" || prev.cond.kind !== "wonClash" || prev.otherwise) return null;
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected") || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
@@ -943,7 +963,7 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|after this phase)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|after this phase)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

@@ -41,6 +41,8 @@ export function layerOf(m: Modification): Layer {
     case "setColors":
     case "addColors":
       return "5";
+    case "cantBlock":
+      return m.ability ? "6" : "rules";
     case "addKeywords":
     case "removeKeywords":
     case "loseAllAbilities":
@@ -289,6 +291,9 @@ function gather(s: GameState): Inst[] {
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
+    // A suspected permanent has menace and "This creature can't block" (CR 701.60c), from when it became suspected.
+    if (o.suspected !== undefined)
+      out.push({ key: `suspected:${id}`, timestamp: o.suspected, order: order++, sourceName: "Suspected", untilEndOfTurn: false, mods: [{ kind: "addKeywords", keywords: ["Menace"] }, { kind: "cantBlock", ability: true }], controller: o.controller, fixed: [id] });
     // An Equipment with reconfigure attached to a creature stops being a creature and loses its creature types until
     // it's unattached (CR 702.151b, rulings), even if it loses its abilities meanwhile. Its timestamp is the attaching's.
     if (o.attachedTo && compileCard(d).reconfigure)
@@ -447,6 +452,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "attackedThisTurn":
       return s.players[you]?.attackedTurn === s.turn;
+    case "committedCrime":
+      return s.players[you]?.crimeTurn === s.turn;
     case "coven": {
       const powers = new Set<number>();
       for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) powers.add(c.power);
@@ -552,6 +559,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const c = chars.get(sourceId);
       return !!c && c.types.includes("Creature") && eventAmount !== undefined && (eventAmount > c.power || eventAmount > c.toughness);
     }
+    case "suspected":
+      return (src.suspected !== undefined) !== !!cond.not; // CR 701.60
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {
@@ -717,6 +726,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.hasPrintedAbilities = false;
       c.grantedAbilities = [];
       c.unblockedDamage = false;
+      c.cantBlock = false; // only abilities' "can't block" is set before the rules layer
       return;
     case "unblockedDamage":
       c.unblockedDamage = true;

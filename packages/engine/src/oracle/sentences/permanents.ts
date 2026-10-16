@@ -261,6 +261,22 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
   }
+  // "Choose up to one target creature. If it's suspected, exile it. Otherwise, suspect it." (Agrus Kos): the target alone;
+  // what follows says what happens to it.
+  if ((m = /^[Cc]hoose ((?:up to one )?target creature)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [] : null;
+  }
+  // Suspect (CR 701.60a): "suspect up to one target creature", "suspect it", "suspect enchanted creature".
+  if ((m = /^[Ss]uspect (.+)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "suspect", what }] : null;
+  }
+  // "All suspected creatures are no longer suspected", "you may have it become no longer suspected" (CR 701.60a).
+  if ((m = /^(.+?) (?:is|are) no longer suspected$/.exec(s)) || (m = /^Have (it|~|that creature) become no longer suspected$/.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    return what ? [{ type: "suspect", what, no: true }] : null;
+  }
   // Detain (CR 701.35a): "until your next turn, that permanent can't attack or block and its activated abilities can't be activated".
   if ((m = /^Detain (target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

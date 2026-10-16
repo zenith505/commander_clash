@@ -2074,6 +2074,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Saddled
           </span>
         )}
+        {o.suspected !== undefined && (
+          <span className="chip other" title="Suspected: it has menace and can't block, until it leaves the battlefield or stops being suspected.">
+            Suspected
+          </span>
+        )}
         {o.classLevel !== undefined && (
           <span className="chip other" title={`This Class is level ${o.classLevel}: it has the abilities of level ${o.classLevel} and below.`}>
             Level {o.classLevel}
@@ -3186,6 +3191,10 @@ function Controls({
           ) : pending.how === "miracle" ? (
             <>
               <strong>Miracle:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it stays in your hand.
+            </>
+          ) : pending.how === "discover" ? (
+            <>
+              <strong>{pending.source}:</strong> discover. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it goes to your hand.
             </>
           ) : pending.how === "suspend" ? (
             <>

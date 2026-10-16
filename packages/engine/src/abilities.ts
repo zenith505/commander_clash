@@ -75,6 +75,8 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true }
   /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
   | { kind: "greatestPowerExiled" }
+  /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
+  | { kind: "destroyedThisWay"; filter: TargetSpec }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
@@ -230,6 +232,8 @@ export interface TargetSpec {
    * "creatures that aren't enchanted".
    */
   status?: "enchanted" | "equipped" | "modified" | "unenchanted";
+  /** "Suspected creature" (CR 701.60). */
+  suspected?: true;
   /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
   commander?: boolean;
   /** "a card named ~": the source's name (only for searches). */
@@ -468,7 +472,8 @@ export type Modification =
   | { kind: "switchPT" } // layer 7d
   // Rules effects about what the object can do (CR 613.11), checked after the layers.
   | { kind: "cantAttack" }
-  | { kind: "cantBlock" }
+  /** `ability`: "This creature can't block" as an ability it has (a suspected creature's, CR 701.60c), so in layer 6. */
+  | { kind: "cantBlock"; ability?: true }
   | { kind: "cantBeBlocked" }
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
@@ -608,6 +613,8 @@ export type StaticCondition =
   | { kind: "beforeAttackers" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** "If ~ is suspected" (CR 701.60); `not`: "if it's not suspected". */
+  | { kind: "suspected"; not?: true }
   /** "If you have the initiative" (CR 726.1). */
   | { kind: "initiative" }
   /**
@@ -700,6 +707,8 @@ export type StaticCondition =
   | { kind: "opponentPoison"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures). */
   | { kind: "attackedThisTurn" }
+  /** "If you've committed a crime this turn" (CR 700.13). */
+  | { kind: "committedCrime" }
   /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
@@ -868,6 +877,8 @@ export type Effect =
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
+  /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
+  | { type: "suspect"; what: ObjRef; no?: true }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   | { type: "proliferate" }
   /** Amass [subtype] N (CR 701.47): an Army gets N +1/+1 counters, made first if you have none. */
@@ -994,6 +1005,11 @@ export type Effect =
   | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
+  /**
+   * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
+   * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
+   */
+  | { type: "discover"; n: number }
   /**
    * Ripple N as it resolves (CR 702.60a): reveal the top N cards, cast any with the same name as the spell for free,
    * the rest to the bottom in any order. `of`: "cause" when the ripple was given to the spell that triggered it.
@@ -1263,6 +1279,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
+  | { kind: "suspected"; what: ObjRef }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
@@ -1421,6 +1439,9 @@ export type TriggerEvent =
   | "youCollectEvidence"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
+  /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
+  | "youCommitCrime"
+  | "opponentCommitsCrime"
   /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
@@ -1563,6 +1584,8 @@ export interface TriggeredAbility {
   ifTreasure?: boolean;
   /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
   ifCastFromHand?: boolean;
+  /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
+  ifCast?: true;
   /**
    * A chapter ability "{rN}—[Effect]": "When one or more lore counters are put onto this Saga, if the number of lore
    * counters on it was less than N and became at least N, [effect]" (CR 714.2b).
@@ -1662,7 +1685,7 @@ export interface ActivatedAbility {
   lifeCost?: number;
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
-  /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a). */
+  /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */
   exileSelf?: boolean;
   /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
   costs?: AdditionalCost[];

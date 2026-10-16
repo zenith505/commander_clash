@@ -55,6 +55,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${src} removes ${defOf(s, o).name} from combat.`);
       }
       return;
+    case "suspect":
+      // Only permanents can be suspected (CR 701.60b); a suspected one isn't suspected again (701.60d), so it keeps its
+      // timestamp.
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield" || (o.suspected !== undefined) !== !!e.no) continue;
+        o.suspected = e.no ? undefined : s.nextTimestamp++;
+        log(s, e.no ? `${defOf(s, o).name} is no longer suspected.` : `${src} suspects ${defOf(s, o).name}.`);
+      }
+      invalidateCharacteristics(s);
+      return;
     case "tap":
     case "untap":
       for (const o of objects(s, e.what, ctx)) {

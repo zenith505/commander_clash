@@ -1,7 +1,7 @@
 import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec } from "../abilities";
-import { CREATURE_TYPES, SUPPORTED_KEYWORDS } from "../keywords";
+import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
-import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, capital, singular } from "./words";
+import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
 import { replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -518,6 +518,126 @@ function parseStaticMods(rest: string): Modification[] | null {
 }
 
 export function parseStatic(line: string): StaticAbility | null {
+  return parseStaticLine(line) ?? parseTransform(line);
+}
+
+/**
+ * Auras and Equipment that turn what they're attached to into something else: "Enchanted creature loses all abilities
+ * and is a blue Frog creature with base power and toughness 1/1" (Frogify), "... has base power and toughness 0/2, has
+ * defender, and loses all other abilities" (Stasis Field), "is a colorless Forest land" (Song of the Dryads), "is a
+ * Treasure artifact with "..." and it loses all other abilities" (Minimus Containment), "is a Turtle with base power and
+ * toughness 0/1. It can't attack and loses all abilities." (Retro-Mutation). One effect, applied in each layer it has
+ * parts in (CR 613.1-613.6): a new card type replaces the old ones but not supertypes (CR 205.1a), "artifact creature"
+ * and "in addition to its other types" keep them (205.1b) unless the text says it loses the others, a creature type
+ * alone replaces only creature types, and losing all abilities comes before what the same effect grants (layer 6).
+ */
+function parseTransform(line: string): StaticAbility | null {
+  const head = /^(Enchanted (?:creature|permanent)|Equipped creature) (.+)$/.exec(line.replace(/\.$/, ""));
+  if (!head) return null;
+  const quotes: string[] = [];
+  const rest = head[2]!
+    .replace(/"[^"]*"/g, (q) => `\u0001${quotes.push(q) - 1}\u0001`)
+    .replace(/\. It /g, ", and ")
+    .replace(/,? and it loses /g, ", and loses ");
+  const clauses = rest.split(/,? and (?=(?:is|has|loses|can't|doesn't|gets) )|, (?=(?:is|has|loses|can't|doesn't|gets) )/).map((c) => c.replace(/\u0001(\d+)\u0001/g, (_, i) => quotes[Number(i)]!));
+  const mods: Modification[] = [];
+  const is: string[] = [];
+  let only = false; // "loses all other card types": the new card types replace the old ones
+  let changes = false;
+  for (const c of clauses) {
+    let m: RegExpExecArray | null;
+    if (/^loses all (?:other )?abilities$/.test(c)) mods.push({ kind: "loseAllAbilities" });
+    else if (/^loses all other card types$/.test(c)) only = true;
+    else if (/^loses all other (?:card types and abilities|abilities, card types, and creature types)$/.test(c)) {
+      only = true;
+      mods.push({ kind: "loseAllAbilities" });
+    } else if ((m = /^has base power and toughness (\d+)\/(\d+)$/.exec(c))) mods.push({ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) });
+    else if ((m = /^is (.+)$/.exec(c)) && m[1] !== "goaded") {
+      is.push(m[1]!);
+      continue;
+    } else {
+      const more = parseStaticMods(c);
+      if (!more) return null;
+      mods.push(...more);
+      continue;
+    }
+    changes = true;
+  }
+  for (const phrase of is) {
+    const more = parseIsA(phrase, only);
+    if (!more) return null;
+    mods.push(...more);
+    changes = true;
+  }
+  if (!changes || (only && !is.length)) return null;
+  // Within layer 6, the loss comes first: "has indestructible, and it loses all other abilities" keeps indestructible.
+  const lose = mods.filter((x) => x.kind === "loseAllAbilities").slice(0, 1);
+  return { affects: { kind: "attached" }, mods: [...lose, ...mods.filter((x) => x.kind !== "loseAllAbilities")], text: line };
+}
+
+/**
+ * After "is": "a blue Frog creature with base power and toughness 1/1", "an Insect artifact creature with base power and
+ * toughness 0/1 and has indestructible", "a colorless land with "{T}: Add {C}"", "a black Dragon", "a blue Wall in
+ * addition to its other colors and types". `only`: the text also says it loses its other card types.
+ */
+function parseIsA(phrase: string, only: boolean): Modification[] | null {
+  let m = /^an? (.+?)(?: in addition to its other (colors and )?types)?$/.exec(phrase);
+  if (!m) return null;
+  const addition = /in addition to its other/.test(phrase);
+  const addColors = !!m[2];
+  let rest = m[1]!;
+  let pt: [number, number] | undefined;
+  const grants: Modification[] = [];
+  if ((m = /^(.+?) with base power and toughness (\d+)\/(\d+)(?: and (?:has )?(.+))?$/.exec(rest))) {
+    pt = [Number(m[2]), Number(m[3])];
+    if (m[4]) {
+      const g = parseGrants(m[4]);
+      if (!g) return null;
+      grants.push(...g);
+    }
+    rest = m[1]!;
+  } else if ((m = /^(.+?) with (.+)$/.exec(rest))) {
+    const g = parseGrants(m[2]!);
+    if (!g) return null;
+    grants.push(...g);
+    rest = m[1]!;
+  }
+  const colors: Color[] = [];
+  let colorless = false;
+  const types: string[] = [];
+  const subtypes: string[] = [];
+  for (const w of rest.split(" ")) {
+    const lw = w.toLowerCase();
+    if (COLOR_WORDS[lw]) colors.push(COLOR_WORDS[lw]!);
+    else if (lw === "colorless") colorless = true;
+    else if (lw === "and") continue;
+    else if (TYPE_WORDS[lw]) types.push(TYPE_WORDS[lw]!);
+    else if (subtypeSet(w)) subtypes.push(w);
+    else return null;
+  }
+  // A subtype needs the card type it goes with (CR 205.3d): "a Treasure artifact", not "a Treasure".
+  const kinds = new Set(subtypes.map(subtypeSet));
+  if (types.length && [...kinds].some((k) => !types.includes(k!))) return null;
+  if (!types.length && !subtypes.length) return null;
+  if (addition && (colorless || only)) return null;
+  const out: Modification[] = [];
+  if (addition) out.push({ kind: "addTypes", types, subtypes });
+  else if (types.join(" ") === "Artifact Creature" && !only) {
+    // "Is a Golem artifact creature" keeps its other card types and subtypes, its creature types aside (CR 205.1b).
+    out.push({ kind: "addTypes", types, subtypes: subtypes.filter((st) => subtypeSet(st) !== "Creature") });
+    if (subtypes.some((st) => subtypeSet(st) === "Creature")) out.push({ kind: "setSubtypes", subtypes: subtypes.filter((st) => subtypeSet(st) === "Creature") });
+  } else if (types.length) out.push({ kind: "setTypes", types, subtypes });
+  else out.push({ kind: "setSubtypes", subtypes });
+  // A basic land type: it loses the abilities from its rules text and taps for that mana instead (CR 305.7).
+  const basics = subtypes.filter((st) => BASIC_TYPES.includes(st));
+  if (basics.length && !addition) out.push({ kind: "setLandTypes", subtypes: basics });
+  if (colorless) out.push({ kind: "setColors", colors: [] });
+  else if (colors.length) out.push(addColors ? { kind: "addColors", colors } : addition ? { kind: "addColors", colors } : { kind: "setColors", colors });
+  if (pt) out.push({ kind: "setPT", power: pt[0], toughness: pt[1] });
+  return [...out, ...grants];
+}
+
+function parseStaticLine(line: string): StaticAbility | null {
   let text = line.replace(/\.$/, "");
   const lands = parseLandTypeStatic(text, line);
   if (lands) return lands;

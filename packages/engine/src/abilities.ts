@@ -423,6 +423,7 @@ export type Modification =
   | { kind: "loseTypes"; types: string[] } // layer 4, "stops being a creature": that type and its subtypes go (CR 702.151b)
   /** `chosen`: "becomes the color of your choice", the color chosen as it resolved. */
   | { kind: "setColors"; colors: Color[]; chosen?: true } // layer 5
+  | { kind: "addColors"; colors: Color[] } // layer 5, "is blue in addition to its other colors"
   /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
   | { kind: "addKeywords"; keywords: string[]; spares?: true }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6

@@ -75,6 +75,8 @@ export function modsAreHarmful(mods: Modification[]): boolean {
     if (m.kind === "addAbility") pt -= grantCost(m.text);
     if (["control", "loseAllAbilities", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes", "setLandTypes", "goad", "cantActivate"].includes(m.kind)) return true;
     if (m.kind === "setPT" && estimate(m.power) + estimate(m.toughness) <= 2) return true;
+    // "Is a colorless Forest land", "is an enchantment and loses all other card types": no longer a creature.
+    if (m.kind === "setTypes" && !m.types.includes("Creature")) return true;
   }
   return pt < 0;
 }

@@ -21,7 +21,7 @@ export const MANA_ABILITY_OFFSET = 1000;
  */
 export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   const c = characteristics(s, o);
-  const out = c.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null);
+  const out = c.landAbilitiesLost ? [] : c.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null);
   if (c.hasPrintedAbilities) out.push(...compileCard(defOf(s, o)).mana);
   for (const t of c.grantedAbilities) out.push(...compileGranted(t).mana); // 'Enchanted land has "{T}: Add ..."'
   return out;

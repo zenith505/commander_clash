@@ -39,6 +39,7 @@ export function layerOf(m: Modification): Layer {
     case "loseTypes":
       return "4";
     case "setColors":
+    case "addColors":
       return "5";
     case "addKeywords":
     case "removeKeywords":
@@ -84,6 +85,8 @@ export interface Characteristics {
   sparedBy?: Record<string, ObjectId>;
   /** False once an effect made it lose all abilities: none of its printed abilities work. */
   hasPrintedAbilities: boolean;
+  /** It lost all abilities, the mana abilities of its basic land types too (CR 305.6). */
+  landAbilitiesLost?: true;
   /** Triggered, activated and mana abilities effects gave it, as text ("~" is this object), in layer 6 order. */
   grantedAbilities: string[];
   controller: PlayerId;
@@ -630,6 +633,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "setColors":
       c.colors = [...m.colors];
       return;
+    case "addColors":
+      for (const col of m.colors) if (!c.colors.includes(col)) c.colors.push(col);
+      return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
       for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined)) {
@@ -645,7 +651,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
       return;
     case "loseAllAbilities":
-      // Abilities granted before this (earlier timestamps) go too; later ones stay (CR 613.7).
+      // Abilities granted before this (earlier timestamps) go too; later ones stay (CR 613.7). So do the mana abilities
+      // its basic land types give it (CR 305.6; Imprisoned in the Moon rulings).
+      c.landAbilitiesLost = true;
       c.keywords = [];
       c.sparedBy = undefined;
       c.hasPrintedAbilities = false;
@@ -778,7 +786,7 @@ function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock:
  * controller, types, colors, and whether a source still has its abilities, so only these
  * can create a dependency (CR 613.8a).
  */
-const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "setColors", "loseAllAbilities"]);
+const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "setColors", "addColors", "loseAllAbilities"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";

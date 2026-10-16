@@ -18,7 +18,7 @@ function searchDest(text: string): SearchDest {
  * hand" (Cultivate), "then shuffle and put that card on top" (Vampiric Tutor).
  */
 export function parseSearch(s: string): Effect[] | null {
-  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) (.+)$/i.exec(s);
+  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then) .+)$/i.exec(s);
   if (!m) return null;
   const upTo = !!m[1] || m[2] === "any number of";
   const n = m[2] === "any number of" ? 99 : NUMBER_WORDS[m[2]!.toLowerCase()]!;
@@ -43,6 +43,13 @@ export function parseSearchFilter(phrase: string): TargetSpec | undefined | null
   const p = phrase.replace(/\bcards\b/g, "card");
   if (/^card$/i.test(p)) return undefined;
   if (/^card named ~$/.test(p)) return { kind: "card", named: "~", text: "card named ~" };
+  // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
+  const parts = p.split(/,? or an? |, an? /);
+  if (parts.length > 1 && parts.every((x) => / card$/.test(x))) {
+    const subs = parts.map((x) => parseSearchFilter(x));
+    if (subs.some((x) => !x)) return null;
+    return { kind: "card", anyOf: subs as TargetSpec[], text: p.replace(/\bcard\b(?=,| or )/g, "card") };
+  }
   // "A land card with a basic land type" (Boseiju, Who Endures): a Plains, Island, Swamp, Mountain or Forest card (CR 205.3i).
   if (/^land card with a basic land type$/.test(p)) return { kind: "card", types: ["Land"], subtypes: [...BASIC_TYPES], text: "land card with a basic land type" };
   // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled.

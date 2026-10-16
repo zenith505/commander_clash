@@ -792,10 +792,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.found) {
         // Only permanent cards can be put onto the battlefield (CR 110.4b).
-        const cards = p.graveyard.filter((id) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
+        const mvMax = e.mvMax === undefined ? undefined : amountNow(s, e.mvMax, ctx);
+        const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
+        const cards = p.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
         const max = Math.min(e.n, cards.length);
         if (!max) return;
-        const kind = e.filter?.text ?? "card";
+        const kind = filter?.text ?? "card";
         const what = e.n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand" };
         return "paused";

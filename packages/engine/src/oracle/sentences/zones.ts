@@ -111,10 +111,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Return a creature card from your graveyard to the battlefield" (Summon Undead), "... tapped" (Port of Karfell), "... with
   // a finality counter on it" (Charnel Serenade): chosen as it resolves, not targeted, under your control (CR 110.2a).
   if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
-    const filter = parseSearchFilter(m[2]!.replace(/ and\/or /g, " or "));
+    // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
+    // as it resolves.
+    const mvX = / with mana value X or less$/.exec(m[2]!);
+    if (mvX && !ctx.spell && !ctx.activated && !ctx.whereX) return null;
+    const filter = parseSearchFilter(m[2]!.slice(0, mvX?.index).replace(/ and\/or /g, " or "));
     const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
-    return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
+    return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(filter ? { filter: mvX ? { ...filter, text: `${filter.text} with mana value X or less` } : filter } : {}), ...(mvX ? { mvMax: amt("X") } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
   }
   // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
   // (Decaying Soil): that player chooses as it resolves.

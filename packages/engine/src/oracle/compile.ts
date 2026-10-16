@@ -1264,7 +1264,11 @@ export function compile(d: CardDef): CompiledCard {
     if (spellLines.length || spree.costs.length < 2 || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...spree.lines, ...spellLines);
     else out.spell = { targets: [], effects: [], text: spree.lines.join(" "), modal: { min: 1, max: modes.length, modes: modes as AbilityBody[], costs: spree.costs } };
   } else if (isSpell) {
-    const body = spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
+    // "Choose one — • Destroy all creatures. • Destroy all planeswalkers." then "Then return a creature ... card from your
+    // graveyard to the battlefield ..." (Blood on the Snow): the paragraph after the modes is done whichever mode was
+    // chosen, after it (CR 700.2, 608.2c). With one mode chosen, that's the same as the end of each mode.
+    const tail = spellLines.length > 1 && spellLines[0]!.includes("•") && !spellLines.slice(1).some((l) => l.includes("•")) ? spellLines.slice(1).join(" ") : undefined;
+    const body = tail !== undefined ? modesThen(spellLines[0]!, tail) : spellLines.length ? parseBody(spellLines.join(" "), { spell: true }) : null;
     if (body && ascendSpell && body.modal) out.unsupported.push("Ascend"); // before the modes: not modeled
     else if (body) out.spell = ascendSpell ? { ...body, effects: [{ type: "ascend" }, ...body.effects] } : body;
     else out.unsupported.push(...spellLines);
@@ -1561,6 +1565,14 @@ function giftOf(what: string): NonNullable<CompiledCard["gift"]> {
 
 const giftText = (what: string) =>
   what === "a card" ? "draws a card" : what === "an extra turn" ? "takes an extra turn after this one" : what === "a tapped Fish" ? "creates a tapped 1/1 blue Fish creature token" : what === "an Octopus" ? "creates an 8/8 blue Octopus creature token" : `creates ${what} token`;
+
+/** A "choose one" spell's modes, each followed by the same paragraph (see the isSpell case of compileCard). */
+function modesThen(modesLine: string, tail: string): AbilityBody | null {
+  const body = parseBody(modesLine, { spell: true });
+  const then = parseBody(tail, { spell: true });
+  if (!body?.modal || body.modal.max !== 1 || body.modal.repeat || !then || then.modal || then.targets.length || body.effects.length || body.targets.length) return null;
+  return { ...body, text: `${body.text} ${then.text}`, modal: { ...body.modal, modes: body.modal.modes.map((m) => ({ ...m, effects: [...m.effects, ...structuredClone(then.effects)], text: `${m.text} ${then.text}` })) } };
+}
 
 /**
  * A modal ability is a "choose ... —" line followed by one line per mode, each starting

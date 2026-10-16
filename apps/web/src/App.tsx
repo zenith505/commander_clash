@@ -347,7 +347,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; collect?: string[]; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -615,6 +615,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.exileFromHand !== undefined) continue;
         return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `put ${c.n === 1 ? "a card" : `${c.n} cards`} from your hand on top of your library`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId), chosen: [] });
       }
+      if (c.kind === "exileFromGraveyard" && !c.top) {
+        // "Exile a card from your graveyard" (Stonerise Spirit): click the cards in your graveyard.
+        if (d.exileCards !== undefined) continue;
+        const what = c.filter?.text ?? "card";
+        const candidates = s.players[HUMAN]!.graveyard.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
+        return setCostPick({ activate: d, kind: "exileCards", label: cardOf(s, d.objectId).name, what: `exile from your graveyard ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
+      }
       if (c.kind !== "sacrifice" && c.kind !== "discard") continue;
       if (c.kind === "discard" && c.random) continue; // the game picks it (CR 701.9b)
       if (d[c.kind] !== undefined) continue;
@@ -626,7 +633,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.collect ? { collect: d.collect } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -2762,7 +2769,9 @@ function LibrarySearch({
               ? `${pending.source}: put ${pending.what} ${dig.to}`
               : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
-                : pending.fromGraveyard
+                : pending.fromGraveyard === "exile"
+                  ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from your graveyard`
+                  : pending.fromGraveyard
                   ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to your hand`
                   : `${pending.source}: search your library for ${pending.what}`}
           </strong>

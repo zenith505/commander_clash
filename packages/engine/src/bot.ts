@@ -138,6 +138,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
+    // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
@@ -2008,6 +2011,15 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const picks = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => hand.includes(x)).slice(0, c.n);
       if (picks.length < c.n) return null;
       out.discard = picks;
+    } else if (c.kind === "exileFromGraveyard" && c.top) {
+      if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
+    } else if (c.kind === "exileFromGraveyard" && !c.x) {
+      // "Exile a card from your graveyard": cards we have no use for there, the cheapest first.
+      const pool = player(s, pid)
+        .graveyard.filter((x) => x !== o.id && !out.exileCards?.includes(x) && !usefulInGraveyard(s, x) && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))))
+        .sort((a, b) => mv(s, a) - mv(s, b));
+      if (pool.length < c.n) return null;
+      out.exileCards = [...(out.exileCards ?? []), ...pool.slice(0, c.n)];
     } else return null;
   }
   return out;

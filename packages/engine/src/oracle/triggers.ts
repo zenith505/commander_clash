@@ -244,7 +244,11 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   const ench = ENCHANTED_CONTROLS.test(phrase);
   const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase);
   if (!filter || filter.kind !== "object") return "fail";
-  const body = parseBody(ench ? m[4]!.replace(/\bthat player\b/g, "enchanted player") : m[4]!, { subjectIt: true });
+  // "That land's controller" (Zo-Zu), and "that player" after "a creature an opponent controls" (Suture Priest): the
+  // entering permanent's controller.
+  let bodyText = ench ? m[4]!.replace(/\bthat player\b/g, "enchanted player") : m[4]!.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
+  if (!ench && filter.controller === "opponent") bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
+  const body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
   const kind = m[1]!.toLowerCase();
   return {

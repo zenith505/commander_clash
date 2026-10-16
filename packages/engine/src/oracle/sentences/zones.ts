@@ -106,7 +106,16 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = parseSearchFilter(m[2]!.replace(/ and\/or /g, " or "));
     const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
-    return [{ type: "returnFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
+    return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
+  }
+  // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
+  // (Decaying Soil): that player chooses as it resolves.
+  if ((m = /^(?:(Target player|Target opponent) exiles|[Ee]xile) (an?|one|two|three) (.+?) from (their|your) graveyard$/.exec(s)) && (m[4] === "their") === !!m[1]) {
+    const who = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : undefined;
+    const filter = parseSearchFilter(m[3]!);
+    const n = num(m[2]!.replace(/^an?$/, "one"));
+    if (who === null || filter === null || !Number.isInteger(n)) return null;
+    return [{ type: "chooseFromGraveyard", n, dest: "exile", ...(who ? { who } : {}), ...(filter ? { filter } : {}) }];
   }
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
   if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];

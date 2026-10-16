@@ -717,8 +717,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
-    case "returnFromGraveyard": {
-      const p = player(s, ctx.controller);
+    case "chooseFromGraveyard": {
+      const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (pid === undefined || player(s, pid).lost) return;
+      const p = player(s, pid);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.found) {
         const cards = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
@@ -726,12 +728,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!max) return;
         const kind = e.filter?.text ?? "card";
         const what = e.n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: true };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand" };
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
-      if (found.length) log(s, `${p.name} returns ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard to their hand.`);
-      for (const id of found) moveObject(s, id, "hand");
+      const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
+      if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : `${p.name} returns ${names} from their graveyard to their hand.`);
+      for (const id of found) moveObject(s, id, e.dest ?? "hand");
       return;
     }
     case "reorderGraveyard": {

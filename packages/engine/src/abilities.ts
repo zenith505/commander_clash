@@ -843,7 +843,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "returnFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** Exiled instead ("Target player exiles a card from their graveyard"). */ dest?: "exile"; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {

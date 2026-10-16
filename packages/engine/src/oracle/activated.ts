@@ -21,7 +21,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -51,6 +51,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     } else if ((c = /^Collect evidence (\d+)$/.exec(part))) {
       // CR 701.59a: exile cards from your graveyard with total mana value N or more.
       extra.push({ kind: "collectEvidence", n: Number(c[1]) });
+    } else if (/^Exile (?!~|the top )/.test(part)) {
+      // "Exile a card from your graveyard" (Relic of Progenitus' cousins, Sigarda): cards chosen as it's activated.
+      const c2 = parseAdditionalCost(part);
+      if (c2?.kind !== "exileFromGraveyard" || c2.top || c2.x) return "fail";
+      extra.push(c2);
     } else if (/^Exile the top /.test(part)) {
       // "Exile the top creature card of your graveyard" (Necratog): no choice, the topmost one (CR 404.1).
       const top = parseAdditionalCost(part);

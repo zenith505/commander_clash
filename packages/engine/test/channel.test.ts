@@ -115,7 +115,7 @@ describe("channel", () => {
     const top = [onTop(s, ap, forest), onTop(s, ap, bear()), onTop(s, ap, forest)];
     for (const a of planActivate(s, ap, ids[0]!, channel(takenuma))!) s = act(s, a);
     s = passAll(s);
-    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, fromGraveyard: true, min: 1, max: 1, cards: [top[1]] });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, fromGraveyard: "hand", min: 1, max: 1, cards: [top[1]] });
     s = act(s, { type: "searchLibrary", player: ap, found: [top[1]!] });
     expect(s.players[ap]!.hand).toContain(top[1]);
   });
@@ -124,7 +124,7 @@ describe("channel", () => {
     let { s, ap, ids } = setup([churn]);
     const b = onTop(s, ap, bear());
     s = cast(s, ap, ids[0]!);
-    expect(s.pending).toMatchObject({ kind: "searchLibrary", fromGraveyard: true, min: 0, max: 1 });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", fromGraveyard: "hand", min: 0, max: 1 });
     s = act(s, { type: "searchLibrary", player: ap, found: [] });
     expect(s.objects[b]!.zone).toBe("graveyard");
   });

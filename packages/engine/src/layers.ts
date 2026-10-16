@@ -868,7 +868,7 @@ function usesCounts(s: GameState): boolean {
   for (const id of s.battlefield) {
     for (const st of compileCard(defOf(s, s.objects[id]!)).statics) {
       if (st.condition) return true; // "as long as": attacking, tapped lands, the graveyard, whose turn it is
-      if (st.affects.kind === "filter" && st.affects.spec?.combat) return true; // "attacking creatures you control"
+      if (st.affects.kind === "filter" && (st.affects.spec?.combat || st.affects.spec?.tapped !== undefined)) return true; // "attacking/untapped creatures you control"
       for (const m of st.mods) {
         if (m.kind === "definePT") return true;
         if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;

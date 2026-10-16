@@ -149,3 +149,51 @@ describe("Auras put onto the battlefield without being cast", () => {
     void x;
   });
 });
+
+// "Aura" as a subtype (CR 205.3h): "Aura spells", "target Aura", "an Aura card". A creature card cast for its bestow cost
+// is an Aura spell (CR 702.103b).
+const hero = card("Hero of Iroas", "Creature — Human Soldier", "{1}{W}", { power: "2", toughness: "2", keywords: ["Heroic"], oracleText: "Aura spells you cast cost {1} less to cast.\nHeroic — Whenever you cast a spell that targets this creature, put a +1/+1 counter on this creature." });
+const spiritdancer = card("Kor Spiritdancer", "Creature — Kor Wizard", "{1}{W}", { power: "0", toughness: "2", oracleText: "This creature gets +2/+2 for each Aura attached to it.\nWhenever you cast an Aura spell, you may draw a card." });
+const pilgrim = card("Heliod's Pilgrim", "Creature — Human Cleric", "{2}{W}", { power: "1", toughness: "2", oracleText: "When this creature enters, you may search your library for an Aura card, reveal it, put it into your hand, then shuffle." });
+const hopeCharm = card("Hope Charm", "Instant", "{W}", { oracleText: "Choose one —\n• Target creature gains first strike until end of turn.\n• Target player gains 2 life.\n• Destroy target Aura." });
+const naiad = card("Nimbus Naiad", "Enchantment Creature — Nymph", "{2}{U}", { power: "2", toughness: "2", keywords: ["Flying", "Bestow"], oracleText: "Bestow {4}{U} (If you cast this card for its bestow cost, it's an Aura spell with enchant creature. It becomes a creature again if it's not attached.)\nFlying\nEnchanted creature gets +2/+2 and has flying." });
+
+describe("Aura as a subtype", () => {
+  it("parses", () => {
+    supported(hero, spiritdancer, pilgrim, hopeCharm, naiad);
+  });
+
+  it("Hero of Iroas makes Aura spells cost {1} less, bestow included; Kor Spiritdancer draws for each", () => {
+    const { s: s0, ap, ids } = setup([pacifism, naiad, naiad]);
+    putOnBattlefield(s0, ap, hero);
+    const dancer = putOnBattlefield(s0, ap, spiritdancer);
+    const mana = (plan: Action[] | null) => (plan ?? []).filter((a) => a.type === "activateMana").length;
+    expect(mana(planCast(s0, ap, ids[0]!, [{ kind: "object", id: dancer }]))).toBe(1); // {1}{W} - 1
+    expect(mana(planCast(s0, ap, ids[1]!, [{ kind: "object", id: dancer }], undefined, undefined, undefined, { alt: "bestow" }))).toBe(4); // {4}{U} - 1
+    expect(mana(planCast(s0, ap, ids[2]!))).toBe(3); // a creature spell: no reduction
+    const hand = s0.players[ap]!.hand.length;
+    let s = run(s0, planCast(s0, ap, ids[1]!, [{ kind: "object", id: dancer }], undefined, undefined, undefined, { alt: "bestow" }));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseMay" });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.players[ap]!.hand.length).toBe(hand); // cast one, drew one
+    expect(s.objects[ids[1]!]).toMatchObject({ zone: "battlefield", attachedTo: dancer });
+  });
+
+  it("Heliod's Pilgrim finds an Aura card; Hope Charm destroys an Aura", () => {
+    const { s: s0, ap, opp, ids } = setup([pilgrim, hopeCharm]);
+    const p = put(s0, ap, pacifism, "library");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", cards: [p] });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [p] }));
+    expect(s.objects[p]!.zone).toBe("hand");
+
+    const theirs = putOnBattlefield(s, opp, bear());
+    const aura = putOnBattlefield(s, opp, holyStrength);
+    s.objects[aura]!.attachedTo = theirs;
+    invalidateCharacteristics(s);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: aura }], [2])));
+    expect(s.objects[aura]!.zone).toBe("graveyard");
+  });
+});

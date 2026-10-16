@@ -434,7 +434,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
       const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `)
-        .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able");
+        .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able")
+        // "You may have target opponent discard a card", "you may have that player lose 1 life": that player does it, if
+        // you choose (the choice is yours, CR 608.2d).
+        .replace(/^Have (target player|target opponent|that player|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `);
       ctx.mayNow = true;
       const inner = parseOne(rest, ctx);
       ctx.mayNow = false;

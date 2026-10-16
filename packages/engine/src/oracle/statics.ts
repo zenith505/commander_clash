@@ -321,6 +321,8 @@ function parseAffected(subject: string): Affects | null {
     const types = ["Creature"];
     let combat: "attacking" | "blocking" | undefined;
     let colorless = false;
+    let tapped: boolean | undefined;
+    let legendary: boolean | undefined;
     for (const w of words) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
       // "Artifact creatures you control get +1/+1", "Land creatures you control have vigilance": both card types.
@@ -329,14 +331,29 @@ function parseAffected(subject: string): Affects | null {
       // "Attacking creatures you control get +1/+0": whichever are attacking right now (CR 611.3a).
       else if ((w.toLowerCase() === "attacking" || w.toLowerCase() === "blocking") && !combat) combat = w.toLowerCase() as "attacking" | "blocking";
       else if (w.toLowerCase() === "colorless" && !colorless) colorless = true; // CR 105.2c
+      // "Untapped creatures you control get +0/+2": whichever are untapped right now, like attacking ones.
+      else if (/^(un)?tapped$/i.test(w) && tapped === undefined) tapped = w.toLowerCase() === "tapped";
+      // "Legendary creatures you control get +2/+2" (supertype, CR 205.4d), "nonlegendary creatures".
+      else if (/^(non)?legendary$/i.test(w) && legendary === undefined) legendary = w.toLowerCase() === "legendary";
       else return null; // "Enchanted creatures", ...: not supported yet
     }
+    const specWords = [combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary"].filter(Boolean);
+    const spec: TargetSpec | undefined = specWords.length
+      ? {
+          kind: "object",
+          ...(combat ? { combat } : {}),
+          ...(colorless ? { colorCount: "colorless" as const } : {}),
+          ...(tapped !== undefined ? { tapped } : {}),
+          ...(legendary === true ? { supertypes: ["Legendary"] } : legendary === false ? { notSupertypes: ["Legendary"] } : {}),
+          text: `${specWords.join(" ")} creature`,
+        }
+      : undefined;
     return {
       kind: "filter",
       types,
       subtypes: subtypes.length ? subtypes : undefined,
       colors: colors.length ? colors : undefined,
-      ...(combat ? { spec: { kind: "object" as const, combat, ...(colorless ? { colorCount: "colorless" as const } : {}), text: `${combat} creature` } } : colorless ? { spec: { kind: "object" as const, colorCount: "colorless" as const, text: "colorless creature" } } : {}),
+      ...(spec ? { spec } : {}),
       controller: m[3]!.toLowerCase() === "you control" ? "you" : "opponent",
       other: !!m[1],
     };

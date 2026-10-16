@@ -2122,8 +2122,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Strive's cost for each target beyond the first is one too, paid even when it's cast without paying its mana cost (rulings).
   const strive = compileCard(d).strive?.repeat(Math.max(0, (how.targets ?? []).filter((t) => t.kind !== "none").length - 1)) ?? "";
   const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive;
-  // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast.
-  const mods = costModsFor(s, pid, o, d, x);
+  // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
+  // an Aura spell (CR 702.103b, Hero of Iroas rulings).
+  const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
   if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
   // "This spell costs {2} less to cast if evidence was collected" (CR 601.2f).

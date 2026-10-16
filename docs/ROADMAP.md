@@ -1,6 +1,6 @@
 # Roadmap
 
-18,559 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,639 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -87,8 +87,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
      Auras" (Anti-Magic Aura), Wall of Shadows.
    Left from the snow-mana rounds (snow mana, mana that remembers its source, "was spent", sacrifice the rest):
-   - Autopay doesn't try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar. A Clone
-     copying Primeval Spawn isn't exiled by its "if ~ would enter and it wasn't cast" replacement.
+   - Autopay doesn't try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar.
    - Snow: all 45 legal {S} cards are supported. Mana Reflection and Nyxbloom Ancient multiply mana as a replacement
      effect while a {T} mana ability resolves (CR 106.12b); other "produces ... instead" replacements (Contamination,
      Infernal Darkness, Pulse of Llanowar) are out.
@@ -176,7 +175,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    harmonize, paradigm, demonstrate):
    - "When you lose control of ~" works (603.2, rulings on Khârn: leaving the battlefield or a control change; the
      player who lost control controls the trigger). A control change before the first state check of a newly placed
-     permanent isn't noticed; bots don't use Gustha's Scepter.
+     permanent isn't noticed.
    - Attach target Equipment works (Brass Squire, Kemba, Magnetic Theft and 9 more); still out: Frodo ("with mana value
      2 or 3"), Grip of Phyresis, Weapons Vendor, Barret, Blacksmith's Talent, Captain America, Cloud's other line,
      Noctis, Raubahn (ward-pay life), Sokka Swordmaster.
@@ -188,27 +187,36 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Khârn the Betrayer: damage dealt to it by several sources at once is one control change, and the opponent for
      non-combat damage is chosen automatically (the opponent with the most life). Stolen Uniform's "if it's attached to
      a creature you control" is checked only as the trigger resolves.
-   - Dice (CR 706) work with results tables, modifiers, "ignore the lower roll", natural results and Pixie Guide-style
-     advantage; still out: d2-style "choose one" Endeavors, "roll again" / "reroll" (Delina, Pixie Guide's Wyll-style
-     rerolls of others), Iron Mastiff, Chaos Dragon, Neverwinter Hydra, Loathsome Troll (activated from the graveyard),
-     Treasure Chest, Ancient Silver/Brass/Bronze Dragon, Farideh, Vexing Puzzlebox, planar die.
+   - Dice (CR 706) work with results tables, modifiers, "ignore the lower roll", natural results, Pixie Guide-style
+     advantage, "roll two and choose one result" (Wild, Reckless and Grave Endeavor; bots take the higher result) and a
+     reflexive trigger using the result (Ancient Bronze Dragon); still out: Valiant and Arcane Endeavor (a filter "with
+     mana value / power less than or equal to" an amount, which blocks 62 cards), "roll again" / "reroll" (Delina,
+     Pixie Guide's Wyll-style rerolls of others), Iron Mastiff, Chaos Dragon, Neverwinter Hydra, Treasure Chest
+     (conditional search), Ancient Brass Dragon, Farideh, Thunderwave ("not chosen"), planar die.
+   - Abilities that work only from your graveyard work (Loathsome Troll); bots don't use them.
    - Face-down exile you may play works (Three Wishes, Outrageous Robbery, Intet, Gonti, Rev and 3 more); "mana of any
      type" doesn't cover Phyrexian symbols' life option (they still need their color or 2 life). Three Wishes' upkeep
-     cleanup is one delayed trigger per card. Still out: Jester's Scepter (a cost that moves a card exiled with it),
-     Rogue Class (level 3 static permission), Klaw ("whenever you play a card from exile"), Mindleecher (mutate),
+     cleanup is one delayed trigger per card. Still out: Klaw ("whenever you play a card from exile"), Mindleecher (mutate),
      Blightwing Bandit, Edward Kenway, Apple of Eden, Predators' Hour, Bloodsoaked Insight.
    - Main phase triggers work for "your first / precombat main phase", "each player's first main phase", "each of your
-     postcombat main phases" and "your second main phase" (505.1); still out: "each of your main phases" (Carpet of
-     Flowers, Frontier Siege), "the active player adds" (Belbe), "that player adds" (Eladamri's Vineyard, Blinkmoth
-     Urn), mana "Spend this mana only ..." from a trigger (Abstract Paintmage, Smoky Lounge), "add mana in any combination
-     of colors" from a trigger (Cosmic Crucible).
+     postcombat main phases", "your second main phase" and "each of your main phases" (505.1), with mana for other
+     players (Belbe, Eladamri's Vineyard, Blinkmoth Urn) and restricted mana (Abstract Paintmage); still out: Carpet of
+     Flowers ("up to X mana of any one color"), Monastery Siege, "add mana in any combination of colors" from a trigger
+     (Cosmic Crucible).
    - "Exile / reveal until a nonland card" works for casting it now or this turn and for Treasure Hunt; still out:
      damage or +X/-X by its mana value (Erratic Explosion, Kaboom!, Undying Flames, Goblin Machinist), "if the spell's
      mana value is ..." (Bre, Breaching Dragonstorm, Ryan Sinclair, Solstice Revelations), paying life or energy instead
      (Bismuth Mindrender, Amped Raptor), each opponent / each player (Fevered Suspicion, Etali, Plargg and Nassari),
      suspend and time counters (Kang Prime, The Tenth Doctor), Neera, Demonlord Belzenlok ("repeat this process").
    - The shared card data in /mnt/project-files/commander-clash-data/cards.json.gz still splits "Time Lord" into two
-     subtypes (it was built before the type-line fix); rebuilding cards.json on Ken's PC fixes it.
+     subtypes (it was built before the type-line fix); rebuilding cards.json on Ken's PC fixes it, or a cloud thread
+     can rewrite the gz once Ken allows writing to the shared folder.
+   Left from the round after dice (choose an opponent, choose a die result, leaves-the-battlefield triggers, searching
+   another player's library):
+   - "Choose an opponent" as a spell resolves works (Myrkul's Edict; bots choose the strongest opponent); "You and that
+     player each ..." (the Offerings) is out.
+   - Still out from this round's search: Power of Persuasion ("until the end of your next turn" control), Kruphix and
+     Horizon Stone (unspent mana becomes colorless), The Ozolith, Taeko, Nikara, Sandstone Oracle, Wrenn and Seven.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or

@@ -4,7 +4,7 @@ import { num, NUMX, X, amt, counterKind, COUNTER, isGroup, keywordOf, parseSpent
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
-import { parseDig, parseSentence } from "./sentence";
+import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
 import { parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
@@ -716,6 +716,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const prev = effects[effects.length - 1];
       if (prev?.type !== "exileFaceDown" || prev.from !== "handCard") return null;
       effects[effects.length - 1] = { ...prev, look: true };
+      continue;
+    }
+    // "Put target creature card from a graveyard onto the battlefield under your control. That creature is a black Zombie in
+    // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
+    // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).
+    const isAlso = /^That creature is (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
+    if (isAlso) {
+      const prev = effects[effects.length - 1];
+      const mods = parseBecomes(isAlso[1]!);
+      if (prev?.type !== "putOntoBattlefield" || !mods || (prev.what.ref === "target" && prev.what.n) || prev.alsoMods) return null;
+      prev.alsoMods = mods;
+      continue;
+    }
+    // "Sacrifice the creature when you lose control of ~" (Seraph): about the permanent the card just put onto the
+    // battlefield became, a delayed trigger watching ~ (CR 603.7).
+    if (/^Sacrifice (?:it|the creature|that creature) when you lose control of ~$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "putOntoBattlefield" || prev.sacrificeOnLostControl || prev.owner) return null;
+      prev.sacrificeOnLostControl = true;
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);

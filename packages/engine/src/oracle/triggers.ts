@@ -655,6 +655,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || !t.cast?.treasure || /\b(it|that spell|that player)\b/.test(orActivates[2]!)) return "fail";
     return { ...t, cast: { ...t.cast, orActivates: true } };
   }
+  // Krovikan Vampire: "At the beginning of each end step, if a creature dealt damage by ~ this turn died, put that card
+  // onto the battlefield under your control. Sacrifice it when you lose control of ~." Every such card still in a
+  // graveyard as it resolves, even one that died in response (rulings); an intervening if (CR 603.4).
+  if (/^At the beginning of each end step, if a creature dealt damage by ~ this turn died, put that card onto the battlefield under your control\. Sacrifice it when you lose control of ~\.$/.test(line))
+    return {
+      event: "eachEndStep",
+      ifCond: { kind: "damagedBySelfDied" },
+      body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "diedDamagedBySelf" }, sacrificeOnLostControl: true }], text: "Put each creature card dealt damage by ~ this turn that died onto the battlefield under your control. Sacrifice it when you lose control of ~." },
+    };
   // "This ability triggers only once each turn": once it has triggered this turn, it doesn't again (the object's own
   // count; a new object starts over, CR 400.7).
   const once = /^(.+?) This ability triggers only once each turn\.?$/.exec(line);

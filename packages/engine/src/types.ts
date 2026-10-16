@@ -536,6 +536,13 @@ export interface DelayedTrigger {
   controller: PlayerId;
   sourceCardId: string;
   subject: { id: ObjectId; zc: number };
+  /**
+   * `lostControl` only: what its instructions are about, when that isn't the object watched ("Sacrifice it when you lose
+   * control of ~", Krovikan Vampire): it triggers even if the watched object left the battlefield (Khârn rulings).
+   */
+  about?: { id: ObjectId; zc: number };
+  /** `lostControl` with `about`: `controller` has controlled the watched object since this was made (Seraph rulings). */
+  held?: true;
   body: AbilityBody;
   /** Made during an end step, "the next end step" is the following turn's (CR 603.7c doesn't fire it in the same step). */
   turn: number;
@@ -793,6 +800,11 @@ export interface TurnLog {
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
   lifeGained?: Record<number, number>;
+  /**
+   * Creatures that died this turn having been dealt damage that turn: the card in the graveyard (`id`, `zc`) and the
+   * permanents that dealt it damage (Krovikan Vampire's "if a creature dealt damage by ~ this turn died").
+   */
+  diedDamaged?: { id: ObjectId; zc: number; by: ObjectId[] }[];
   /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
   damageSources?: Record<number, string[]>;
 }

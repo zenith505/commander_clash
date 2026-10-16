@@ -253,6 +253,14 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return players(s, ref.who, ctx)
       .map((pid) => graveyardEnd(s, pid, { ...(ref.filter ? { filter: ref.filter } : {}), ...(ref.bottom ? { bottom: true } : {}), ...(ref.only ? { only: true } : {}) }))
       .filter((o): o is GameObject => !!o);
+  if (ref.ref === "diedDamagedBySelf") {
+    const out: GameObject[] = [];
+    for (const d of s.turnLog?.diedDamaged ?? []) {
+      const o = s.objects[d.id];
+      if (ctx.sourceId !== undefined && d.by.includes(ctx.sourceId) && o?.zone === "graveyard" && (o.zoneChanges ?? 0) === d.zc && !out.includes(o)) out.push(o);
+    }
+    return out;
+  }
   if (ref.ref === "created") return (s.resolving?.created ?? []).map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
   if (ref.ref === "attached") {
     // What the Aura or Equipment is attached to, while it's still the object the ability came from (CR 400.7).

@@ -1017,7 +1017,24 @@ export function checkLostControl(s: GameState) {
     if (d.when !== "lostControl") continue;
     const o = s.objects[d.subject.id];
     const here = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === d.subject.zc;
-    if (here && controllerOf(s, o) === d.controller) continue;
+    // What it would sacrifice is gone (CR 400.7): nothing left to do.
+    const it = d.about && s.objects[d.about.id];
+    if (d.about && !(it && it.zone === "battlefield" && (it.zoneChanges ?? 0) === d.about.zc)) {
+      s.delayed = s.delayed!.filter((x) => x !== d);
+      continue;
+    }
+    if (here && controllerOf(s, o) === d.controller) {
+      d.held = true;
+      continue;
+    }
+    if (d.about) {
+      // "Sacrifice it when you lose control of ~" (Krovikan Vampire): ~ leaving counts too (Khârn rulings); one you
+      // haven't controlled since it was made can't be lost yet, or ever once it's gone (Seraph rulings).
+      if (here && !d.held) continue;
+      s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.held) s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.about, body: d.body });
+      continue;
+    }
     s.delayed = s.delayed!.filter((x) => x !== d);
     if (here) s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
   }

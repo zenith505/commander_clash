@@ -536,6 +536,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.destroyed ?? []).some((e) => e.controller === you && e.by !== you);
     case "damagedByCreatures":
       return (s.turnLog?.damagedBy?.[you]?.length ?? 0) >= cond.n;
+    case "damagedBySelfDied":
+      return (s.turnLog?.diedDamaged ?? []).some((d) => d.by.includes(sourceId));
     case "opponentGainedLife":
       return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
     case "opponentCardsToGraveyard":

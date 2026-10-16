@@ -698,6 +698,8 @@ export function moveObject(
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
   o.copyEffects = undefined;
+  // Krovikan Vampire: a creature that died after being dealt damage this turn, and what dealt it (rulings: any damage).
+  if (fromZone === "battlefield" && to === "graveyard" && wasCreature && o.damagedBy?.length) ((s.turnLog ??= {}).diedDamaged ??= []).push({ id, zc: o.zoneChanges, by: [...o.damagedBy] });
   o.tapped = false;
   o.damage = 0;
   o.damagedBy = undefined;

@@ -1,5 +1,5 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
-import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
@@ -879,6 +879,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "putOntoBattlefield": {
       const list = objects(s, e.what, ctx);
+      // Who controls ~ is watched from now on (CR 400.7): a ~ that has left by then never makes you sacrifice (Seraph rulings).
+      const watch = e.sacrificeOnLostControl === true ? (ctx.sourceId ? s.objects[ctx.sourceId] : undefined) : undefined;
+      const watched = e.sacrificeOnLostControl === true ? (watch?.zone === "battlefield" && (ctx.sourceZc === undefined || (watch.zoneChanges ?? 0) === ctx.sourceZc) ? { id: watch.id, zc: watch.zoneChanges ?? 0 } : undefined) : e.sacrificeOnLostControl;
+      if (e.atNextEndStep) {
+        // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step" (CR 603.7),
+        // if it's still that card then.
+        const { atNextEndStep: _, ...later } = e;
+        for (const o of list) addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [{ ...later, what: { ref: "subjectCard" }, ...(watched ? { sacrificeOnLostControl: watched } : { sacrificeOnLostControl: undefined }) }], text: `Put ${defOf(s, o).name} onto the battlefield under your control.` }, ctx.sourceId && s.objects[ctx.sourceId] ? cardIdOf(s.objects[ctx.sourceId]!) : cardIdOf(o));
+        return;
+      }
       const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);
       // Auras: their controller chooses what each enchants as it enters (CR 303.4f), all before any card moves; one with
       // nothing to enchant stays where it is (303.4g).
@@ -915,9 +925,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;
           s.resolving?.created?.push(o.id);
+          if (e.alsoMods) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep)
             addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
+          // "Sacrifice it when you lose control of ~" (Krovikan Vampire): once you've controlled ~ since now (Seraph rulings).
+          const w = watched && s.objects[watched.id];
+          if (w && w.zone === "battlefield" && (w.zoneChanges ?? 0) === watched!.zc) {
+            const d = { when: "lostControl" as const, controller: ctx.controller, sourceCardId: cardIdOf(w), subject: watched!, about: { id: o.id, zc: o.zoneChanges ?? 0 }, ...(controllerOf(s, w) === ctx.controller ? { held: true as const } : {}), body: { targets: [], effects: [{ type: "sacrifice" as const, what: { ref: "subject" as const } }], text: `Sacrifice ${defOf(s, o).name}.` }, turn: s.turn, step: s.step };
+            (s.delayed ??= []).push(d);
+          }
         }
       });
       return;

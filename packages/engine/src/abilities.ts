@@ -393,7 +393,12 @@ export type ObjRef =
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
    * of target player's graveyard is a creature card, put that card ...": the top card, only if it matches.
    */
-  | { ref: "graveyardEnd"; who: PlayerRef; filter?: TargetSpec; bottom?: true; only?: true };
+  | { ref: "graveyardEnd"; who: PlayerRef; filter?: TargetSpec; bottom?: true; only?: true }
+  /**
+   * Krovikan Vampire's "that card": each creature card that died this turn after the source dealt it damage that turn,
+   * while it's still that card in the graveyard (rulings: once it leaves, the game loses track of it).
+   */
+  | { ref: "diedDamagedBySelf" };
 
 /** Which player(s) an effect touches. */
 export type PlayerRef =
@@ -644,6 +649,8 @@ export interface StaticAbility {
  */
 export type StaticCondition =
   | { kind: "graveyardAtLeast"; n: number }
+  /** Krovikan Vampire: "if a creature dealt damage by ~ this turn died" (see TurnLog.diedDamaged). */
+  | { kind: "damagedBySelfDied" }
   /** A number compared to fixed bounds: "as long as your devotion to black is less than five" (Theros gods, CR 700.5). */
   | { kind: "amount"; amount: Amount; min?: number; max?: number }
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
@@ -989,6 +996,15 @@ export type Effect =
       atEndStep?: "exile" | "sacrifice";
       /** "With a +1/+1 counter on it" (Undying Malice): counters it enters with (CR 614.1c). */
       counters?: Record<string, number>;
+      /**
+       * "Sacrifice it when you lose control of ~" (Krovikan Vampire, Seraph): a delayed trigger watching ~ (`true`: this
+       * ability's source, if it's on the battlefield) for each permanent put there (CR 603.7).
+       */
+      sacrificeOnLostControl?: true | { id: ObjectId; zc: number };
+      /** "That creature is a black Zombie in addition to its other colors and types": an effect on the permanent from then on (CR 611.2c). */
+      alsoMods?: Modification[];
+      /** "Put that card onto the battlefield ... at the beginning of the next end step" (Seraph): a delayed trigger for each card (CR 603.7). */
+      atNextEndStep?: true;
     }
   /**
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target

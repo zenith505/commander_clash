@@ -1942,6 +1942,8 @@ export interface ManaAbility {
   oncePerTurn?: boolean;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object: see GameObject.activatedEver. */
   onceEver?: true;
+  /** It's an exhaust ability ("Exhaust — {G}, {T}: Add ..."), which Elvish Refueler lets you activate again (CR 702.177b). */
+  exhaust?: true;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
@@ -2268,6 +2270,11 @@ export interface CompiledCard {
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
   youHave?: "hexproof" | "shroud" | "protection";
+  /**
+   * Elvish Refueler: "During your turn, as long as you haven't activated an exhaust ability this turn, you may activate
+   * exhaust abilities as though they haven't been activated" (CR 702.177b): see Player.exhaustTurn.
+   */
+  exhaustAgain?: true;
   /**
    * Platinum Angel: "You can't lose the game and your opponents can't win the game" (`cantLose` "you", `cantWin`
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).

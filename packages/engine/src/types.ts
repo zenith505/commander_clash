@@ -389,6 +389,8 @@ export interface Player {
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;
   speedTurn?: number;
+  /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
+  exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
   commanderCasts: Record<ObjectId, number>;
   /** Poison counters (CR 122.1f); ten or more loses the game (CR 704.5c). */

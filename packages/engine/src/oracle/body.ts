@@ -242,6 +242,17 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "~ gains indestructible until end of turn. Tap it." (Icehide Troll): "it" is the permanent the sentence before was
     // about, when that sentence was about ~ itself and nothing else.
     if (/^(?:Tap|Untap) it$/.test(s) && si > 0 && /^~ (?:gets|gains|has|becomes)\b/.test(sentences[si - 1]!) && !/\btarget\b/.test(sentences[si - 1]!)) s = s.replace(/it$/, "~");
+    // "Put seven +1/+1 counters on ~. It becomes a 0/0 Spirit creature" (Haunted Screen), "~ becomes a Werewolf. Put two
+    // +1/+1 counters on it" (Mild-Mannered Librarian): "it" is ~, when the sentence before was about ~ and nothing else.
+    const aboutSelf = si > 0 && /^(?:~ (?:gets|gains|has|becomes)\b|Put [^.]+ counters? on ~$)/.test(sentences[si - 1]!) && !/\b(?:target|it|them)\b/.test(sentences[si - 1]!);
+    if (aboutSelf && /^It (?:becomes|gains|gets) /.test(s)) s = s.replace(/^It /, "~ ");
+    if (aboutSelf && /^Put [^.]+ counters? on it(?: and |$)/.test(s)) s = s.replace(/ counters? on it\b/, (w) => w.replace(/it$/, "~"));
+    // "Put three +1/+1 counters on ~ and it becomes a black Demon ..." (Possessed Goat): two instructions about ~.
+    const putThen = /^(Put [^.]+ counters? on ~) and it (becomes .+)$/.exec(s);
+    if (putThen) {
+      s = putThen[1]!;
+      sentences.splice(si + 1, 0, `~ ${putThen[2]!}`);
+    }
     if (!closeGate()) return null;
     [prevStart, curStart] = [curStart, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];

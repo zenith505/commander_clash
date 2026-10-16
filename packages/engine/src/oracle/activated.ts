@@ -81,6 +81,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let sorcerySpeed = false;
   let oncePerTurn = keyword === "Boast";
   let maxPerTurn: number | undefined;
+  let onceEver = keyword === "Exhaust";
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
   let activateIf: ActivatedAbility["activateIf"] = keyword === "Boast" ? { kind: "self", is: "attackedThisTurn" } : undefined;
   // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
@@ -93,6 +94,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       if (!c) return "fail";
       costLess = { ...c, times: (c.times ?? 1) * Number(less[1]) };
       effectText = effectText.slice(0, less.index);
+      found = true;
+    }
+    // "Activate only once." (CR 602.5b): for as long as it's the same object (CR 400.7), like exhaust (702.177a).
+    if (/ Activate only once\.$/.test(effectText) && !onceEver && !keyword) {
+      onceEver = true;
+      effectText = effectText.slice(0, effectText.length - " Activate only once.".length);
       found = true;
     }
     // "Activate no more than twice each turn." (CR 602.5b)
@@ -161,7 +168,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
-    ...(keyword === "Exhaust" ? { onceEver: true as const } : {}),
+    ...(onceEver ? { onceEver: true as const } : {}),
     ...(keyword ? { keyword } : {}),
     ...(maxPerTurn ? { maxPerTurn } : {}),
     ...(costLess ? { costLess } : {}),

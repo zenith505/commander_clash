@@ -415,7 +415,7 @@ export function compile(d: CardDef): CompiledCard {
     const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(line);
     if (manaAb && exhaust) {
       if (manaAb.oncePerTurn) out.unsupported.push(raw);
-      else out.mana.push({ ...manaAb, text: line, onceEver: true });
+      else out.mana.push({ ...manaAb, text: line, onceEver: true, exhaust: true });
       continue;
     }
     if (manaAb) {
@@ -894,6 +894,10 @@ export function compile(d: CardDef): CompiledCard {
     const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
     if (youHave && !out.youHave) {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
+      continue;
+    }
+    if (line === "During your turn, as long as you haven't activated an exhaust ability this turn, you may activate exhaust abilities as though they haven't been activated.") {
+      out.exhaustAgain = true;
       continue;
     }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {

@@ -15,6 +15,8 @@ const sheriff = card("Shoot the Sheriff", "Instant", "{1}{B}", { oracleText: "De
 const bards = card("Bard's Company", "Creature — Human Citizen", "{2}{W}{U}", { power: "2", toughness: "3", keywords: ["Recruit"], oracleText: "You may cast this spell as though it had flash if you control a Human.\nOther creatures you control get +1/+1.\nWhenever this creature enters or attacks, recruit. (Draw a card, then discard a card. If you discarded a nonland card, create a 1/1 white Human Soldier creature token.)" });
 const marchesa = card("Marchesa, Dealer of Death", "Legendary Creature — Human Rogue", "{U}{B}{R}", { power: "3", toughness: "4", oracleText: "Whenever you commit a crime, you may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the other into your graveyard. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)" });
 const lookout = card("Freestrider Lookout", "Creature — Human Rogue", "{2}{G}", { power: "3", toughness: "3", keywords: ["Reach"], oracleText: "Reach\nWhenever you commit a crime, look at the top five cards of your library. You may put a land card from among them onto the battlefield tapped. Put the rest on the bottom of your library in a random order. This ability triggers only once each turn. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)" });
+const tide = card("Crashing Tide", "Sorcery", "{2}{U}", { oracleText: "This spell has flash as long as you control a Merfolk.\nReturn target creature to its owner's hand.\nDraw a card." });
+const mutual = card("Mutual Destruction", "Sorcery", "{B}", { oracleText: "This spell has flash as long as you control a permanent with flash.\nAs an additional cost to cast this spell, sacrifice a creature.\nDestroy target creature." });
 const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
 const opt = card("Opt", "Instant", "{U}", { oracleText: "Scry 1. (Look at the top card of your library. You may put that card on the bottom.)\nDraw a card." });
 
@@ -24,7 +26,7 @@ const run = (s: GameState, pid: PlayerId, id: string, t?: Parameters<typeof plan
 
 describe("outlaws, conditional flash, crimes during your turn", () => {
   it("compiles them", () => {
-    supported(ride, muscle, posse, sheriff, bards);
+    supported(ride, muscle, posse, sheriff, bards, tide, mutual);
     expect(compileCard(ride).flashIf).toEqual({ kind: "committedCrime" });
     expect(compileCard(muscle).triggers[0]).toMatchObject({ event: "youCommitCrime", activeIf: { kind: "yourTurn" } });
   });
@@ -86,6 +88,16 @@ describe("outlaws, conditional flash, crimes during your turn", () => {
     expect(can(s, ap, ids[1]!)).toBe(false);
     putOnBattlefield(s, ap, bear({ name: "Villager", subtypes: ["Human"], typeLine: "Creature — Human" }));
     expect(can(s, ap, ids[1]!)).toBe(true);
+  });
+
+  it("Mutual Destruction: \"this spell has flash\" works from your hand while you control a permanent with flash", () => {
+    let { s, ap, ids, opp } = setup([opt, mutual]);
+    const theirs = putOnBattlefield(s, opp, bear());
+    putOnBattlefield(s, ap, bear());
+    s = run(s, ap, ids[0]!);
+    expect(can(s, ap, ids[1]!, [{ kind: "object", id: theirs }])).toBe(false);
+    putOnBattlefield(s, ap, bear({ name: "Flash Bear", keywords: ["Flash"], oracleText: "Flash" }));
+    expect(can(s, ap, ids[1]!, [{ kind: "object", id: theirs }])).toBe(true);
   });
 
   it("Marchesa: pay {1} to look at two, one to your hand and the other to your graveyard", () => {

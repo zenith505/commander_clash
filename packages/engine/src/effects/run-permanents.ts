@@ -60,6 +60,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // timestamp.
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "battlefield" || (o.suspected !== undefined) !== !!e.no) continue;
+        // "Enchanted creature can't become suspected" (Airtight Alibi).
+        if (!e.no && characteristics(s, o).cantBeSuspected) continue;
         o.suspected = e.no ? undefined : s.nextTimestamp++;
         log(s, e.no ? `${defOf(s, o).name} is no longer suspected.` : `${src} suspects ${defOf(s, o).name}.`);
       }

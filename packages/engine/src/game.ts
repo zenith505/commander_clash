@@ -3128,7 +3128,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true });
       }

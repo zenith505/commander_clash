@@ -1374,7 +1374,7 @@ function checkCastingLinks(out: CompiledCard) {
         delete o.cost;
       }
     }
-    if (o.ref === "sacrificed" && !canSac) bad = true;
+    if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");

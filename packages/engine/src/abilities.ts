@@ -485,6 +485,8 @@ export type Modification =
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
   | { kind: "doesntUntap" }
+  /** "Can't become suspected" (Airtight Alibi, CR 701.60): suspect effects don't apply to it. */
+  | { kind: "cantBeSuspected" }
   /**
    * Ghostly Prison: "Creatures can't attack you unless their controller pays {2} for each creature they control that's
    * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
@@ -1289,6 +1291,9 @@ export type SpellCondition =
   | { kind: "wonClash" }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
   | { kind: "suspected"; what: ObjRef }
+  /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
+   * existed on the battlefield (CR 608.2h), where being suspected is a designation it had (CR 701.60). */
+  | { kind: "sacrificedSuspected" }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */

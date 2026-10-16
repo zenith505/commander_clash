@@ -540,6 +540,8 @@ export interface LastKnown {
   copyKey?: string;
   /** Who controlled it as it last existed: "that creature's controller" after it died (CR 608.2h). */
   controller?: PlayerId;
+  /** It was suspected as it last existed (CR 701.60): "if the sacrificed creature was suspected". */
+  suspected?: true;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */

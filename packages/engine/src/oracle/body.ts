@@ -665,6 +665,9 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
   { re: "the gift wasn't promised", cond: { kind: "gift" }, not: true },
+  // The creature a sacrifice cost sacrificed (compile checks there is one). Costs are paid after targets are chosen
+  // (CR 601.2c, 601.2h), so no target can depend on it.
+  { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
   { re: "~'s spectacle cost was paid", cond: { kind: "altPaid", alt: "spectacle" } },
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
@@ -794,7 +797,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
-    if (last?.type === "continuous" && last.what.ref === "each" && last.duration === "endOfTurn") ctx.lastGroup = { ref: "affected" };
+    if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
   }

@@ -145,6 +145,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? gifteeOf(s, ctx) !== undefined
             : e.cond.kind === "altPaid"
             ? (s.resolving!.item.kind === "spell" ? s.objects[s.resolving!.item.objectId ?? ""]?.castAlt : ctx.event?.castAlt) === e.cond.alt
+            : e.cond.kind === "sacrificedSuspected"
+            ? !!ctx.sacrificed?.[0]?.suspected
             : e.cond.kind === "suspected"
             ? objects(s, e.cond.what, ctx).some((o) => o.zone === "battlefield" && o.suspected !== undefined)
             : e.cond.kind === "state"

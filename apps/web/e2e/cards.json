@@ -110,6 +110,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f28b21a6-f7ce-437a-8c5b-0423cb55cefb",
+  "name": "Banishing Light",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile target nonland permanent an opponent controls until this enchantment leaves the battlefield.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoe",
+  "releasedAt": "2025-08-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a465f8a9-d5aa-4dfa-b674-7aa1798cb0bd",
   "name": "Beast Mode",
   "manaCost": "{1}{G}",
@@ -704,6 +730,32 @@
   "set": "ema",
   "releasedAt": "2016-06-10",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a7e97fa9-4b72-4548-b854-5be5f18a6f1a",
+  "name": "Disenchant",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target artifact or enchantment.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -1472,6 +1524,36 @@
   "releasedAt": "2018-04-27",
   "rarity": "mythic",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9357de36-f8be-4f49-b2c8-9fe9eaf82b07",
+  "name": "Holy Strength",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature gets +1/+2.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "10e",
+  "releasedAt": "2007-07-13",
+  "rarity": "common",
+  "layout": "normal",
   "gameChanger": false
  },
  {

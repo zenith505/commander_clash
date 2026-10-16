@@ -1,6 +1,6 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
-import { attackedName, attackedPlaneswalker, auraHostFor, auraHostKey, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
@@ -18,17 +18,24 @@ export function isSuspended(s: GameState, o: GameObject): boolean {
   return o.zone === "exile" && (o.counters.time ?? 0) > 0 && !!compileCard(defOf(s, o)).suspend;
 }
 
-/** Put an exiled card onto the battlefield; an Aura needs something to enchant, or it stays in exile (CR 303.4f-g). */
-function returnFromExile(s: GameState, c: GameObject, controller: PlayerId, src: string, counter?: CounterKind) {
-  const d = defOf(s, c);
-  if (!isPermanentCard(d)) return;
-  let host: AuraHost | undefined;
-  if (d.subtypes.includes("Aura")) {
-    host = auraHostFor(s, c, controller);
-    if (!host) return;
+/**
+ * Put exiled cards onto the battlefield, all at once: an Aura's new controller chooses what it enchants as it enters,
+ * and with nothing it can enchant it stays in exile (CR 303.4f-g, rulings on Flicker of Fate).
+ */
+function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind): "paused" | void {
+  const back = cards.filter((c) => isPermanentCard(defOf(s, c)));
+  const hosts = chooseAuraHosts(s, back.map((o) => ({ o, under: under(o) })), src);
+  if (hosts === "paused") return "paused";
+  for (const c of back) {
+    const d = defOf(s, c);
+    const host = hosts.get(c.id);
+    if (d.subtypes.includes("Aura") && !host) {
+      log(s, `${d.name} has nothing to enchant, so it stays in exile.`);
+      continue;
+    }
+    log(s, `${src} returns ${d.name} to the battlefield${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+    moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { counters: { [counter]: 1 } } : {}) });
   }
-  log(s, `${src} returns ${d.name} to the battlefield.`);
-  moveObject(s, c.id, "battlefield", { controller, ...host, ...(counter ? { counters: { [counter]: 1 } } : {}) });
 }
 
 /**
@@ -48,12 +55,8 @@ export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: Pla
       hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
       continue;
     }
-    const labels = options.map((h) => ("attachTo" in h ? `${defOf(s, obj(s, h.attachTo)).name} (${player(s, controllerOf(s, obj(s, h.attachTo))).name})` : player(s, h.attachToPlayer).name));
-    // Two of the same name under one player: number them, so each button says which.
-    const seen = new Map<string, number>();
-    const shown = labels.map((l) => (labels.filter((x) => x === l).length > 1 ? `${l} #${seen.set(l, (seen.get(l) ?? 0) + 1).get(l)}` : l));
     sc.auraAsking = o.id;
-    s.pending = { kind: "chooseOption", player: under, source: src, what: "enchant", options: options.map(auraHostKey), labels: shown, prompt: `choose what ${defOf(s, o).name} enchants as it enters` };
+    s.pending = { kind: "chooseOption", player: under, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose what ${defOf(s, o).name} enchants as it enters` };
     return "paused";
   }
   const out = new Map<ObjectId, AuraHost>();
@@ -490,24 +493,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "returnLinked": {
       // The leaves ability triggered after the source moved, so the object it links to is the one before (CR 400.7).
       const key = `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
-      const cards = (s.linkedExile?.[key] ?? []).map((l) => s.objects[l.id]).filter((c, i): c is GameObject => !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === s.linkedExile![key]![i]!.zc && !c.isToken);
-      delete s.linkedExile?.[key];
-      for (const c of cards) {
-        const d = defOf(s, c);
-        if (e.dest === "hand") {
-          log(s, `${src} returns ${d.name} to its owner's hand.`);
-          moveObject(s, c.id, "hand");
-          continue;
-        }
-        let host: AuraHost | undefined;
-        if (d.subtypes.includes("Aura")) {
-          host = auraHostFor(s, c, c.owner);
-          if (!host) continue; // nothing it can enchant: it stays in exile (CR 303.4g)
-        }
-        log(s, `${src} returns ${d.name} to the battlefield.`);
-        moveObject(s, c.id, "battlefield", { controller: c.owner, ...host });
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.flickered) {
+        sc.flickered = (s.linkedExile?.[key] ?? []).filter((l) => !s.objects[l.id]?.isToken);
+        delete s.linkedExile?.[key];
       }
-      return;
+      const cards = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
+      if (e.dest === "hand") {
+        for (const c of cards) {
+          log(s, `${src} returns ${defOf(s, c).name} to its owner's hand.`);
+          moveObject(s, c.id, "hand");
+        }
+        return;
+      }
+      // Under their owners' control; an Aura's owner chooses what it enchants (CR 303.4f, Oblivion Ring rulings).
+      return returnFromExile(s, cards, (c) => c.owner, src);
     }
     case "pick":
       return pickPermanents(s, e, ctx, src);
@@ -686,27 +686,33 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${src} exiles ${p.name}'s graveyard (${n} card${n === 1 ? "" : "s"}).`);
       }
       return;
-    case "flicker":
-      for (const o of objects(s, e.what, ctx)) {
-        if (o.zone !== "battlefield") continue;
-        const d = defOf(s, o);
-        log(s, `${src} exiles ${d.name}${e.at ? "" : " and returns it"}.`);
-        moveObject(s, o.id, "exile");
-        if (o.isToken) continue; // a token that left the battlefield doesn't come back (CR 111.7)
-        if (e.at)
-          addDelayed(s, "nextEndStep", ctx.controller, o, {
-            targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}) }],
-            text: `Return ${d.name} to the battlefield under ${e.under === "owner" ? "its owner's" : "your"} control.`,
-          });
-        else returnFromExile(s, o, e.under === "owner" ? o.owner : ctx.controller, src, e.counter);
+    case "flicker": {
+      // Exiled, then returned together once any Aura's host is chosen (CR 303.4f).
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.flickered) {
+        sc.flickered = [];
+        for (const o of objects(s, e.what, ctx)) {
+          if (o.zone !== "battlefield") continue;
+          const d = defOf(s, o);
+          log(s, `${src} exiles ${d.name}${e.at ? "" : " and returns it"}.`);
+          moveObject(s, o.id, "exile");
+          if (o.isToken) continue; // a token that left the battlefield doesn't come back (CR 111.7)
+          if (e.at)
+            addDelayed(s, "nextEndStep", ctx.controller, o, {
+              targets: [],
+              effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}) }],
+              text: `Return ${d.name} to the battlefield under ${e.under === "owner" ? "its owner's" : "your"} control.`,
+            });
+          else sc.flickered.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+        }
       }
-      return;
+      const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
+      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter);
+    }
     case "returnExiled": {
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
       if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
-      returnFromExile(s, o, e.under === "owner" ? o.owner : ctx.controller, src, e.counter);
-      return;
+      return returnFromExile(s, [o], (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter);
     }
     case "exileIfDies":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfDiesTurn = s.turn;

@@ -526,6 +526,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
     add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
+    const by = controllerOf(s, o);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) !== by) continue;
+      add(w, by, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && !(t.attacker.other && w.id === o.id) && objectMatches(s, t.attacker.filter, o, by, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    }
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
     // "Whenever a creature attacks enchanted player": not one attacking a planeswalker of theirs (rulings).

@@ -305,7 +305,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);
-  if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature"))) return "fail";
+  if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
   let text = m[4]!;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
@@ -321,6 +321,22 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     body,
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
   };
+}
+
+/**
+ * "Whenever a creature you control attacks, it gets +2/+2 until end of turn" (Fervent Charge), "Whenever a Dragon you
+ * control attacks, bolster 2", "Whenever another creature you control attacks": once for each such creature as it's
+ * declared as an attacker (CR 508.3a), not one put onto the battlefield attacking (508.4). "It" and "that creature" are
+ * the attacker; "defending player" is the player it's attacking (CR 508.5a).
+ */
+function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (another|an?) (.+?) you control attacks, (.+)$/.exec(line);
+  if (!m) return null;
+  const filter = parseTargetPhrase(m[2]!);
+  if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
+  const body = parseBody(m[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
+  if (!body) return "fail";
+  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}) }, body };
 }
 
 /**
@@ -631,6 +647,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (dies) return dies;
   const dealer = parseDealerTrigger(line);
   if (dealer) return dealer;
+  const attacker = parseAttackerTrigger(line);
+  if (attacker) return attacker;
   const sacrifices = parseSacrificeTrigger(line);
   if (sacrifices) return sacrifices;
   const group = parseGroupTrigger(line);

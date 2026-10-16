@@ -817,6 +817,12 @@ export interface GameState {
    * Choices made as permanents enter (CR 614.12), still to ask. `enters`: its enters event waits for
    * the choice (riot, unleash: whether it has a +1/+1 counter as it enters matters to what triggers).
    */
+  /**
+   * Cards coming back from "until ~ leaves" in the current event (CR 610.3, 610.3d): `returned`, what already came back;
+   * `auras`, Auras that come back once their owner has chosen what each enchants (CR 303.4f), which can't be anything
+   * in `returned`. `asking`: that one is being asked now.
+   */
+  untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
@@ -918,6 +924,7 @@ export interface Resolving {
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     found?: ObjectId[]; // the cards a library search found
+    flickered?: { id: ObjectId; zc: number }[]; // cards a flicker exiled, to return once Auras' hosts are chosen
     playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from

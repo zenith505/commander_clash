@@ -1,6 +1,6 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
+import { askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
@@ -140,6 +140,8 @@ export function continueResolution(s: GameState): Resolution {
     // which can't stop for a choice: the event it's part of ends later.
     if (!r.scratch && !item.manaAbility) {
       closeGraveyardBatch(s);
+      // Auras coming back because the last instruction made an "until ~ leaves" source leave (CR 303.4f, 610.3).
+      if (askAuraReturns(s) === "asked") return "paused";
       if (askGraveyardOrder(s)) return "paused";
     }
     if (r.next >= r.body.effects.length) break;

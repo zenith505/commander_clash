@@ -4,7 +4,7 @@ import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, c
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
-import { describeCount, entwined, withModes, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
+import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
@@ -450,11 +450,14 @@ export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
   return s.pending?.kind === "castFree" && s.pending.player === pid ? s.pending.objectId : undefined;
 }
 
-/** The madness cost `pid` may cast this card for right now, as its madness ability resolves (CR 702.35a). */
+/**
+ * The madness or miracle cost `pid` may cast this card for right now, as its madness or miracle ability resolves (CR
+ * 702.35a, 702.94a): an alternative cost, cast while the ability resolves, so its timing doesn't matter.
+ */
 export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
   const pend = s.pending;
-  if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || pend.how !== "madness") return undefined;
-  return compileCard(defOf(s, obj(s, id))).madness;
+  if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle")) return undefined;
+  return pend.how === "miracle" ? compileCard(defOf(s, obj(s, id))).miracle : compileCard(defOf(s, obj(s, id))).madness;
 }
 
 /**
@@ -465,7 +468,7 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && pd.how === "madness");
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle"));
 }
 
 function requireNoPending(s: GameState) {
@@ -718,6 +721,7 @@ export function moveObject(
   // triggers say "put into a graveyard" or "leaves the battlefield".
   // A creature put into a graveyard from the battlefield died (CR 700.4), a token too (it goes there first, CR 111.7).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature) (s.diedThisTurn ??= []).push(lastController);
+  if (fromZone === "battlefield" && to === "graveyard") s.toGraveyardThisTurn = (s.toGraveyardThisTurn ?? 0) + 1;
   if (fromZone === "battlefield") {
     if (!(s.permanentLeftThisTurn ??= []).includes(lastController)) s.permanentLeftThisTurn.push(lastController); // revolt
     if (!last.types.includes("Land")) s.voidThisTurn = true;
@@ -1283,6 +1287,22 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
   // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
   p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
   fireEvent(s, { type: "draw", player: pid, nth: p.draws.n });
+  // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast
+  // it for its miracle cost. It's always revealed here; whether to cast it is asked as the trigger resolves.
+  const card = obj(s, top);
+  const miracle = p.draws.n === 1 && card.zone === "hand" ? compileCard(defOf(s, card)).miracle : undefined;
+  if (miracle) {
+    log(s, `${p.name} reveals ${defOf(s, card).name} (miracle).`);
+    card.miracleRevealed = { turn: s.turn, zc: card.zoneChanges ?? 0 };
+    s.triggerQueue.push({
+      sourceId: top,
+      sourceCardId: cardIdOf(card),
+      controller: pid,
+      index: -1,
+      subject: { id: top, zc: card.zoneChanges ?? 0 },
+      body: { targets: [], effects: [{ type: "miracle" }], text: `Miracle ${miracle}: you may cast ~ for its miracle cost.` },
+    });
+  }
   return true;
 }
 
@@ -1441,6 +1461,7 @@ function startNextTurn(s: GameState) {
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
   s.diedThisTurn = undefined;
+  s.toGraveyardThisTurn = undefined;
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
   s.blockersStep = undefined;
@@ -2082,7 +2103,7 @@ export function castProblem(
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
-  if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
+  if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
     if (!altCost(d, choices.alt, s, pid))
@@ -2143,6 +2164,12 @@ export function castProblem(
     if (typeof fit === "string") return fit;
     [specs, targets] = [fit.body.targets, fit.targets];
   }
+  // Splice (CR 702.47b): the spliced cards' targets come after the spell's own, and must be choosable too.
+  if (choices?.splice?.length) {
+    const sp = spliceProblem(s, pid, id, choices.splice);
+    if (sp) return sp;
+    specs = withSplices({ targets: specs, effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
+  }
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
     // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
@@ -2185,7 +2212,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain" | "evidence"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -2198,7 +2225,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const strive = compileCard(d).strive?.repeat(Math.max(0, (how.targets ?? []).filter((t) => t.kind !== "none").length - 1)) ?? "";
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate;
+  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x);
@@ -2407,7 +2434,8 @@ const convokeProblem = (s: GameState, pid: PlayerId, ids: ObjectId[]) => tapCrea
 export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => spellTargetSpecs(castDef(s, id, alt), modes, how);
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
-export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence">): CastHow => ({
+export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt">): CastHow => ({
+  ...(choices?.alt ? { alt: choices.alt } : {}),
   ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
   ...(choices?.bargain ? { bargained: true } : {}),
   ...(choices?.evidence ? { evidence: true } : {}),
@@ -2471,7 +2499,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "Sacrifice a creature or pay {3}{B}": which one is announced as it's cast (CR 601.2b).
   const or = compileCard(d).costOr;
   if (or && choices.costOr === undefined) throw new RulesError(`choose how to pay ${d.name}'s additional cost: ${or.map((x) => x.text).join(" or ")}`);
-  const specs = spellTargets(s, id, modes, undefined, castHow(choices));
+  const specs = withSplices({ targets: spellTargets(s, id, modes, undefined, castHow(choices)), effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
   if (problem) throw new RulesError(problem);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
@@ -2481,6 +2509,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const fit = fitMany(body, targets ?? [], x) as Exclude<ReturnType<typeof fitMany>, string>;
     [body, targets] = [fit.body, fit.targets];
   }
+  // Spliced cards' text, after the spell's own (CR 702.47c); the cards stay in your hand, revealed.
+  if (body && choices.splice?.length) body = withSplices(body, splicedBodies(s, choices.splice));
   const fromCommand = o.zone === "command";
   const tax = fromCommand ? commanderTax(p, o) : 0;
   // The total cost is locked in, then paid (CR 601.2f-h): convoke creatures are tapped as part of paying it.
@@ -2520,7 +2550,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.castFrom = castFrom;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
-  o.castAlt = madness ? "madness" : choices.alt;
+  o.castAlt = madness ? (s.pending?.kind === "castFree" && s.pending.how === "miracle" ? "miracle" : "madness") : choices.alt;
   if (choices.alt === "warp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
@@ -2566,6 +2596,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
+    (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
     (choices.delve?.length ? `, exiling ${choices.delve.map((c) => nameOf(s, c)).join(", ")} from their graveyard (delve)` : "");
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
@@ -2621,8 +2652,33 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   fireEvent(s, { type: "targeted", stackId });
 }
 
+/** Splice (CR 702.47a): the cards in your hand that can be spliced onto this spell as it's cast, not the spell itself. */
+export function spliceCandidates(s: GameState, pid: PlayerId, id: ObjectId): ObjectId[] {
+  const o = s.objects[id];
+  if (!o || o.faceDown) return [];
+  const d = defOf(s, o);
+  return player(s, pid).hand.filter((c) => {
+    const sp = c !== id ? compileCard(defOf(s, obj(s, c))).splice : undefined;
+    return !!sp && (sp.onto === "Arcane" ? d.subtypes.includes("Arcane") : isType(d, "Instant") || isType(d, "Sorcery"));
+  });
+}
+
+/** Spliced cards are each spliced once (CR 702.47b), from your hand, onto a spell they can be spliced onto. */
+function spliceProblem(s: GameState, pid: PlayerId, id: ObjectId, ids: ObjectId[]): string | null {
+  if (new Set(ids).size !== ids.length) return "a card can be spliced onto a spell only once";
+  const ok = spliceCandidates(s, pid, id);
+  const bad = ids.find((c) => !ok.includes(c));
+  return bad === undefined ? null : `${s.objects[bad] ? nameOf(s, bad) : "that card"} can't be spliced onto ${nameOf(s, id)}`;
+}
+
+/** The rules text the spliced cards add (CR 702.47c): each one's spell ability. */
+export const splicedBodies = (s: GameState, ids: ObjectId[] = []): AbilityBody[] => ids.flatMap((c) => compileCard(defOf(s, obj(s, c))).spell ?? []);
+const spliceMana = (s: GameState, ids: ObjectId[] = []) => ids.map((c) => compileCard(defOf(s, obj(s, c))).splice?.mana ?? "").join("");
+
 /** "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2). */
 function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
+  const epic = player(s, pid).cantCastSpells;
+  if (epic) return `${epic}: you can't cast spells for the rest of the game`;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
     if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
@@ -2850,13 +2906,13 @@ function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choic
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr"> & { modes?: number[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback"> & { modes?: number[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
   const beyond = Math.max(0, (choices?.modes?.length ?? 0) - 1);
   const escalate: AdditionalCost[] = esc && beyond && "n" in esc ? [{ ...esc, n: esc.n * beyond }] : [];
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -3599,6 +3655,16 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "topOrBottom") {
     if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
     (r.scratch ??= {}).topOrBottom = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "castFromHand") {
+    (r.scratch ??= {}).castFromHand = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "tapOrUntap") {
+    (r.scratch ??= {}).tapOrUntap = choice;
     continueResolution(s);
     return;
   }

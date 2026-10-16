@@ -250,6 +250,7 @@ export function compile(d: CardDef): CompiledCard {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
+  let awaken: { n: number; raw: string } | undefined;
   // "Choose one. If this spell was cast using teamwork, choose both instead." and "Choose one. If you control a commander
   // as you cast this spell, you may choose both instead.": a "Choose one —" list whose count can change as it's cast.
   // "Choose one. If this spell was kicked, choose any number instead." (Inscriptions) too.
@@ -400,10 +401,34 @@ export function compile(d: CardDef): CompiledCard {
     if (yard !== null) {
       if (yard === "fail") out.unsupported.push(raw);
       else if ("fromGraveyard" in yard) (out.fromGraveyard ??= []).push(yard.fromGraveyard);
-      else if ("buyback" in yard) out.buyback = yard.buyback;
+      else if ("buyback" in yard) {
+        out.buyback = yard.buyback;
+        if (yard.costs) [out.buybackCosts, out.buybackText] = [yard.costs, yard.text];
+      }
       else if ("rebound" in yard) out.rebound = true;
       else if ("escapesWith" in yard) out.escapesWith = yard.escapesWith;
       else out.activated.push(yard.unearth);
+      continue;
+    }
+    // Awaken N—[cost] (CR 702.113a): an alternative cost, and a spell ability added after the spell's own (see below).
+    const awakenLine = /^Awaken (\d+)—((?:\{[^}]+\})+)$/.exec(line);
+    if (awakenLine && isSpell && !awaken && parseManaCost(awakenLine[2]!).supported && !parseManaCost(awakenLine[2]!).hasX) {
+      awaken = { n: Number(awakenLine[1]), raw };
+      (out.altCosts ??= []).push({ kind: "awaken", mana: awakenLine[2]! });
+      continue;
+    }
+    if (/^Awaken\b/.test(line)) {
+      out.unsupported.push(raw);
+      continue;
+    }
+    // Splice onto Arcane [cost] (CR 702.47a): only a mana cost, and only one splice ability.
+    const splice = /^Splice onto (Arcane|instant or sorcery) ((?:\{[^}]+\})+)$/.exec(line);
+    if (splice && isSpell && !out.splice && parseManaCost(splice[2]!).supported && !parseManaCost(splice[2]!).hasX) {
+      out.splice = { onto: splice[1] === "Arcane" ? "Arcane" : "instantOrSorcery", mana: splice[2]! };
+      continue;
+    }
+    if (/^Splice onto\b/.test(line)) {
+      out.unsupported.push(raw);
       continue;
     }
     const costKw = parseCostKeyword(line, d);
@@ -413,13 +438,14 @@ export function compile(d: CardDef): CompiledCard {
         if (costKw.delve) out.delve = true;
         if (costKw.assist) out.assist = true;
         // Two of the same: each would work separately (CR 702.153b), which isn't modeled.
-        const twice = (costKw.madness && out.madness) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.foretell && out.foretell) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
+        const twice = (costKw.madness && out.madness) || (costKw.miracle && out.miracle) || (costKw.suspend && out.suspend) || (costKw.casualty && out.casualty) || (costKw.dredge && out.dredge) || (costKw.plot && out.plot) || (costKw.foretell && out.foretell) || (costKw.alt && out.altCosts?.some((a) => a.kind === costKw.alt!.kind));
         if (twice) {
           out.unsupported.push(raw);
           continue;
         }
         if (costKw.alt) (out.altCosts ??= []).push(costKw.alt);
         if (costKw.madness) out.madness = costKw.madness;
+        if (costKw.miracle) out.miracle = costKw.miracle;
         if (costKw.plot) out.plot = costKw.plot;
         if (costKw.foretell) out.foretell = costKw.foretell;
         if (costKw.suspend) out.suspend = costKw.suspend;
@@ -474,6 +500,8 @@ export function compile(d: CardDef): CompiledCard {
       out.textKeywords.push(...textKeywords(kwLine));
       if (kw.convoke) out.convoke = true;
       if (kw.improvise) out.improvise = true;
+      if (kw.epic) out.epic = true;
+      for (let i = 0; i < (kw.undaunted ?? 0); i++) out.costLess = [...(out.costLess ?? []), { count: { kind: "players", opponents: true } }];
       if (kw.affinity.length) out.costLess = [...(out.costLess ?? []), ...kw.affinity.map((filter) => ({ count: { kind: "permanents" as const, filter } }))];
       if (kw.plusCounters) {
         const prev = out.entersWithCounters?.n ?? 0;
@@ -934,7 +962,7 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Cast this spell only during combat", "... only during your end step", "... only during the declare attackers step
     // and only if you've been attacked this step" (CR 506.8, 601.3).
-    const castOnly = /^Cast ~ only ((?:during|if) [^.]+)\.$/.exec(line);
+    const castOnly = /^Cast ~ only ((?:during|if|before|after) [^.]+)\.$/.exec(line);
     if (castOnly) {
       const clauses = parseOnlyClauses(castOnly[1]!);
       if (!clauses?.cond || clauses.once || clauses.sorcery || out.castOnly) out.unsupported.push(raw);
@@ -1191,6 +1219,27 @@ export function compile(d: CardDef): CompiledCard {
       out.unsupported.push("Cipher (on a modal spell)");
     }
   }
+  // Awaken (CR 702.113a-b): "If this spell's awaken cost was paid, put N +1/+1 counters on target land you control. That
+  // land becomes a 0/0 Elemental creature with haste. It's still a land." That target only when it's awakened.
+  if (awaken) {
+    if (out.spell && !out.spell.modal) {
+      const i = out.spell.targets.length;
+      const land = { ref: "target", index: i } as const;
+      const awakened: Effect[] = [
+        { type: "counters", what: land, counter: "+1/+1", n: awaken.n },
+        { type: "continuous", what: land, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: ["Elemental"] }, { kind: "setPT", power: 0, toughness: 0 }, { kind: "addKeywords", keywords: ["Haste"] }], duration: "game" },
+      ];
+      out.spell = {
+        ...out.spell,
+        targets: [...out.spell.targets, { kind: "object", types: ["Land"], controller: "you", text: "target land you control", onlyIf: { cond: { kind: "altPaid", alt: "awaken" } } }],
+        effects: [...out.spell.effects, { type: "if", cond: { kind: "altPaid", alt: "awaken" }, effects: awakened }],
+        text: `${out.spell.text} Awaken ${awaken.n}.`,
+      };
+    } else {
+      delete out.spell;
+      out.unsupported.push(awaken.raw);
+    }
+  }
   // A spell's gift happens before any of its other instructions (CR 702.174j).
   if (out.gift && isSpell) {
     if (out.spell && !out.spell.modal) out.spell = { ...out.spell, effects: [{ type: "if", cond: { kind: "gift" }, effects: out.gift.effects }, ...out.spell.effects] };
@@ -1360,6 +1409,12 @@ function checkX(d: CardDef, out: CompiledCard) {
   if (out.costLess && usesX(out.costLess)) {
     bad("costs {X} less");
     delete out.costLess;
+  }
+  // Spliced, only the card's rules text is added (CR 702.47c): a plain spell, with nothing that depends on how this card
+  // itself was cast, and no X (the spell it's spliced onto has its own).
+  if (out.splice && (!out.spell || out.spell.modal || usesX(out.spell) || out.kicker || out.altCosts || out.buyback !== undefined || out.fromGraveyard)) {
+    bad(`Splice onto ${out.splice.onto === "Arcane" ? "Arcane" : "instant or sorcery"} ${out.splice.mana}`);
+    delete out.splice;
   }
 }
 

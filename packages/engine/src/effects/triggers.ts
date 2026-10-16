@@ -776,9 +776,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
-            : ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
+            : d.when !== "leaves" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
-      s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.when !== "eachYourUpkeep") s.delayed = s.delayed!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).

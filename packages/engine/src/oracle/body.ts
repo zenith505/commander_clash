@@ -64,7 +64,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
@@ -458,8 +458,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       if (inner.length > 1 && inner.some((e) => pauses(e))) return null;
       // "You may put a land card from your hand onto the battlefield": choosing none is the "may" (one question).
       const only = inner.length === 1 ? inner[0]! : undefined;
-      if (only?.type === "putFromHand" && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
-        effects.push({ ...only, may: true });
+      // "You may tap or untap target permanent": tap, untap or neither, as one question.
+      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
+        effects.push(only.type === "castFromHand" ? only : { ...only, may: true }); // castFromHand offers "Don't cast" itself
         if (!defineX()) return null;
         continue;
       }

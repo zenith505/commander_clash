@@ -361,6 +361,53 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       moveObject(s, o!.id, "graveyard");
       return;
     }
+    case "miracle": {
+      // CR 702.94a: cast it for its miracle cost as this resolves, ignoring timing; only while it's still in its owner's
+      // hand as the card that was revealed (CR 400.7).
+      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      if (!o || o.zone !== "hand" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.may !== undefined) return;
+      sc.may = false;
+      o.miracleRevealed = undefined; // no longer revealed once the ability resolves (CR 702.94b)
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "miracle" };
+      const problem = castProblem(s, ctx.controller, o.id);
+      if (problem === null || /^not enough mana/.test(problem)) return "paused";
+      s.pending = null;
+      log(s, `${defOf(s, o).name} can't be cast for its miracle cost.`);
+      return;
+    }
+    case "castFromHand": {
+      // Cast as this resolves, ignoring timing based on its card type; X is 0, no alternative costs, but additional
+      // costs are paid (rulings on the Expertises, CR 118.9, 107.3b). Lands can't be cast.
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (sc.castFromHand === "cast" || sc.castFromHand === "none") return;
+      const castable = (id: ObjectId) => {
+        s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
+        const problem = castProblem(s, p.id, id);
+        s.pending = null;
+        return problem === null || /^not enough mana/.test(problem);
+      };
+      if (sc.castFromHand === undefined) {
+        // "With mana value X or less": this spell's X (TargetSpec.xRange).
+        const { xRange, ...rest } = e.filter;
+        const filter: TargetSpec = xRange ? { ...rest, manaValue: { max: ctx.x ?? 0 } } : rest;
+        const options = p.hand.filter((id) => !isType(defOf(s, obj(s, id)), "Land") && printedMatches(filter, defOf(s, obj(s, id))) && castable(id));
+        if (!options.length) {
+          log(s, `${p.name} has no ${filter.text.replace(/^an? /, "")} in hand to cast.`);
+          return;
+        }
+        const text = filter.text.replace(/^(?!an? )/, /^[aeiou]/i.test(filter.text) ? "an " : "a ");
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: `cast ${text} from your hand without paying its mana cost?` };
+        return "paused";
+      }
+      const id = sc.castFromHand;
+      sc.castFromHand = "cast";
+      if (!s.objects[id] || obj(s, id).zone !== "hand" || !castable(id)) return;
+      s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
+      return "paused";
+    }
     case "suspendTick": {
       // CR 702.62a: "At the beginning of your upkeep, if this card is suspended, remove a time counter from it."
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;

@@ -117,6 +117,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.diedThisTurn ?? []).filter((p) => !c.yours || p === ctx.controller).length;
     case "attackersThisTurn":
       return s.attackersThisTurn ?? 0;
+    case "toGraveyardThisTurn":
+      return s.toGraveyardThisTurn ?? 0;
     case "commanderCasts":
       return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
     case "party":
@@ -311,6 +313,8 @@ function describeCount(c: Count): string {
       return "#creatures that died this turn";
     case "attackersThisTurn":
       return "#creatures that attacked this turn";
+    case "toGraveyardThisTurn":
+      return "#permanents put into a graveyard this turn";
     case "commanderCasts":
       return "#times you've cast your commander";
     case "party":

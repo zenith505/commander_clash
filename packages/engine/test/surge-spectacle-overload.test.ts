@@ -4,8 +4,8 @@
 // its mana value doesn't change, and a copy is overloaded too, CR 707.10).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passAll, putOnBattlefield, setup, swamp, target } from "./helpers";
-import { botActions, castProblem, characteristics, isFullySupported, loseLife, planCast, spellManaValue, type Action, type CardDef, type GameState } from "../src";
+import { act, bear, card, mountain, passAll, putOnBattlefield, setup, swamp, target } from "./helpers";
+import { abilitiesOf, abilityProblem, botActions, castProblem, characteristics, isFullySupported, loseLife, moveObject, planCast, spellManaValue, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const rift = card("Cyclonic Rift", "Instant", "{1}{U}", { keywords: ["Overload"], oracleText: 'Return target nonland permanent you don\'t control to its owner\'s hand.\nOverload {6}{U} (You may cast this spell for its overload cost. If you do, change "target" in its text to "each.")' });
@@ -22,6 +22,28 @@ const hexproofBear = bear({ name: "Slippery Bear", keywords: ["Hexproof"], oracl
 const regenBear = bear({ name: "River Boa", oracleText: "{G}: Regenerate this creature." });
 const relic = card("Mind Stone", "Artifact", "{2}", { oracleText: "{T}: Add {C}." });
 const flier = bear({ name: "Bird Bear", keywords: ["Flying"], oracleText: "Flying" });
+const counterflux = card("Counterflux", "Instant", "{U}{U}{R}", { keywords: ["Overload"], oracleText: 'This spell can\'t be countered.\nCounter target spell you don\'t control.\nOverload {1}{U}{U}{R} (You may cast this spell for its overload cost. If you do, change "target" in its text to "each.")' });
+const spasm = card("Street Spasm", "Instant", "{X}{R}", { keywords: ["Overload"], oracleText: 'Street Spasm deals X damage to target creature without flying you don\'t control.\nOverload {X}{X}{R}{R} (You may cast this spell for its overload cost. If you do, change "target" in its text to "each.")' });
+const teleportal = card("Teleportal", "Sorcery", "{U}{R}", { keywords: ["Overload"], oracleText: 'Target creature you control gets +1/+0 until end of turn and can\'t be blocked this turn.\nOverload {3}{U}{R} (You may cast this spell for its overload cost. If you do, change "target" in its text to "each.")' });
+const duel = card("Compelled Duel", "Sorcery", "{1}{G}", { oracleText: "Target creature gets +3/+3 until end of turn and must be blocked this turn if able." });
+const nivix = card("Nivix Guildmage", "Creature — Human Wizard", "{U}{R}", { power: "2", toughness: "2", oracleText: "{1}{U}{R}: Draw a card, then discard a card.\n{2}{U}{R}: Copy target instant or sorcery spell you control. You may choose new targets for the copy." });
+const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+
+/** Pass priority until `pid` has it. */
+function priorityTo(s: GameState, pid: PlayerId) {
+  for (let i = 0; i < 8 && waitingOn(s) !== pid; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  expect(waitingOn(s)).toBe(pid);
+  return s;
+}
+/** `pid` casts Shock at `at`, from a hand card given to them and a Mountain of theirs. */
+function opponentShocks(s: GameState, pid: PlayerId, at: PlayerId) {
+  putOnBattlefield(s, pid, mountain);
+  const id = putOnBattlefield(s, pid, shock);
+  moveObject(s, id, "hand");
+  const sh = s.players[pid]!.hand.find((h) => s.cards[s.objects[h]!.cardId]!.name === "Shock")!;
+  s = priorityTo(s, pid);
+  return { s: run(s, planCast(s, pid, sh, [{ kind: "player", id: at }])), shock: sh };
+}
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -78,6 +100,74 @@ describe("overload", () => {
     const s = passAll(castFor(s0, ap, ids[0]!, "overload"));
     expect(s.battlefield).toContain(mineStone);
     for (const id of theirs) expect(s.battlefield).not.toContain(id);
+  });
+});
+
+describe("overload leftovers", () => {
+  it("parses", () => supported(counterflux, spasm, teleportal, duel, nivix));
+
+  it("Counterflux: one target spell you don't control; overloaded, each of them, never your own", () => {
+    const { s: s0, ap, ids, opp } = setup([counterflux, counterflux, cheap]);
+    // Your own spell can't be its target.
+    let s = run(s0, planCast(s0, ap, ids[2]!));
+    const mine = s.stack.at(-1)!;
+    expect(castProblem(s, ap, ids[0]!, [{ kind: "stack", id: mine.id }])).toMatch(/target/);
+    // An opponent's Shock, then a second player's Shock on top: overloaded, it counters both and leaves your Bear.
+    const r = opponentShocks(s, opp, ap);
+    const third = s.turnOrder[(s.turnOrder.indexOf(ap) + 2) % 4]!;
+    const r2 = opponentShocks(r.s, third, ap);
+    s = priorityTo(r2.s, ap);
+    s = run(s, planCast(s, ap, ids[1]!, undefined, undefined, "auto", undefined, { alt: "overload" }));
+    expect(s.stack.at(-1)!.targets ?? []).toHaveLength(0);
+    for (let i = 0; i < 12 && s.stack.some((x) => x.objectId === ids[1]); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[r.shock]!.zone).toBe("graveyard");
+    expect(s.objects[r2.shock]!.zone).toBe("graveyard");
+    expect(s.stack.map((x) => x.objectId)).toEqual([ids[2]]);
+    s = passAll(s);
+    expect(s.players[ap]!.life).toBe(40);
+    expect(s.battlefield).toContain(ids[2]);
+  });
+
+  it("Street Spasm overloaded: X damage to each creature without flying you don't control, paying {X}{X}{R}{R}", () => {
+    const { s: s0, ap, ids, opp } = setup([spasm]);
+    const mine = putOnBattlefield(s0, ap, bear()), a = putOnBattlefield(s0, opp, bear()), b = putOnBattlefield(s0, opp, bear()), bird = putOnBattlefield(s0, opp, flier);
+    const untapped = (s: GameState) => s.battlefield.filter((id) => s.objects[id]!.controller === ap && !s.objects[id]!.tapped).length;
+    const before = untapped(s0);
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 2, { alt: "overload" }));
+    expect(untapped(s)).toBe(before - 6);
+    expect(spellManaValue(s, s.stack.at(-1)!)).toBe(3); // {X}{R} with X = 2
+    s = passAll(s);
+    for (const id of [a, b]) expect(s.battlefield).not.toContain(id);
+    expect(s.battlefield).toEqual(expect.arrayContaining([mine, bird]));
+  });
+
+  it("Teleportal overloaded: each creature you control gets +1/+0 and can't be blocked", () => {
+    const { s: s0, ap, ids } = setup([teleportal]);
+    const a = putOnBattlefield(s0, ap, bear()), b = putOnBattlefield(s0, ap, flier);
+    const s = passAll(castFor(s0, ap, ids[0]!, "overload"));
+    for (const id of [a, b]) {
+      const c = characteristics(s, s.objects[id]!);
+      expect(c.power).toBe(3);
+      expect(c.cantBeBlocked).toBe(true);
+    }
+  });
+
+  it("Compelled Duel: +3/+3 and must be blocked this turn", () => {
+    const { s: s0, ap, ids } = setup([duel]);
+    const a = putOnBattlefield(s0, ap, bear());
+    const s = passAll(run(s0, planCast(s0, ap, ids[0]!, [target(a)])));
+    const c = characteristics(s, s.objects[a]!);
+    expect([c.power, c.toughness, c.mustBeBlocked]).toEqual([5, 5, true]);
+  });
+
+  it("Nivix Guildmage copies only a spell you control", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, nivix);
+    const i = abilitiesOf(s0, s0.objects[g]!).activated.findIndex((ab) => /Copy target/.test(ab.body.text));
+    const r = opponentShocks(s0, opp, ap);
+    const s = priorityTo(r.s, ap);
+    const theirs = s.stack.at(-1)!;
+    expect(abilityProblem(s, ap, g, i, [{ kind: "stack", id: theirs.id }])).toMatch(/target/);
   });
 });
 

@@ -2,7 +2,7 @@
 // comes back tapped when it dies or is exiled.
 
 import { describe, expect, it } from "vitest";
-import { act, card, cast, putOnBattlefield, setup, target, pt } from "./helpers";
+import { act, card, cast, passUntil, putOnBattlefield, setup, target, pt } from "./helpers";
 import { botActions, characteristics, isFullySupported, objHasKeyword, objIsType, waitingOn, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -51,6 +51,18 @@ describe("earthbend", () => {
       expect(objIsType(s, o, "Creature")).toBe(false);
       expect(o.counters["+1/+1"] ?? 0).toBe(0);
     }
+  });
+
+  it("still returns it when it dies turns later: its controller's next upkeep doesn't use up the trigger", () => {
+    const { s: s0, ap, ids } = setup([earthbendingLesson, murder]);
+    const land = putOnBattlefield(s0, ap, wastes);
+    let s = cast(s0, ap, ids[0]!, [target(land)]);
+    s = passUntil(passUntil(s, "end", ap), "main1", ap);
+    expect(s.objects[land]!.zoneChanges ?? 0).toBe(0);
+    expect((s.delayed ?? []).some((d) => d.when === "leaves")).toBe(true);
+    s = settle(cast(s, ap, ids[1]!, [target(land)]));
+    expect(s.objects[land]!.zone).toBe("battlefield");
+    expect(s.objects[land]!.zoneChanges).toBe(2);
   });
 
   it("doesn't return it from anywhere else, and only once", () => {

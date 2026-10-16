@@ -1,4 +1,4 @@
-import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec } from "../abilities";
+import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint } from "../abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
@@ -183,6 +183,7 @@ export function parseDuring(text: string): StaticCondition | null {
   if (text === "your turn") return { kind: "yourTurn" };
   if (text === "an opponent's turn") return { kind: "yourTurn", not: true };
   if (text === "your turn, before attackers are declared") return { kind: "beforeAttackers" };
+  if (text === "an opponent's turn, before attackers are declared") return { kind: "during", window: "beforeAttackers", turn: "opponent" };
   if (text === "an opponent's turn after their upkeep step") return { kind: "during", window: "afterUpkeep", turn: "opponent" };
   if ((m = /^combat( on your turn| on an opponent's turn)?( before blockers are declared| after blockers are declared)?$/.exec(text)))
     return { kind: "during", window: !m[2] ? "combat" : /before/.test(m[2]) ? "combatBeforeBlocks" : "combatAfterBlocks", ...whose(m[1]) };
@@ -192,6 +193,19 @@ export function parseDuring(text: string): StaticCondition | null {
     return { kind: "during", window: m[2] === "attackers" ? "declareAttackers" : "declareBlockers", ...whose(m[1] ?? m[3]) };
   if (text === "the end of combat step") return { kind: "during", window: "endCombat" };
   return null;
+}
+
+/** "Before combat", "before attackers are declared", "after combat" (CR 506.8a-b, d): a point in the turn's first combat. */
+function parseTurnPoint(text: string): StaticCondition | null {
+  const points: Record<string, TurnPoint> = {
+    "before combat": "beforeCombat",
+    "before attackers are declared": "beforeAttackers",
+    "before blockers are declared": "beforeBlockers",
+    "before the combat damage step": "beforeDamage",
+    "after combat": "afterCombat",
+  };
+  const w = points[text];
+  return w ? { kind: "during", window: w } : null;
 }
 
 /**
@@ -206,6 +220,7 @@ export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?:
     if (clause === "once each turn") out.once = true;
     else if (clause === "as a sorcery") out.sorcery = true;
     else if (clause.startsWith("during ") && (c = parseDuring(clause.slice(7)))) conds.push(c);
+    else if ((c = parseTurnPoint(clause))) conds.push(c);
     else if (clause === "if you've been attacked this step") conds.push({ kind: "attackedThisStep" });
     else if (clause.startsWith("if ") && (c = parseActivateCondition(clause.slice(3)))) conds.push(c);
     else return null;
@@ -440,7 +455,7 @@ export function parseExtraBlocks(text: string): Modification | null {
 }
 
 /** "get +1/+1", "have flying and vigilance", "get +2/+0 and have first strike", "can't block". */
-function parseStaticMods(rest: string): Modification[] | null {
+export function parseStaticMods(rest: string): Modification[] | null {
   let m: RegExpExecArray | null;
   // The job select Equipment: "gets +1/+0 and is a Monk in addition to its other types", "gets +2/+2, has reach, and
   // is a Bard ...", "is a Wizard in addition to its other types and has "..."", "gets +0/+2, is a Wizard in addition to

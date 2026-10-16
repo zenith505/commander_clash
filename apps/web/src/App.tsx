@@ -73,6 +73,9 @@ import {
   autoConvoke,
   autoCrew,
   casualtyCandidates,
+  spliceCandidates,
+  splicedBodies,
+  withSplices,
   bargainCandidates,
   autoEvidence,
   evidenceCandidates,
@@ -274,6 +277,8 @@ type CastDraft = {
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
+  /** Arcane cards in your hand spliced onto it, revealed as it's cast (CR 702.47a-b). */
+  splice?: string[];
   /** Cast for its evoke or dash cost (CR 118.9). */
   alt?: AltCostKind;
   /** Cards exiled from your graveyard for delve (CR 702.66a). */
@@ -319,15 +324,17 @@ type DelvePick = { draft: CastDraft; label: string; max: number; candidates: str
 type GiftPick = { draft: CastDraft; label: string; what: string; options: PlayerId[]; life?: number };
 
 /** Paying buyback or not (CR 702.27). */
-type BuybackPick = { draft: CastDraft; label: string; cost: string };
+type BuybackPick = { draft: CastDraft; label: string; cost: string; /** A cost that isn't mana: "sacrifice a land". */ text?: string };
 
 /** Choosing which kicker costs to pay (CR 702.33). */
 type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boolean; name: ReturnType<typeof kickerName>; chosen: number[] };
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire" | "exileFromHand";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice";
   label: string;
+  /** "Any number of": fewer than `n` are fine, down to this many (splice). */
+  min?: number;
   /** The Shoals: the card picked sets X, its mana value (CR 107.3a). */
   setsX?: true;
   /** Foil: one of the cards picked must be this. */
@@ -650,7 +657,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}) };
+    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     if (d.kicks === undefined && compiled.kicker)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
@@ -660,17 +667,24 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const body = { targets: [], effects: [], text: card.oracleText, modal: kickedModal.modal! };
       return setModePick({ mode: "cast", objectId: d.objectId, label: card.name, body: d.kicks?.length ? { ...body, modal: { ...body.modal, max: body.modal.modes.length } } : body, draft: d });
     }
-    if (d.buyback === undefined && compiled.buyback) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback });
+    // Splice onto Arcane: reveal any number of cards in your hand to splice onto it, each adding its rules text and
+    // its splice cost (CR 702.47a-b, 601.2b).
+    const splices = d.splice === undefined ? spliceCandidates(s, HUMAN, d.objectId) : [];
+    if (splices.length) return setCostPick({ draft: d, kind: "splice", label: card.name, what: "splice onto it any number of cards from your hand", n: splices.length, min: 0, candidates: splices, chosen: [] });
+    if (d.buyback === undefined && compiled.buyback !== undefined) return setBuybackPick({ draft: d, label: card.name, cost: compiled.buyback, ...(compiled.buybackText ? { text: compiled.buybackText } : {}) });
     if (d.costOr === undefined && compiled.costOr) return setCostOrPick({ draft: d, label: card.name, options: compiled.costOr.map((c) => c.text) });
     // Gift: you may promise an opponent a gift as you cast it (CR 702.174a), announced with the other costs (601.2b).
     if (d.gift === undefined && compiled.gift && opps.length) return setGiftPick({ draft: d, label: card.name, what: compiled.gift.what, options: opps });
     // Cast without paying its mana cost, X is 0 (CR 107.3b); not so for "pay X life" and the like, an X in an
     // additional cost (Toxic Deluge's rulings).
     const costX = costsHaveX(card, d);
-    if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && !free && !d.via && !d.alt) || costX)) {
+    // An alternative cost with X in it: overloaded Street Spasm's {X}{X}{R}{R} (CR 107.3a).
+    const altMana = d.alt ? altCost(card, d.alt)?.mana : undefined;
+    const altX = !!altMana && parseManaCost(altMana).hasX;
+    if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX) && !d.via && !d.alt) || altX || costX)) {
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
       const extra = costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
-      return setXPick({ mode: "cast", draft: d, label: card.name, cost: card.manaCost, max, value: max, ...(extra ? { extra } : {}) });
+      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: max, ...(extra ? { extra } : {}) });
     }
     // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is
     // asked before them when a target depends on it.
@@ -680,7 +694,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
     }
     // "Any number of target ...": an "up to" target for each there could be, "up to X" no more than X (CR 601.2c).
-    const specs = offerTargets(s, spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) })), HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId);
+    // The spliced cards' targets come after the spell's own (CR 702.47b).
+    const own = spellTargets(s, d.objectId, d.modes, d.alt, castHow({ ...(d.alt ? { alt: d.alt } : {}), ...(d.kicks ? { kicks: d.kicks } : {}), ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}), ...(d.teamwork ? { teamwork: d.teamwork } : {}), ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}) }));
+    const specs = offerTargets(s, d.splice?.length ? withSplices({ targets: own, effects: [], text: "" }, splicedBodies(s, d.splice)).targets : own, HUMAN, d.x ?? 0, sourceQuality(s, d.objectId), d.objectId);
     // Every target skipped: it's cast as if it had none.
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
@@ -1274,7 +1290,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {buybackPick && (
             <div className="targeting">
               <span>
-                <strong>{buybackPick.label}</strong>: pay buyback <ManaCost cost={buybackPick.cost} size="sm" /> too? It returns to your hand as it resolves.
+                <strong>{buybackPick.label}</strong>: pay buyback {buybackPick.text ? `(${buybackPick.text})` : <ManaCost cost={buybackPick.cost} size="sm" />} too? It returns to your hand as it resolves.
               </span>
               <button
                 disabled={planCast(s, HUMAN, buybackPick.draft.objectId, undefined, buybackPick.draft.modes, buybackPick.draft.convoke ?? "auto", undefined, { buyback: true, ...(buybackPick.draft.kicks?.length ? { kicks: buybackPick.draft.kicks } : {}) }) === null}
@@ -1395,6 +1411,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               cards={costPick.candidates}
               chosen={costPick.chosen}
               n={costPick.n}
+              {...(costPick.min !== undefined ? { min: costPick.min } : {})}
               valid={!costPick.oneOf || costPick.chosen.some((id) => printedMatches(costPick.oneOf!, cardOf(s, id)))}
               onHover={setHover}
               onToggle={(id) =>
@@ -1446,7 +1463,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload" };
+const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1465,6 +1482,8 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   surge: "only if you've cast another spell this turn",
   spectacle: "only if an opponent lost life this turn",
   overload: "\"target\" in its text becomes \"each\": no targets, it affects all of them",
+  awaken: "also put +1/+1 counters on target land you control: it becomes a 0/0 Elemental creature with haste",
+  miracle: "",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem" };
@@ -3148,6 +3167,10 @@ function Controls({
             <>
               <strong>Madness:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it goes to your graveyard.
             </>
+          ) : pending.how === "miracle" ? (
+            <>
+              <strong>Miracle:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it stays in your hand.
+            </>
           ) : pending.how === "suspend" ? (
             <>
               <strong>Suspend:</strong> the last time counter is gone. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it stays in exile.
@@ -3159,8 +3182,8 @@ function Controls({
           )}
         </span>
         <button
-          disabled={pending.how === "madness" && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
-          title={pending.how === "madness" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
+          disabled={(pending.how === "madness" || pending.how === "miracle") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
+          title={pending.how === "madness" || pending.how === "miracle" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
           onClick={() => onCastFree(pending.objectId)}
         >
           Cast it
@@ -3270,7 +3293,21 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead") && pending.player === HUMAN)
+  // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none.
+  if (pending?.kind === "chooseOption" && pending.what === "castFromHand" && pending.player === HUMAN)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} className={o === "none" ? "ghost" : ""} onMouseEnter={() => o !== "none" && onHover(cardOf(s, o))} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tapOrUntap" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

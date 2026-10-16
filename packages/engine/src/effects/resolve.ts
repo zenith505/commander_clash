@@ -152,7 +152,7 @@ export function continueResolution(s: GameState): Resolution {
   }
   s.leftTogether = undefined;
   s.resolving = null;
-  if (item.kind === "spell" && item.objectId && s.objects[item.objectId]?.zone === "stack") finishSpell(s, item.objectId);
+  if (item.kind === "spell" && item.objectId && s.objects[item.objectId]?.zone === "stack") finishSpell(s, item.objectId, item);
   if (item.manaAbility) manaAbilityResolved(s, item, r.made ?? []);
   return "done";
 }
@@ -480,6 +480,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ninjutsu":
     case "impulse":
     case "madness":
+    case "miracle":
+    case "castFromHand":
     case "suspendTick":
     case "suspendCast":
     case "exileSelfWithTime":
@@ -488,6 +490,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "untap":
+    case "tapOrUntap":
     case "becomeSaddled":
     case "removeFromCombat":
     case "earthbend":
@@ -532,6 +535,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterUnlessPays":
     case "counterCause":
     case "counterSpell":
+    case "counterEach":
     case "changeTarget":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
@@ -572,10 +576,18 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
  * has rebound and was cast from their hand (CR 702.88a). Flashback's and jump-start's exile is a
  * replacement effect that applies whatever the destination (CR 702.34a, see moveObject).
  */
-function finishSpell(s: GameState, id: ObjectId) {
+function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
   const o = obj(s, id);
   const d = defOf(s, o);
   const controller = o.controller;
+  // Epic's two spell abilities, last as it resolves (CR 702.50a-b); a copy has no epic ability. Its copies copy it as it
+  // resolved, with its choices (X, modes, targets), CR 707.10.
+  if (compileCard(d).epic && !item.copy) {
+    player(s, controller).cantCastSpells = d.name;
+    (s.epics ??= {})[item.id] = structuredClone(item);
+    addDelayed(s, "eachYourUpkeep", controller, o, { targets: [], effects: [{ type: "copySpell", spell: { epic: item.id }, n: 1, newTargets: true }], text: "Epic: copy ~ except for its epic ability. You may choose new targets for the copy." });
+    log(s, `${player(s, controller).name} can't cast spells for the rest of the game (epic).`);
+  }
   if (compileCard(d).rebound && o.castFrom === "hand" && !o.exileIfLeaves) {
     moveObject(s, id, "exile");
     log(s, `${d.name} is exiled (rebound).`);

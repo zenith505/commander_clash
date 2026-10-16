@@ -270,6 +270,8 @@ export interface GameObject {
   exiledUntilLeaves?: { id: ObjectId; zc: number; hand?: true }[];
   /** Cast as a prototyped spell (CR 718.3): its alternative mana cost, color, power and toughness, on the stack and the battlefield. */
   prototyped?: boolean;
+  /** Revealed for miracle as it was drawn (CR 702.94b): it stays revealed while it's in hand and its trigger waits. */
+  miracleRevealed?: { turn: number; zc: number };
   /** A spell cast for its overload cost (CR 702.96a): "target" in its text is "each" while it's on the stack. */
   overloaded?: true;
   /**
@@ -313,6 +315,8 @@ export interface RestrictedMana {
 }
 
 export interface Player {
+  /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
+  cantCastSpells?: string;
   id: PlayerId;
   name: string;
   life: number;
@@ -456,7 +460,8 @@ export interface StackItem {
  */
 export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "endOfCombat" | "nextCleanup" | "leaves";
+  /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "endOfCombat" | "nextCleanup" | "leaves";
   to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;
@@ -557,6 +562,8 @@ export interface CostChoices {
   conspire?: ObjectId[];
   /** Gift (CR 702.174a): the opponent chosen to promise the gift to. */
   gift?: PlayerId;
+  /** Splice (CR 702.47a-b): the cards revealed from your hand to splice onto this spell, in the order their effects happen. */
+  splice?: ObjectId[];
   /** "Have an opponent gain 3 life" (Invigorate's alternative cost): the opponent who gains it. */
   lifeTo?: PlayerId;
   /** Assist (CR 702.132a): the other player asked to help pay for the generic mana in its total cost. */
@@ -628,7 +635,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -651,7 +658,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "castFromHand" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -730,6 +737,8 @@ export interface GameState {
   cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** Each spell cast this turn as it was cast, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
   castItems?: Record<string, StackItem>;
+  /** Spells with epic as they resolved, by stack id: copied at each of their controller's upkeeps (CR 702.50a). */
+  epics?: Record<string, StackItem>;
   seed: number;
   rngState: number;
   turn: number;
@@ -757,6 +766,8 @@ export interface GameState {
   damageBatch?: { events: DamageEvent[]; answers: number[] };
   /** The controllers of the creatures that died this turn, one entry per creature (morbid, CR 700.4). */
   diedThisTurn?: PlayerId[];
+  /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */
+  toGraveyardThisTurn?: number;
   /** Creatures declared as attackers this turn ("for each creature that attacked this turn"). */
   attackersThisTurn?: number;
   /** Combat phases begun this turn: "if it's the first combat phase of the turn" (CR 506.1, 500.8). */
@@ -956,6 +967,9 @@ export interface Resolving {
     copies?: { of: string; left: number; targets?: TargetChoice[] }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
+    tapOrUntap?: string; // "tap", "untap" or "neither", for "tap or untap target permanent"
+    /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */
+    castFromHand?: string;
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     evidence?: ObjectId[]; // the cards picked to collect evidence with as it resolves (CR 701.59a)

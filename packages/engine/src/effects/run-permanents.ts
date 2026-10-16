@@ -62,6 +62,32 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         else untapPermanent(s, o);
       }
       return;
+    case "tapOrUntap": {
+      // Its controller chooses as it resolves (CR 608.2d); an illegal target isn't asked about (CR 608.2b).
+      const o = objects(s, e.what, ctx).find((x) => x.zone === "battlefield");
+      if (!o) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.tapOrUntap === undefined) {
+        const name = defOf(s, o).name;
+        s.pending = {
+          kind: "chooseOption",
+          player: ctx.controller,
+          source: src,
+          what: "tapOrUntap",
+          about: o.id,
+          options: ["tap", "untap", ...(e.may ? ["neither"] : [])],
+          labels: [`Tap ${name}`, `Untap ${name}`, ...(e.may ? ["Neither"] : [])],
+          prompt: `tap or untap ${name}${o.tapped ? " (tapped)" : " (untapped)"}?`,
+        };
+        return "paused";
+      }
+      const choice = sc.tapOrUntap;
+      sc.tapOrUntap = undefined;
+      if (choice === "tap") tapPermanent(s, o);
+      else if (choice === "untap") untapPermanent(s, o);
+      log(s, choice === "neither" ? `${src}: ${defOf(s, o).name} is neither tapped nor untapped.` : `${src} ${choice}s ${defOf(s, o).name}.`);
+      return;
+    }
     case "becomeSaddled":
       // Only permanents can become saddled (CR 702.171b).
       for (const o of objects(s, e.what, ctx)) {

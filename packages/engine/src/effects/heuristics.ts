@@ -29,7 +29,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Returning a card from a graveyard to its owner's hand helps its owner.
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
     // Phasing out removes a permanent until its controller's next turn: used against opponents' things.
-    if (["destroy", "exile", "bounce", "tap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
+    if (["destroy", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
     // "Destroy all creatures target player controls": aimed at an opponent, like the permanents themselves would be.
@@ -74,7 +74,8 @@ export function modsAreHarmful(mods: Modification[]): boolean {
     if (m.kind === "modifyPT") pt += estimate(m.power) + estimate(m.toughness);
     if (m.kind === "addAbility") pt -= grantCost(m.text);
     if (["control", "loseAllAbilities", "removeKeywords", "cantAttack", "cantBlock", "doesntUntap", "setSubtypes", "setLandTypes", "goad", "cantActivate"].includes(m.kind)) return true;
-    if (m.kind === "setPT" && estimate(m.power) + estimate(m.toughness) <= 2) return true;
+    // A small base P/T hurts a creature, but not a land made into one (awaken's counters come with it).
+    if (m.kind === "setPT" && estimate(m.power) + estimate(m.toughness) <= 2 && !mods.some((x) => x.kind === "addTypes" && x.types.includes("Creature"))) return true;
     // "Is a colorless Forest land", "is an enchantment and loses all other card types": no longer a creature.
     if (m.kind === "setTypes" && !m.types.includes("Creature")) return true;
   }

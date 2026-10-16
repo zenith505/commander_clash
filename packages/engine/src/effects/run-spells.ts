@@ -103,10 +103,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       if (!sc.copies) {
-        const i = e.spell === "cause" ? -1 : e.spell.target;
+        const i = e.spell === "cause" || "epic" in e.spell ? -1 : e.spell.target;
         const t = i >= 0 ? ctx.targets[i] : undefined;
-        const id = i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
-        const orig = id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id]) : undefined;
+        const id = typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
+        const orig = id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || orig.kind !== "spell") return;
         const n = e.n === "storm" ? (orig.castNth ?? 0) : e.n === "kicked" ? (orig.kicked?.length ?? 0) : amountNow(s, e.n, ctx);
         if (n <= 0) return;
@@ -114,7 +114,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const c = sc.copies;
       // As it is now, or as it was cast if it has left the stack.
-      const orig = s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of];
+      const orig = s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of] ?? s.epics?.[c.of];
       const specs = orig?.body?.targets ?? [];
       while (orig && c.left > 0) {
         if (e.newTargets && specs.length && c.targets === undefined) {
@@ -208,6 +208,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       return changeTarget(s, ctx, t.id, src, e.unless);
+    }
+    case "counterEach": {
+      // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
+      // since it isn't one it can counter (CR 608.2: it's resolving).
+      for (const item of [...s.stack]) {
+        if (item.kind !== "spell" || item.id === s.resolving?.item.id || !isLegalTarget(s, e.filter, { kind: "stack", id: item.id }, ctx.controller)) continue;
+        counterOnStack(s, ctx, item.id, src);
+      }
+      return;
     }
     case "counterSpell": {
       const t = ctx.targets[e.index];

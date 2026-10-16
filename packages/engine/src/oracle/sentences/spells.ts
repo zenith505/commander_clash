@@ -178,11 +178,24 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // value, as it resolves, is countered (rulings).
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
   // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
-  if ((m = /^Counter target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
+  if ((m = /^Counter target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!, { x: true });
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
     if (!spec || unless === null || (spec.xRange && (!ctx.spell || ctx.whereX))) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
+  }
+  // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (Sram's Expertise),
+  // "... with mana value X or less ..." (Electrodominance: its X), "... an instant or sorcery spell from your hand ...".
+  if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:\d+|X) or less)?) from your hand without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow)) {
+    m.splice(1, 1);
+    const filter = parseTargetPhrase(m[1]!, { x: true });
+    if (filter?.kind !== "spell" || filter.controller || filter.targetsWhat || (filter.xRange && (!ctx.spell || ctx.whereX || filter.xRange.at !== "most"))) return null;
+    return [{ type: "castFromHand", filter: { ...filter, text: m[1]! } }];
+  }
+  // Overloaded Counterflux: "Counter each spell you don't control" (CR 702.96a), no targets.
+  if ((m = /^Counter each (.*?spell (?:you don't control|an opponent controls))$/i.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    return filter?.kind === "spell" && filter.controller === "opponent" ? [{ type: "counterEach", filter: { ...filter, text: `each ${m[1]!}` } }] : null;
   }
   // Deflection: "Change the target of target spell with a single target" (CR 115.7a); Bolt Bend's "spell or ability".
   if ((m = /^Change the target of target spell( or ability)? with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s)) && !(m[1] && m[2])) {

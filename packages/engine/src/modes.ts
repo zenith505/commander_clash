@@ -5,7 +5,7 @@
 // whose text is just the chosen modes, in printed order (CR 608.2c), which is what
 // `withModes` builds.
 
-import type { AbilityBody, SpellCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, SpellCondition, TargetChoice, TargetSpec } from "./abilities";
 import type { PlayerId } from "./types";
 
 /** Why `modes` isn't a valid choice for this modal body (ignoring targets), or null. `both`: see modeRange. */
@@ -72,6 +72,22 @@ export function withModes(body: AbilityBody, modes: number[] | undefined): Abili
   return out;
 }
 
+/**
+ * Splice (CR 702.47a, c-d): the spell gains the rules text of each spliced card, whose effects happen after the main
+ * spell's, in the order given (702.47b). Their targets are chosen with the spell's, after its own.
+ */
+export function withSplices(body: AbilityBody, spliced: AbilityBody[]): AbilityBody {
+  if (!spliced.length) return body;
+  const out: AbilityBody = { ...body, targets: [...body.targets], effects: [...body.effects] };
+  for (const b of spliced) {
+    const offset = out.targets.length;
+    out.targets.push(...b.targets.map((spec) => (spec.distinctFrom ? { ...spec, distinctFrom: spec.distinctFrom.map((j) => j + offset) } : spec)));
+    out.effects.push(...b.effects.map((e) => shiftTargets(e, offset)));
+  }
+  out.text = [body.text, ...spliced.map((b) => b.text)].join(" ");
+  return out;
+}
+
 /** Copy of an effect with every target index moved up by `offset`. */
 function shiftTargets<T>(x: T, offset: number): T {
   if (offset === 0) return x;
@@ -93,6 +109,8 @@ export interface CastHow {
   teamwork?: boolean;
   gift?: boolean;
   evidence?: boolean;
+  /** The alternative cost it's cast for: awaken's target is chosen only then (CR 702.113b). */
+  alt?: AltCostKind;
 }
 
 /** Whether a spell cast this way meets a condition on how it was cast ("if ~ was kicked", "if the gift was promised"). */
@@ -108,6 +126,8 @@ export function castConditionMet(cond: SpellCondition, how: CastHow): boolean {
       return !!how.gift;
     case "evidence":
       return !!how.evidence;
+    case "altPaid":
+      return how.alt === cond.alt;
     default:
       return true;
   }

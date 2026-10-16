@@ -1,6 +1,6 @@
 import { refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, isGroup, keywordOf, WHEEL } from "./words";
+import { num, NUMX, X, amt, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
@@ -138,9 +138,12 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
-    .flatMap((x) => (/^If you do, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
+    // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
+    // of Denial) is all conditional.
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
+    .flatMap(splitSpentPair)
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;
@@ -313,7 +316,12 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (howCast) {
       const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx, true);
       if (!fx || (howCast.not && fx.instead) || (howCast.noTargets && ctx.targets.length !== curTargets)) return null;
-      if (!gateNewTargets(ctx, howCast.cond, howCast.not, fx, effects.slice(prevStart), prevTargets, curTargets)) return null;
+      if (howCast.ofTarget) {
+        // "Counter target spell if no mana was spent to cast it": the one target spell this sentence chose.
+        const spell = ctx.targets.length === curTargets + 1 && ctx.targets[curTargets]!.kind === "spell";
+        if (!spell || fx.instead || howCast.cond.kind !== "spent") return null;
+        howCast.cond.target = curTargets;
+      } else if (!howCast.ungated && !gateNewTargets(ctx, howCast.cond, howCast.not, fx, effects.slice(prevStart), prevTargets, curTargets)) return null;
       if (howCast.not) effects.push({ type: "if", cond: howCast.cond, effects: [], otherwise: fx.effects });
       else if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: howCast.cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
       else effects.push({ type: "if", cond: howCast.cond, effects: fx.effects });
@@ -537,7 +545,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able")
         // "You may have target opponent discard a card", "you may have that player lose 1 life": that player does it, if
         // you choose (the choice is yours, CR 608.2d).
-        .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `);
+        .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `)
+        // "You may have target creature get -2/-2 until end of turn", "... it gain reach", "... Ally creatures you control
+        // gain first strike", "... enchanted creature fight target creature": they do it, if you choose (CR 608.2d).
+        .replace(/^Have (.+?) (get|gain|lose|fight|deal) (?=\S)/, (all, who: string, verb: string) => {
+          if (/^(?:target (?:player|opponent)|that player|its controller|each opponent|you)$/.test(who)) return all;
+          const it = /^(?:it|her|him)$/.test(who);
+          const subject = it ? (ctx.selfIt || ctx.selfCard ? "~" : "It") : who.charAt(0).toUpperCase() + who.slice(1);
+          const plural = !it && /\b(?:creatures|permanents)\b/.test(who);
+          return `${subject} ${plural ? verb : verb === "lose" ? "loses" : `${verb}s`} `;
+        });
       ctx.mayNow = true;
       const inner = parseOne(rest, ctx);
       ctx.mayNow = false;
@@ -686,19 +703,53 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
  * "If ~ was bargained, X", "X if ~ was cast using teamwork", "Also X if ...", "X instead if ...", "X unless ~ was cast
  * using teamwork" (the same as "if it wasn't"): the condition, and X ("instead" kept for parseKicked).
  */
-function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string; noTargets?: true } | null {
+/**
+ * "You gain X life if {G} was spent to cast ~ and X life if {W} was spent to cast ~" (Dawnglow Infusion), "Creatures your
+ * opponents control lose flying until end of turn if {G} was spent to cast ~, and creatures you control gain flying until
+ * end of turn if {U} was spent to cast ~": two instructions, each with its own condition. A second half that goes on
+ * from the first's verb ("X life", "3 damage to ...") takes the first's words before its amount.
+ */
+function splitSpentPair(x: string): string[] {
+  const m = new RegExp(`^(.+? if ${SPENT_TO_CAST}),? and (.+? if ${SPENT_TO_CAST})$`).exec(x);
+  if (!m) return [x];
+  const [first, second] = [m[1]!, m[4]!];
+  const amount = /^(?:X|\d+) /.test(second) && /^(.+?\b)(?:X|\d+) /.exec(first);
+  if (amount) return [first, amount[1] + second];
+  return /^(?:creatures|target|each|all|you) /i.test(second) ? [first, second.charAt(0).toUpperCase() + second.slice(1)] : [x];
+}
+
+function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string; noTargets?: true; ungated?: true; ofTarget?: true } | null {
   for (const h of HOW_CAST) {
     if (h.spellOnly && !ctx.spell) continue;
     if (h.activatedOnly && !ctx.activated) continue;
     const found = howCastText(s, h);
     if (found) return { ...found, ...(h.noTargets ? { noTargets: true as const } : {}) };
   }
-  return null;
+  return spentHowCast(s, ctx);
 }
 
-function howCastText(s: string, h: (typeof HOW_CAST)[number]): { cond: SpellCondition; not: boolean; text: string } | null {
+/**
+ * "If {B} was spent to cast ~, ...", "... if {W} was spent to cast ~", "Sacrifice it unless {U} was spent to cast it" (an
+ * enters trigger), "If five or more mana was spent to cast that spell, ..." (a cast trigger): what was spent (CR 601.2h),
+ * checked as it resolves. A spell's targets are chosen before it's paid for, so they're chosen whatever is spent
+ * (Cankerous Thirst rulings): `ungated`. "Counter target spell if no mana was spent to cast it" (Nix) is about that target.
+ */
+function spentHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string; ungated: true; ofTarget?: true } | null {
+  const found = howCastText(s, { re: SPENT_TO_CAST, cond: { kind: "youDid" } });
+  const m = found && new RegExp(SPENT_TO_CAST).exec(s);
+  const req = m && parseSpentReq(m[1]!);
+  if (!found || !m || !req) return null;
+  const of = m[2]!;
+  // "~": the spell, or the permanent in its enters trigger (compile checks which); "it" and "that spell": the spell a cast
+  // trigger is about, or the permanent in its enters trigger; in a spell, "it" is its target spell.
+  const ofTarget = ctx.spell && of === "it";
+  if (of === "that spell" ? !ctx.castSpell : of === "it" ? !ctx.castSpell && !ctx.selfIt && !ofTarget : !ctx.spell && !ctx.selfIt) return null;
+  return { cond: { kind: "spent", req }, not: found.not, text: found.text, ungated: true, ...(ofTarget ? { ofTarget: true as const } : {}) };
+}
+
+function howCastText(s: string, h: { re: string; cond: SpellCondition; not?: true }): { cond: SpellCondition; not: boolean; text: string } | null {
   const lead = new RegExp(`^If ${h.re}, (.+)$`).exec(s);
-  if (lead) return { cond: h.cond, not: !!h.not, text: lead[1]! };
+  if (lead) return { cond: h.cond, not: !!h.not, text: lead[lead.length - 1]! };
   const trail = new RegExp(`^(?:Also )?(.+?)( instead)? (if|unless) ${h.re}$`).exec(s);
   if (!trail || (trail[3] === "unless" && trail[2])) return null;
   return { cond: h.cond, not: !!h.not !== (trail[3] === "unless"), text: `${trail[1]!}${trail[2] ?? ""}` };
@@ -787,13 +838,29 @@ function insteadOfAffected(fx: Effect[], previous: Effect[]): Effect[] | null {
   return swap(fx);
 }
 
+/**
+ * "Draw a card, then discard a card" after a condition ("If you control a blue creature, ..."): the instructions in order,
+ * all under it. Only one of them may wait on a choice, the last, so resuming it doesn't repeat the others.
+ */
+function parseThen(s: string, ctx: Ctx): Effect[] | null {
+  const parts = s.split(/, then (?!shuffle)/);
+  if (parts.length < 2) return null;
+  const out: Effect[] = [];
+  for (const [i, p] of parts.entries()) {
+    const fx = parseOne(i ? p.charAt(0).toUpperCase() + p.slice(1) : p, ctx);
+    if (!fx) return null;
+    out.push(...fx);
+  }
+  return out.slice(0, -1).some((e) => pauses(e)) ? null : out;
+}
+
 /** One sentence: a plain instruction, two joined by "and", or one with "for each" / "equal to" in it. */
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
   if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
-  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
+  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx));
   if (fx) noteLast(ctx, fx);
   return fx;
 }

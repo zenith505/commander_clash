@@ -1,12 +1,12 @@
 import { allEffects } from "../abilities";
-import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition } from "../abilities";
+import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
-import { NUM, num, NUMX, COUNTER, counterKind, X, amt, plainMana, sacrificeSelf } from "./words";
+import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
@@ -683,6 +683,14 @@ export function compile(d: CardDef): CompiledCard {
         };
       continue;
     }
+    // Adamant: "If at least three white mana was spent to cast ~, ~ enters with a +1/+1 counter on it." (CR 614.1c, 601.2h)
+    const spentCounters = new RegExp(`^(?:Adamant — )?If ${SPENT} was spent to cast ~, (?:~|it) enters(?: the battlefield)? with ${NUM} ([+-]1/[+-]1) counters? on it\\.$`).exec(line);
+    const spentReq = spentCounters && parseSpentReq(spentCounters[1]!);
+    if (spentCounters) {
+      if (out.entersWithCounters || !spentReq) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: spentCounters[3] === "-1/-1" ? "-1/-1" : "+1/+1", n: { count: { kind: "spentWas", req: spentReq }, times: num(spentCounters[2]!) } };
+      continue;
+    }
     // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a), maybe with "This spell costs
     // {2} less to cast if evidence was collected" in the same paragraph.
     const evidence = !d.types.includes("Land") ? /^As an additional cost to cast ~, you may collect evidence (\d+)\.(?: ~ costs \{(\d+)\} less to cast if evidence was collected\.)?$/.exec(line) : null;
@@ -1352,7 +1360,33 @@ export function compile(d: CardDef): CompiledCard {
   const json = JSON.stringify(out);
   if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;
+  const wanted = wantedSpent(out);
+  if (wanted.length) out.wantSpent = wanted;
   return out;
+}
+
+/**
+ * What this card's own text hopes was spent to cast it (CR 601.2h): "if {U} was spent to cast ~", adamant's "at least three
+ * white mana", "sacrifice it unless {U} was spent to cast it". Not "no mana" (paying can't do that), nor Nix's target's
+ * or a cast trigger's spell.
+ */
+function wantedSpent(out: CompiledCard): SpentReq[] {
+  const reqs: SpentReq[] = [];
+  const visit = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(visit);
+    if (!v || typeof v !== "object") return;
+    const o = v as { kind?: string; req?: SpentReq; target?: number };
+    if ((o.kind === "spent" && o.target === undefined) || o.kind === "spentWas") reqs.push(o.req!);
+    Object.values(v).forEach(visit);
+  };
+  visit(out.spell);
+  visit(out.entersWithCounters);
+  for (const t of out.triggers) if (t.event === "selfEnters") {
+    if (t.ifSpent) reqs.push(t.ifSpent);
+    visit(t.body);
+  }
+  const seen = new Set<string>();
+  return reqs.filter((r) => !r.none && (r.colors || r.sameColor) && !seen.has(JSON.stringify(r)) && seen.add(JSON.stringify(r)));
 }
 
 /**
@@ -1444,6 +1478,10 @@ function checkCastingLinks(out: CompiledCard) {
     if ((altIn(out.spell) || out.triggers.some((t) => t.ifAlt === alt || altIn(t.body))) && !linked) bad = true;
     if (out.triggers.some((t) => t.event !== "selfEnters" && altIn(t.body)) || altIn(out.activated) || altIn(out.statics)) bad = true;
   }
+  // The mana spent to cast a spell (CR 601.2h) is known for the spell, its permanent's enters trigger, and a cast trigger's
+  // spell; Nix's is its target's.
+  const spentIn = (v: unknown): boolean => Array.isArray(v) ? v.some(spentIn) : !!v && typeof v === "object" && ((v as { kind?: string; target?: number }).kind === "spent" && (v as { target?: number }).target === undefined ? true : Object.values(v).some(spentIn));
+  if (out.triggers.some((t) => t.event !== "selfEnters" && t.event !== "castSpell" && spentIn(t.body)) || spentIn(out.statics) || spentIn(out.activated)) bad = true;
   // Mana from Treasures spent (CR 106.3) is known for a spell, its permanent's enters trigger, and an activated ability.
   const treasureIn = (v: unknown) => /"kind":"treasure(?:Spent)?"/.test(JSON.stringify(v ?? null));
   if (out.triggers.some((t) => t.event !== "selfEnters" && treasureIn(t.body)) || treasureIn(out.statics) || JSON.stringify(out.activated ?? null).includes('"kind":"treasureSpent"')) bad = true;

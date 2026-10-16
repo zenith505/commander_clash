@@ -1,7 +1,7 @@
 // Copies of spells (CR 707.10): Twincast, storm (702.40), replicate (702.56), "whenever you cast ..., copy it".
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, mountain, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, island, mountain, passUntil, putOnBattlefield, setup } from "./helpers";
 import { isFullySupported, planCast, waitingOn, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.oracleText).toBe(true));
@@ -42,6 +42,31 @@ describe("copying spells", () => {
     expect(Object.values(s.objects).filter((o) => o.spellCopy)).toHaveLength(0); // CR 707.10a
     expect(s.players[ap]!.graveyard).toEqual(expect.arrayContaining([ids[0], ids[1]]));
     expect(s.players[ap]!.graveyard).toHaveLength(2);
+  });
+
+  it("new targets of a copy are checked against protection and \"can't be the target of\" (CR 702.16b, 115.4, 707.10)", () => {
+    const paladin = card("Paladin en-Vec", "Creature — Human Knight", "{1}{W}{W}", { power: "2", toughness: "2", keywords: ["First strike", "Protection"], oracleText: "First strike, protection from black and from red (This creature deals combat damage before creatures without first strike. It can't be blocked, targeted, dealt damage, or enchanted by anything black or red.)" });
+    const strider = card("Karplusan Strider", "Creature — Yeti", "{3}{G}", { power: "3", toughness: "4", oracleText: "This creature can't be the target of blue or black spells." });
+    const unsummon = card("Unsummon", "Instant", "{U}", { oracleText: "Return target creature to its owner's hand." });
+    supported(paladin, strider, unsummon);
+    const { s: s0, ap, opp, ids } = setup([shock, twincast, unsummon, twincast]);
+    const pal = putOnBattlefield(s0, opp, paladin);
+    const str = putOnBattlefield(s0, opp, strider);
+    const b = putOnBattlefield(s0, opp, bear());
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, ap, island);
+    // A red copy can't target the Paladin; the Yeti is fine.
+    let s = castOnly(s0, ap, ids[0]!, [player(opp)]);
+    s = settle(castOnly(s, ap, ids[1]!, [{ kind: "stack", id: s.stack[s.stack.length - 1]!.id }]));
+    expect(s.pending?.kind).toBe("copyTargets");
+    expect(() => act(s, { type: "copyTargets", player: ap, targets: [{ kind: "object", id: pal }] })).toThrow(/legal new target/);
+    s = settle(act(s, { type: "copyTargets", player: ap, targets: [{ kind: "object", id: str }] }));
+    expect(s.objects[str]!.damage).toBe(2);
+    // A blue copy can't target the Yeti; the bear is fine.
+    s = castOnly(s, ap, ids[2]!, [{ kind: "object", id: b }]);
+    s = settle(castOnly(s, ap, ids[3]!, [{ kind: "stack", id: s.stack[s.stack.length - 1]!.id }]));
+    expect(s.pending?.kind).toBe("copyTargets");
+    expect(() => act(s, { type: "copyTargets", player: ap, targets: [{ kind: "object", id: str }] })).toThrow(/legal new target/);
+    expect(() => act(s, { type: "copyTargets", player: ap, targets: [{ kind: "object", id: pal }] })).not.toThrow();
   });
 
   it("keeping the targets", () => {

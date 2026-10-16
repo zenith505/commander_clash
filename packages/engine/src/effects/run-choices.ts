@@ -1,5 +1,5 @@
 import type { Effect, PayCost, PunisherOption } from "../abilities";
-import { parseManaCost } from "../mana";
+import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, obj, player } from "../game";
@@ -139,6 +139,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? evidenceCollected(s, ctx)
             : e.cond.kind === "treasure"
             ? (ctx.treasureSpent ?? 0) > 0
+            : e.cond.kind === "spent"
+            ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
             : e.cond.kind === "teamwork"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"
@@ -157,6 +159,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
   }
+}
+
+/**
+ * The mana spent to cast a target spell (Nix): any player's (rulings), none for a copy or a spell no longer on the stack's
+ * object as it was cast.
+ */
+function targetSpellSpent(s: GameState, ctx: ResolveCtx, i: number): ManaSpent | undefined {
+  const t = ctx.targets[i];
+  const item = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+  return item?.kind === "spell" && !item.copy ? s.objects[item.objectId ?? ""]?.spent : undefined;
 }
 
 /** Can `pid` pay this now: mana from their pool or untapped sources, life (CR 119.4), energy (CR 107.14)? */

@@ -75,8 +75,9 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
  */
 function untargetableBy(u: Untargetable & { of: PlayerId }, controller: PlayerId, src?: SourceQuality): boolean {
   if (u.opponents && u.of === controller) return false;
-  if (!src) return !u.spells && !u.colors && !u.notColors;
+  if (!src) return !u.spells && !u.abilities && !u.colors && !u.notColors;
   if (u.spells && !src.spell) return false;
+  if (u.abilities && src.spell) return false;
   if (u.subtype && !src.subtypes?.includes(u.subtype)) return false;
   if (u.colors && !u.colors.some((col) => src.colors.includes(col))) return false;
   return !u.notColors?.some((col) => src.colors.includes(col));

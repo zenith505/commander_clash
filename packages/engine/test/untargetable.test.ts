@@ -19,6 +19,7 @@ const strider = card("Karplusan Strider", "Creature — Yeti", "{3}{G}", { power
 const thrun = card("Thrun, Breaker of Silence", "Legendary Creature — Troll Shaman", "{3}{G}{G}", { power: "5", toughness: "5", supertypes: ["Legendary"], keywords: ["Trample"], oracleText: "This spell can't be countered.\nTrample\nThrun can't be the target of nongreen spells your opponents control or abilities from nongreen sources your opponents control.\nDuring your turn, Thrun has indestructible." });
 const bartel = card("Bartel Runeaxe", "Legendary Creature — Giant Warrior", "{3}{B}{R}{G}", { power: "6", toughness: "5", supertypes: ["Legendary"], keywords: ["Vigilance"], oracleText: "Vigilance\nBartel Runeaxe can't be the target of Aura spells." });
 const paladin = card("Fiendslayer Paladin", "Creature — Human Knight", "{1}{W}{W}", { power: "2", toughness: "2", keywords: ["First strike", "Lifelink"], oracleText: "First strike (This creature deals combat damage before creatures without first strike.)\nLifelink (Damage dealt by this creature also causes you to gain that much life.)\nThis creature can't be the target of black or red spells your opponents control." });
+const shanna = card("Shanna, Sisay's Legacy", "Legendary Creature — Human Warrior", "{G}{W}", { power: "0", toughness: "0", supertypes: ["Legendary"], oracleText: "Shanna can't be the target of abilities your opponents control.\nShanna gets +1/+1 for each creature you control." });
 const vines = card("Vines of Vastwood", "Instant", "{G}", { keywords: ["Kicker"], oracleText: "Kicker {G} (You may pay an additional {G} as you cast this spell.)\nTarget creature can't be the target of spells or abilities your opponents control this turn. If this spell was kicked, that creature gets +4/+4 until end of turn." });
 
 const shock = () => card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
@@ -55,6 +56,22 @@ describe("can't be the target of ...", () => {
     const theirShock = inHand(s, opp, shock());
     expect(canCast(s, opp, theirShock, theirs)).toBe(false); // not hexproof (rulings)
     expect(canCast(s, ap, ids[1]!, theirs)).toBe(true);
+  });
+
+  it("Shanna: not the target of abilities its opponents control, but of spells and of its controller's abilities", () => {
+    supported(shanna);
+    const { s, ap, opp, ids } = setup([shock()]);
+    const sh = putOnBattlefield(s, ap, shanna);
+    const mine = putOnBattlefield(s, ap, pyromancer);
+    const theirs = putOnBattlefield(s, opp, pyromancer);
+    s.priority = opp;
+    expect(abilityProblem(s, opp, theirs, 0, [target(sh)])).toMatch(/target/);
+    expect(abilityProblem(s, opp, theirs, 0, [target(mine)])).toBeNull();
+    s.priority = ap;
+    expect(abilityProblem(s, ap, mine, 0, [target(sh)])).toBeNull();
+    const theirShock = inHand(s, opp, shock());
+    expect(canCast(s, opp, theirShock, sh)).toBe(true);
+    expect(canCast(s, ap, ids[0]!, sh)).toBe(true);
   });
 
   it("Spectral Shield stops spells, not abilities", () => {

@@ -212,6 +212,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = { ...(m[1] ? stackSpec("spell or ability") : { kind: "spell" as const, text: "target spell" }), singleTarget: true, text: `target spell${m[1] ?? ""} with a single target` };
     return [{ type: "changeTarget", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
   }
+  // "Whenever a player casts a spell, if no mana was spent to cast it, counter that spell." (Vexing Bauble)
+  if (ctx.castSpell && /^Counter (?:it|that spell)$/i.test(s)) return [{ type: "counterCause" }];
   // "Whenever a player casts a spell, counter it unless that player pays {1}."
   if (ctx.castSpell && (m = /^Counter (?:it|that spell) unless (?:that player|its controller) pays (.+)$/i.exec(s))) {
     const unless = parseUnlessPays(m[1]!, ctx);

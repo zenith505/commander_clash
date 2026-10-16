@@ -4,9 +4,9 @@ import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, activationCost, altCost, isTreasure, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
-import type { TargetChoice } from "./abilities";
+import type { SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
-import { COLORS, type Action, type CardDef, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
+import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** One way to make mana with a permanent, for planning. */
 interface Option {
@@ -35,6 +35,9 @@ interface Source {
   options: Option[];
   /** How many colors its free options can make: less flexible sources get used first. */
   colors: number;
+  /** The colors (and {C}) its free options can make. */
+  makes: ManaType[];
+  creature: boolean;
 }
 
 function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: ManaUse): Source[] {
@@ -57,11 +60,12 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
           return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
         });
       if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o));
-      return { id: o.id, options, colors: new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds)).size };
+      const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
+      return { id: o.id, options, colors: makes.length, makes, creature: isCreature(o.id) };
     })
     .filter((src) => src.options.length > 0)
     // Prefer tapping lands, then the least flexible sources, so creatures and rainbow sources stay available.
-    .sort((a, b) => Number(isCreature(a.id)) - Number(isCreature(b.id)) || a.colors - b.colors);
+    .sort((a, b) => Number(a.creature) - Number(b.creature) || a.colors - b.colors);
 }
 
 /** The activated mana abilities (CR 605.1a) a payment can use, as options. */
@@ -107,11 +111,47 @@ function namedColors(cost: ParsedCost): Set<ManaType> {
 }
 
 /**
+ * How much of each color the player's other cards ask for (their hand and command zone), for keeping those colors
+ * untapped: what's being paid for now is left out once.
+ */
+function colorDemand(s: GameState, pid: PlayerId, use: ManaUse): Map<ManaType, number> {
+  const p = player(s, pid);
+  const out = new Map<ManaType, number>();
+  let skip = use !== "other" && "spell" in use ? use.spell.oracleId : undefined;
+  for (const id of [...p.hand, ...p.command]) {
+    const o = s.objects[id];
+    if (!o) continue;
+    const d = defOf(s, o);
+    if (d.oracleId === skip) {
+      skip = undefined;
+      continue;
+    }
+    for (const sym of parseManaCost(d.manaCost).symbols) {
+      if (sym.kind === "colored" || sym.kind === "phyrexian" || sym.kind === "twoHybrid") out.set(sym.color, (out.get(sym.color) ?? 0) + 1);
+      if (sym.kind === "hybrid") for (const c of sym.options) out.set(c as ManaType, (out.get(c as ManaType) ?? 0) + 1 / sym.options.length);
+    }
+  }
+  return out;
+}
+
+/**
+ * What using a source gives up, for keeping the colors the player's other cards need untapped: each color it could make
+ * counts for how much it's needed, over how many unused sources make it (a little even when nothing asks for it, so the
+ * colors stay mixed). Paying {3}{B} with two Swamps and a black card in hand, other lands pay the generic mana and a Swamp
+ * is left for the black card.
+ */
+function scarcity(sources: Source[], used: Set<ObjectId>, demand: Map<ManaType, number>): (src: Source) => number {
+  const count = new Map<ManaType, number>();
+  for (const src of sources) if (!used.has(src.id)) for (const m of src.makes) count.set(m, (count.get(m) ?? 0) + 1);
+  return (src) => src.makes.reduce((sum, m) => sum + ((demand.get(m) ?? 0) + 0.01) / (count.get(m) ?? 1), 0);
+}
+
+/**
  * Pay `cost` with mana abilities that cost no mana, on top of `pool`. Greedy: each colored
  * symbol from the least flexible source that makes it, then hybrid, then generic, keeping
  * sources that make the colors in `avoid` for last.
  */
-function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid = new Set<ManaType>()) {
+function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: ManaPool, sources: Source[], used0: Set<ObjectId>, avoid = new Set<ManaType>(), demand = new Map<ManaType, number>()) {
   const pool = { ...pool0 };
   const used = new Set(used0);
   const chosen: Option[] = [];
@@ -130,11 +170,13 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
   // Colored mana the cost names: of two ways to use one source (Fertile Ground's "GW" and "GU"), the one adding more of it.
   const named = namedColors(cost);
   const useful = (x: Option) => x.adds.filter((m) => named.has(m)).length;
-  const free = (pred: (x: Option) => boolean) =>
-    sources
+  const free = (pred: (x: Option) => boolean) => {
+    const loss = scarcity(sources, used, demand);
+    return sources
       .filter((src) => !used.has(src.id))
-      .flatMap((src, order) => src.options.filter((x) => !x.cost && pred(x) && tapsFor(x, used)).map((x) => ({ x, order })))
-      .sort((a, b) => a.x.penalty - b.x.penalty || a.order - b.order || useful(b.x) - useful(a.x))[0]?.x;
+      .flatMap((src, order) => src.options.filter((x) => !x.cost && pred(x) && tapsFor(x, used)).map((x) => ({ x, order, src })))
+      .sort((a, b) => a.x.penalty - b.x.penalty || Number(a.src.creature) - Number(b.src.creature) || loss(a.src) - loss(b.src) || a.order - b.order || useful(b.x) - useful(a.x))[0]?.x;
+  };
   for (const sym of cost.symbols) {
     if (sym.kind !== "colored" && sym.kind !== "phyrexian" && sym.kind !== "twoHybrid") continue;
     const c = sym.color;
@@ -156,16 +198,20 @@ function planFree(cost: ParsedCost, extraGeneric: number, life: number, pool0: M
     if (have) reserved[have]--;
   }
   for (let guard = 0; guard < 60 && !payFromPool(cost, pool, extraGeneric, life); guard++) {
-    // Most mana for the least given up, colorless first, sources making colors we still need last.
+    // Most mana for the least given up, colorless first, sources making colors we still need last, then lands before
+    // creatures and what leaves the most colors available (scarcity).
+    const loss = scarcity(sources, used, demand);
     const best = sources
       .filter((src) => !used.has(src.id))
-      .flatMap((src, order) => src.options.filter((x) => !x.cost && tapsFor(x, used)).map((x) => ({ x, order })))
+      .flatMap((src, order) => src.options.filter((x) => !x.cost && tapsFor(x, used)).map((x) => ({ x, order, src })))
       .sort(
         (a, b) =>
           a.x.penalty - b.x.penalty ||
           Number(a.x.adds.some((m) => avoid.has(m))) - Number(b.x.adds.some((m) => avoid.has(m))) ||
           b.x.adds.length - a.x.adds.length ||
           Number(b.x.mana === "C") - Number(a.x.mana === "C") ||
+          Number(a.src.creature) - Number(b.src.creature) ||
+          loss(a.src) - loss(b.src) ||
           a.order - b.order,
       )[0]?.x;
     if (!best) return null;
@@ -225,8 +271,11 @@ export function planCast(
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
   const pool = poolFor(s, pid, use).pool;
   const rainbow = compileCard(d).countsColors && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
+  // "If {U} was spent to cast ~", adamant: ask for those colors where its generic or hybrid mana allows, as many as can be.
+  const wanted = compileCard(d).wantSpent && !payFromPool(cost, pool, extra, player(s, pid).life) ? wantCosts(cost, extra, compileCard(d).wantSpent!) : [];
   let taps: Action[] | null = null;
-  for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
+  for (const r of wanted) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
+  if (!taps) for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
   taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
@@ -262,6 +311,46 @@ function rainbowCosts(cost: ParsedCost, extra: number, pool: ManaPool): { cost: 
     }
   const inPool = (c: ParsedCost) => c.symbols.filter((sym) => sym.kind === "colored" && pool[sym.color] > 0).length;
   return out.sort((a, b) => a.extra - b.extra || inPool(b.cost) - inPool(a.cost));
+}
+
+/**
+ * The cost with some of its generic or hybrid mana asked for as the colors its text hopes were spent (`wantSpent`):
+ * every hope met first, then fewer. Paying that, castSpell's payment spends those colors (payFromPool's `want`).
+ */
+function wantCosts(cost: ParsedCost, extra: number, reqs: SpentReq[]): { cost: ParsedCost; extra: number }[] {
+  const g = splitGeneric(cost, extra);
+  // Each hope as the ways to meet it: "three mana of the same color" is any one color three times.
+  const ways = reqs.map((r): Partial<Record<Color, number>>[] => (r.sameColor ? COLORS.map((c) => ({ ...r.colors, [c]: Math.max(r.sameColor!, r.colors?.[c] ?? 0) })) : [r.colors ?? {}]));
+  const out: { cost: ParsedCost; extra: number; met: number }[] = [];
+  const seen = new Set<string>();
+  const tryNeed = (need: Partial<Record<Color, number>>, met: number) => {
+    const symbols = [...g.cost.symbols];
+    let generic = g.extra;
+    for (const c of COLORS) {
+      let have = symbols.filter((sym) => sym.kind === "colored" && sym.color === c).length;
+      for (let i = 0; i < symbols.length && have < (need[c] ?? 0); i++) {
+        const sym = symbols[i]!;
+        if (sym.kind === "hybrid" && sym.options.includes(c)) [symbols[i], have] = [{ kind: "colored", color: c }, have + 1];
+      }
+      const more = Math.max(0, (need[c] ?? 0) - have);
+      if (more > generic) return;
+      generic -= more;
+      for (let k = 0; k < more; k++) symbols.push({ kind: "colored", color: c });
+    }
+    const key = JSON.stringify([symbols, generic]);
+    if (generic === g.extra && symbols.every((sym, i) => sym === g.cost.symbols[i])) return;
+    if (!seen.has(key) && seen.add(key)) out.push({ cost: { ...g.cost, symbols }, extra: generic, met });
+  };
+  for (let mask = (1 << reqs.length) - 1; mask > 0; mask--) {
+    const picked = ways.filter((_, i) => mask & (1 << i));
+    const combos = picked.reduce<Partial<Record<Color, number>>[]>((acc, w) => acc.flatMap((a) => w.map((b) => {
+      const m = { ...a };
+      for (const [c, n] of Object.entries(b)) m[c as Color] = Math.max(m[c as Color] ?? 0, n ?? 0);
+      return m;
+    })), [{}]);
+    for (const need of combos) tryNeed(need, picked.length);
+  }
+  return out.sort((a, b) => b.met - a.met).map(({ cost, extra }) => ({ cost, extra }));
 }
 
 /** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */
@@ -383,12 +472,13 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
   const sources = manaSources(s, pid, [...(exclude ? [exclude] : []), ...alsoExclude], use);
   const unrestricted = sources.map((src) => ({ ...src, options: src.options.filter((x) => !x.restricted) }));
   const needColors = namedColors(cost);
+  const demand = colorDemand(s, pid, use);
   let pool: ManaPool = start.pool;
   const restricted: ManaPool = start.prefer;
   let used = new Set<ObjectId>();
   const taps: Action[] = [];
   for (let round = 0; round < 8; round++) {
-    const plan = planFree(cost, extraGeneric, p.life, pool, sources, used);
+    const plan = planFree(cost, extraGeneric, p.life, pool, sources, used, undefined, demand);
     if (plan) return [...taps, ...plan.chosen.map((x) => toAction(pid, x))];
     // Add one mana ability that costs mana: one making a color the cost names first, then the biggest net gain.
     const costed = sources
@@ -404,7 +494,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
       const others = unrestricted.filter((src) => src.id !== x.id);
       const free = { ...pool };
       for (const m of Object.keys(free) as ManaType[]) free[m] -= restricted[m];
-      const pay = planFree(x.cost!, 0, p.life, free, others, used, needColors);
+      const pay = planFree(x.cost!, 0, p.life, free, others, used, needColors, demand);
       if (!pay) continue;
       const next = payFromPool(x.cost!, pay.pool)!.pool;
       const nextRestricted = { ...restricted };
@@ -414,7 +504,7 @@ export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGen
         if (x.restricted) nextRestricted[m]++;
       }
       const option = { actions: [...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x)], pool: next, restricted: nextRestricted, used: new Set([...pay.used, x.id]) };
-      const done = !!planFree(cost, extraGeneric, p.life, next, sources, option.used);
+      const done = !!planFree(cost, extraGeneric, p.life, next, sources, option.used, undefined, demand);
       if (!pick || done) pick = option;
       if (done) break;
     }

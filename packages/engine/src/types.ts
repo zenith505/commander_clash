@@ -235,6 +235,8 @@ export interface GameObject {
   colorsSpent?: Color[];
   /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */
   manaSpent?: number;
+  /** The mana spent to cast it by type (CR 601.2h), kept by the permanent the spell becomes ("if {U} was spent"). */
+  spent?: Partial<Record<ManaType, number>>;
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
   phantomEvent?: string;
   /**
@@ -974,6 +976,8 @@ export interface TriggerEventInfo {
   treasureSpent?: number;
   /** A permanent's enters trigger: its spell's surge or spectacle cost was paid (CR 702.117a, 702.137a). */
   castAlt?: "surge" | "spectacle";
+  /** A permanent's enters trigger, or a cast trigger: the mana spent to cast that spell by type (CR 601.2h). */
+  spent?: Partial<Record<ManaType, number>>;
 }
 
 export interface Resolving {

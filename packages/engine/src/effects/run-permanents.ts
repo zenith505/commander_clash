@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { cardIdOf, defOf, isType, objIsType, power, toughness } from "../cards";
-import { clearCombat, draw, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent, whileTappedHolds } from "../game";
+import { clearCombat, draw, enterTogether, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
@@ -176,7 +176,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const armies = () => s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) === ctx.controller && characteristics(s, o).subtypes.includes("Army") && objIsType(s, o, "Creature"));
       if (!armies().length) {
         const army: TokenSpec = { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] };
-        for (let i = 0; i < tokensToCreate(s, ctx.controller, army, 1); i++) createToken(s, ctx.controller, army);
+        enterTogether(s, () => {
+          for (let i = tokensToCreate(s, ctx.controller, army, 1); i > 0; i--) createToken(s, ctx.controller, army);
+        });
       }
       const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
       if (!army) return;
@@ -224,7 +226,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (!nonland) return;
         const soldier: TokenSpec = { name: "Human Soldier", power: 1, toughness: 1, colors: ["W"], types: ["Creature"], subtypes: ["Human", "Soldier"], keywords: [] };
         const k = tokensToCreate(s, pid, soldier, 1);
-        for (let i = 0; i < k; i++) createToken(s, pid, soldier);
+        enterTogether(s, () => {
+          for (let i = 0; i < k; i++) createToken(s, pid, soldier);
+        });
         if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
         return;
       }
@@ -295,7 +299,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const spirit: TokenSpec = { name: "Spirit", power: n, toughness: n, colors: ["W"], types: ["Creature"], subtypes: ["Spirit"], keywords: [] };
       if (s.resolving) s.resolving.created = [];
-      for (let i = tokensToCreate(s, who, spirit, 1); i > 0; i--) createToken(s, who, spirit);
+      enterTogether(s, () => {
+        for (let i = tokensToCreate(s, who, spirit, 1); i > 0; i--) createToken(s, who, spirit);
+      });
       log(s, `${src} endures ${n}: ${player(s, who).name} creates a ${n}/${n} Spirit token.`);
       return;
     }

@@ -170,7 +170,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
     case "rollResult":
-      return s.resolving?.rolled?.result ?? ctx.event?.amount ?? 0;
+      return s.resolving?.rolled?.result ?? s.resolving?.item.rolled ?? ctx.event?.amount ?? 0;
     case "rollOther":
       return s.resolving?.rolled?.other ?? 0;
     case "snowSpent":

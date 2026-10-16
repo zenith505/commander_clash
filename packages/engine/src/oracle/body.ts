@@ -882,8 +882,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const whenDo = /^When you do, (.+)$/.exec(s);
     if (whenDo) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence") || si !== sentences.length - 1) return null;
-      const reflexive = parseBody(whenDo[1]!.charAt(0).toUpperCase() + whenDo[1]!.slice(1), {
+      // "Roll a d20. When you do, put X +1/+1 counters on each of up to two target creatures, where X is the result"
+      // (Ancient Bronze Dragon): the roll always happens; the result goes with the reflexive trigger.
+      const rolled = prev?.type === "roll" && !prev.chooseOne && effects.length === 1;
+      if ((!rolled && (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence"))) || si !== sentences.length - 1) return null;
+      // Its own "where X is ..." goes with it.
+      const whenText = where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!;
+      const reflexive = parseBody(`${whenText.charAt(0).toUpperCase()}${whenText.slice(1)}.`, {
         ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
         ...(ctx.selfIt ? { selfIt: true } : {}),
         ...(ctx.selfCard ? { selfCard: true } : {}),
@@ -892,7 +897,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         ...(ctx.defending ? { defending: true } : {}),
       });
       if (!reflexive || reflexive.modal) return null;
-      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
     // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."

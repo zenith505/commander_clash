@@ -102,6 +102,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         ...(item.subject ? { subject: item.subject } : {}),
         ...(item.event ? { event: item.event } : {}),
         ...(item.x ? { x: item.x } : {}),
+        ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
       });
       return;
     }

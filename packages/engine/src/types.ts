@@ -504,6 +504,8 @@ export interface StackItem {
   sourceUntaps?: number;
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
+  /** See PendingTrigger.rolled. */
+  rolled?: number;
   /**
    * In `castItems` only: the spell's mana value as it was put on the stack, X included (CR 202.3e), for when it has left
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
@@ -590,6 +592,8 @@ export interface PendingTrigger {
   lki?: LastKnown;
   /** For an enters trigger of a permanent that was a spell with X: that X (CR 107.3m). */
   x?: number;
+  /** A reflexive trigger after a roll ("roll a d20. When you do, ... where X is the result"): that result. */
+  rolled?: number;
   kicked?: number[];
   colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */

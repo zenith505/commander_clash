@@ -37,6 +37,7 @@ function inYard(s: GameState, pid: PlayerId, def: CardDef) {
 const edict = card("Myrkul's Edict", "Sorcery", "{1}{B}", { oracleText: "Roll a d20.\n1—9 | Choose an opponent. That player sacrifices a creature of their choice.\n10—19 | Each opponent sacrifices a creature of their choice.\n20 | Each opponent sacrifices a creature with the greatest power among creatures that player controls." });
 const cone = card("Cone of Cold", "Sorcery", "{3}{U}", { oracleText: "Roll a d20.\n1—9 | Tap all creatures your opponents control.\n10—19 | Tap all creatures your opponents control. Those creatures don't untap during their controllers' next untap steps.\n20 | Tap all creatures your opponents control. Those creatures don't untap during their controllers' next untap steps. Until your next turn, creatures your opponents control enter tapped." });
 const scion = card("Scion of Stygia", "Creature — Tiefling Shaman", "{2}{U}", { power: "2", toughness: "1", keywords: ["Flash"], oracleText: "Flash\nCone of Cold — When this creature enters, choose target creature an opponent controls, then roll a d20.\n1—9 | Tap that creature.\n10—20 | Tap that creature. It doesn't untap during its controller's next untap step." });
+const bronze = card("Ancient Bronze Dragon", "Creature — Elder Dragon", "{5}{G}{G}", { power: "7", toughness: "7", keywords: ["Flying"], oracleText: "Flying\nWhenever this creature deals combat damage to a player, roll a d20. When you do, put X +1/+1 counters on each of up to two target creatures, where X is the result." });
 const silver = card("Ancient Silver Dragon", "Creature — Elder Dragon", "{6}{U}{U}", { power: "8", toughness: "8", keywords: ["Flying"], oracleText: "Flying\nWhenever this creature deals combat damage to a player, roll a d20. Draw cards equal to the result. You have no maximum hand size for the rest of the game." });
 const counsel = card("Praetor's Counsel", "Sorcery", "{5}{G}{G}{G}", { oracleText: "Return all cards from your graveyard to your hand. Exile Praetor's Counsel. You have no maximum hand size for the rest of the game." });
 const wisdom = card("Wisdom of Ages", "Sorcery", "{4}{U}{U}{U}", { oracleText: "Return all instant and sorcery cards from your graveyard to your hand. You have no maximum hand size for the rest of the game.\nExile Wisdom of Ages." });
@@ -48,7 +49,7 @@ const big = bear({ name: "Test Giant", power: "5", toughness: "5" });
 
 describe("dice tables", () => {
   it("parse", () => {
-    supported(edict, cone, scion, silver, counsel, wisdom, troll, puzzlebox);
+    supported(edict, cone, scion, bronze, silver, counsel, wisdom, troll, puzzlebox);
     expect(compileCard(troll).activated[0]).toMatchObject({ zone: "graveyard" });
     expect(compileCard(troll).activated[0]!.exileSelf).toBeUndefined();
     expect(compileCard(puzzlebox).activated[0]!.mana).toBeTruthy();
@@ -121,6 +122,22 @@ describe("dice tables", () => {
     expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
     s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] }));
     expect(s.objects[theirs]).toMatchObject({ tapped: true, skipNextUntap: true });
+  });
+});
+
+describe("a reflexive trigger after a roll (CR 603.12)", () => {
+  it("Ancient Bronze Dragon: the targets are chosen after the roll, and X is its result", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const d = putOnBattlefield(s0, ap, bronze);
+    const b = putOnBattlefield(s0, ap, bear());
+    rig(s0, 20, [13]);
+    s0.triggerQueue.push({ sourceId: d, sourceCardId: bronze.oracleId, controller: ap, index: 0, sourceZc: 0, event: { player: opp, amount: 7 } });
+    let s = settle(s0);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    expect(s.log.some((l) => l.text.includes("rolls a d20 for Ancient Bronze Dragon: 13."))).toBe(true);
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: d }, { kind: "object", id: b }] }));
+    expect(s.objects[d]!.counters["+1/+1"]).toBe(13);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(13);
   });
 });
 

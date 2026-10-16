@@ -1114,6 +1114,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.subject ? { subject: t.subject } : {}),
     ...(t.lki ? { lki: t.lki } : {}),
     ...(t.x ? { x: t.x } : {}),
+    ...(t.rolled !== undefined ? { rolled: t.rolled } : {}),
     ...(t.kicked ? { kicked: t.kicked } : {}),
     ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}),
     ...(t.event ? { event: t.event } : {}),

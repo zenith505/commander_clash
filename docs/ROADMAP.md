@@ -1,6 +1,6 @@
 # Roadmap
 
-17,776 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,874 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -68,24 +68,41 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      "Equip—Pay {3} or discard a card" (Bloodthorn Flail) is two equip abilities, one for each cost.
    - "Add {B} or {G} for each" (Culling Ritual), Deadly Tempest's "each player loses life equal to the number of creatures
      they controlled that were destroyed this way".
+   Left from the Cases round (Cases, enters with a number of counters, dies-return tapped, several cards entering
+   together, "can't be the target of"):
+   - Cases (9 of 13 legal supported) still out: Burning Masks ("Choose one of them. You may play that card this turn"),
+     Gateway Express ("Each creature you control deals 1 damage to that creature"), Pilfered Proof ("turned face up", a
+     Clue in its token replacement), Uneaten Feast (granting "You may cast this card from your graveyard"); Case File
+     Auditor's "When ~ enters and whenever you solve a Case" (the engine has a "solved" event for it).
+   - "Enters with a number of counters equal to" still out: "three minus X" (Slumbering Trudge), Ulamog; Kurbis, Marath,
+     Dyadrine and Gyrus are blocked on other lines.
+   - Dies-return still out: Unstoppable Slasher, Not Dead After All, Vincent's Limit Break, Phytotitan ("at the beginning
+     of their next upkeep").
+   - Several cards from among the top ones: "with total mana value N or less" (Ao, Michelangelo's Technique, Smelting
+     Vat), two destinations in one sentence (Bounty of Skemfar, Wakanda Forever!), "tapped and attacking" (Arthur, Jet,
+     Winota, Owlbear Cub), "where X is" in the look (Ajani Outland Chaperone, Famished Worldsire, Emergent Woodwurm), the X
+     of an enters or cast trigger (Knickknack Ouphe, Genesis Hydra), exiled top cards (Xenagos, Tezzeret), "that many
+     cards" (Gishath), "If you put fewer than two lands" (Expand the Sphere), "land and/or legendary permanent cards"
+     (Kamahl's Druidic Vow), "When a creature is put onto the battlefield this way" (Vivien's Invocation, Gilgamesh).
+     Tokens created together still enter one at a time (only cards moved by one instruction enter together).
+   - "Can't be the target of" still out: abilities only (Shanna, Artifact Ward), "unless it attacked or blocked this turn"
+     (Lurker), "can't be enchanted by other Auras" (Anti-Magic Aura), Wall of Shadows. A spell copy's new targets
+     (chooseCopyTargets) aren't checked against protection or these restrictions: it passes no source.
+   - Autopay may tap every Swamp for generic mana and leave no {B} for a second black spell (seen with 14 mixed lands
+     paying {3}{B}); worth checking.
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
      (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and
      Alan). "If you cast it" works on enters triggers only (The One Ring's protection is out).
-   - Suspect still out: Cases (CR 719: "To solve —", Case of the Stashed Skeleton), "you may suspect one of the other
-     creatures" (Frantic Scapegoat), "as long as ~ remains on the battlefield, that creature is also goaded" (Hot Pursuit),
-     "enters with a number of counters equal to ..." (Investigator's Journal; even "the number of creatures you control"
-     doesn't parse there), Nelly Borca's "you and the controller of those creatures each draw a card".
+   - Suspect still out: "you may suspect one of the other creatures" (Frantic Scapegoat), "as long as ~ remains on the
+     battlefield, that creature is also goaded" (Hot Pursuit), Nelly Borca's "you and the controller of those creatures
+     each draw a card".
    - Crime still out: "exile up to one target black card from your graveyard and copy it" (Kaervek).
    - Conditional flash still out: "five or more mana values among cards in your graveyard" (Graveyard Shift), "two or more
      instant and/or sorcery cards in your graveyard" (spell mastery: Swift Reckoning). "~ has flash as long as" on a
      permanent stays out on purpose (it doesn't work in your hand, CR 113.6e); "This spell has flash" does.
    - "Your choice of" keywords works once per ability, on "gain(s)"; "It gains your choice of" after another instruction
      (Hungering Puppetbeast) is out.
-   - "Look at the top N cards. You may put a creature card from among them onto the battlefield" takes one card only;
-     several at once would need them to enter at the same time, which the dig doesn't do yet.
-   - "When ~ dies, return it to the battlefield tapped under its owner's control" parses as a body but the trigger is
-     still rejected; "untapped" works (Presumed Dead).
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
    epic, free casts from hand, timing points, overload leftovers):
    - Overload still out: Dragonshift, Fangs of Kalonia, March of Progress, Winds of Abandon, Mizzix's Mastery (copy an exiled card and

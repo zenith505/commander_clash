@@ -113,6 +113,15 @@ export type Count =
   | { kind: "eventAmount" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
   | { kind: "colorsSpent" }
+  /**
+   * "Enters with a number of +1/+1 counters on it equal to the amount of mana spent to cast it" (Marath): only in an
+   * "enters with" (the spell it was); 0 if it wasn't cast.
+   */
+  | { kind: "manaSpent" }
+  /** "The greatest number of creatures a player controls" (Investigator's Journal), `opponents`: "an opponent controls". */
+  | { kind: "greatestControlled"; filter: TargetSpec; opponents?: true }
+  /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
+  | { kind: "greatestDrawn" }
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
   | { kind: "treasureSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
@@ -448,6 +457,20 @@ export interface TokenSpec {
  * One change made by a continuous effect. Each kind belongs to one layer (CR 613.1),
  * see `layerOf` in layers.ts. An effect can have parts in several layers (CR 613.6).
  */
+/**
+ * What can't target a permanent: spells and abilities (`spells`: only spells; `subtype`: "Aura spells") whose source matches. `opponents`: controlled
+ * by an opponent of the permanent's controller; `colors`: from a source of one of these colors; `notColors`: from a source
+ * that's none of these ("nongreen"). A spell's color is its own; an ability's is its source's (CR 113.7a).
+ */
+export interface Untargetable {
+  opponents?: true;
+  spells?: true;
+  colors?: Color[];
+  notColors?: Color[];
+  /** "Aura spells". */
+  subtype?: string;
+}
+
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
@@ -502,6 +525,8 @@ export type Modification =
   | { kind: "mustAttackPlayer"; player: PlayerId }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
+  /** "Can't be the target of spells or abilities your opponents control", "... of black spells or abilities from black sources" (CR 115.4). */
+  | { kind: "untargetable"; by: Untargetable }
   /**
    * "Can't be blocked except by creatures with flying", "... except by black creatures", "... except by Walls and/or
    * creatures with flying" (CR 509.1b): only a creature matching one of `filters` can block it.
@@ -718,6 +743,18 @@ export type StaticCondition =
   | { kind: "attackedThisTurn" }
   /** "If you've committed a crime this turn" (CR 700.13). */
   | { kind: "committedCrime" }
+  /** A Case's solved designation (CR 719.3b): "Solved — [ability]" (702.169); `not`: a "To solve" trigger's "this Case is not solved" (719.3a). */
+  | { kind: "solved"; not?: true }
+  /** "Three or more creature cards were put into graveyards from anywhere this turn": cards, anyone's, with all of `types` (as cards in the graveyard). */
+  | { kind: "cardsToGraveyard"; n: number; types: string[] }
+  /** "Three or more sources you controlled dealt damage this turn": different sources, as the objects they were (CR 400.7), controlled by you as they dealt it. */
+  | { kind: "sourcesDealtDamage"; n: number }
+  /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
+  | { kind: "castCount"; n: number; filter: TargetSpec }
+  /** "There are five colors among permanents you control" (CR 105.2). */
+  | { kind: "colorsAmong"; n: number }
+  /** "You've gained 5 or more life this turn": in total. */
+  | { kind: "lifeGainedThisTurn"; n: number }
   /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
@@ -878,6 +915,8 @@ export type Effect =
       haste?: "endOfTurn" | "game";
       /** "Exile it at the beginning of the next end step", "Sacrifice it ...": a delayed trigger for it (CR 603.7), while it's that object. */
       atEndStep?: "exile" | "sacrifice";
+      /** "With a +1/+1 counter on it" (Undying Malice): counters it enters with (CR 614.1c). */
+      counters?: Record<string, number>;
     }
   /**
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
@@ -1195,6 +1234,8 @@ export type Effect =
   | { type: "becomeSaddled"; what: ObjRef }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
   | { type: "classLevel"; n: number }
+  /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
+  | { type: "solve" }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
@@ -1250,7 +1291,7 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak"; rest: "graveyard" | "bottom" | "shuffle"; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true }
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak"; rest: "graveyard" | "bottom" | "shuffle" | "hand"; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */

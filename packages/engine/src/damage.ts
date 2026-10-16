@@ -94,6 +94,10 @@ export function dealDamage(
     }
     return 0;
   }
+  // Case of the Burning Masks: each source once, as the object it was (CR 400.7), under its controller as it dealt damage.
+  const key = src.ref ? `${src.ref.object}@${src.ref.zc}` : src.name;
+  const sources = (((s.turnLog ??= {}).damageSources ??= {})[src.controller] ??= []);
+  if (!sources.includes(key)) sources.push(key);
   if ("object" in to) {
     const o = to.object;
     const c = characteristics(s, o);

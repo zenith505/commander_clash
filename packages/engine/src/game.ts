@@ -16,7 +16,7 @@ import { addMana, canPayFromPool, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
-import { CREATURE_TYPES } from "./keywords";
+import { CREATURE_TYPES, type SourceQuality } from "./keywords";
 import {
   COLORS,
   RulesError,
@@ -507,6 +507,31 @@ function zoneList(s: GameState, o: GameObject): ObjectId[] | null {
   }
 }
 
+/** The permanents entering together while `enterTogether` runs, kept off the battlefield list until all have entered. */
+type EnteringTogether = { ids: ObjectId[]; events: Parameters<typeof fireEvent>[1][] };
+let together: EnteringTogether | null = null;
+
+/**
+ * Several cards put onto the battlefield at the same time by one instruction (Collected Company, Genesis Wave): each
+ * enters without seeing the others, so their replacement effects and "enters with" counts don't count each other
+ * (CR 614.12), nor can one enter as a copy of another; then they're all there before anything triggers, so each one's
+ * enters abilities see the others enter too (CR 603.6a). `run` makes the moves; one at a time, or nested, is as before.
+ */
+export function enterTogether(s: GameState, run: () => void) {
+  if (together) return run();
+  const batch: EnteringTogether = { ids: [], events: [] };
+  together = batch;
+  try {
+    run();
+  } finally {
+    together = null;
+    s.battlefield = [...batch.ids.filter((id) => s.objects[id]?.zone === "battlefield").reverse(), ...s.battlefield];
+    invalidateCharacteristics(s);
+    for (const c of s.entersChoices ?? []) if (batch.ids.includes(c.id) && batch.ids.length > 1) c.together = batch.ids.filter((id) => id !== c.id);
+  }
+  for (const ev of batch.events) fireEvent(s, ev);
+}
+
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
 export function moveObject(
   s: GameState,
@@ -629,6 +654,7 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.colorsSpent = undefined;
+    o.manaSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
@@ -666,6 +692,7 @@ export function moveObject(
   o.monstrous = undefined;
   o.suspected = undefined; // CR 701.60a
   o.classLevel = undefined; // CR 716.2b
+  o.solved = undefined; // CR 719.3b
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
@@ -708,7 +735,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) ? undefined : printedCounters;
-  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length })) : 0;
+  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0 })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
@@ -732,6 +759,12 @@ export function moveObject(
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
+    // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
+    if (together && o.zone === "battlefield") {
+      s.battlefield = s.battlefield.filter((x) => x !== id);
+      together.ids.push(id);
+      invalidateCharacteristics(s);
+    }
   }
   // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
   // triggers say "put into a graveyard" or "leaves the battlefield".
@@ -748,6 +781,8 @@ export function moveObject(
   if (to === "graveyard" && !o.isToken && !o.spellCopy) {
     const yards = ((s.turnLog ??= {}).toGraveyard ??= {});
     yards[o.owner] = (yards[o.owner] ?? 0) + 1;
+    const types = (s.turnLog.toGraveyardTypes ??= {});
+    for (const t of defOf(s, o).types) types[t] = (types[t] ?? 0) + 1;
   }
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
@@ -798,7 +833,11 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
   const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
-  if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
+  if (!options.length) {
+    const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
+    if (together) together.events.push(ev);
+    else fireEvent(s, ev);
+  }
 }
 
 /** What a permanent entering "as a copy of" something could copy: other permanents on the battlefield (not targeted). */
@@ -819,7 +858,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
   }
   const printed = compileCard(defOf(s, o));
   const ewc = printed.entersWithCounters;
-  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x })) : 0;
+  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0 })) : 0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 
@@ -836,24 +875,26 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
     const c = s.objects[l.id];
     return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
   });
-  for (const l of back) {
-    const c = obj(s, l.id);
-    const d = defOf(s, c);
-    // It returns to the zone it was exiled from (CR 610.3): Kitesail Freebooter's card goes back to its owner's hand.
-    if (l.hand) {
-      log(s, `${d.name} returns to its owner's hand (${source} left).`);
-      moveObject(s, c.id, "hand");
-      continue;
+  enterTogether(s, () => {
+    for (const l of back) {
+      const c = obj(s, l.id);
+      const d = defOf(s, c);
+      // It returns to the zone it was exiled from (CR 610.3): Kitesail Freebooter's card goes back to its owner's hand.
+      if (l.hand) {
+        log(s, `${d.name} returns to its owner's hand (${source} left).`);
+        moveObject(s, c.id, "hand");
+        continue;
+      }
+      const r = (s.untilReturns ??= { auras: [], returned: [] });
+      if (d.subtypes.includes("Aura")) {
+        r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source });
+        continue;
+      }
+      log(s, `${d.name} returns to the battlefield (${source} left).`);
+      moveObject(s, c.id, "battlefield", { controller: c.owner });
+      r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
     }
-    const r = (s.untilReturns ??= { auras: [], returned: [] });
-    if (d.subtypes.includes("Aura")) {
-      r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source });
-      continue;
-    }
-    log(s, `${d.name} returns to the battlefield (${source} left).`);
-    moveObject(s, c.id, "battlefield", { controller: c.owner });
-    r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
-  }
+  });
 }
 
 /**
@@ -1067,6 +1108,8 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
   player(s, pid).life += n;
   const gained = ((s.turnLog ??= {}).gainedLife ??= []);
   if (!gained.includes(pid)) gained.push(pid);
+  const total = (s.turnLog.lifeGained ??= {});
+  total[pid] = (total[pid] ?? 0) + n;
   fireEvent(s, { type: "lifeGained", player: pid, amount: n });
 }
 
@@ -2185,11 +2228,13 @@ export function castProblem(
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
+  // A spell's colors are its card's (CR 702.16b), and it's a spell ("can't be the target of spells").
+  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, spell: true };
   if (spell?.modal) {
     if (modes === undefined) {
-      if (!canChooseModes(s, spell, pid, d)) return `${d.name} has no mode that can be chosen`;
+      if (!canChooseModes(s, spell, pid, sq)) return `${d.name} has no mode that can be chosen`;
     } else {
-      const mp = modesProblem(s, spell, modes, pid, d, bothModes(s, pid, spell, choices));
+      const mp = modesProblem(s, spell, modes, pid, sq, bothModes(s, pid, spell, choices));
       if (mp) return mp;
     }
   }
@@ -2211,8 +2256,8 @@ export function castProblem(
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
     // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
-    const any = () => hasLegalTargetsFor(s, specs, pid, d) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, spellTargetSpecs(d, modes, ALL_PAID), pid, d));
-    const tp = targets ? targetProblem(s, specs, targets, pid, d) : any() ? null : `${d.name} has no legal targets`;
+    const any = () => hasLegalTargetsFor(s, specs, pid, sq) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, spellTargetSpecs(d, modes, ALL_PAID), pid, sq));
+    const tp = targets ? targetProblem(s, specs, targets, pid, sq) : any() ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
   const tax = fromCommand ? commanderTax(p, o) : 0;
@@ -2577,6 +2622,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
+  o.manaSpent = manaSpent || undefined;
   o.treasureSpent = paid.treasure || undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
@@ -3867,7 +3913,8 @@ function askEntersChoice(s: GameState): boolean {
     }
     if (c.what === "copy") {
       // "You may have ~ enter as a copy of ...": any of them, or none (CR 707.5).
-      const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter);
+      // Not one that entered at the same time (CR 614.12, rulings on Clone).
+      const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter).filter((id) => !c.together?.includes(id));
       const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...ids, "none"], labels: [...labels, "Don't copy"], objectId: o.id };
       return true;

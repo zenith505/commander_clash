@@ -1,11 +1,11 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, amt, num, singularWord } from "../words";
+import { NUM, COUNTER, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
-import { parseStaticCondition } from "../statics";
+import { parseStaticCondition, parseUntargetable } from "../statics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -177,8 +177,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it
   // became (CR 701.60a).
-  if (ctx.selfCard && (m = /^[Rr]eturn (?:it|~) to the battlefield under (your|its owner's) control( and suspect it)?$/.exec(s)))
-    return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] === "its owner's" ? { owner: true } : {}) }, ...(m[2] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : [])];
+  // "Return it to the battlefield tapped under its owner's control" (Supernatural Stamina, Fungal Fortitude), "... with a
+  // +1/+1 counter on it" (Undying Malice; it enters with it, CR 614.1c).
+  if (ctx.selfCard && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)? under (your|its owner's) control(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?$`).exec(s)))
+    return [
+      { type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] ? { tapped: true } : {}), ...(m[2] === "its owner's" ? { owner: true } : {}), ...(m[3] ? { counters: { [counterKind(m[4]!)]: num(m[3]) } } : {}) },
+      ...(m[5] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : []),
+    ];
   // "When enchanted creature dies, return that card to the battlefield under your control" (False Demise): the card
   // that went to the graveyard, if it's still there (CR 400.7); a token is gone (CR 111.7).
   if ((m = /^Return (that card|it) to the battlefield( tapped)? under (your|its owner's) control$/i.exec(s)) && ctx.subjectLeft) {
@@ -257,6 +262,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const mods: Modification[] =
       m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : m[2] === "be blocked" ? [{ kind: "cantBeBlocked" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
     return what ? [{ type: "continuous", what, mods, duration: m[3] === "this turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
+  // "Target creature can't be the target of spells or abilities your opponents control this turn" (Vines of Vastwood): the
+  // opponents of whoever controls the effect, its spell's controller (rulings on Vines of Vastwood).
+  if ((m = /^(.+?) can't be the target of (.+) this turn$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const by = parseUntargetable(m[2]!);
+    return what && by ? [{ type: "continuous", what, mods: [{ kind: "untargetable", by }], duration: "endOfTurn" }] : null;
   }
   // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
   // of their choice", "return a land you control to its owner's hand" (CR 701.21).

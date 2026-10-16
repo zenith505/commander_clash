@@ -14,6 +14,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
 
   // A class level bar's activated ability (CR 716.2a; see striations.ts): only in an activated ability of its own.
   if ((m = /^~'s level becomes (\d+)$/.exec(s))) return ctx.activated ? [{ type: "classLevel", n: Number(m[1]) }] : null;
+  // A Case's "To solve" trigger (CR 719.3a; see compile.ts): "this Case becomes solved".
+  if (s === "~ becomes solved") return [{ type: "solve" }];
   // "Tap that creature and it doesn't untap during its controller's next untap step" (Kashi-Tribe Warriors).
   if ((m = /^Tap (target .+?|that creature|it) and it doesn't untap during its controller's next untap step$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -251,7 +253,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Target land you control becomes a 3/3 Elemental creature with haste that's still a land" (Brave the Wilds): with no
   // duration, for as long as it stays on the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
-  if ((m = /^(target .+?) becomes? (an? \d+\/\d+ .+)$/i.exec(s))) {
+  // "Put four +1/+1 counters on target noncreature artifact. It becomes a 0/0 Bird creature" (Case of the Filched Falcon): the target.
+  if ((m = /^(target .+?|It) becomes? (an? \d+\/\d+ .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

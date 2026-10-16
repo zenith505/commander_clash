@@ -37,6 +37,7 @@ import {
   spellTargets,
   offerTargets,
   sourceQuality,
+  spellQuality,
   castHow,
   isSummoningSick,
   legalActions,
@@ -493,6 +494,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const nextSpec = targeting ? targeting.specs[targeting.chosen.length] : undefined;
   // "Another target creature" on a permanent's ability can't be that permanent.
   const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : undefined;
+  // The spell's own colors, or the ability's source's, for protection and "can't be the target of black spells" (CR 115.4).
+  const castObj = targeting?.mode === "cast" && s ? s.objects[targeting.draft.objectId] : undefined;
+  const targetQuality = !s ? undefined : castObj ? spellQuality(s, cardIdOf(castObj)) : targetSource ? sourceQuality(s, targetSource) : undefined;
   const runEnd = targeting && targeting.mode !== "change" ? perOpponentRun(targeting.specs, targeting.chosen.length) : 0;
   const inRun = !!targeting && runEnd > targeting.chosen.length;
   /** In a run of per-opponent slots, the slot this target would fill: the one for its controller (CR 601.2c). */
@@ -501,7 +505,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const from = targeting.chosen.length;
     for (let j = from; j < runEnd; j++) {
       const before = [...targeting.chosen, ...Array.from({ length: j - from }, (_, k) => targeting.ahead?.[from + k] ?? NONE)];
-      if (canChooseTarget(s, targeting.specs, before, j, c, HUMAN, undefined, targetSource)) return j;
+      if (canChooseTarget(s, targeting.specs, before, j, c, HUMAN, targetQuality, targetSource)) return j;
     }
     return -1;
   };
@@ -513,7 +517,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ? pending?.kind === "changeTarget" && pending.options.some((o) => sameTarget(o, c))
       : inRun
         ? runSlot(c) >= 0
-        : canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, undefined, targetSource));
+        : canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, targetQuality, targetSource));
 
   function pickTarget(c: TargetChoice) {
     if (!s || !targeting || !nextSpec) return;
@@ -2077,6 +2081,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {o.suspected !== undefined && (
           <span className="chip other" title="Suspected: it has menace and can't block, until it leaves the battlefield or stops being suspected.">
             Suspected
+          </span>
+        )}
+        {o.solved && (
+          <span className="chip other" title="Solved: this Case's Solved ability works now. It stays solved until it leaves the battlefield.">
+            Solved
           </span>
         )}
         {o.classLevel !== undefined && (

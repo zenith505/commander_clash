@@ -10,7 +10,7 @@ import { RulesError, type CardDef, type Chosen, type Color, type GameObject, typ
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import { addMana } from "../spend";
-import { objectMatches, bindChosen, sourceQuality, isLegalTarget, lesserPowerOk } from "./targeting";
+import { objectMatches, bindChosen, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runDungeonsEffect } from "./run-dungeons";
@@ -82,7 +82,7 @@ export function gifteeOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
  */
 export function beginResolution(s: GameState, item: StackItem, body: AbilityBody): Resolution {
   const targets = item.targets ?? [];
-  const src = item.kind === "spell" ? sourceQuality(s, undefined, (s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  const src = item.kind === "spell" ? spellQuality(s, s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined) : sourceQuality(s, item.sourceId, item.sourceCardId);
   const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, spec, targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId));
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
@@ -505,6 +505,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "tapOrUntap":
     case "becomeSaddled":
     case "classLevel":
+    case "solve":
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":

@@ -232,13 +232,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       if (!choose[3]) si++;
       continue;
     }
+    // "Look at the top twenty cards of your library, put any number of land cards from among them onto the battlefield
+    // tapped, then shuffle" (Through the Forest Gate): the same as three sentences.
+    const joined = new RegExp(`^((?:Look at|Reveal) the top ${NUMX} cards of your library), (put .+ from among them .+), then shuffle$`).exec(s);
+    if (joined && !dig) {
+      sentences.splice(si, 1, joined[1]!, joined[3]!.charAt(0).toUpperCase() + joined[3]!.slice(1), "Shuffle");
+      s = sentences[si]!;
+    }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
     if (look && !dig) {
       dig = { type: "dig", n: amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
       continue;
     }
     if (dig) {
-      const done = parseDig(s, dig);
+      const done = parseDig(s, dig, ctx);
       if (!done) return null;
       if (done === "more") continue;
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
@@ -551,7 +558,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".
-    if (/^Until end of turn, /.test(s)) s = `${s.replace(/^Until end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
+    if (/^[Uu]ntil end of turn, /.test(s)) s = `${s.replace(/^[Uu]ntil end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
     // "Target creature you control gains protection from the color of your choice until end of turn": the
     // color is chosen as it resolves (CR 608.2d), after the target was chosen on casting.
     // "Target creature gains your choice of menace or lifelink until end of turn", "... flying, vigilance, deathtouch, or
@@ -787,8 +794,14 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   const support = /^[Ss]upport (\d+)$/.exec(s);
   if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
   const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
-  const last = fx?.[fx.length - 1];
-  if (fx) {
+  if (fx) noteLast(ctx, fx);
+  return fx;
+}
+
+/** What "it", "they" and "those creatures" can mean after these effects (the token just created, the group changed). */
+function noteLast(ctx: Ctx, fx: Effect[]) {
+  const last = fx[fx.length - 1];
+  {
     // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
     // One card put onto the battlefield: "Put a +1/+1 counter on it", "It gains haste until your next turn".
@@ -801,7 +814,6 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
   }
-  return fx;
 }
 
 /**
@@ -996,6 +1008,8 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
   for (const p of parts) {
     const fx = parseSentence(p.charAt(0).toUpperCase() + p.slice(1), ctx);
     if (!fx) return null;
+    // "Create a 2/1 black Skeleton creature token and suspect it" (Case of the Stashed Skeleton): it's the token.
+    noteLast(ctx, fx);
     out.push(...fx);
   }
   return out;

@@ -1,4 +1,4 @@
-import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, Range, TargetChoice, TargetSpec } from "../abilities";
+import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
@@ -63,9 +63,23 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.suspected && o.suspected === undefined) return false;
   if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
+  if (targeting && c.untargetable?.some((u) => untargetableBy(u, controller, src))) return false;
   // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d).
   if (src && protectedFrom(c.keywords, src)) return false;
   return true;
+}
+
+/**
+ * "Can't be the target of [what]": by a spell or ability `controller` controls, from a source like `src` (CR 115.4). With
+ * no source given (the UI's highlights), only who controls it is checked, as with protection; casting checks it all.
+ */
+function untargetableBy(u: Untargetable & { of: PlayerId }, controller: PlayerId, src?: SourceQuality): boolean {
+  if (u.opponents && u.of === controller) return false;
+  if (!src) return !u.spells && !u.colors && !u.notColors;
+  if (u.spells && !src.spell) return false;
+  if (u.subtype && !src.subtypes?.includes(u.subtype)) return false;
+  if (u.colors && !u.colors.some((col) => src.colors.includes(col))) return false;
+  return !u.notColors?.some((col) => src.colors.includes(col));
 }
 
 /**
@@ -133,6 +147,9 @@ export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): Sou
   const d = cardId ? s.cards[cardId] : undefined;
   return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes } : { colors: [] };
 }
+
+/** A spell's own characteristics (its card's) as a source of targeting: a spell (CR 113.7a doesn't apply to it). */
+export const spellQuality = (s: GameState, cardId?: string): SourceQuality => ({ ...sourceQuality(s, undefined, cardId), spell: true });
 
 /** Filters checked against a card's printed characteristics, for spells and cards in graveyards. */
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {

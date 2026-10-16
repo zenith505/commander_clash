@@ -673,6 +673,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0bbcb563-09b3-499d-a9cc-3a6d7501dd81",
+  "name": "Collected Company",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top six cards of your library. Put up to two creature cards with mana value 3 or less from among them onto the battlefield. Put the rest on the bottom of your library in any order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2020-11-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "22a78443-db21-4656-b38a-e3e3186fd94b",
   "name": "Collective Brutality",
   "manaCost": "{1}{B}",
@@ -1664,6 +1690,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "26f6cc1e-d85e-45a3-a1ed-7f09d7cfc7df",
+  "name": "Gaea's Revenge",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "This spell can't be countered.\nHaste\nThis creature can't be the target of nongreen spells or abilities from nongreen sources.",
+  "power": "8",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "m11",
+  "releasedAt": "2010-07-16",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dfe8f77a-cc26-438b-92ae-2ca7a91f813b",
   "name": "Galvanizing Sawship",
   "manaCost": "{5}{R}",
@@ -1692,6 +1750,32 @@
   "set": "eoe",
   "releasedAt": "2025-08-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5748ebf1-24e3-499d-ab7c-c2cebd462a24",
+  "name": "Giant Growth",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Target creature gets +3/+3 until end of turn.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msh",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3752,6 +3836,37 @@
   "set": "frf",
   "releasedAt": "2015-01-23",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f3fad295-1af2-4ecc-8546-b121ad6be27b",
+  "name": "Soul Warden",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "Whenever another creature enters, you gain 1 life.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-08-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

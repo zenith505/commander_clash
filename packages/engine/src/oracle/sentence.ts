@@ -1,7 +1,7 @@
 import type { Modification, Effect } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL } from "./words";
+import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind } from "./words";
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseKeywordList, parseObject } from "./targets";
@@ -20,10 +20,10 @@ import { parsePreventionSentence } from "./sentences/prevention";
  * put one of those cards back on top of your library") and where the rest go ("Put the rest into your
  * graveyard", "on the bottom of your library in a random order"). "more" while the rest is still to come.
  */
-export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>): Extract<Effect, { type: "dig" }> | "more" | null {
-  const REST = "(into your graveyard|on the bottom of your library(?: in (?:any|a random) order)?)";
+export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>, ctx?: Ctx): Extract<Effect, { type: "dig" }> | "more" | null {
+  const REST = "(into your graveyard|into your hand|on the bottom of your library(?: in (?:any|a random) order)?)";
   // Without "in a random order", the owner arranges the cards going to the bottom (CR 401.4).
-  const restOf = (r: string) => (r === "into your graveyard" ? { rest: "graveyard" as const } : / random /.test(r) ? { rest: "bottom" as const, random: true as const } : { rest: "bottom" as const });
+  const restOf = (r: string) => (r === "into your graveyard" ? { rest: "graveyard" as const } : r === "into your hand" ? { rest: "hand" as const } : / random /.test(r) ? { rest: "bottom" as const, random: true as const } : { rest: "bottom" as const });
   let m: RegExpExecArray | null;
   if (dig.into === undefined) {
     if ((m = new RegExp(`^Put (one|two|three) of (?:them|those cards) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
@@ -33,17 +33,34 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter((m[1] ?? m[2])!.replace(/^an? /, ""));
       if (!filter) return null;
       Object.assign(dig, { count: 1, upTo: true, filter, into: "hand" });
-    } else if ((m = /^You may put (an? .+?) from among them onto the battlefield( tapped)?$/.exec(s))) {
-      // "You may put a land card from among them onto the battlefield tapped" (Freestrider Lookout).
-      const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
+    } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s))) {
+      // "You may put a land card from among them onto the battlefield tapped" (Freestrider Lookout), "Put up to two creature
+      // cards with mana value 3 or less from among them onto the battlefield" (Collected Company): several enter at the
+      // same time (enterTogether). "Put a land card ..." takes one if there is one; "all" every one that matches.
+      const how = m[2]!;
+      const count = /^an?$/.test(how) ? 1 : /^up to /.test(how) ? num(how.slice(6)) : 99;
+      const required = how === "all" || (/^an?$/.test(how) && m[1] === "Put");
+      if (/^(?:an?|up to one)$/.test(how) === /cards\b/.test(m[3]!)) return null;
+      // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), not a "where X is".
+      let what = m[3]!.replace(/\bcards\b/, "card").replace(/ and\/or /, " or ");
+      const mvX = / with mana value X or less$/.exec(what);
+      if (mvX) {
+        if (!ctx || !(ctx.spell || ctx.activated) || ctx.whereX) return null;
+        what = what.slice(0, mvX.index);
+      }
+      const filter = parseSearchFilter(what);
       if (!filter) return null;
-      Object.assign(dig, { count: 1, upTo: true, filter, into: "battlefield", ...(m[2] ? { tapped: true } : {}) });
+      if (mvX) Object.assign(filter, { xRange: { key: "manaValue", at: "most" }, text: `${filter.text} with mana value X or less` });
+      Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
+      if (m[6]) Object.assign(dig, restOf(m[6]));
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else return null;
     return dig.rest ? (dig as Extract<Effect, { type: "dig" }>) : "more";
   }
-  if ((m = new RegExp(`^Put the rest ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
+  if ((m = new RegExp(`^Put (?:the rest|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
+  // "Then shuffle" (the "Then" is gone by now), "Then shuffle the rest into your library" (CR 701.20).
+  if (/^Shuffle(?: the rest into your library)?$/.test(s)) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: "shuffle" };
   return null;
 }
 
@@ -125,6 +142,13 @@ export function parseBecomes(text: string): Modification[] | null {
     rest = (m[1] ?? m[2])!;
     still = true;
   }
+  // "Becomes a 0/0 Bird creature with flying in addition to its other types" (Case of the Filched Falcon): it keeps its
+  // card types and subtypes (CR 205.1b).
+  let addition = false;
+  if ((m = /^(.+?) in addition to its other types$/i.exec(rest)) && !still) {
+    rest = m[1]!;
+    addition = true;
+  }
   // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
   if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
@@ -157,7 +181,10 @@ export function parseBecomes(text: string): Modification[] | null {
     else if (CREATURE_TYPES.has(w)) subtypes.push(w);
     else return null;
   }
-  if (types.join(" ") === "Artifact Creature") {
+  if (addition) {
+    if (!types.length && !subtypes.length) return null;
+    out.push({ kind: "addTypes", types, subtypes });
+  } else if (types.join(" ") === "Artifact Creature") {
     // "Becomes an artifact creature" keeps its other card types and subtypes; "a Golem artifact
     // creature" keeps them too, except that its creature types are replaced (CR 205.1b).
     out.push({ kind: "addTypes", types, subtypes: [] });

@@ -24,6 +24,8 @@ export interface AmountCtx {
   kicked?: number[];
   /** How many colors of mana were spent to cast the spell (or the spell its permanent was), CR 207.2c. */
   colorsSpent?: number;
+  /** The amount of mana spent to cast the spell its permanent was (Marath): 0 if it wasn't cast. */
+  manaSpent?: number;
   /** How much mana from Treasures was spent to cast the spell (or the spell its permanent was) or activate the ability (CR 106.3). */
   treasureSpent?: number;
   /** What was sacrificed to cast the spell, as it last existed. */
@@ -94,6 +96,18 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return n;
     }
+    case "greatestControlled": {
+      // Each player's own count, the most of them (0 with none); players who have left the game control nothing.
+      const per = new Map<PlayerId, number>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (ch && objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false, undefined, ch, ctx.view)) per.set(ch.controller, (per.get(ch.controller) ?? 0) + 1);
+      }
+      return Math.max(0, ...[...per].filter(([p]) => !s.players[p]!.lost && !(c.opponents && p === ctx.controller)).map(([, n]) => n));
+    }
+    case "greatestDrawn":
+      // Opponents who have left the game too (rulings).
+      return Math.max(0, ...s.players.filter((p) => p.id !== ctx.controller).map((p) => (p.draws?.turn === s.turn ? p.draws.n : 0)));
     case "cardsInHand":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
     case "cardsInLibrary":
@@ -142,6 +156,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
     case "colorsSpent":
       return ctx.colorsSpent ?? 0;
+    case "manaSpent":
+      return ctx.manaSpent ?? 0;
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
     case "players":
@@ -369,6 +385,12 @@ function describeCount(c: Count): string {
       return "kicked";
     case "colorsSpent":
       return "colors of mana spent";
+    case "manaSpent":
+      return "mana spent to cast it";
+    case "greatestControlled":
+      return `the greatest number of ${c.filter.text} ${c.opponents ? "an opponent" : "a player"} controls`;
+    case "greatestDrawn":
+      return "the greatest number of cards an opponent has drawn this turn";
     case "treasureSpent":
       return "mana from Treasures spent";
     default:

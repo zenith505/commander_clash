@@ -73,6 +73,8 @@ export interface SourceQuality {
   colors: readonly string[];
   types?: readonly string[];
   subtypes?: readonly string[];
+  /** It's a spell (not an ability of the source), for "can't be the target of spells". */
+  spell?: true;
 }
 
 /** "Goblins" -> "Goblin", "Elves" -> "Elf", "Sphinxes" -> "Sphinx": a creature type's plural, as protection names it. */

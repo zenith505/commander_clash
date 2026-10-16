@@ -1,4 +1,4 @@
-import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint } from "../abilities";
+import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
@@ -6,6 +6,7 @@ import { replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { parseGrants } from "./grants";
+import { parseSearchFilter } from "./search";
 
 /** What "~ enters tapped unless ..." waits for (CR 614.1d). */
 export function parseEntersCondition(text: string): EntersCondition | null {
@@ -236,6 +237,30 @@ export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?:
   return out;
 }
 
+/**
+ * What follows "can't be the target of": "spells or abilities your opponents control" (Canopy Cover), "black spells or
+ * abilities from black sources" (Mercenary Informer), "nongreen spells or abilities from nongreen sources" (Gaea's Revenge),
+ * "blue or black spells" (Karplusan Strider), "Aura spells" (Tetsuo Umezawa). Abilities alone (Shanna) aren't modeled: a
+ * spell copy choosing new targets isn't marked as a spell (chooseCopyTargets).
+ */
+export function parseUntargetable(t: string): Untargetable | null {
+  const COLOR = "(white|blue|black|red|green)";
+  const opp = / your opponents control$/.test(t) ? { opponents: true as const } : {};
+  let m: RegExpExecArray | null;
+  if (/^spells or abilities your opponents control$/.test(t)) return { opponents: true };
+  if (/^spells(?: your opponents control)?$/.test(t)) return { spells: true, ...opp };
+  if (/^Aura spells$/.test(t)) return { spells: true, subtype: "Aura" };
+  if ((m = new RegExp(`^${COLOR}(?: or ${COLOR})? spells(?: your opponents control)?$`).exec(t))) return { spells: true, colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])], ...opp };
+  if ((m = new RegExp(`^${COLOR} spells or abilities from ${COLOR} sources$`).exec(t)) && m[1] === m[2]) return { colors: [COLOR_WORDS[m[1]!]!] };
+  if ((m = new RegExp(`^non${COLOR} spells(?: your opponents control)? or abilities from non${COLOR} sources(?: your opponents control)?$`).exec(t)) && m[1] === m[2]) {
+    // "Nongreen spells your opponents control or abilities from nongreen sources your opponents control" (Thrun): both halves.
+    const both = / spells your opponents control or /.test(t);
+    if (both !== / sources your opponents control$/.test(t)) return null;
+    return { notColors: [COLOR_WORDS[m[1]!]!], ...(both ? { opponents: true as const } : {}) };
+  }
+  return null;
+}
+
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
@@ -258,6 +283,17 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
+  if (/^you have no cards in hand$/.test(text)) return { kind: "noneInHand", filter: { kind: "card", text: "card" } };
+  // The Cases' "To solve" conditions (CR 719.3a), about this turn.
+  if ((m = new RegExp(`^${NUM} or more (creature|artifact|enchantment|land|instant|sorcery) cards were put into graveyards from anywhere this turn$`).exec(text)))
+    return { kind: "cardsToGraveyard", n: num(m[1]!), types: [capital(m[2]!)] };
+  if ((m = new RegExp(`^${NUM} or more sources you controlled dealt damage this turn$`).exec(text))) return { kind: "sourcesDealtDamage", n: num(m[1]!) };
+  if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
+    const filter = parseSearchFilter(`${m[2]!.replace(/ and /g, " or ")} card`);
+    return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
+  }
+  if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };
+  if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
@@ -550,6 +586,10 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
   }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
+  if ((m = /^can't be the target of (.+)$/.exec(rest))) {
+    const by = parseUntargetable(m[1]!);
+    return by ? [{ kind: "untargetable", by }] : null;
+  }
   if (/^can't be blocked$/.test(rest)) return [{ kind: "cantBeBlocked" }];
   if (/^can't be blocked by more than one creature$/.test(rest)) return [{ kind: "maxOneBlocker" }];
   if ((m = new RegExp(`^can't be blocked except by ${NUM} or more creatures$`).exec(rest)) && num(m[1]!) >= 2) return [{ kind: "minBlockers", n: num(m[1]!) }];
@@ -666,6 +706,13 @@ function parseIsA(phrase: string, only: boolean): Modification[] | null {
   let rest = m[1]!;
   let pt: [number, number] | undefined;
   const grants: Modification[] = [];
+  // "Is a 4/4 Gorgon creature with deathtouch": its base power and toughness (layer 7b, CR 613.4b).
+  const lead = /^(\d+)\/(\d+) (.+ creature\b.*)$/.exec(rest);
+  if (lead) {
+    pt = [Number(lead[1]), Number(lead[2])];
+    rest = lead[3]!;
+  }
+  if (lead && /with base power/.test(rest)) return null;
   if ((m = /^(.+?) with base power and toughness (\d+)\/(\d+)(?: and (?:has )?(.+))?$/.exec(rest))) {
     pt = [Number(m[2]), Number(m[3])];
     if (m[4]) {
@@ -752,6 +799,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (also) {
     const types = also[1]!.replace(/,? and /, ", ").split(", ");
     return types.every((t) => CREATURE_TYPES.has(t)) ? { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: types, supertypes: [] }], text: line } : null;
+  }
+  // "~ is a 4/4 Gorgon creature with deathtouch and lifelink in addition to its other types" (Case of the Gorgon's Kiss,
+  // solved): types (layer 4), abilities (6) and base power and toughness (7b), CR 613.1.
+  const isA = /^~ is (an? \d+\/\d+ .+ in addition to its other types)$/.exec(text);
+  if (isA) {
+    const mods = parseIsA(isA[1]!, false);
+    return mods ? { affects: { kind: "self" }, mods, text: line } : null;
   }
   const cda = parseDefinedPT(text);
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };

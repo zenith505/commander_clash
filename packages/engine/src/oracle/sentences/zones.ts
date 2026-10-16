@@ -239,7 +239,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;
   }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
-  if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s))) {
+  if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }

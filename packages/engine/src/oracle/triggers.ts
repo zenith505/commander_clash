@@ -1,8 +1,8 @@
-import type { Effect, TriggeredAbility, SpellCondition, TargetSpec, TriggerEvent } from "../abilities";
+import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, TargetSpec, TriggerEvent } from "../abilities";
 import { NUM, X, num, singularWord } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
-import { parseTargetPhrase } from "./targets";
+import { parseGroup, parseTargetPhrase } from "./targets";
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
@@ -410,6 +410,84 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}) };
 }
 
+/** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
+function batchPermanents(phrase: string): { filter: TargetSpec; other: boolean } | null {
+  const other = /^other /.test(phrase);
+  const p = phrase.replace(/^other /, "");
+  const group = parseGroup(p, true);
+  if (group) return { filter: group.filter, other };
+  const one = p.replace(/,? and\/or /g, (x) => x.replace("and/or", "or")).replace(/ your opponents control\b/, " an opponent controls").split(/(\s+|,)/).map((w) => (/^[\s,]*$/.test(w) ? w : singularWord(w))).join("");
+  const spec = parseTargetPhrase(one);
+  return spec?.kind === "object" ? { filter: { ...spec, text: phrase }, other } : null;
+}
+
+/** "Creature cards", "artifact and/or creature cards", "cards": the cards a batch trigger counts. */
+function batchCards(kind: string | undefined): TargetSpec | undefined | null {
+  if (!kind) return undefined;
+  const spec = parseTargetPhrase(`${kind.replace(/ and\/or /g, " or ")} card from a graveyard`);
+  if (spec?.kind !== "card") return null;
+  const { owner: _, ...rest } = spec;
+  return { ...rest, text: `${kind} cards` };
+}
+
+/**
+ * "Whenever one or more cards leave your graveyard", "Whenever one or more tokens you control enter", "Whenever one or more
+ * other creatures die", "Whenever one or more creature cards are put into your graveyard from anywhere", "Whenever you
+ * discard one or more cards": once for each event that moves one or more of them (CR 603.2c). "That many" is how many.
+ * What the event moved as a group ("them", "those cards", "one of them") isn't modeled.
+ */
+function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
+  let m: RegExpExecArray | null;
+  let batch: BatchTrigger;
+  let rest: string;
+  let yourTurn = false;
+  if ((m = /^Whenever one or more (?:(.+?) )?cards (leave your graveyard|are put into exile from your graveyard)( during your turn)?, (.+)$/.exec(line))) {
+    const filter = batchCards(m[1]);
+    if (filter === null) return "fail";
+    batch = { what: "leavesGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] !== "leave your graveyard" ? { to: "exile" as const } : {}) };
+    yourTurn = !!m[3];
+    rest = m[4]!;
+  } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into your graveyard from (anywhere|your library)( during your turn)?, (.+)$/.exec(line))) {
+    const filter = batchCards(m[1]);
+    if (filter === null) return "fail";
+    batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}) };
+    yourTurn = !!m[3];
+    rest = m[4]!;
+  } else if ((m = /^Whenever (you|one or more players) discards? one or more (?:(.+?) )?cards( for the first time each turn)?, (.+)$/.exec(line))) {
+    const filter = batchCards(m[2]);
+    if (filter === null) return "fail";
+    batch = { what: "discards", ...(m[1] === "you" ? { whose: "you" as const } : {}), ...(filter ? { filter } : {}), ...(m[3] ? { first: true as const } : {}) };
+    rest = m[4]!;
+  } else if ((m = /^Whenever one or more (.+?) (enter|die|leave the battlefield( without dying)?|are put into a graveyard from the battlefield)( during your turn)?, (.+)$/.exec(line))) {
+    const what = batchPermanents(m[1]!);
+    if (!what) return "fail";
+    const verb = m[2]!;
+    // "Creatures die": only a creature dies (CR 700.4), as it last existed.
+    if (verb === "die" && !(what.filter.types?.includes("Creature") || what.filter.allTypes?.includes("Creature") || what.filter.subtypes?.length)) return "fail";
+    batch = {
+      what: verb === "enter" ? "enters" : "leaves",
+      filter: what.filter,
+      ...(what.other ? { other: true as const } : {}),
+      ...(verb === "die" || /^are put/.test(verb) ? { dies: true as const } : {}),
+      ...(m[3] ? { notDies: true as const } : {}),
+    };
+    yourTurn = !!m[4];
+    rest = m[5]!;
+  } else return null;
+  // The objects as a group: not modeled.
+  if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(rest)) return "fail";
+  let text = rest;
+  const thatMuch = /\bthat (?:much|many)\b/.test(text);
+  if (thatMuch) {
+    if (/\bX\b/.test(text)) return "fail";
+    text = text.replace(/\bthat (?:much|many)\b/g, "X");
+  }
+  let body = parseBody(text, {});
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, rest) };
+  return { event: "batch", batch, body, ...(yourTurn ? { activeIf: { kind: "yourTurn" as const } } : {}) };
+}
+
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
   if (!m) return null;
@@ -636,6 +714,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (targetedBy) return targetedBy;
   const cast = parseCastTrigger(line);
   if (cast) return cast;
+  const batch = parseBatchTrigger(line);
+  if (batch) return batch;
   // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with
   // them). "That many" is how many were put on it.
   const put = /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);

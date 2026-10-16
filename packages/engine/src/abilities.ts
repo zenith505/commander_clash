@@ -1443,7 +1443,13 @@ export type TriggerEvent =
   /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
-  | "creaturesYouControlDealCombatDamageToPlayer";
+  | "creaturesYouControlDealCombatDamageToPlayer"
+  /**
+   * "Whenever one or more cards leave your graveyard", "one or more tokens you control enter", "one or more other creatures
+   * die", "you discard one or more cards": once for each event that moves one or more matching objects (CR 603.2c), see
+   * TriggeredAbility.batch. "That many" is how many of them matched.
+   */
+  | "batch";
 
 
 export interface TriggeredAbility {
@@ -1584,6 +1590,34 @@ export interface TriggeredAbility {
   enchantedPlayersTurn?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
+  /** For "batch": what the event has to move, see BatchTrigger. */
+  batch?: BatchTrigger;
+}
+
+/**
+ * A "one or more" trigger (CR 603.2c): it triggers once for an event that moves one or more objects that match, however
+ * many there are. `what`:
+ * - "enters": permanents entering the battlefield (`filter` as they are there, CR 603.6a);
+ * - "leaves": permanents leaving the battlefield, as they last existed (CR 603.10a); `dies`, only those put into a graveyard
+ *   (CR 700.4), `notDies`, only those that went anywhere else ("without dying");
+ * - "leavesGraveyard": cards leaving their owner's graveyard (a look-back trigger, CR 603.10a), `to` where they went;
+ * - "toGraveyard": cards put into their owner's graveyard, `from` where they came from ("from anywhere": unset);
+ * - "discards": cards discarded (CR 701.9), `by` who discarded them.
+ * `whose`: who has to control the permanents (or own the cards) relative to this ability's controller.
+ */
+export interface BatchTrigger {
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards";
+  /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
+  filter?: TargetSpec;
+  whose?: "you" | "opponent";
+  /** "One or more other creatures": not this permanent. */
+  other?: true;
+  dies?: true;
+  notDies?: true;
+  from?: "library" | "battlefield";
+  to?: "exile";
+  /** "For the first time each turn": only the first such event this turn (counting the ones before this permanent was there). */
+  first?: true;
 }
 
 export interface ActivatedAbility {

@@ -11,7 +11,7 @@ import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import { addMana } from "../spend";
 import type { ManaSpent } from "../mana";
-import { objectMatches, bindChosen, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk } from "./targeting";
+import { objectMatches, bindChosen, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runDungeonsEffect } from "./run-dungeons";
@@ -224,16 +224,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       const t = ctx.targets[i];
       if (ctx.legal[i] && t?.kind === "object") out.push(obj(s, t.id));
     }
-    if (ref.sameName && out[0]?.zone === "battlefield" && !out[0].faceDown) {
-      const t = out[0];
-      const name = characteristics(s, t).name;
-      const whose = controllerOf(s, t);
-      const { filter, of } = ref.sameName;
-      for (const id of s.battlefield) {
-        const o = obj(s, id);
-        if (o.id !== t.id && !o.faceDown && characteristics(s, o).name === name && (!of || controllerOf(s, o) === whose) && objectMatches(s, filter, o, ctx.controller, false)) out.push(o);
-      }
-    }
+    if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
     return out;
   }
   if (ref.ref === "selfCard") {

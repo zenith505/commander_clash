@@ -186,7 +186,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
     // "As ~ enters, choose a player" (True-Name Nemesis's protection): the opponent with the most power on the battlefield.
-    if (pend.kind === "chooseOption" && pend.what === "player") {
+    // "Choose an opponent. That player sacrifices a creature" (Myrkul's Edict): the same one.
+    if (pend.kind === "chooseOption" && (pend.what === "player" || pend.what === "opponent")) {
       const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       const opps = pend.options.filter((x) => Number(x) !== pid);
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;

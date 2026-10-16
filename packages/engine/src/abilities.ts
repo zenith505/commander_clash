@@ -441,7 +441,9 @@ export type PlayerRef =
    * "They" in "Each player loses 1 life for each creature they control" (Stronghold Discipline): the player the instruction
    * is being done to, one at a time.
    */
-  | { ref: "eachOne" };
+  | { ref: "eachOne" }
+  /** "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). */
+  | { ref: "chosenPlayer" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -985,7 +987,7 @@ export type Effect =
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
    */
-  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true }
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
   /**
@@ -1075,6 +1077,10 @@ export type Effect =
   | { type: "mustBlockSource"; what: ObjRef; attacker?: ObjRef; thisTurn?: true }
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
+  /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */
+  | { type: "noMaxHandSize" }
+  /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. */
+  | { type: "enterTappedUntil"; filter: TargetSpec }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
   | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true }
@@ -1509,7 +1515,8 @@ export type Effect =
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
-export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword";
+/** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
+export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor";

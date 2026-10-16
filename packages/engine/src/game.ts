@@ -1052,6 +1052,7 @@ function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: 
  * the entering one itself; such an effect wins over "enters tapped unless" (rulings), since it applies either way.
  */
 function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
+  if (s.entersTappedUntil?.some((r) => objectMatches(s, r.filter, o, r.controller, false))) return true;
   return s.battlefield.some((id) => {
     if (id === o.id) return false;
     const src = obj(s, id);
@@ -1580,6 +1581,8 @@ function startNextTurn(s: GameState) {
     invalidateCharacteristics(s);
   }
   releasePhased(s, began);
+  if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
+  if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
   for (const p of s.players) {
     p.landsPlayedThisTurn = 0;
@@ -1797,6 +1800,7 @@ function sagaSBAs(s: GameState): boolean {
 
 /** "You have no maximum hand size" on a permanent the player controls (CR 402.2, 514.1). */
 export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
+  !!player(s, pid).noMaxHandSize ||
   s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).noMaxHandSize);
 
 function finishCleanup(s: GameState) {
@@ -4104,7 +4108,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   r.chosen = withChoice(r.chosen, pend.what, choice);
-  log(s, `${p.name} chooses ${choice}.`);
+  log(s, `${p.name} chooses ${pend.what === "opponent" ? player(s, Number(choice)).name : choice}${pend.what === "opponent" ? ` for ${pend.source}` : ""}.`);
   continueResolution(s);
 }
 

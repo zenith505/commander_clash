@@ -150,6 +150,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "creatureType") return { ...chosen, type: choice };
   if (what === "basicLandType") return { ...chosen, landType: choice };
   if (what === "keyword") return { ...chosen, keyword: choice };
+  if (what === "opponent") return { ...chosen, player: Number(choice) };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };
 }

@@ -81,6 +81,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
+  // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
+  if (ctx.selfCard && ctx.activated && (m = /^(?:Return ~ to (your hand|the battlefield)( tapped)?|Put ~ on top of your library)$/.exec(s)))
+    return !m[1] ? [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }] : m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
   // The order of a graveyard (CR 404.1; see graveyard.ts): "Return the top creature card of your graveyard to the
@@ -156,6 +159,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
+  }
+  // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
+  // graveyard to your hand" (Praetor's Counsel).
+  if ((m = /^[Rr]eturn all (?:(.+?) )?cards from your graveyard to your hand$/.exec(s))) {
+    const kinds = (m[1] ?? "").replace(/,? and /g, " or ").replace(/, /g, " or ");
+    const spec = parseTargetPhrase(`${kinds ? `${kinds.split(/\s+/).map(singularWord).join(" ")} ` : ""}card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1] ? `${m[1]} ` : ""}card` }, toHand: true }];
   }
   // "You may put a land card from your hand onto the battlefield (tapped)".
   // Brainstorm: "put two cards from your hand on top of your library in any order", "put a card from your hand on top

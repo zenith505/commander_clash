@@ -2,7 +2,7 @@ import { allEffects, type Effect, type PayCost, type PunisherOption, type Target
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, obj, payableLife, player } from "../game";
+import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, obj, opponents, payableLife, player } from "../game";
 import { cardIdOf, defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
@@ -122,6 +122,18 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "choose": {
       // "Choose a creature type": the controller names one as it resolves (CR 608.2c-d); it's kept for the rest.
       const r = s.resolving!;
+      if (e.choice === "opponent") {
+        // "Choose an opponent" (CR 608.2d): one still in the game (CR 800.4a); with one, there's nothing to ask.
+        if (r.chosen?.player !== undefined) return;
+        const opps = opponents(s, ctx.controller);
+        if (opps.length === 1) {
+          r.chosen = { ...r.chosen, player: opps[0]! };
+          log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
+        }
+        if (opps.length <= 1) return;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent" };
+        return "paused";
+      }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "basicLandType" ? "landType" : e.choice === "keyword" ? "keyword" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         if (chooser === undefined) return;

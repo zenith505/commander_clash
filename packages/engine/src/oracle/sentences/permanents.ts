@@ -2,7 +2,7 @@
 
 import type { Effect, ObjRef } from "../../abilities";
 import { NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
-import { pickFilter, parseObject, parseTargetPhrase } from "../targets";
+import { pickFilter, parseGroup, parseObject, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
@@ -12,6 +12,14 @@ import { canonicalKeyword } from "../../keywords";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
+  if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
+  // "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect that lasts
+  // (CR 614.1c, 611.2b).
+  const untilTapped = /^Until your next turn, ([a-z][^,]*?) enter tapped$/.exec(s);
+  if (untilTapped) {
+    const g = parseGroup(untilTapped[1]!, true);
+    return g && !g.other ? [{ type: "enterTappedUntil", filter: g.filter }] : null;
+  }
   let m: RegExpExecArray | null;
 
   // "That creature enters with an additional +1/+1 counter on it" about a creature spell a cast trigger is about (Boreal
@@ -140,7 +148,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
   if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what && !isGroup(what) ? [{ type: "skipUntap", what }] : null;
+    // "Tap all creatures your opponents control. Those creatures don't untap ..." (Cone of Cold): the group just tapped.
+    const tapped = what && what === ctx.lastGroup && /^(?:those creatures|they)$/i.test(m[1]!);
+    return what && (!isGroup(what) || tapped) ? [{ type: "skipUntap", what }] : null;
   }
   // Phasing out (CR 702.26b): "~ phases out", "target creature phases out", "all permanents you control phase out".
   if ((m = /^(.+?) phases? out$/i.exec(s))) {

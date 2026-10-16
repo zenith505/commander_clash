@@ -18,7 +18,7 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Choose target creature you control. Each other creature becomes a copy of that creature": the first sentence
   // only chooses the target the second refers to.
   // "Choose any number of target creatures. Each of those creatures gains persist until end of turn." too.
-  if ((m = /^Choose ((?:any number of )?target .+)$/.exec(s))) {
+  if ((m = /^[Cc]hoose ((?:any number of )?target .+)$/.exec(s))) {
     // "Choose any number of target opponents" (Call the Coppercoats): players, likewise.
     if (/^any number of target (?:players|opponents)$/.test(m[1]!)) return parsePlayer(m[1]!, ctx) ? [] : null;
     // "Choose target creature you control and target Equipment" (Stolen Uniform): two targets, in that order.

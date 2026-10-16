@@ -170,6 +170,7 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   // "Any number of target players' graveyards" (Stonespeaker Crystal), "their" after them: all of them.
   if (/^any number of target (?:players|opponents)'$/.test(x)) return parsePlayer(x.slice(0, -1), ctx);
   if (ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers) return x === "their" || x === "those players'" || x === "those opponents'" ? { ref: "target", index: ctx.manyPlayers, n: 2 } : null;
+  if (x === "that player's" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   if ((x === "that player's" || x === "their") && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
   // "At the beginning of each opponent's upkeep, ~ deals X damage to that player, where X is the number of cards in their hand".
   if ((x === "that player's" || x === "their") && ctx.eventPlayer) return { ref: "eventPlayer" };

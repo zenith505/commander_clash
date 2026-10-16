@@ -61,6 +61,8 @@ export interface Ctx {
   selfCastSpell?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
+  /** "Choose an opponent." came before: "that player" is the one chosen. */
+  chosenOpponent?: boolean;
   /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
   defending?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
@@ -1028,6 +1030,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       }
       effects.push({ type: "may", effects: inner, text: may[1]! });
       if (!defineX()) return null;
+      continue;
+    }
+    // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not
+    // targeted. One per ability.
+    if (/^Choose an opponent$/.test(s)) {
+      if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
+      effects.push({ type: "choose", choice: "opponent" });
+      ctx.chosenOpponent = true;
       continue;
     }
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".

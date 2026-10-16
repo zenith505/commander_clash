@@ -65,6 +65,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "you") return { ref: "you" };
   if (x === "each opponent") return { ref: "eachOpponent" };
   if (x === "each player") return { ref: "eachPlayer" };
+  // "Choose an opponent. That player sacrifices a creature of their choice."
+  if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   if (x === "defending player" && ctx.defending) return { ref: "eventPlayer" };

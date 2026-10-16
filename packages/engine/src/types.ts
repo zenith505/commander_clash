@@ -378,6 +378,8 @@ export interface ManaLot {
 }
 
 export interface Player {
+  /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
+  noMaxHandSize?: true;
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
   /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */
@@ -947,6 +949,12 @@ export interface GameState {
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
   /** Rules for one player this turn: "you can't lose life this turn" (CR 119.8), "you can't lose the game this turn", "your opponents can't win the game this turn". */
   turnRules?: TurnRule[];
+  /**
+   * "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect from a
+   * resolved spell (CR 614.1c), with `filter` from `controller`'s view, ending as `controller`'s next turn begins
+   * (CR 611.2b, 800.4m).
+   */
+  entersTappedUntil?: { controller: PlayerId; filter: TargetSpec; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */

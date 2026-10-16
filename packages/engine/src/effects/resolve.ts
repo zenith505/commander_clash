@@ -328,6 +328,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "eachOne":
       return ctx.eachOne !== undefined ? [ctx.eachOne] : [];
+    case "chosenPlayer": {
+      const p = s.resolving?.chosen?.player;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? []).filter((p) => !player(s, p).lost);
     case "punished":
@@ -562,6 +566,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "connive":
     case "recruit":
     case "skipUntap":
+    case "enterTappedUntil":
+    case "noMaxHandSize":
     case "counters":
     case "distribute":
     case "lastKnownCounters":

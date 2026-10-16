@@ -825,8 +825,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.event !== "batch" || !t.batch) continue;
         const b = t.batch;
         if (gone ? !lookBack(b) : lookBack(b) && arrived.has(`${w.id}@${w.zoneChanges ?? 0}`)) continue;
-        const n = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone)).length;
+        const matched = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone));
+        const n = matched.length;
         if (!n) continue;
+        // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
+        if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: n, ...(b.whose === "you" ? { player: you } : {}) });
       }
@@ -1104,6 +1107,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (!m.entered || !o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== m.zc) return false;
     // Torpor Orb: "creatures entering don't cause abilities to trigger" for these controllers.
     if (m.locks?.some((l) => !l.opponents || l.by !== you)) return false;
+    if (b.orSelf && o.id === w.id) return true;
     if (b.other && o.id === w.id) return false;
     return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, o, you, false));
   }

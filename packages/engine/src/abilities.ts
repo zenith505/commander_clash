@@ -1809,6 +1809,10 @@ export interface BatchTrigger {
   whose?: "you" | "opponent";
   /** "One or more other creatures": not this permanent. */
   other?: true;
+  /** "Whenever ~ and/or one or more other creatures you control enter": this permanent entering counts too. */
+  orSelf?: true;
+  /** Satoru: "if none of them were cast or no mana was spent to cast them" (an intervening if, CR 603.4). */
+  noneCastWithMana?: true;
   dies?: true;
   notDies?: true;
   from?: "library" | "battlefield";

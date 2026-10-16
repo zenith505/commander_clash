@@ -494,6 +494,18 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (filter === null) return "fail";
     batch = { what: "discards", ...(m[1] === "you" ? { whose: "you" as const } : {}), ...(filter ? { filter } : {}), ...(m[3] ? { first: true as const } : {}) };
     rest = m[4]!;
+  } else if ((m = /^Whenever ~ and\/or one or more other (.+?) enter, (.+)$/.exec(line))) {
+    // "Whenever ~ and/or one or more other Vampires you control enter" (Anje): it or any of the others (CR 603.2c).
+    const what = batchPermanents(`other ${m[1]!}`);
+    if (!what?.other) return "fail";
+    batch = { what: "enters", filter: what.filter, other: true, orSelf: true };
+    rest = m[2]!;
+    // Satoru: "if none of them were cast or no mana was spent to cast them": none of them was cast with mana spent on it.
+    const none = /^if none of them were cast or no mana was spent to cast them, (.+)$/.exec(rest);
+    if (none) {
+      batch.noneCastWithMana = true;
+      rest = none[1]!;
+    }
   } else if ((m = /^Whenever one or more (.+?) (enter|die|leave the battlefield( without dying)?|are put into a graveyard from the battlefield)( during your turn)?, (.+)$/.exec(line))) {
     const what = batchPermanents(m[1]!);
     if (!what) return "fail";

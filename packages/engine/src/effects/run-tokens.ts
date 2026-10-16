@@ -1,9 +1,9 @@
 import type { Effect, TokenSpec } from "../abilities";
 import { defOf, power, toughness } from "../cards";
-import { livingPlayers, log, moveObject, newObject, opponents, player } from "../game";
+import { auraHostOptions, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokensToCreate } from "../counters";
 import { copyKey, type CopyExcept } from "../copies";
-import type { CardDef, GameState, PlayerId } from "../types";
+import type { CardDef, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault } from "./triggers";
 import { copiedValues } from "./run-copies";
@@ -85,7 +85,13 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "createToken": {
       const n = amountNow(s, e.n, ctx);
+      // "Attached to it": what was just put onto the battlefield, found before this list starts over.
+      const hosts = e.attachTo && objects(s, e.attachTo, ctx).map((o) => o.id);
       if (s.resolving) s.resolving.created = [];
+      if (hosts) {
+        createAttachedTokens(s, e, hosts, n, ctx, src);
+        return;
+      }
       // Token doublers apply per player (CR 614.1a): "twice that many of those tokens".
       for (const pid of players(s, e.who, ctx)) {
         const k = tokensToCreate(s, pid, e.token, n);
@@ -98,6 +104,36 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
   }
+}
+
+/**
+ * Aura tokens created attached to permanents (Roles, CR 303.7): for each one still on the battlefield, the token is put
+ * onto the battlefield attached to it. It isn't targeted, so hexproof doesn't matter, but one that couldn't legally
+ * enchant it (protection from enchantments, not a creature any more) isn't created at all (rulings on Roles). Token
+ * doublers make more, all attached to it; the newest Role stays (704.5z), and those are identical anyway.
+ */
+function createAttachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }>, hosts: ObjectId[], n: number, ctx: ResolveCtx, src: string) {
+  for (const pid of players(s, e.who, ctx))
+    for (const host of hosts) {
+      if (s.objects[host]?.zone !== "battlefield") continue;
+      const k = tokensToCreate(s, pid, e.token, n);
+      let made = 0;
+      for (let i = 0; i < k; i++) {
+        const o = newObject(s, tokenDef(e.token), pid, "exile");
+        o.isToken = true;
+        if (!auraHostOptions(s, o, pid).some((h) => "attachTo" in h && h.attachTo === host)) {
+          // Never created: it leaves no trace (CR 111.1).
+          delete s.objects[o.id];
+          continue;
+        }
+        moveObject(s, o.id, "battlefield", { attachTo: host });
+        s.resolving?.created?.push(o.id);
+        made++;
+      }
+      if (made) log(s, `${src} creates ${made === 1 ? "a" : made} ${e.token.name} ${e.token.subtypes.includes("Role") ? "Role " : ""}token${made > 1 ? "s" : ""} attached to ${nameOf(s, host)}.`);
+      else if (k) log(s, `${src} can't create a ${e.token.name} token attached to ${nameOf(s, host)}.`);
+    }
+  invalidateCharacteristics(s);
 }
 
 export function tokenDef(t: TokenSpec): CardDef {

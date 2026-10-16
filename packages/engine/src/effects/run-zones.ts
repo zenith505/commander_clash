@@ -561,6 +561,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // nothing to enchant stays where it is (303.4g).
       const hosts = e.attachToSubject ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, list.filter((o) => isPermanentCard(defOf(s, o))).map((o) => ({ o, under: under(o) })), src);
       if (hosts === "paused") return "paused";
+      // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
+      if (s.resolving) s.resolving.created = [];
       for (const o of list) {
         const d = defOf(s, o);
         if (e.attachToSubject) {
@@ -588,6 +590,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
         // the permanent it became, while it's still that object (CR 400.7, rulings).
         if (o.zone !== "battlefield") continue;
+        s.resolving?.created?.push(o.id);
         if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
         if (e.atEndStep)
           addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
@@ -715,7 +718,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return returnFromExile(s, [o], (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter);
     }
     case "exileIfDies":
-      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfDiesTurn = s.turn;
+      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield" && (!e.ifCreature || objIsType(s, o, "Creature"))) o.exileIfDiesTurn = s.turn;
+      return;
+    case "noRegen":
+      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield" && (!e.ifCreature || objIsType(s, o, "Creature"))) o.noRegenTurn = s.turn;
       return;
     case "lookAtHand":
       for (const pid of players(s, e.who, ctx)) {

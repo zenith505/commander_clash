@@ -40,6 +40,11 @@ export interface Ctx {
   activated?: boolean;
   /** The last sentence created one token: "put a +1/+1 counter on it" means that token. */
   lastCreated?: boolean;
+  /**
+   * The last sentence put one card onto the battlefield ("Return target creature card from your graveyard to the
+   * battlefield"): "it" and "that creature" are the permanent it became (CR 400.7), kept in `created` like a token.
+   */
+  lastPut?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
@@ -97,7 +102,7 @@ function splitSentences(text: string): string[] {
 export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
-    const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts.spell);
+    const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
     const how = modal[2]?.trim();
     // Only "choose one", and an ability's (no spell has these).
     if (!body || !how) return body;
@@ -501,11 +506,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       last.loseAtEnd = true;
       continue;
     }
-    // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c).
-    if (/^(It|They|The creature) can't be regenerated$/i.test(s)) {
+    // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c), "That creature", "Those
+    // creatures", "Creatures destroyed this way", "A creature destroyed this way".
+    if (/^(?:It|They|The creature|That (?:creature|artifact|permanent|Wall)|Those (?:creatures|permanents)|(?:Creatures|A creature) destroyed this way) can't be regenerated$/i.test(s)) {
       const last = effects[effects.length - 1];
       if (!last || last.type !== "destroy") return null;
       last.noRegen = true;
+      // "Destroy target nonblack creature and target land. They can't be regenerated.": both.
+      if (/^They\b/.test(s)) for (let i = effects.length - 2, e = effects[i]; e?.type === "destroy"; e = effects[--i]) e.noRegen = true;
       continue;
     }
     // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a),
@@ -685,7 +693,10 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   if (fx) {
     // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
-    ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1);
+    // One card put onto the battlefield: "Put a +1/+1 counter on it", "It gains haste until your next turn".
+    const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
+    ctx.lastPut = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject;
+    ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
     if (last?.type === "continuous" && last.what.ref === "each" && last.duration === "endOfTurn") ctx.lastGroup = { ref: "affected" };
@@ -865,11 +876,12 @@ const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
   "up to one": () => [0, 1],
 };
 
-function parseModal(count: string, bullets: string, text: string, spell?: boolean): AbilityBody | null {
+function parseModal(count: string, bullets: string, text: string, opts: Parameters<typeof parseBody>[1] = {}): AbilityBody | null {
   const modes: AbilityBody[] = [];
   for (const b of bullets.split("•").map((x) => x.trim()).filter(Boolean)) {
     // "Street Justice — Exile target creature ...": a mode's name is a flavor word, with no rules meaning (CR 207.2d).
-    const body = parseBody(b.replace(/^[A-Z][A-Za-z' ,!-]* — /, ""), { spell });
+    // A trigger's modes can say what its event was about: "Create a Royal Role token attached to that creature".
+    const body = parseBody(b.replace(/^[A-Z][A-Za-z' ,!-]* — /, ""), opts);
     if (!body) return null; // every mode has to work, or the card isn't supported
     modes.push(body);
   }
@@ -918,6 +930,7 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
 export function addTarget(ctx: Ctx, spec: TargetSpec): number {
   ctx.targets.push(spec);
   ctx.lastCreated = false;
+  ctx.lastPut = false;
   const i = ctx.targets.length - 1;
   if (spec.kind === "object" || spec.kind === "spell") ctx.lastObjectTarget = i;
   return i;

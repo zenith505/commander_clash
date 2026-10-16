@@ -25,6 +25,18 @@ export const PREDEFINED_TOKENS: Record<string, TokenSpec> = {
   Heartwood: { name: "Heartwood", colors: ["R", "G"], types: ["Artifact"], subtypes: ["Heartwood"], keywords: [], abilities: "{T}: Add {R} or {G}." },
 };
 
+/** Role tokens (CR 111.10j-r, 303.7): colorless Aura Role enchantment tokens with enchant creature, created attached to a creature. */
+const role = (name: string, text: string): TokenSpec => ({ name, colors: [], types: ["Enchantment"], subtypes: ["Aura", "Role"], keywords: [], abilities: `Enchant creature\n${text}` });
+export const ROLE_TOKENS: Record<string, TokenSpec> = {
+  Cursed: role("Cursed", "Enchanted creature has base power and toughness 1/1."),
+  Monster: role("Monster", "Enchanted creature gets +1/+1 and has trample."),
+  Royal: role("Royal", "Enchanted creature gets +1/+1 and has ward {1}."),
+  Sorcerer: role("Sorcerer", 'Enchanted creature gets +1/+1 and has "Whenever this creature attacks, scry 1."'),
+  Virtuous: role("Virtuous", "Enchanted creature gets +1/+1 for each enchantment you control."),
+  Wicked: role("Wicked", "Enchanted creature gets +1/+1.\nWhen this token is put into a graveyard from the battlefield, each opponent loses 1 life."),
+  "Young Hero": role("Young Hero", 'Enchanted creature has "Whenever this creature attacks, if its toughness is 3 or less, put a +1/+1 counter on it."'),
+};
+
 /** An Incubator token (CR 701.53b, 111.10i): a colorless Incubator artifact, and on its back a 0/0 Phyrexian artifact creature. */
 export const INCUBATOR: TokenSpec = {
   name: "Incubator",

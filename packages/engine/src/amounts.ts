@@ -88,7 +88,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         const ch = view(o);
-        if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch)) n++;
+        if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) n++;
       }
       return n;
     }
@@ -214,7 +214,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         const ch = view(o);
-        if (ch && objectMatches(s, filter, o, ctx.controller, false, undefined, ch)) best = Math.max(best, ch.power);
+        if (ch && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = Math.max(best, ch.power);
       }
       return best;
     }
@@ -224,7 +224,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         const ch = view(o);
-        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)) best = Math.max(best, manaValue(parseManaCost(defOf(s, o).manaCost)));
+        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = Math.max(best, manaValue(parseManaCost(defOf(s, o).manaCost)));
       }
       return best;
     }

@@ -549,6 +549,7 @@ export function moveObject(
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
   o.exileIfDiesTurn = undefined;
+  o.noRegenTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.attacked = undefined;
   o.exertedTurn = undefined;
@@ -606,6 +607,7 @@ export function moveObject(
   }
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
   const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
+  if (snapshot) snapshot.lastAttachments = attachments;
   o.exiledUntilLeaves = undefined;
   const from = zoneList(s, o);
   if (from) {
@@ -689,6 +691,7 @@ export function moveObject(
       }
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
+  o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
@@ -1150,7 +1153,8 @@ export function destroyPermanent(s: GameState, o: GameObject, message: string, n
   if (objHasKeyword(s, o, "Indestructible")) return false;
   if (useShieldCounter(s, o, "it being destroyed")) return false;
   const name = defOf(s, o).name;
-  if (!noRegen && (o.regenShields ?? 0) > 0) {
+  // "It can't be regenerated (this turn)": its shields don't apply (CR 701.19c); they stay for later.
+  if (!noRegen && o.noRegenTurn !== s.turn && (o.regenShields ?? 0) > 0) {
     o.regenShields! -= 1;
     o.damage = 0;
     o.deathtouchDamage = false;
@@ -4577,6 +4581,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       } else seen.set(key, id);
     }
     if (attachmentSBAs(s)) changed = true;
+    if (roleSBAs(s)) changed = true; // 704.5z
     if (sagaSBAs(s)) changed = true; // 704.5s
     if (dungeonSBAs(s)) changed = true; // 704.5t
     // Commanders in graveyard/exile may return to the command zone (903.9a). Owners always choose yes for now.
@@ -4669,6 +4674,34 @@ function attachmentSBAs(s: GameState): boolean {
     }
   }
   return changed;
+}
+
+/**
+ * A permanent with more than one Role controlled by the same player attached to it: all but the one with the most recent
+ * timestamp go to their owners' graveyards (CR 303.7a, 704.5z). Roles that became attached at the same time (a token
+ * doubler) are the same Role, so which one stays doesn't matter.
+ */
+function roleSBAs(s: GameState): boolean {
+  const newest = new Map<string, GameObject>();
+  const extra: GameObject[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (!o.attachedTo) continue;
+    const c = characteristics(s, o);
+    if (!c.subtypes.includes("Role")) continue;
+    const key = `${o.attachedTo}:${c.controller}`;
+    const other = newest.get(key);
+    if (!other) newest.set(key, o);
+    else if (o.timestamp > other.timestamp) {
+      extra.push(other);
+      newest.set(key, o);
+    } else extra.push(o);
+  }
+  for (const o of extra) {
+    log(s, `${characteristics(s, o).name} is put into the graveyard (a newer Role is attached to ${nameOf(s, o.attachedTo!)}).`);
+    moveObject(s, o.id, "graveyard");
+  }
+  return extra.length > 0;
 }
 
 /**

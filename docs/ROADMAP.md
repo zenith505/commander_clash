@@ -1,6 +1,6 @@
 # Roadmap
 
-16,835 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,984 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -16,6 +16,18 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
+   Left from the Roles/modified/can't be regenerated/equip round:
+   - Role cards still out on other lines: reflexive "When you do, create a ... Role" (Curse of the Werefox, Merry
+     Bards, Spellbook Vendor), Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
+     enchanted creature or enchantment creature"), Seeds of Innocence-style "the controller of each of those".
+   - "Can't be regenerated" still out: "for each creature destroyed this way" (Decree of Pain), Purge ("artifact
+     creature or black creature"), Mageta ("except for ~"), The Abyss ("of their choice"), Scorching Lava (kicked
+     "that creature"), Whippoorwill, Runesword.
+   - Equip still out: "Equip—Pay {3} or discard a card", equip planeswalker, "Equip worthy"; bots never use an equip
+     cost that sacrifices a creature (Demonmail Hauberk), only the human player does.
+   - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
+     them" and several cards don't. Named legendary tokens (Tuktuk the Explorer's "create Tuktuk the Returned, a
+     legendary 5/5 ... token") aren't parsed.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
@@ -71,7 +83,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      removal only with as much X as they can pay; they never hold a free Fierce Guardianship for a bigger threat.
    Left from the conditional targets/Will cycle/hideaway conditions round:
    - "Choose target X ... If the gift was promised, instead choose target Y ... the chosen" (Too Evil to Stay Dead,
-     Expel the Unworthy, The Eagles Are Coming!); Role tokens (Diminisher Witch); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead"
+     Expel the Unworthy, The Eagles Are Coming!); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead"
      (Earth's Mightiest Heroes); "twice X ... instead"
      (Stonesplitter Bolt, Torch the Tower).
    - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Cruelclaw's Heist, Dawn's Truce, Longstalk Brawl,
@@ -99,8 +111,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Entwine with a non-mana cost (Betrayal of Flesh, Solar Tide); the other unsupported entwine cards fail on a mode.
    - Job select (11 of 19): granted quoted abilities that don't compile (Ninja's Blades, Blue Mage's Cane, Summoner's
      Grimoire, Astrologian's Planisphere, Dancer's Chakrams' "other commanders you control"), "for each artifact you
-     control" (Machinist's Arsenal), "Equip—Pay 3 life" (Dark Knight's Greatsword), Reaper's Scythe's soul counters.
-   - Bargain (11 of 20): Role tokens (Diminisher Witch), "twice X" and "instead it deals 3 ... and you scry"
+     control" (Machinist's Arsenal), Reaper's Scythe's soul counters.
+   - Bargain (12 of 20): "twice X" and "instead it deals 3 ... and you scry"
      (Stonesplitter Bolt, Torch the Tower), "look at the top eight
      instead" (Farsight Ritual), Beseech the Mirror's free cast, Back for Seconds, Rowan's Grim Search, Thunderous
      Debut, Realm-Scorcher Hellkite's mana.

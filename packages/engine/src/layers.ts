@@ -349,6 +349,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = src.counters[cond.counter] ?? 0;
       return n >= cond.min && (cond.max === undefined || n <= cond.max);
     }
+    case "selfPT": {
+      // Only in a trigger's intervening if, so the layers are all applied by now; gone from the battlefield, it's false.
+      const c = chars.get(sourceId);
+      if (!c) return false;
+      const n = cond.stat === "power" ? c.power : c.toughness;
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+    }
     case "yourTurn":
       return (s.activePlayer === you) !== !!cond.not;
     case "anyOf":
@@ -422,7 +429,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
     case "onBattlefield": {
       let n = 0;
-      for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
+      for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
       return (cond.max === undefined || n <= cond.max) && (cond.min === undefined || n >= cond.min);
     }
     case "life": {
@@ -486,7 +493,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "attachedIs": {
       const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
       const c = host && chars.get(host.id);
-      return !!c && objectMatches(s, cond.filter, host, you, false, undefined, c);
+      return !!c && objectMatches(s, cond.filter, host, you, false, undefined, c, (x) => chars.get(x.id));
     }
     case "opponentPoison":
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (s.players[p]!.poison ?? 0) >= cond.n);
@@ -524,7 +531,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         for (const [id, c] of chars) {
           if (cond.other && id === sourceId) continue;
           if (c.controller !== who) continue;
-          if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c)) n++;
+          if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
         }
         return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
       });
@@ -571,7 +578,7 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
     if (a.controller === "opponent" && c.controller === you) continue;
     if (a.controller === "enchanted" && c.controller !== s.objects[e.sourceId!]?.attachedToPlayer) continue;
     if (a.ownedCommanders && !(s.objects[id]!.isCommander && s.objects[id]!.owner === you)) continue;
-    if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c)) continue;
+    if (spec && !objectMatches(s, spec, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
     out.push(id);
   }
   return out;
@@ -865,6 +872,10 @@ function countSignature(s: GameState): string {
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     if (o.tapped || o.attacking !== undefined || o.blocking) parts.push(`${id}${o.tapped ? "t" : ""}${o.attacking !== undefined ? "a" : ""}${o.blocking ? "b" : ""}`);
+    // Enchanted, equipped and modified creatures (TargetSpec.status): what's attached to what, and counters.
+    if (o.attachedTo) parts.push(`${id}@${o.attachedTo}`);
+    const n = Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0);
+    if (n) parts.push(`${id}#${n}`);
   }
   parts.push(`${s.activePlayer}`, `${s.turn}`); // and "this turn" conditions start over each turn
   return parts.join("|");
@@ -876,7 +887,7 @@ function usesCounts(s: GameState): boolean {
   for (const id of s.battlefield) {
     for (const st of compileCard(defOf(s, s.objects[id]!)).statics) {
       if (st.condition) return true; // "as long as": attacking, tapped lands, the graveyard, whose turn it is
-      if (st.affects.kind === "filter" && (st.affects.spec?.combat || st.affects.spec?.tapped !== undefined)) return true; // "attacking/untapped creatures you control"
+      if (st.affects.kind === "filter" && (st.affects.spec?.combat || st.affects.spec?.tapped !== undefined || st.affects.spec?.status)) return true; // "attacking/untapped/modified creatures you control"
       for (const m of st.mods) {
         if (m.kind === "definePT") return true;
         if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;

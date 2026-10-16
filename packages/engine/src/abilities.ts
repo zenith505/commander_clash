@@ -213,6 +213,12 @@ export interface TargetSpec {
   dealtDamageThisTurn?: true;
   /** true: a token; false: "nontoken". */
   token?: boolean;
+  /**
+   * "Enchanted creatures you control" (an Aura attached), "equipped creature" (an Equipment attached), "modified
+   * creature" (CR 700.9: a counter on it, equipped, or enchanted by an Aura its controller controls); "unenchanted":
+   * "creatures that aren't enchanted".
+   */
+  status?: "enchanted" | "equipped" | "modified" | "unenchanted";
   /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
   commander?: boolean;
   /** "a card named ~": the source's name (only for searches). */
@@ -559,6 +565,8 @@ export type StaticCondition =
   | { kind: "selfCounters"; counter: CounterKind; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" }
+  /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
+  | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
   | { kind: "anyOf"; conds: StaticCondition[] }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
@@ -810,7 +818,10 @@ export type Effect =
    */
   | { type: "recruit" }
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
-  | { type: "exileIfDies"; what: ObjRef }
+  /** `ifCreature`: "If it's a creature, ... if it would die this turn, exile it instead" (Carbonize, any target). */
+  | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
+  /** "It can't be regenerated this turn" (CR 701.19c): its regeneration shields don't apply this turn. */
+  | { type: "noRegen"; what: ObjRef; ifCreature?: true }
   /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
   | { type: "lookAtHand"; who: PlayerRef; reveal?: true }
   /** "~ assigns no combat damage this turn" (CR 510.1). */
@@ -928,7 +939,21 @@ export type Effect =
    */
   | { type: "becomeCopy"; what: ObjRef; of: ObjRef; except?: CopyExcept; duration: "game" | "endOfTurn" | "yourNextTurn" }
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking whom the ability's source attacks. */
-  | { type: "createToken"; who: PlayerRef; n: Amount; token: TokenSpec; tapped?: boolean; attacking?: boolean; /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */ counters?: { counter: CounterKind; n: Amount } }
+  | {
+      type: "createToken";
+      who: PlayerRef;
+      n: Amount;
+      token: TokenSpec;
+      tapped?: boolean;
+      attacking?: boolean;
+      /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */
+      counters?: { counter: CounterKind; n: Amount };
+      /**
+       * An Aura token "attached to" this object (a Role, CR 303.7): one for each object it means. It isn't created if it
+       * couldn't legally enchant that object (rulings on Roles).
+       */
+      attachTo?: ObjRef;
+    }
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   | { type: "exileTop"; who: PlayerRef; n: Amount }
@@ -1421,6 +1446,8 @@ export interface TriggeredAbility {
   ifEvidence?: boolean;
   /** "When ~ enters, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR 603.4). */
   ifTreasure?: boolean;
+  /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
+  ifCastFromHand?: boolean;
   /**
    * A chapter ability "{rN}—[Effect]": "When one or more lore counters are put onto this Saga, if the number of lore
    * counters on it was less than N and became at least N, [effect]" (CR 714.2b).

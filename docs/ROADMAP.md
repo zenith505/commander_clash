@@ -1,6 +1,6 @@
 # Roadmap
 
-17,066 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,208 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -28,17 +28,28 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
      them" and several cards don't. Named legendary tokens (Tuktuk the Explorer's "create Tuktuk the Returned, a
      legendary 5/5 ... token") aren't parsed.
-   Left from the timing restrictions/surge/spectacle/overload round (`npm run blockers` used to hide every spell
-   keyword line; it now shows them, so these are newly visible):
-   - Overload still out: Teleportal, Chemister's Trick, Dragonshift, Counterflux, Fangs of Kalonia, March of Progress,
-     Winds of Abandon, Mizzix's Mastery, Break the Ice, Rise and Shine, Spectacular Showdown, Eldritch Immunity (their
-     "each" lines), Street Spasm ({X}{X} overload cost). Fall of the Titans' Surge {X}{R}.
-   - Spell keywords now listed as blockers: Splice onto Arcane, Awaken, Miracle, Harmonize, Undaunted, Paradigm, Epic,
-     Demonstrate, Gravestorm, Buyback with a cost that isn't mana, Expertise's free cast, "tap or untap target"
-     (Jolt, Twiddle).
-   - Timing still out: "before blockers are declared" without "during combat", "after combat", "before the combat
-     damage step", "before attackers are declared" alone, "only if defending player controls ..." (Arcum's Sleigh),
-     Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it".
+   Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
+   epic, free casts from hand, timing points, overload leftovers):
+   - Overload still out: Chemister's Trick ("attacks this turn if able": does it bind more than one combat?),
+     Dragonshift, Fangs of Kalonia, March of Progress, Winds of Abandon, Mizzix's Mastery (copy an exiled card and
+     cast the copy), Break the Ice, Rise and Shine, Spectacular Showdown, Eldritch Immunity, Corporeal Projection, Bail
+     Out (their "each" lines). Fall of the Titans' Surge {X}{R}. Bots never overload Counterflux.
+   - Splice with a cost that isn't mana (Horobi's Whisper, Hundred-Talon Strike, Torrent of Stone, Veil of Secrecy,
+     Roar of Jukai), a second splice line, and splice onto a spell with X, modes, kicker, buyback or another
+     alternative cost. Memory Crystal ("buyback costs cost {2} less").
+   - Miracle: the card is always revealed when it's the first one drawn (revealing is optional in the rules) and the
+     cast is offered as the trigger resolves; Bonfire of the Damned and Terminus are out on their own lines.
+   - Epic: Eternal Dominion, Neverending Torment, Undying Flames are out on their own lines. Bots cast an epic spell
+     only as their last spell in hand.
+   - Free casts from hand still out: "mana value 1 or 2", "equal or lesser mana value" (Reinterpret, Press the
+     Enemy), "shares a card type" (Counterlash), "where X is ..." (Gandalf, Party Guest, Epistolary Librarian), "once
+     during each of your turns" (Zaffai, Vision), named filters (West Coast Expansion's Hero spell).
+   - Tap-or-untap variants: Telekinetic Bonds, Tolarian Kraken, Chain Stasis. Berserker's Frenzy ("before combat or
+     during combat before blockers are declared"). Arcum's Sleigh and Kjeldoran Guard ("only if defending player
+     controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it".
+     Coastal Wizard, Lady Sun, Diaochan, Maddening Imp, Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
+     their other lines.
+   - Harmonize, Paradigm, Demonstrate are still out.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or

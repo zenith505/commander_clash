@@ -17,7 +17,7 @@
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
 import { creatureCardAbove } from "./graveyard";
-import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow } from "./abilities";
+import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
@@ -346,6 +346,20 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
       return ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
     case "combatBeforeBlocks": // before the declare blockers step begins (CR 506.8b)
       return s.step === "beginCombat" || s.step === "declareAttackers";
+    case "beforeCombat":
+    case "beforeAttackers":
+    case "beforeBlockers":
+    case "beforeDamage": {
+      // Before that point of the turn's first combat (CR 506.8d): the beginning phase and first main phase, and the steps
+      // of that combat before it. With no attackers declared, the declare blockers and combat damage steps are skipped,
+      // so the window ends with the declare attackers step (506.8e).
+      if (["untap", "upkeep", "draw", "main1"].includes(s.step) && !s.combatsThisTurn) return true;
+      if ((s.combatsThisTurn ?? 0) !== 1) return false;
+      const table: Record<Exclude<TurnPoint, "afterCombat">, string[]> = { beforeCombat: [], beforeAttackers: ["beginCombat"], beforeBlockers: ["beginCombat", "declareAttackers"], beforeDamage: ["beginCombat", "declareAttackers", "declareBlockers"] };
+      return table[w].includes(s.step);
+    }
+    case "afterCombat": // once the turn's first combat phase has ended (CR 506.8d)
+      return !!s.combatsThisTurn && !(s.combatsThisTurn === 1 && ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step));
     case "combatAfterBlocks": // not in a combat whose declare blockers step was skipped (CR 506.8f)
       return ["declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step) && s.blockersStep?.turn === s.turn && s.blockersStep.combat === (s.combatsThisTurn ?? 0);
   }

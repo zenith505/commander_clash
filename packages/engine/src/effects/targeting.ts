@@ -200,6 +200,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
     if (item.kind === "ability") return !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered);
     if (spec.noSpells || !item.objectId) return false;
+    // "Target spell you control", "... you don't control" / "... an opponent controls" (no teammates here).
+    if ((spec.controller === "you" && item.controller !== controller) || (spec.controller === "opponent" && item.controller === controller)) return false;
     if (spec.targetsWhat && !targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller)) return false;
     // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used. Its mana value
     // counts the X chosen for it (CR 202.3e); a face-down spell's is 0 (CR 708.2).

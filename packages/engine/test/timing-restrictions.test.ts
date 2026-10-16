@@ -257,3 +257,74 @@ describe("bots", () => {
     expect(botActions(s0, ap).some((a) => a.type === "activateAbility" && a.objectId === d)).toBe(false);
   });
 });
+
+// "Only before (or after) [a point in combat]" without "during combat" means the turn's first combat (CR 506.8d); a
+// skipped declare blockers step ends "before the combat damage step" with the declare attackers step (506.8e).
+describe("before and after a point in combat", () => {
+  // Real oracle text (Scryfall), except `lateHymn`, which uses the real phrase "after combat" on a plain effect.
+  const angus = card("Angus Mackenzie", "Legendary Creature — Human Cleric", "{G}{W}{U}", { power: "2", toughness: "2", oracleText: "{G}{W}{U}, {T}: Prevent all combat damage that would be dealt this turn. Activate only before the combat damage step." });
+  const sorcerer = card("Apprentice Sorcerer", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to any target. Activate only during your turn, before attackers are declared." });
+  const lateHymn = card("Late Hymn", "Instant", "{W}", { oracleText: "Cast this spell only after combat.\nYou gain 3 life." });
+  const watcher = card("Gate Watcher", "Creature — Human Soldier", "{1}", { power: "1", toughness: "1", oracleText: "{T}: You gain 1 life. Activate only during an opponent's turn, before attackers are declared." });
+
+  it("parses", () => supported(angus, sorcerer, lateHymn, watcher));
+
+  it("Angus Mackenzie: before the combat damage step, on any player's turn, not once damage is dealt", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, angus);
+    expect(allowed(abilityProblem(s0, ap, g, 0))).toBe(true);
+    const a = putOnBattlefield(s0, ap, bear());
+    let s = attackWith(s0, ap, [{ attacker: a, defender: opp }]);
+    s = act(passUntil(s, "declareBlockers", ap), { type: "declareBlockers", player: opp, blocks: [] });
+    expect(allowed(abilityProblem(priorityTo(s, ap), ap, g, 0))).toBe(true);
+    s = passUntil(s, "combatDamage", ap);
+    expect(abilityProblem(s, ap, g, 0)).toMatch(/can't be activated now/);
+    s = passUntil(s, "main2", ap);
+    expect(abilityProblem(s, ap, g, 0)).toMatch(/can't be activated now/);
+    // With no attackers the declare blockers and combat damage steps are skipped: the window ends with declare attackers.
+    const { s: t0, ap: ap2 } = setup([]);
+    const g2 = putOnBattlefield(t0, ap2, angus);
+    const t = passUntil(t0, "endCombat", ap2);
+    expect(abilityProblem(t, ap2, g2, 0)).toMatch(/can't be activated now/);
+    // On an opponent's turn, before their combat damage step.
+    const u = priorityTo(passUntil(s, "upkeep", opp), ap);
+    expect(allowed(abilityProblem(u, ap, g, 0))).toBe(true);
+  });
+
+  it("Apprentice Sorcerer: during your turn before attackers are declared, so in the beginning of combat step but not after", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const w = putOnBattlefield(s0, ap, sorcerer);
+    const them = [{ kind: "player" as const, id: opp }];
+    expect(allowed(abilityProblem(s0, ap, w, 0, them))).toBe(true);
+    let s = passUntil(s0, "beginCombat", ap);
+    expect(allowed(abilityProblem(priorityTo(s, ap), ap, w, 0, them))).toBe(true);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [] });
+    expect(abilityProblem(s, ap, w, 0, them)).toMatch(/can't be activated now/);
+    s = passUntil(s, "main2", ap);
+    expect(abilityProblem(s, ap, w, 0, them)).toMatch(/can't be activated now/);
+    const t = priorityTo(passUntil(s, "upkeep", opp), ap);
+    expect(abilityProblem(t, ap, w, 0, them)).toMatch(/can't be activated now/);
+  });
+
+  it("an opponent's turn, before attackers are declared", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const w = putOnBattlefield(s0, ap, watcher);
+    expect(abilityProblem(s0, ap, w, 0)).toMatch(/can't be activated now/);
+    let s = priorityTo(passUntil(s0, "upkeep", opp), ap);
+    expect(allowed(abilityProblem(s, ap, w, 0))).toBe(true);
+    s = passUntil(s, "main2", opp);
+    expect(abilityProblem(priorityTo(s, ap), ap, w, 0)).toMatch(/can't be activated now/);
+  });
+
+  it("after combat: once the turn's first combat phase has ended", () => {
+    const { s: s0, ap, ids } = setup([lateHymn]);
+    expect(castProblem(s0, ap, ids[0]!)).toMatch(/only after combat/);
+    let s = passUntil(s0, "endCombat", ap);
+    expect(castProblem(s, ap, ids[0]!)).toMatch(/only after combat/);
+    s = passUntil(s, "main2", ap);
+    expect(allowed(castProblem(s, ap, ids[0]!))).toBe(true);
+    s = passUntil(s, "end", ap);
+    expect(allowed(castProblem(priorityTo(s, ap), ap, ids[0]!))).toBe(true);
+  });
+});

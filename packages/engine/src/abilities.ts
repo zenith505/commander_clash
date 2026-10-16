@@ -109,6 +109,8 @@ export type Count =
   | { kind: "devoured" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
   | { kind: "diedThisTurn"; yours?: true }
+  /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
+  | { kind: "toGraveyardThisTurn" }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
   | { kind: "attackersThisTurn" }
   /** "For each time you've cast your commander from the command zone this game": all of your commanders (CR 903.8, rulings). */
@@ -713,7 +715,14 @@ export const timedCondition = (c: StaticCondition | undefined): boolean =>
  * attackers), "combatAfterBlocks" (once blockers are declared, 506.8f: not in a combat whose declare blockers step was
  * skipped), and the steps "declareAttackers", "declareBlockers" and "endCombat", once their turn-based actions are done.
  */
-export type TimingWindow = "upkeep" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat";
+export type TimingWindow = "upkeep" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
+
+/**
+ * "Only before combat", "only before attackers are declared", "only before blockers are declared", "only before the
+ * combat damage step", "only after combat" (CR 506.8a-b, d-e): without "during combat", the point is the one in the
+ * turn's first combat phase, so the windows run from the start of the turn, or after that first combat.
+ */
+export type TurnPoint = "beforeCombat" | "beforeAttackers" | "beforeBlockers" | "beforeDamage" | "afterCombat";
 
 export type Effect =
   /** `also`: more recipients dealt the same damage at the same time ("to each creature and each player", CR 120.3). */
@@ -849,6 +858,11 @@ export type Effect =
   /** "~ assigns no combat damage this turn" (CR 510.1). */
   | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
+  /**
+   * "Tap or untap target permanent": its controller chooses which as it resolves (CR 608.2d); `may`: "you may tap or
+   * untap", where doing neither is a choice too (one question).
+   */
+  | { type: "tapOrUntap"; what: ObjRef; may?: true }
   /** Provoke's "block [the source] this combat if able" (CR 702.39a): a blocking requirement, see blockRequirementProblem. */
   /** Provoke and "target creature blocks ~ this turn if able": for this combat, or the rest of the turn (CR 509.1c). */
   | { type: "mustBlockSource"; what: ObjRef; thisTurn?: true }
@@ -896,6 +910,13 @@ export type Effect =
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
   | { type: "madness" }
+  /** Miracle's trigger (CR 702.94a): "you may cast it by paying [cost] rather than its mana cost", while it's still in hand. */
+  | { type: "miracle" }
+  /**
+   * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
+   * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
+   */
+  | { type: "castFromHand"; filter: TargetSpec }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -922,7 +943,8 @@ export type Effect =
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
    * `newTargets`: "you may choose new targets for the copy" (707.10c).
    */
-  | { type: "copySpell"; spell: "cause" | { target: number }; n: Amount | "storm" | "kicked"; newTargets: boolean }
+  /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
+  | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }
@@ -1042,6 +1064,8 @@ export type Effect =
    * Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead", "put it on
    * top of its owner's library instead".
    */
+  /** "Counter each spell you don't control" (overloaded Counterflux): every spell on the stack matching it, not abilities. */
+  | { type: "counterEach"; filter: TargetSpec }
   | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean; /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */ ifMvX?: true }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
@@ -1199,7 +1223,7 @@ export type SpellCondition =
   /** "If the gift was promised" (CR 702.174b, k). */
   | { kind: "gift" }
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
-  | { kind: "altPaid"; alt: "surge" | "spectacle" }
+  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition };
 
@@ -1761,7 +1785,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload";
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
@@ -2020,8 +2044,23 @@ export interface CompiledCard {
   escapesWith?: number;
   /** Buyback (CR 702.27): an optional additional cost; paid, the spell returns to its owner's hand as it resolves. */
   buyback?: string;
+  /**
+   * "Buyback—Sacrifice a land." (Constant Mists), "Buyback—Pay 3 life, Discard a card at random.": a buyback cost that
+   * isn't mana (CR 702.27a, 118.8), paid with the spell's other costs; `buyback` is "" then, and `buybackText` says it.
+   */
+  buybackCosts?: AdditionalCost[];
+  /** Miracle [cost] (CR 702.94a): revealed as it's drawn as the first card drawn this turn, it may be cast for `miracle`. */
+  miracle?: string;
+  /**
+   * "Splice onto Arcane {1}{R}" (CR 702.47a): revealed from your hand as you cast an Arcane spell (or "instant or
+   * sorcery" spell), that spell gains this card's rules text and you pay `mana` as an additional cost.
+   */
+  splice?: { onto: "Arcane" | "instantOrSorcery"; mana: string };
+  buybackText?: string;
   /** Rebound (CR 702.88). */
   rebound?: boolean;
+  /** Epic (CR 702.50a): see finishSpell. */
+  epic?: true;
   /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
   altCosts?: {
     kind: AltCostKind;

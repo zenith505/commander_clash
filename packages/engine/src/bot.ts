@@ -54,6 +54,8 @@ import {
   teamworkCandidates,
   teamworkPower,
   conspireCandidates,
+  spliceCandidates,
+  madnessCastOf,
   auraHostFor,
   auraHostKey,
 } from "./game";
@@ -192,6 +194,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Read ahead (CR 702.155): start on chapter I, so every chapter happens.
     if (pend.kind === "chooseOption" && pend.what === "readAhead") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
+    // Tap or untap: tap an opponent's untapped permanent, untap our own tapped one; otherwise leave it if we may.
+    // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": the biggest one.
+    if (pend.kind === "chooseOption" && pend.what === "castFromHand") {
+      const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));
+      const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
+    }
+    if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
@@ -302,7 +312,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Damage prevention waits for damage coming (chooseDamageShield).
       .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -672,9 +682,11 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   const d = defOf(s, obj(s, id));
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
-  const cost = parseManaCost(graveyardWay(s, obj(s, id), via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
+  // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
+  const paidAs = free ? madnessCastOf(s, pid, id) : undefined;
+  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
-  if (cost.hasX && free) return null;
+  if (cost.hasX && free && !paidAs) return null;
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
   const effects = compileCard(d).spell?.effects ?? [];
   if (!free && effects.length && effects.every((e) => e.type === "addMana" || e.type === "choose")) {
@@ -751,6 +763,13 @@ function overloadPlan(s: GameState, pid: PlayerId, id: string): Action[] | null 
   return castPlan(s, pid, id, false, undefined, "overload");
 }
 
+/** Awaken (CR 702.113a) whenever we can pay it and have a land to awaken: the spell's effect, and a creature too. */
+function awakenPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "hand" || !altCost(defOf(s, o), "awaken")) return null;
+  return castPlan(s, pid, id, false, undefined, "awaken");
+}
+
 /** Surge and spectacle (CR 702.117a, 702.137a) whenever they're allowed: no more than the mana cost, and maybe a bonus. */
 function cheaperAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   const o = obj(s, id);
@@ -820,6 +839,17 @@ function chooseForetell(s: GameState, pid: PlayerId): Action[] | null {
  * Which room to venture into, or which dungeon to start (CR 701.49): damage and bodies first, the counters only with a
  * creature to put them on, goad only with an opponent's creature to goad.
  */
+/** "Tap or untap target permanent": what's best for us about the permanent it's about. */
+function tapOrUntapChoice(s: GameState, pid: PlayerId, options: string[]): string {
+  const pend = s.pending;
+  const o = pend?.kind === "chooseOption" && pend.about ? s.objects[pend.about] : undefined;
+  if (!o) return options[options.length - 1]!;
+  const ours = controllerOf(s, o) === pid;
+  if (ours && o.tapped) return "untap";
+  if (!ours && !o.tapped) return "tap";
+  return options.includes("neither") ? "neither" : ours ? "untap" : "tap";
+}
+
 function chooseRoom(s: GameState, pid: PlayerId, options: string[]): string {
   const creatures = (mine: boolean) => s.battlefield.some((id) => objIsType(s, obj(s, id), "Creature") && (controllerOf(s, obj(s, id)) === pid) === mine);
   const score = (room: string) =>
@@ -993,7 +1023,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   // Whether a cost of this kind must be paid (true), must not be (false), or is up to the usual choice (undefined).
   const must = (kind: SpellCondition["kind"]) => (gate && gate.conds.some((c) => c.kind === kind) ? gate.paid : undefined);
   const kickOk = (kicks: number[]) => !gate || !gate.conds.some((c) => c.kind === "kicked") || gate.conds.filter((c) => c.kind === "kicked").every((c) => castConditionMet(c, { kicks }) === gate.paid);
-  const how: CastHow = gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {};
+  const how: CastHow = { ...(gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {}), ...(alt ? { alt } : {}) };
   const body = printed && gateBody(withModes(printed, modes), how);
   const specs = body?.targets ?? spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
@@ -1004,6 +1034,8 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     for (let i = targets.length - 1; i > 0 && !planCast(s, pid, id, targets, modes, "auto", x, way); i--) if (targets[i]!.kind !== "none") targets[i] = { kind: "none" };
   }
   if (!free && body && isCounterOnly(body)) return null; // hold counterspells
+  // Epic: no more spells for the rest of the game (CR 702.50a), so only as our last spell in hand.
+  if (compileCard(defOf(s, obj(s, id))).epic && player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land"))) return null;
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
   if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
   // "Sacrifice a creature or pay {3}{B}" (CR 601.2b): the first way we're willing and able to pay.
@@ -1068,15 +1100,40 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
       .slice(0, room);
   }
   // Buy it back if we can afford to (CR 702.27a), then kick it if we can: the most kicker costs first (CR 702.33).
-  const buybacks = compileCard(defOf(s, obj(s, id))).buyback && !via ? [true, false] : [false];
-  for (const buyback of buybacks)
-    for (const kicks of kickOptions(s, pid, id, free).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
-      const plan = planCast(s, pid, id, targets ?? undefined, modes, "auto", x, { ...extra, ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}) });
-      // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
-      if (plan && targets && !canAlsoPayWard(s, pid, plan, targets)) continue;
-      if (plan) return plan;
-    }
+  // A buyback cost that isn't mana ("sacrifice a land", "discard two cards"): paid only as our other costs would be.
+  const bb = compileCard(defOf(s, obj(s, id)));
+  const bbCosts = bb.buybackCosts && !via && !extra.sacrifice && !extra.discard ? chooseExtraCosts(s, pid, id, targets ?? [], via, alt, extra.costOr, x ?? 0, modes, true) : undefined;
+  const buybacks = bb.buyback !== undefined && !via && (!bb.buybackCosts || bbCosts) ? [true, false] : [false];
+  // Splice (CR 702.47a): the cards in hand worth adding, with their own targets after the spell's; then without.
+  const spliced = chooseSplices(s, pid, id, x ?? 0);
+  for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
+    for (const buyback of buybacks)
+      for (const kicks of kickOptions(s, pid, id, free).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
+        const all = splice ? [...(targets ?? []), ...splice.targets] : targets;
+        const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}) });
+        // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
+        if (plan && all && !canAlsoPayWard(s, pid, plan, all)) continue;
+        if (plan) return plan;
+      }
   return null;
+}
+
+/**
+ * Cards to splice onto this spell (CR 702.47a): ones whose text does something for us now (not only mana, which would
+ * come too late), each with targets of its own we'd pick.
+ */
+function chooseSplices(s: GameState, pid: PlayerId, id: ObjectId, x: number): { ids: ObjectId[]; targets: TargetChoice[] } {
+  const out: { ids: ObjectId[]; targets: TargetChoice[] } = { ids: [], targets: [] };
+  for (const c of spliceCandidates(s, pid, id)) {
+    const body = compileCard(defOf(s, obj(s, c))).spell!;
+    if (body.effects.every((e) => e.type === "addMana")) continue;
+    if ((groupValue(s, pid, body, defOf(s, obj(s, c))) ?? 1) <= 0) continue;
+    const t = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
+    if (!t || t.some((x) => x.kind === "none")) continue;
+    out.ids.push(c);
+    out.targets.push(...t);
+  }
+  return out;
 }
 
 const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
@@ -1115,11 +1172,11 @@ function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): nu
  * and cheap permanents get sacrificed, never the commander or something it targets; the least useful
  * cards get discarded; life is paid only with plenty to spare.
  */
-function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0, modes?: number[]): CostChoices | null {
+function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: TargetChoice[], via?: CastFromGraveyardKind, alt?: AltCostKind, costOr?: number, x = 0, modes?: number[], buyback?: boolean): CostChoices | null {
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt, costOr, ...(modes ? { modes } : {}) }, x, s, pid)) {
+  for (const c of castExtraCosts(d, { via, alt, costOr, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     if (c.kind === "giveLife") {
       // Invigorate: the opponent with the least life gets it (the least threat to us); "each other player": nothing to choose.

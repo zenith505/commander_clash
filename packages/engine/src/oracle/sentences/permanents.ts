@@ -5,7 +5,7 @@ import { NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
 import { pickFilter, parseObject, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseChanges } from "../sentence";
-import { parseExtraBlocks } from "../statics";
+import { parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -16,6 +16,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Tap (target .+?|that creature|it) and it doesn't untap during its controller's next untap step$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "tap", what }, { type: "skipUntap", what }] : null;
+  }
+  // "Tap or untap target permanent" (Twiddle, Pestermite): which is chosen as it resolves (CR 608.2d).
+  if ((m = /^Tap or untap ((?:another )?target .+|that creature|it|~|enchanted \w+|equipped \w+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) && !(what.ref === "target" && what.n) ? [{ type: "tapOrUntap", what }] : null;
   }
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
@@ -219,6 +224,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
     const mods = what && parseChanges([m[2], m[3]!.replace(/ this turn$/, "")].filter(Boolean).join(" and "));
     return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
+  }
+  // "Target creature gets +1/+0 until end of turn and can't be blocked this turn" (Teleportal), "... and must be blocked
+  // this turn if able" (Compelled Duel, CR 509.1c): "this turn" ends with "until end of turn", in the cleanup step (CR
+  // 514.2), so it's one change until end of turn.
+  if ((m = /^(.+?) ((?:gets?|gains?) .+) until end of turn and (can't be blocked(?: by .+?)?|can't block|must be blocked) this turn( if able)?$/i.exec(s))) {
+    if (!!m[4] !== (m[3] === "must be blocked")) return null;
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    const first = what && parseChanges(m[2]!);
+    const second = first && parseStaticMods(m[3] === "must be blocked" ? "must be blocked if able" : m[3]!);
+    return what && first && second ? [{ type: "continuous", what, mods: [...first, ...second], duration: "endOfTurn" }] : null;
   }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

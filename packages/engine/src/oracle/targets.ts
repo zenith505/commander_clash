@@ -382,12 +382,13 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
       extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };
     }
     p = p.slice(0, m.index);
-  } else if ((m = / (with|without) ([a-z ]+)$/.exec(p))) {
+  } else if ((m = / (with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     const kws = parseKeywordList(m[2]!);
     if (!kws || kws.length !== 1) return null;
     if (m[1] === "with") extra.keywords = kws;
     else extra.notKeywords = kws;
-    p = p.slice(0, m.index);
+    // "Creature without flying you don't control" (Street Spasm): whose it is, read below.
+    p = p.slice(0, m.index) + (m[3] ?? "");
   }
   // "Target 1/1 creature" (Pendelhaven, The Seedcore): power and toughness exactly those.
   if ((m = /^(\d+)\/(\d+) (?=creature\b)/.exec(p)) && !extra.power && !extra.toughness) {
@@ -500,7 +501,7 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
     return { kind: "card", ...filters, ...(owner ? { owner } : {}), text };
   }
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, text };
+  if (isSpell) return extra.keywords || extra.notKeywords || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
 }
 

@@ -18,7 +18,7 @@ import { parseStaticCondition } from "./statics";
 export function parseGraveyardKeyword(
   line: string,
   d: CardDef,
-): { fromGraveyard: CastFromGraveyard } | { buyback: string } | { rebound: true } | { escapesWith: number } | { unearth: ActivatedAbility } | "fail" | null {
+): { fromGraveyard: CastFromGraveyard } | { buyback: string; costs?: AdditionalCost[]; text?: string } | { rebound: true } | { escapesWith: number } | { unearth: ActivatedAbility } | "fail" | null {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   let m: RegExpExecArray | null;
   if ((m = /^(Flashback|Escape)(?: |—)(.+?)\.?$/.exec(line))) {
@@ -47,6 +47,12 @@ export function parseGraveyardKeyword(
   }
   if (/^Rebound$/.test(line)) return isSpell ? { rebound: true } : "fail";
   if ((m = /^Buyback ((?:\{[^}]+\})+)$/.exec(line))) return isSpell && parseManaCost(m[1]!).supported && !parseManaCost(m[1]!).hasX ? { buyback: m[1]! } : "fail";
+  // "Buyback—Sacrifice a land.", "Buyback—Pay 3 life, Discard a card at random." (CR 702.27a): costs that aren't mana.
+  if ((m = /^Buyback—(.+?)\.?$/.exec(line))) {
+    if (!isSpell) return "fail";
+    const costs = m[1]!.split(", ").map((part) => parseAdditionalCost(part));
+    return costs.every((c) => c) ? { buyback: "", costs: costs as AdditionalCost[], text: m[1]!.replace(/^./, (c) => c.toLowerCase()).replace(/, (\w)/g, (_, c: string) => ` and ${c.toLowerCase()}`) } : "fail";
+  }
   if ((m = new RegExp(`^~ escapes with ${NUM} \\+1/\\+1 counters? on it\\.$`).exec(line))) return { escapesWith: num(m[1]!) };
   if ((m = /^Unearth ((?:\{[^}]+\})+)$/.exec(line))) {
     if (!parseManaCost(m[1]!).supported || parseManaCost(m[1]!).hasX) return "fail";
@@ -81,6 +87,7 @@ export function parseCostKeyword(
   assist?: true;
   faceDown?: { kind: FaceDownKind; cost: string };
   madness?: string;
+  miracle?: string;
   suspend?: { n: number; cost: string };
   plot?: string;
   foretell?: string;
@@ -140,6 +147,9 @@ export function parseCostKeyword(
   // Bestow (CR 702.103a); "Bestow—{R}, Collect evidence 6" isn't modeled. (Cast bestowed, the card is an Aura: see bestowedDef.)
   if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
   // Madness (CR 702.35a): "Madness—{1}{B}, Pay 1 life" and X madness costs aren't modeled.
+  // Miracle [cost] (CR 702.94a): a mana cost, without an X the mana cost doesn't have.
+  if ((m = /^Miracle ((?:\{[^}]+\})+)$/.exec(line))) return parseManaCost(m[1]!).supported && (!/\{X\}/.test(m[1]!) || /\{X\}/.test(d.manaCost)) ? { miracle: m[1]! } : "fail";
+  if (/^Miracle\b/.test(line)) return "fail";
   if ((m = /^Madness(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { madness: m[1]! } : "fail";
   // Suspend N—[cost] (CR 702.62a); "Suspend X—{X}{U}. X can't be 0." isn't modeled.
   if ((m = /^Suspend (\d+)—((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[2]!) ? { suspend: { n: Number(m[1]), cost: m[2]! } } : "fail";
@@ -227,8 +237,10 @@ export function parseCostKeyword(
   if (/^(Surge|Spectacle)\b/.test(line)) return "fail";
   // Overload [cost] (CR 702.96a): an alternative cost for an instant or sorcery; compile checks its "each" text.
   if ((m = /^Overload ((?:\{[^}]+\})+)$/.exec(line))) {
-    // An overload cost with {X} (Street Spasm) waits: how X is paid twice isn't modeled.
-    if (!plainMana(m[1]!) || !d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return "fail";
+    // An overload cost with {X} (Street Spasm's {X}{X}{R}{R}): X is announced and paid for each {X} in it (CR 107.3a,
+    // 107.4b); only when the spell's own text has the X.
+    const xOk = plainMana(m[1]!.replace(/\{X\}/g, "")) && parseManaCost(m[1]!).supported && /\{X\}/.test(d.manaCost);
+    if (!(plainMana(m[1]!) || xOk) || !d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return "fail";
     return { alt: { kind: "overload", mana: m[1]! } };
   }
   if (/^Overload\b/.test(line)) return "fail";
@@ -506,6 +518,10 @@ interface KeywordParts {
   sunburst?: { counter?: "+1/+1" };
   amplify?: number;
   enlist?: boolean;
+  /** Undaunted's instances (CR 702.125c). */
+  undaunted?: number;
+  /** Epic (CR 702.50a), on an instant or sorcery. */
+  epic?: boolean;
 }
 
 /** CR 702.189a: "Whenever this creature attacks, add N {R}. Until end of combat, you don't lose this mana as steps and phases end." */
@@ -553,6 +569,21 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.40a: "When you cast this spell, copy it for each other spell that was cast before it this turn. If the
       // spell has any targets, you may choose new targets for any of the copies."
       out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." } });
+    } else if (/^gravestorm$/i.test(p)) {
+      // CR 702.69a: "When you cast this spell, copy it for each permanent that was put into a graveyard from the
+      // battlefield this turn. If the spell has any targets, you may choose new targets for any of the copies."
+      // Counted as the trigger resolves; each instance triggers (702.69b).
+      out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: { count: { kind: "toGraveyardThisTurn" } }, newTargets: true }], text: "Gravestorm: copy ~ for each permanent put into a graveyard from the battlefield this turn." } });
+    } else if (/^epic$/i.test(p)) {
+      // CR 702.50a: "For the rest of the game, you can't cast spells," and "At the beginning of each of your upkeeps for
+      // the rest of the game, copy this spell except for its epic ability. If the spell has any targets, you may choose
+      // new targets for the copy." Both happen as it resolves, after its other instructions.
+      if (!d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return null;
+      out.epic = true;
+    } else if (/^undaunted$/i.test(p)) {
+      // CR 702.125a: "This spell costs {1} less to cast for each opponent you have"; players who left aren't counted
+      // (702.125b), and each instance applies (702.125c).
+      out.undaunted = (out.undaunted ?? 0) + 1;
     } else if (/^cascade$/i.test(p)) {
       // CR 702.85a: "When you cast this spell, exile cards from the top of your library until you exile a nonland card
       // whose mana value is less than this spell's mana value. You may cast that card without paying its mana cost if

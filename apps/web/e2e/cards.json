@@ -197,6 +197,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d3a0b660-358c-41bd-9cd2-41fbf3491b1a",
+  "name": "Birds of Paradise",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Bird",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird"
+  ],
+  "oracleText": "Flying\n{T}: Add one mana of any color.",
+  "power": "0",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ff387264-31da-4f6b-88c6-2843f56acbda",
   "name": "Bite Down on Crime",
   "manaCost": "{3}{G}",
@@ -514,6 +553,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2c6658c3-8c0e-46c9-8127-bc5b77eb0dab",
+  "name": "Clutch of Currents",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target creature to its owner's hand.\nAwaken 3—{4}{U} (If you cast this spell for {4}{U}, also put three +1/+1 counters on target land you control and it becomes a 0/0 Elemental creature with haste. It's still a land.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Awaken"
+  ],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "22a78443-db21-4656-b38a-e3e3186fd94b",
   "name": "Collective Brutality",
   "manaCost": "{1}{B}",
@@ -633,6 +700,34 @@
   "set": "mkm",
   "releasedAt": "2024-02-09",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c850a29e-dc40-4ab6-89f1-d501a1a350d1",
+  "name": "Constant Mists",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Buyback—Sacrifice a land. (You may sacrifice a land in addition to any other costs as you cast this spell. If you do, put this card into your hand as it resolves.)\nPrevent all combat damage that would be dealt this turn.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Buyback"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-06-09",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -1044,6 +1139,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c62a9e10-cfc6-48cc-a3f7-68d624182a5a",
+  "name": "Endless Swarm",
+  "manaCost": "{5}{G}{G}{G}",
+  "cmc": 8,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create a 1/1 green Snake creature token for each card in your hand.\nEpic (For the rest of the game, you can't cast spells. At the beginning of each of your upkeeps, copy this spell except for its epic ability.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Epic"
+  ],
+  "commanderLegal": "legal",
+  "set": "sok",
+  "releasedAt": "2005-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b23dc81d-01bb-4bf0-9932-5d32a6b22cf7",
   "name": "Explosive Derailment",
   "manaCost": "{R}",
@@ -1423,6 +1546,36 @@
   "set": "eoe",
   "releasedAt": "2025-08-01",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e65a8ab8-84a7-4fe2-b009-ceb87bec6b4e",
+  "name": "Glacial Ray",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Glacial Ray deals 2 damage to any target.\nSplice onto Arcane {1}{R} (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Splice"
+  ],
+  "commanderLegal": "legal",
+  "set": "pal04",
+  "releasedAt": "2004-01-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -1963,6 +2116,36 @@
   "set": "j25",
   "releasedAt": "2024-11-15",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c027a8ef-6cdd-4c14-9d4f-b21c63312874",
+  "name": "Kodama's Might",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Instant — Arcane",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Arcane"
+  ],
+  "oracleText": "Target creature gets +2/+2 until end of turn.\nSplice onto Arcane {G} (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Splice"
+  ],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3310,6 +3493,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5cd17347-5558-46f9-b8bb-ae5deeb1f229",
+  "name": "Sram's Expertise",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create three 1/1 colorless Servo artifact creature tokens.\nYou may cast a spell with mana value 3 or less from your hand without paying its mana cost.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "aer",
+  "releasedAt": "2017-01-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a494fcee-6885-434c-aad5-6f83640c4472",
   "name": "Stonespeaker Crystal",
   "manaCost": "{4}",
@@ -3330,6 +3539,34 @@
   "commanderLegal": "legal",
   "set": "clb",
   "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "95385d84-550c-4d6c-a889-62bdbc1d518d",
+  "name": "Street Spasm",
+  "manaCost": "{X}{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Street Spasm deals X damage to target creature without flying you don't control.\nOverload {X}{X}{R}{R} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Overload"
+  ],
+  "commanderLegal": "legal",
+  "set": "ddj",
+  "releasedAt": "2012-09-07",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -3495,6 +3732,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "78260893-c443-44c8-ab45-ce86ef347d98",
+  "name": "Thunderous Wrath",
+  "manaCost": "{4}{R}{R}",
+  "cmc": 6,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Thunderous Wrath deals 5 damage to any target.\nMiracle {R} (You may cast this card for its miracle cost when you draw it if it's the first card you drew this turn.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Miracle"
+  ],
+  "commanderLegal": "legal",
+  "set": "avr",
+  "releasedAt": "2012-05-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "afaef788-34d1-460b-b884-9d7ae6ddeb18",
   "name": "Toxic Deluge",
   "manaCost": "{2}{B}",
@@ -3517,6 +3782,32 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "773ad2ef-5acc-49ea-8d85-056330e87039",
+  "name": "Twiddle",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You may tap or untap target artifact, creature, or land.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "lea",
+  "releasedAt": "1993-08-05",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

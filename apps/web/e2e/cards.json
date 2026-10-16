@@ -673,6 +673,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0bbcb563-09b3-499d-a9cc-3a6d7501dd81",
+  "name": "Collected Company",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top six cards of your library. Put up to two creature cards with mana value 3 or less from among them onto the battlefield. Put the rest on the bottom of your library in any order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2020-11-06",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "22a78443-db21-4656-b38a-e3e3186fd94b",
   "name": "Collective Brutality",
   "manaCost": "{1}{B}",
@@ -3752,6 +3778,37 @@
   "set": "frf",
   "releasedAt": "2015-01-23",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f3fad295-1af2-4ecc-8546-b121ad6be27b",
+  "name": "Soul Warden",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Cleric",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Cleric"
+  ],
+  "oracleText": "Whenever another creature enters, you gain 1 life.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-08-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

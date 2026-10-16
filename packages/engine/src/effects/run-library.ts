@@ -2,7 +2,7 @@ import type { Effect } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
-import { gainLife, log, loseLife, moveObject, obj, opponents, player } from "../game";
+import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { printedMatches } from "./targeting";
@@ -10,6 +10,7 @@ import { ResolveCtx, apnap, players, amountNow, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { chooseAuraHosts } from "./run-zones";
+import type { AuraHost } from "../game";
 
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -367,15 +368,17 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of found) moves.push({ pid, id });
         if (searchers.length === 1) shuffle(s, p.library);
       }
-      for (const { pid, id } of moves) {
-        const p = player(s, pid);
-        const to = dest(pid, id);
-        if (to.zone === "libraryTop") {
-          obj(s, id).zone = "library";
-          p.library.unshift(id);
-        } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id) });
-        else moveObject(s, id, to.zone);
-      }
+      enterTogether(s, () => {
+        for (const { pid, id } of moves) {
+          const p = player(s, pid);
+          const to = dest(pid, id);
+          if (to.zone === "libraryTop") {
+            obj(s, id).zone = "library";
+            p.library.unshift(id);
+          } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id) });
+          else moveObject(s, id, to.zone);
+        }
+      });
       // "Then shuffles": after the cards are put onto the battlefield, each player who searched (CR 701.23, 701.20).
       if (searchers.length > 1)
         for (const pid of searchers) {
@@ -393,49 +396,65 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!sc.looked) {
         sc.looked = p.library.slice(0, amountNow(s, e.n, ctx));
         if (!sc.looked.length) return;
-        const options = sc.looked.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange).
+        const filter = e.filter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(e.filter) : e.filter;
+        const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         const max = Math.min(e.count, options.length);
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {
-          const kind = (e.filter?.text ?? "card").replace(/~/g, src);
+          const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${ctx.x ?? 0} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
           const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
-          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : "on the bottom of your library";
+          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
           return "paused";
         }
         sc.found = options.slice(0, max);
       }
       const looked = sc.looked;
-      const found = (sc.found ?? []).filter((id) => looked.includes(id));
+      let found = (sc.found ?? []).filter((id) => looked.includes(id));
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
       const faceDown = e.into === "manifest" || e.into === "cloak" ? e.into : undefined;
       // Resuming after the owner ordered the rest for the bottom: the cards taken have already moved.
       if (sc.moved) return toBottom(s, pid, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false);
+      // An Aura put onto the battlefield: its controller chooses what it enchants as it enters (CR 303.4f), or it stays
+      // with the rest (303.4g).
+      const hosts = e.into === "battlefield" ? chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src) : new Map<ObjectId, AuraHost>();
+      if (hosts === "paused") return "paused";
+      found = found.filter((id) => {
+        if (e.into !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id)) return true;
+        log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays with the rest.`);
+        return false;
+      });
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
-      for (const id of found) {
-        if (e.into === "hand") moveObject(s, id, "hand");
-        else if (faceDown) {
-          // One at a time (CR 701.40e, 701.58e), each a 2/2 face-down creature; "it" in what follows.
-          moveObject(s, id, "battlefield", { controller: p.id, faceDown });
-          if (obj(s, id).zone === "battlefield") r.created!.push(id);
+      enterTogether(s, () => {
+        for (const id of found) {
+          if (e.into === "hand") moveObject(s, id, "hand");
+          else if (faceDown) {
+            // One at a time (CR 701.40e, 701.58e), each a 2/2 face-down creature; "it" in what follows.
+            moveObject(s, id, "battlefield", { controller: p.id, faceDown });
+            if (obj(s, id).zone === "battlefield") r.created!.push(id);
+          }
+          else if (e.into === "battlefield") {
+            moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: { [e.counters.counter]: e.counters.n } } : {}), ...hosts.get(id) });
+            if (obj(s, id).zone === "battlefield") r.created!.push(id); // "it" in what follows
+          } else p.library = [id, ...p.library.filter((x) => x !== id)];
         }
-        else if (e.into === "battlefield") {
-          moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: { [e.counters.counter]: e.counters.n } } : {}) });
-          if (obj(s, id).zone === "battlefield") r.created!.push(id); // "it" in what follows
-        } else p.library = [id, ...p.library.filter((x) => x !== id)];
-      }
+      });
       if (e.rest === "shuffle") {
         shuffle(s, p.library); // "Then shuffle" (CR 701.20)
         log(s, `${p.name} shuffles their library.`);
       } else if (e.rest === "graveyard") {
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
+      } else if (e.rest === "hand") {
+        if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "the other card" : `the other ${rest.length} cards`} into their hand.`);
+        for (const id of rest) moveObject(s, id, "hand");
       } else {
         sc.moved = true;
         return toBottom(s, pid, rest, src, !!e.random);

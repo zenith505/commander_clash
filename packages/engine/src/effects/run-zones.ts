@@ -1,6 +1,6 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
-import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
@@ -26,16 +26,18 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
   const back = cards.filter((c) => isPermanentCard(defOf(s, c)));
   const hosts = chooseAuraHosts(s, back.map((o) => ({ o, under: under(o) })), src);
   if (hosts === "paused") return "paused";
-  for (const c of back) {
-    const d = defOf(s, c);
-    const host = hosts.get(c.id);
-    if (d.subtypes.includes("Aura") && !host) {
-      log(s, `${d.name} has nothing to enchant, so it stays in exile.`);
-      continue;
+  enterTogether(s, () => {
+    for (const c of back) {
+      const d = defOf(s, c);
+      const host = hosts.get(c.id);
+      if (d.subtypes.includes("Aura") && !host) {
+        log(s, `${d.name} has nothing to enchant, so it stays in exile.`);
+        continue;
+      }
+      log(s, `${src} returns ${d.name} to the battlefield${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { counters: { [counter]: 1 } } : {}) });
     }
-    log(s, `${src} returns ${d.name} to the battlefield${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-    moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { counters: { [counter]: 1 } } : {}) });
-  }
+  });
 }
 
 /**
@@ -649,15 +651,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g).
       const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src);
       if (hosts === "paused") return "paused";
-      for (const o of cards) {
-        const host = hosts.get(o.id);
-        if (defOf(s, o).subtypes.includes("Aura") && !host) {
-          log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in ${p.name}'s hand.`);
-          continue;
+      enterTogether(s, () => {
+        for (const o of cards) {
+          const host = hosts.get(o.id);
+          if (defOf(s, o).subtypes.includes("Aura") && !host) {
+            log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in ${p.name}'s hand.`);
+            continue;
+          }
+          log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
         }
-        log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-        moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
-      }
+      });
       return;
     }
     case "putOntoBattlefield": {
@@ -669,38 +673,40 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
-      for (const o of list) {
-        const d = defOf(s, o);
-        if (e.attachToSubject) {
-          // An Aura returned "attached to that creature" (CR 303.4f): only to one it could enchant, protection
-          // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.
-          const enchant = compileCard(d).enchant;
-          const host = ctx.subject && s.objects[ctx.subject.id];
-          const ok = enchant?.kind === "object" && !!host && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && objectMatches(s, enchant, host, ctx.controller, false, d);
-          if (!ok) {
-            log(s, `${d.name} can't be attached to that creature, so it stays in the graveyard.`);
+      enterTogether(s, () => {
+        for (const o of list) {
+          const d = defOf(s, o);
+          if (e.attachToSubject) {
+            // An Aura returned "attached to that creature" (CR 303.4f): only to one it could enchant, protection
+            // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.
+            const enchant = compileCard(d).enchant;
+            const host = ctx.subject && s.objects[ctx.subject.id];
+            const ok = enchant?.kind === "object" && !!host && host.zone === "battlefield" && (host.zoneChanges ?? 0) === ctx.subject!.zc && objectMatches(s, enchant, host, ctx.controller, false, d);
+            if (!ok) {
+              log(s, `${d.name} can't be attached to that creature, so it stays in the graveyard.`);
+              continue;
+            }
+            log(s, `${src} returns ${d.name} to the battlefield attached to ${defOf(s, host).name}.`);
+            moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host.id });
             continue;
           }
-          log(s, `${src} returns ${d.name} to the battlefield attached to ${defOf(s, host).name}.`);
-          moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host.id });
-          continue;
+          if (!isPermanentCard(d)) continue;
+          const host = hosts.get(o.id);
+          if (d.subtypes.includes("Aura") && !host) {
+            log(s, `${d.name} has nothing to enchant, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
+            continue;
+          }
+          log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host }); // CR 110.2a
+          // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
+          // the permanent it became, while it's still that object (CR 400.7, rulings).
+          if (o.zone !== "battlefield") continue;
+          s.resolving?.created?.push(o.id);
+          if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+          if (e.atEndStep)
+            addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
         }
-        if (!isPermanentCard(d)) continue;
-        const host = hosts.get(o.id);
-        if (d.subtypes.includes("Aura") && !host) {
-          log(s, `${d.name} has nothing to enchant, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
-          continue;
-        }
-        log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-        moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host }); // CR 110.2a
-        // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
-        // the permanent it became, while it's still that object (CR 400.7, rulings).
-        if (o.zone !== "battlefield") continue;
-        s.resolving?.created?.push(o.id);
-        if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
-        if (e.atEndStep)
-          addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
-      }
+      });
       return;
     }
     case "randomFromGraveyard": {
@@ -774,7 +780,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (hosts === "paused") return "paused";
       const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
       if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
-      for (const id of ids) moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) });
+      enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) })));
       return;
     }
     case "putInLibrary":

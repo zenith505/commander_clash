@@ -232,13 +232,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       if (!choose[3]) si++;
       continue;
     }
+    // "Look at the top twenty cards of your library, put any number of land cards from among them onto the battlefield
+    // tapped, then shuffle" (Through the Forest Gate): the same as three sentences.
+    const joined = new RegExp(`^((?:Look at|Reveal) the top ${NUMX} cards of your library), (put .+ from among them .+), then shuffle$`).exec(s);
+    if (joined && !dig) {
+      sentences.splice(si, 1, joined[1]!, joined[3]!.charAt(0).toUpperCase() + joined[3]!.slice(1), "Shuffle");
+      s = sentences[si]!;
+    }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
     if (look && !dig) {
       dig = { type: "dig", n: amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
       continue;
     }
     if (dig) {
-      const done = parseDig(s, dig);
+      const done = parseDig(s, dig, ctx);
       if (!done) return null;
       if (done === "more") continue;
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });

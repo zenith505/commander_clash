@@ -507,6 +507,31 @@ function zoneList(s: GameState, o: GameObject): ObjectId[] | null {
   }
 }
 
+/** The permanents entering together while `enterTogether` runs, kept off the battlefield list until all have entered. */
+type EnteringTogether = { ids: ObjectId[]; events: Parameters<typeof fireEvent>[1][] };
+let together: EnteringTogether | null = null;
+
+/**
+ * Several cards put onto the battlefield at the same time by one instruction (Collected Company, Genesis Wave): each
+ * enters without seeing the others, so their replacement effects and "enters with" counts don't count each other
+ * (CR 614.12), nor can one enter as a copy of another; then they're all there before anything triggers, so each one's
+ * enters abilities see the others enter too (CR 603.6a). `run` makes the moves; one at a time, or nested, is as before.
+ */
+export function enterTogether(s: GameState, run: () => void) {
+  if (together) return run();
+  const batch: EnteringTogether = { ids: [], events: [] };
+  together = batch;
+  try {
+    run();
+  } finally {
+    together = null;
+    s.battlefield = [...batch.ids.filter((id) => s.objects[id]?.zone === "battlefield").reverse(), ...s.battlefield];
+    invalidateCharacteristics(s);
+    for (const c of s.entersChoices ?? []) if (batch.ids.includes(c.id) && batch.ids.length > 1) c.together = batch.ids.filter((id) => id !== c.id);
+  }
+  for (const ev of batch.events) fireEvent(s, ev);
+}
+
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
 export function moveObject(
   s: GameState,
@@ -734,6 +759,12 @@ export function moveObject(
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
+    // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
+    if (together && o.zone === "battlefield") {
+      s.battlefield = s.battlefield.filter((x) => x !== id);
+      together.ids.push(id);
+      invalidateCharacteristics(s);
+    }
   }
   // Leaving the battlefield: "dies" is a creature put into a graveyard from the battlefield (CR 700.4); other
   // triggers say "put into a graveyard" or "leaves the battlefield".
@@ -802,7 +833,11 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
   const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
-  if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
+  if (!options.length) {
+    const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
+    if (together) together.events.push(ev);
+    else fireEvent(s, ev);
+  }
 }
 
 /** What a permanent entering "as a copy of" something could copy: other permanents on the battlefield (not targeted). */
@@ -840,24 +875,26 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
     const c = s.objects[l.id];
     return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
   });
-  for (const l of back) {
-    const c = obj(s, l.id);
-    const d = defOf(s, c);
-    // It returns to the zone it was exiled from (CR 610.3): Kitesail Freebooter's card goes back to its owner's hand.
-    if (l.hand) {
-      log(s, `${d.name} returns to its owner's hand (${source} left).`);
-      moveObject(s, c.id, "hand");
-      continue;
+  enterTogether(s, () => {
+    for (const l of back) {
+      const c = obj(s, l.id);
+      const d = defOf(s, c);
+      // It returns to the zone it was exiled from (CR 610.3): Kitesail Freebooter's card goes back to its owner's hand.
+      if (l.hand) {
+        log(s, `${d.name} returns to its owner's hand (${source} left).`);
+        moveObject(s, c.id, "hand");
+        continue;
+      }
+      const r = (s.untilReturns ??= { auras: [], returned: [] });
+      if (d.subtypes.includes("Aura")) {
+        r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source });
+        continue;
+      }
+      log(s, `${d.name} returns to the battlefield (${source} left).`);
+      moveObject(s, c.id, "battlefield", { controller: c.owner });
+      r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
     }
-    const r = (s.untilReturns ??= { auras: [], returned: [] });
-    if (d.subtypes.includes("Aura")) {
-      r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source });
-      continue;
-    }
-    log(s, `${d.name} returns to the battlefield (${source} left).`);
-    moveObject(s, c.id, "battlefield", { controller: c.owner });
-    r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
-  }
+  });
 }
 
 /**
@@ -3874,7 +3911,8 @@ function askEntersChoice(s: GameState): boolean {
     }
     if (c.what === "copy") {
       // "You may have ~ enter as a copy of ...": any of them, or none (CR 707.5).
-      const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter);
+      // Not one that entered at the same time (CR 614.12, rulings on Clone).
+      const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter).filter((id) => !c.together?.includes(id));
       const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...ids, "none"], labels: [...labels, "Don't copy"], objectId: o.id };
       return true;

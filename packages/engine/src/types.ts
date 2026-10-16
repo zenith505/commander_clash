@@ -923,7 +923,7 @@ export interface GameState {
    * in `returned`. `asking`: that one is being asked now.
    */
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,

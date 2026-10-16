@@ -292,7 +292,7 @@ function enchantedControls(phrase: string): TargetSpec | null {
 }
 
 // "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (?:dies|is put into a graveyard from the battlefield), (.+)$/;
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -305,7 +305,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
   // "That player" in a trigger about what enchanted player controls is that player.
-  let bodyText = (attached ? attached[2]! : m![3]!).replace(ench ? /\bthat player\b/g : /$^/, "enchanted player");
+  let bodyText = (attached ? attached[2]! : m![4]!).replace(ench ? /\bthat player\b/g : /$^/, "enchanted player");
   // "That land's controller", and "that player" after "an artifact an opponent controls": who controlled it as it last
   // existed (CR 603.10a).
   if (!attached) {
@@ -314,6 +314,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever another Zombie you control dies, if it didn't have decayed, ..." (Wilhelt): an intervening if (CR 603.4) on
   // the creature as it last existed (CR 603.10a), which can't change, so part of what dies.
+  const leaves = !attached && m![3]!.startsWith("leaves");
+  // "Whenever another creature you control leaves the battlefield, if it didn't die, ..." (Taeko): where it went can't
+  // change, so it's part of the event, like "without dying".
+  const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
+  if (didntDie) bodyText = bodyText.slice(didntDie[0].length);
+  const notDies = !!didntDie || (!attached && m![3]! === "leaves the battlefield without dying");
+  // "If it had a counter on it", "if it had one or more counters on it": as it last existed, so it can't change.
+  const hadCounter = !attached && /^if it had (?:a counter|one or more counters|counters) on it, /.exec(bodyText);
+  if (hadCounter) bodyText = bodyText.slice(hadCounter[0].length);
   const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
@@ -335,6 +344,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? { damagedBySelf: true } : {}),
+      ...(leaves ? { leaves: true as const } : {}),
+      ...(notDies ? { notDies: true as const } : {}),
+      ...(hadCounter ? { hadCounter: true as const } : {}),
     },
     body,
   };

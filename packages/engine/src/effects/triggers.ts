@@ -422,11 +422,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
     // "Whenever another creature dies", "a creature you control", "equipped creature": abilities of permanents
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
-    if (ev.to === "graveyard" && ev.snapshot && ev.chars) {
+    // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
+    if (ev.snapshot && ev.chars) {
       const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
+      const hadCounter = Object.values(ev.counters).some((n) => n > 0);
+      const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") : ev.to === "graveyard") && (!d.hadCounter || hadCounter);
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
-        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);
+        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
         const src = obj(s, id);
         consider(src, controllerOf(s, src), ev.attachments?.includes(id) ? ev.id : src.attachedTo);

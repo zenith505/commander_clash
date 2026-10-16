@@ -604,6 +604,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6d194882-ca37-49bb-ac9f-a751c53850a8",
+  "name": "Bribery",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then that player shuffles.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "578e0577-0ad8-4bfb-a317-9684c508770a",
   "name": "Brutal Deceiver",
   "manaCost": "{2}{R}",

@@ -16,6 +16,16 @@ import { parsePreventAll } from "../statics";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
+  // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search
+  // their library (CR 701.23a); a permanent found comes under your control.
+  const theirs = /^Search (target opponent's|target player's) library for (an? (?:.+? )?card) and (put that card onto the battlefield under your control|exile it)$/.exec(s);
+  if (theirs) {
+    const filter = parseSearchFilter(theirs[2]!.replace(/^an? /, ""));
+    if (filter === null) return null;
+    const library = parsePlayer(theirs[1]!.replace(/'s$/, ""), ctx);
+    return library ? [{ type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: false, dest: { zone: theirs[3] === "exile it" ? "exile" : "battlefield" }, library }] : null;
+  }
   // "Search your library for a number of basic land cards equal to the other result, put them onto the battlefield
   // tapped, then shuffle" (Wild Endeavor): that many, counted as it resolves.
   const howMany = /^Search your library for a number of (.+? cards) equal to (.+?)((?:,| and) (?:put|then) .+)$/i.exec(s);

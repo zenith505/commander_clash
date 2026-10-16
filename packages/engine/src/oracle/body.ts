@@ -73,6 +73,16 @@ export interface Ctx {
   whereX?: boolean;
 }
 
+/**
+ * The instruction after ", then": "Target player draws a card, then discards a card" (Cephalid Looter) is the same player
+ * discarding, "that player"; "each player draws ..., then discards ..." each of them.
+ */
+function thenSubject(first: string, next: string): string {
+  const who = /^(Target player|Target opponent|That player|Each player|Each opponent) /.exec(first);
+  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : who[1]} ${next}`;
+  return next.charAt(0).toUpperCase() + next.slice(1);
+}
+
 /** Starts a results table row's marker sentence (see parseBody). */
 const ROW_MARK = "\u0001";
 
@@ -332,7 +342,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i, all) => (i ? thenSubject(all[0]!, p) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1038,6 +1048,12 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push({ type: "may", effects: inner, text: may[1]! });
       if (!defineX()) return null;
       continue;
+    }
+    // "Search target opponent's library for ... Then that player shuffles" (Bribery): the search shuffles it.
+    if (/^That player shuffles$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type === "search" && prev.library) continue;
+      return null;
     }
     // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not
     // targeted. One per ability.

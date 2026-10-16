@@ -2141,7 +2141,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // What its source was as it was activated, before it's sacrificed (CR 106.3): a Treasure, a snow permanent, ...
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
-  if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
+  const manaPaid = ab.manaCost ? spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o }) : null;
   if (ab.tap) tapPermanent(s, o);
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
@@ -2159,6 +2159,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
+  // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
+  fireEvent(s, { type: "activated", player: p.id, mana: true, ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
 }
 
 /** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
@@ -3546,6 +3548,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
     log(s, `${p.name} activates ${d.name} (${ab.text.replace(/~/g, d.name).replace(/\.$/, "")}).`);
     resolveManaAbility(s, item, body, manaPick.mana);
+    fireEvent(s, { type: "activated", player: p.id, mana: true, ...(paid.treasure ? { treasure: paid.treasure } : {}) });
     return true;
   }
   s.stack.push(item);
@@ -3560,7 +3563,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     log(s, `${p.name} activates ${d.name} (${what.replace(/~/g, d.name).replace(/\.$/, "")})${abCost.hasX ? ` with X=${x ?? 0}` : ""}${describeTargets(s, targets)}.`);
   }
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
-  fireEvent(s, { type: "activated", player: p.id, ...(activatedFrom ? { source: activatedFrom } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

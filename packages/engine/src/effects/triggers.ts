@@ -123,7 +123,7 @@ export type TriggerSourceEvent =
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; source?: { snapshot: GameObject; chars: Characteristics } }
+  | { type: "activated"; player: PlayerId; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -813,8 +813,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       add(o, you, (e, t) => {
+        // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
+        if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || (a.by === "opponent" && ev.player === you)) return false;
+        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you)) return false;
         return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }

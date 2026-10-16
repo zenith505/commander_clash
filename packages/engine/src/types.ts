@@ -754,6 +754,8 @@ export interface GameEvent {
 export interface TurnLog {
   /** Players who searched their library (Archive Trap). */
   searched?: PlayerId[];
+  /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
+  tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
   entered?: { controller: PlayerId; types: string[]; colors: Color[] }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */

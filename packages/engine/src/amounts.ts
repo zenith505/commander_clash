@@ -145,6 +145,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.sourceId && staticConditionNow(s, c.cond, ctx.sourceId, ctx.controller) ? 1 : 0;
     case "diedThisTurn":
       return (s.diedThisTurn ?? []).filter((p) => !c.yours || p === ctx.controller).length;
+    case "tokensCreatedThisTurn":
+      return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
     case "attackersThisTurn":
       return s.attackersThisTurn ?? 0;
     case "toGraveyardThisTurn":
@@ -368,6 +370,8 @@ function describeCount(c: Count): string {
       return c.opponents ? "#opponents" : "#players";
     case "diedThisTurn":
       return "#creatures that died this turn";
+    case "tokensCreatedThisTurn":
+      return `#${c.subtype ? `${c.subtype} ` : ""}tokens you created this turn`;
     case "attackersThisTurn":
       return "#creatures that attacked this turn";
     case "toGraveyardThisTurn":

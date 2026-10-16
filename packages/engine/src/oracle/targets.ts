@@ -105,7 +105,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
-  if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(they|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
+  if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
   if (dealt) return { ref: "damagedThisWay", ...(dealt[1]!.toLowerCase() !== "permanent" ? { filter: { kind: "object" as const, types: [dealt[1]![0]!.toUpperCase() + dealt[1]!.slice(1).toLowerCase()], text: dealt[1]!.toLowerCase() } } : {}) };
@@ -131,6 +131,21 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     ctx.lastAttached = true;
     return { ref: "attached" };
   }
+  // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
+  // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).
+  const of = /^(.+?) (target player|target opponent|that player) controls\b(.*)$/i.exec(x);
+  const ofGroup = of && !/^(?:up to |another |any number of |one or |\w+ )?(?:other )?target\b/i.test(of[1]!) ? parseGroup(`${of[1]}${of[3]}`, true) : null;
+  if (of && ofGroup && !ofGroup.other && !ofGroup.filter.controller) {
+    const who = of[2]!.toLowerCase();
+    let whose: PlayerRef | null = null;
+    if (who.startsWith("target ")) {
+      const index = addTarget(ctx, { kind: "player", opponent: who === "target opponent", text: who });
+      ctx.lastPlayerTarget = index;
+      whose = { ref: "target", index };
+    } else whose = parsePlayer("that player", ctx);
+    if (!whose || (whose.ref === "target" && whose.n)) return null;
+    return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose };
+  }
   const group = parseGroup(x);
   if (group && group.other && ctx.spell) {
     // A spell's "other creatures you control": other than the creature it targeted ("Put two +1/+1
@@ -142,8 +157,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const m = /^target (.+)$/i.exec(x);
   if (!m) return null;
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
-  const spec = parseTargetPhrase(phrase);
+  const spec = parseTargetPhrase(phrase, { x: true });
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
+  // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
+  if (spec.xRange && ((!ctx.spell && !ctx.activated) || ctx.whereX)) return null;
   return { ref: "target", index: addTarget(ctx, theirs ? { ...spec, controller: "eventPlayer", text: `target ${m[1]!}` } : spec) };
 }
 
@@ -305,7 +322,7 @@ export function parseCardTarget(p: string, ctx: Ctx, owner?: "you"): ObjRef | nu
 }
 
 /** Parse the words after "target": "nonblack creature an opponent controls", "artifact or enchantment", "spell", ... */
-export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {}): TargetSpec | null {
+export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** "with power X or less" may be the X announced (TargetSpec.xRange). */ x?: boolean } = {}): TargetSpec | null {
   let p = phrase.trim().toLowerCase();
   const text = `target ${p}`;
   const extra: Partial<TargetSpec> = {};
@@ -349,10 +366,15 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean } = {
   }
   // "... with flying", "... without flying", "... with power 4 or greater", "... with mana value 3 or less"
   let m: RegExpExecArray | null;
-  if ((m = /(?:^| )with (power|toughness|mana value) (\d+) or (greater|less)$/.exec(p))) {
-    const n = Number(m[2]);
+  if ((m = /(?:^| )with (power|toughness|mana value) (\d+|x)(?: or (greater|less))?$/.exec(p))) {
     const key = m[1] === "mana value" ? "manaValue" : (m[1] as "power" | "toughness");
-    extra[key] = m[3] === "greater" ? { min: n } : { max: n };
+    // "With mana value 2" (Spell Snare): exactly that. With X, the X it's cast or activated with (TargetSpec.xRange).
+    if (m[2] === "x" && !opts.x) return null;
+    if (m[2] === "x") extra.xRange = { key, at: m[3] === "greater" ? "least" : m[3] === "less" ? "most" : "exact" };
+    else {
+      const n = Number(m[2]);
+      extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };
+    }
     p = p.slice(0, m.index);
   } else if ((m = / (with|without) ([a-z ]+)$/.exec(p))) {
     const kws = parseKeywordList(m[2]!);

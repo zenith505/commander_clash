@@ -591,6 +591,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // "If you control two or more other lands, ~ enters tapped" (the Adventures in the Forgotten Realms creature lands):
+    // untapped only with one or fewer other lands, as it enters (CR 614.1d).
+    const ifOthers = new RegExp(`^If you control ${NUM} or more other lands, ~ enters tapped\\.$`).exec(line);
+    if (ifOthers) {
+      out.entersTappedUnless = { kind: "control", who: "you", types: ["Land"], other: true, max: num(ifOthers[1]!) - 1 };
+      continue;
+    }
     const unless = /^~ enters tapped unless (.+)\.$/.exec(line);
     if (unless) {
       const cond = parseEntersCondition(unless[1]!);

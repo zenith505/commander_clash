@@ -15,6 +15,8 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if ((m = new RegExp(`^you control ${NUM} or more basic lands$`).exec(text))) return { kind: "control", who: "you", types: ["Land"], supertypes: ["Basic"], min: num(m[1]!) };
   if (/^you control a basic land$/.test(text)) return { kind: "control", who: "you", types: ["Land"], supertypes: ["Basic"], min: 1 };
   if (/^you control a planeswalker$/.test(text)) return { kind: "control", who: "you", types: ["Planeswalker"], min: 1 };
+  // The Roads (Outlaws of Thunder Junction): a permanent with either subtype (CR 205.3).
+  if (/^you control a Mount or Vehicle$/.test(text)) return { kind: "control", who: "you", subtypes: ["Mount", "Vehicle"], min: 1 };
   if (/^you control a legendary creature$/.test(text)) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], min: 1 };
   if ((m = /^you control an? (\w+)(?: or an? (\w+))?$/.exec(text)) && [m[1], m[2]].every((x) => x === undefined || BASIC_TYPES.includes(x)))
     return { kind: "control", who: "you", subtypes: [m[1]!, ...(m[2] ? [m[2]] : [])], min: 1 };
@@ -197,6 +199,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
   if (/^you have a full party$/.test(text)) return { kind: "fullParty" }; // CR 700.8a
+  // CR 903.3: whoever's commander it is (rulings on Fierce Guardianship).
+  if (/^you control a commander$/.test(text)) return { kind: "controlCommander" };
+  if (/^you control a commander that's a creature or planeswalker$/.test(text)) return { kind: "controlCommander", types: ["Creature", "Planeswalker"] };
   if ((m = /^you (don't )?control a Ring-bearer$/.exec(text))) return { kind: "ringBearer", ...(m[1] ? { not: true as const } : {}) };
   if (/^~ is your Ring-bearer$/.test(text)) return { kind: "ringBearer", self: true };
   if (/^no opponent has more life than that player$/.test(text)) return { kind: "defenderMostLife" };

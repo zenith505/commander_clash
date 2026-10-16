@@ -206,14 +206,18 @@ function seatCorners(s: GameState): Record<Corner, PlayerId | undefined> {
 type ZoneView = { pid: PlayerId; zone: "graveyard" | "exile" | "hand" };
 
 /** The human is picking targets for a spell, an activated ability, or a triggered ability (after its modes, if modal). */
-type Targeting =
+type Targeting = (
   | { mode: "cast"; draft: CastDraft; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   | { mode: "activate"; objectId: string; index: number; specs: TargetSpec[]; chosen: TargetChoice[]; label: string; modes?: number[]; x?: number }
   | { mode: "trigger"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   /** New targets for a copy of a spell (CR 707.10c), or keep the old ones. */
   | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   /** The new target of a spell whose target a resolving spell changes (CR 115.7a): one of the pending options. */
-  | { mode: "change"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string };
+  | { mode: "change"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
+) & {
+  /** The picks so far in a run of per-opponent slots starting at the next one (see perOpponentRun), by slot. */
+  ahead?: (TargetChoice | undefined)[];
+};
 
 /** Targeting the engine is waiting on, which can't be cancelled. */
 const answering = (t: Targeting | null | undefined) => t?.mode === "trigger" || t?.mode === "copy" || t?.mode === "change";
@@ -347,10 +351,22 @@ type XPick =
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
 /** How many "up to" targets in a row start at `i`. */
 /** Targets chosen so far, then nothing for each next one the spell is cast as if it didn't have (CR 702.33g). */
+const NONE: TargetChoice = { kind: "none" };
+
 const skipped = (specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice[] => {
   const out = [...chosen];
   while (out.length < specs.length && specs[out.length]!.skip) out.push({ kind: "none" });
   return out;
+};
+
+/**
+ * "For each opponent, … up to one target … that player controls" (CR 601.2c): one optional slot per opponent, in turn
+ * order. The slots from `i` on that are part of such a run, so a click goes to the slot of the target's controller.
+ */
+const perOpponentRun = (specs: TargetSpec[], i: number) => {
+  let end = i;
+  while (specs[end]?.optional && specs[end]!.controlledBy !== undefined && !specs[end]!.skip) end++;
+  return end - i > 1 ? end : i;
 };
 
 const optionalLeft = (specs: TargetSpec[], i: number) => {
@@ -469,28 +485,59 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const nextSpec = targeting ? targeting.specs[targeting.chosen.length] : undefined;
   // "Another target creature" on a permanent's ability can't be that permanent.
   const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : undefined;
+  const runEnd = targeting && targeting.mode !== "change" ? perOpponentRun(targeting.specs, targeting.chosen.length) : 0;
+  const inRun = !!targeting && runEnd > targeting.chosen.length;
+  /** In a run of per-opponent slots, the slot this target would fill: the one for its controller (CR 601.2c). */
+  const runSlot = (c: TargetChoice) => {
+    if (!s || !targeting || !inRun) return -1;
+    const from = targeting.chosen.length;
+    for (let j = from; j < runEnd; j++) {
+      const before = [...targeting.chosen, ...Array.from({ length: j - from }, (_, k) => targeting.ahead?.[from + k] ?? NONE)];
+      if (canChooseTarget(s, targeting.specs, before, j, c, HUMAN, undefined, targetSource)) return j;
+    }
+    return -1;
+  };
   const canTarget = (c: TargetChoice) =>
     !!s &&
     !!targeting &&
     !!nextSpec &&
-    (targeting.mode === "change" ? pending?.kind === "changeTarget" && pending.options.some((o) => sameTarget(o, c)) : canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, undefined, targetSource));
+    (targeting.mode === "change"
+      ? pending?.kind === "changeTarget" && pending.options.some((o) => sameTarget(o, c))
+      : inRun
+        ? runSlot(c) >= 0
+        : canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, undefined, targetSource));
 
   function pickTarget(c: TargetChoice) {
     if (!s || !targeting || !nextSpec) return;
     if (!canTarget(c)) return;
+    if (inRun) {
+      // One for each opponent, in any order; picking another for the same opponent replaces the first.
+      const ahead = [...(targeting.ahead ?? [])];
+      ahead[runSlot(c)] = c;
+      if (ahead.slice(targeting.chosen.length, runEnd).filter(Boolean).length < runEnd - targeting.chosen.length) return setTargeting({ ...targeting, ahead });
+      return finishRun(ahead);
+    }
     finishTargets([...targeting.chosen, c]);
+  }
+
+  /** The per-opponent picks are made: the opponents without one get no target (CR 115.6). */
+  function finishRun(ahead: (TargetChoice | undefined)[]) {
+    if (!targeting) return;
+    const run = Array.from({ length: runEnd - targeting.chosen.length }, (_, k) => ahead[targeting.chosen.length + k] ?? NONE);
+    finishTargets([...targeting.chosen, ...run], undefined, { ...targeting, ahead: undefined });
   }
 
   /** "Up to two target creatures": leave the rest of them unchosen (CR 115.6). */
   function skipTargets() {
     if (!targeting) return;
+    if (inRun) return finishRun(targeting.ahead ?? []);
     const chosen = [...targeting.chosen];
     while (chosen.length < targeting.specs.length && targeting.specs[chosen.length]!.optional) chosen.push({ kind: "none" });
     finishTargets(chosen);
   }
 
-  function finishTargets(chosen0: TargetChoice[], divided?: Targeting) {
-    const tg = divided ?? targeting;
+  function finishTargets(chosen0: TargetChoice[], divided?: Targeting, current?: Targeting) {
+    const tg = divided ?? current ?? targeting;
     if (!tg) return;
     const chosen = skipped(tg.specs, chosen0);
     if (chosen.length < tg.specs.length) return setTargeting({ ...tg, chosen });
@@ -988,9 +1035,19 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <div className="targeting">
               <span>
                 <strong>{targeting.label}</strong>: choose {nextSpec?.text}{" "}
-                {nextSpec?.optional ? `(optional, up to ${optionalLeft(targeting.specs, targeting.chosen.length)} more)` : `(${targeting.specs.slice(0, targeting.chosen.length).filter((t) => !t.skip).length + 1}/${targeting.specs.filter((t) => !t.skip).length})`}
+                {inRun
+                  ? `(optional, one for each opponent: ${targeting.specs
+                      .slice(targeting.chosen.length, runEnd)
+                      .map((sp, k) => {
+                        const c = targeting.ahead?.[targeting.chosen.length + k];
+                        return `${s.players[sp.controlledBy!]!.name} ${c?.kind === "object" ? cardOf(s, c.id).name : "—"}`;
+                      })
+                      .join(", ")})`
+                  : nextSpec?.optional
+                    ? `(optional, up to ${optionalLeft(targeting.specs, targeting.chosen.length)} more)`
+                    : `(${targeting.specs.slice(0, targeting.chosen.length).filter((t) => !t.skip).length + 1}/${targeting.specs.filter((t) => !t.skip).length})`}
               </span>
-              {nextSpec?.optional && <button onClick={skipTargets}>{targeting.chosen.some((c) => c.kind !== "none") ? "Done" : "Choose none"}</button>}
+              {nextSpec?.optional && <button onClick={skipTargets}>{targeting.chosen.some((c) => c.kind !== "none") || targeting.ahead?.some(Boolean) ? "Done" : "Choose none"}</button>}
               {targeting.mode === "copy" && pending?.kind === "copyTargets" && (
                 <button
                   onClick={() => {

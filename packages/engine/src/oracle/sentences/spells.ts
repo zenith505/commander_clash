@@ -177,10 +177,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana
   // value, as it resolves, is countered (rulings).
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
-  if ((m = /^Counter target (.*?)spell(?: unless its controller pays (.+))?$/i.exec(s))) {
-    const spec = parseTargetPhrase(`${m[1]}spell`);
+  // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
+  if ((m = /^Counter target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!, { x: true });
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
-    if (!spec || unless === null) return null;
+    if (!spec || unless === null || (spec.xRange && (!ctx.spell || ctx.whereX))) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
   }
   // Deflection: "Change the target of target spell with a single target" (CR 115.7a); Bolt Bend's "spell or ability".

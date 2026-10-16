@@ -1,6 +1,6 @@
 # Roadmap
 
-16,499 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,622 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -40,11 +40,18 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - An activated mana ability whose body isn't a plain "Add ..." (Leafkin Druid's "add {G}{G} instead") can't be
      activated while a "whenever ~ is tapped for mana, add one mana of any color" trigger would need a color choice
      (Fertile Ground on it): it's refused rather than asked. No supported card hits this yet.
+   Left from the for-each-opponent/commander/mana value X round:
+   - Reflexive "When you do" outside collect evidence (Lich's Relic, Balrog); "choose up to one target" (Luminate
+     Primordial, Shellshock, Mega Flare); "third from the top" (Riptide Gearhulk); exchanges of control (Twist
+     Allegiance, Reins of Power); "creatures and lands target opponent controls don't untap during their next
+     untap step" (Exhaustion).
+   - Bots choose X for "with mana value X" counterspells (Spell Blast) but cast Killing Glare-style "power X or less"
+     removal only with as much X as they can pay; they never hold a free Fierce Guardianship for a bigger threat.
    Left from the conditional targets/Will cycle/hideaway conditions round:
    - "Choose target X ... If the gift was promised, instead choose target Y ... the chosen" (Too Evil to Stay Dead,
-     Expel the Unworthy, The Eagles Are Coming!); "each creature target player controls" (Galadriel's Dismissal);
-     Role tokens (Diminisher Witch); "choose both instead" on modes that don't parse (Atlantis Attacks); "pays {4}
-     instead" (We Say Thee Nay!); "any number of ... instead" (Earth's Mightiest Heroes); "twice X ... instead"
+     Expel the Unworthy, The Eagles Are Coming!); Role tokens (Diminisher Witch); "choose both instead" on modes
+     that don't parse (Atlantis Attacks); "pays {4} instead" (We Say Thee Nay!); "any number of ... instead"
+     (Earth's Mightiest Heroes); "twice X ... instead"
      (Stonesplitter Bolt, Torch the Tower).
    - The rest of the gift cards: Bilbo's Gambit, Coiling Rebirth, Cruelclaw's Heist, Dawn's Truce, Longstalk Brawl,
      Octomancer, Parting Gust, Perch Protection, Starfall Invocation; Dark Apostle's "Gift of Chaos" is a flavor word.
@@ -90,15 +97,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Spree modes that don't parse yet: outlaw groups (Caught in the Crossfire), "search for a basic land or Desert"
      and X/X tokens (Dance of the Tumbleweeds), "choose a creature you control. It gains" (Final Showdown),
      "if no other creature has greater power" (Getaway Glamer), "choose target opponent. Whenever ..." (Great Train
-     Heist), total mana value (Lively Dirge), "Mount or Vehicle" / "Aura or Equipment" (One Last Job), "each creature
-     target player controls" (Requisition Raid, Rustler Rampage), copying an ability (Return the Favor), "half ...
-     rounded up" (Rush of Dread), "exchange control of two target" (Shifting Grift), Smuggler's Surprise.
+     Heist), total mana value (Lively Dirge), "Mount or Vehicle" / "Aura or Equipment" (One Last Job), copying an
+     ability (Return the Favor), "half ... rounded up" (Rush of Dread), "exchange control of two target" (Shifting
+     Grift), Smuggler's Surprise.
    - Saddle: "the creature that saddled it this turn" (Giant Beaver, Rambling Possum, Calamity, Fortune, The Gitrog),
      effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory), "is saddled" and "becomes
      saddled for the first time each turn" (Archmage's Newt, Caustic Bronco, Stubborn Burrowfiend), "saddles a Mount
-     or crews a Vehicle" triggers (Canyon Vaulter, Reckless Velocitaur), "Mount or Vehicle" groups (Cloudspire Captain
-     and the "unless you control a Mount or Vehicle" lands), Bounding Felidar, Guardian Sunmare, Lagorin, Ornery
-     Tumblewagg. Bots only saddle Mounts that have an "attacks while saddled" trigger.
+     or crews a Vehicle" triggers (Canyon Vaulter, Reckless Velocitaur), "Mount or Vehicle" groups (Cloudspire Captain),
+     Bounding Felidar, Guardian Sunmare, Lagorin, Ornery Tumblewagg. Bots only saddle Mounts that have an "attacks
+     while saddled" trigger.
    - Station and levelers: a striation is all or nothing, so cards with one unparsed line there stay out (Entropic
      Battlecruiser, Exploration Broodship, Hearthhull, Inspirit, The Seriema, Echo Mage, Hedron-Field Purists,
      Lighthouse Chronologist, Lord of Shatterskull Pass); "stations permanents using its toughness" (Tapestry Warden).
@@ -320,7 +327,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   melee").
 - Threshold activated abilities with "Activate only if there are seven or more cards in your graveyard", threshold
   granting quoted triggers, "choose a color" inside a threshold "If" sentence.
-- Assist: bots never ask for or give help (everyone else is an opponent). Gang Up's "power X or less" target.
+- Assist: bots never ask for or give help (everyone else is an opponent).
   Assist kicker (All-Star Kicker) and team-play cards.
 - Attack taxes other than "{N} for each creature they control that's attacking you": domain X (Collective
   Restraint), "{1} for each of those creatures" (Dáin, Summon: Yojimbo), only nonblack creatures (Elephant Grass),

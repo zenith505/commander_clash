@@ -3709,7 +3709,7 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
   const r = s.resolving;
   if (pend?.kind !== "arrangeTop" || pend.player !== p.id || !r) throw new RulesError("nothing to arrange");
   const all = [...top, ...away];
-  if ((pend.how === "order" || pend.how === "bottom") && away.length) throw new RulesError(pend.how === "order" ? "put them all back on top" : "put them all on the bottom");
+  if ((pend.how === "order" || pend.how === "bottom" || pend.how === "look") && away.length) throw new RulesError(pend.how === "bottom" ? "put them all on the bottom" : "put them all back on top");
   if (all.length !== pend.cards.length || new Set(all).size !== all.length || all.some((id) => !pend.cards.includes(id)))
     throw new RulesError("put each card on top or " + (pend.how === "scry" ? "on the bottom" : "into your graveyard"));
   r.scratch = { ...r.scratch, arranged: { top, away } };

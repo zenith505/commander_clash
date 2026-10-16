@@ -537,6 +537,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "578e0577-0ad8-4bfb-a317-9684c508770a",
+  "name": "Brutal Deceiver",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "{1}: Look at the top card of your library.\n{2}: Reveal the top card of your library. If it's a land card, this creature gets +1/+0 and gains first strike until end of turn. Activate only once each turn.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "566b4dcc-b7d7-4443-b2d0-954f1fc33a11",
   "name": "Burn Trail",
   "manaCost": "{3}{R}",

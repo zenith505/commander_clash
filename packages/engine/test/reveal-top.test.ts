@@ -3,7 +3,7 @@
 // creates ..." after "Exile target card from a graveyard" (the owner of that card, not the controller of the spell).
 
 import { describe, expect, it } from "vitest";
-import { act, activate, bear, card, cast, forest, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { act, activate, bear, card, cast, forest, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
 import { isFullySupported, objHasKeyword, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -34,10 +34,35 @@ const raid = card("Impromptu Raid", "Enchantment", "{3}{R/G}", { oracleText: "{2
 const thrasios = card("Thrasios, Triton Hero", "Legendary Creature — Merfolk Wizard", "{G}{U}", { power: "1", toughness: "3", keywords: ["Partner"], oracleText: "{4}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.\nPartner (You can have two commanders if both have partner.)" });
 const pyre = card("Funeral Pyre", "Instant", "{W}", { oracleText: "Exile target card from a graveyard. Its owner creates a 1/1 white Spirit creature token with flying." });
 const pharika = card("Pharika, God of Affliction", "Legendary Enchantment Creature — God", "{1}{B}{G}", { power: "5", toughness: "5", keywords: ["Indestructible"], oracleText: "Indestructible\nAs long as your devotion to black and green is less than seven, Pharika isn't a creature.\n{B}{G}: Exile target creature card from a graveyard. Its owner creates a 1/1 black and green Snake enchantment creature token with deathtouch." });
+const brutal = card("Brutal Deceiver", "Creature — Spirit", "{2}{R}", { power: "2", toughness: "2", oracleText: "{1}: Look at the top card of your library.\n{2}: Reveal the top card of your library. If it's a land card, this creature gets +1/+0 and gains first strike until end of turn. Activate only once each turn." });
 const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
 
 describe("reveal the top card", () => {
-  it("compiles", () => supported(nylea, oracle, raid, thrasios, pyre, pharika));
+  it("compiles", () => supported(nylea, oracle, raid, thrasios, pyre, pharika, brutal));
+
+  it("Brutal Deceiver: look at the top card (it stays there); reveal a land for +1/+0 and first strike, once each turn", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, brutal);
+    const l = onTop(s0, ap, forest);
+    let s = settle(activate(s0, ap, d, 0));
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "look", cards: [l] });
+    expect(() => act(s, { type: "arrangeTop", player: ap, top: [], away: [l] })).toThrow(/back on top/);
+    s = settle(act(s, { type: "arrangeTop", player: ap, top: [l], away: [] }));
+    expect(s.players[ap]!.library[0]).toBe(l);
+    s = settle(activate(s, ap, d, 1));
+    expect(pt(s, d)).toBe("3/2");
+    expect(objHasKeyword(s, s.objects[d]!, "First strike")).toBe(true);
+    expect(s.players[ap]!.library[0]).toBe(l);
+    expect(() => activate(s, ap, d, 1)).toThrow();
+  });
+
+  it("Brutal Deceiver: a nonland revealed does nothing", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, brutal);
+    onTop(s0, ap, shock);
+    const s = settle(activate(s0, ap, d, 1));
+    expect(pt(s, d)).toBe("2/2");
+  });
 
   it("Nylea: a creature card goes to hand; otherwise you may put it into your graveyard", () => {
     const { s: s0, ap } = setup([]);

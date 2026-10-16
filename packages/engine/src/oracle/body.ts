@@ -257,6 +257,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       }
       continue;
     }
+    // "{1}: Look at the top card of your library." (Brutal Deceiver): only as the last instruction, so nothing after it
+    // refers to the card.
+    const lookTop = /^[Ll]ook at the top card of (your|target player's|target opponent's) library$/.exec(s);
+    if (lookTop && si === sentences.length - 1) {
+      const who = parsePlayer(lookTop[1] === "your" ? "you" : lookTop[1]!.replace(/'s$/, ""), ctx);
+      if (!who) return null;
+      effects.push({ type: "orderTop", who, n: 1 });
+      continue;
+    }
     // "Reveal the top card of your library. If it's a creature card, put it into your hand. Otherwise, you may put it into
     // your graveyard." (Nylea, Keen-Eyed; CR 701.20a): what's done depends on the revealed card's printed characteristics;
     // it stays in the library until an instruction moves it.

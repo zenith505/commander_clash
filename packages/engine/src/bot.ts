@@ -234,7 +234,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "arrangeTop", player: pid, top: [...pend.cards].sort((a, b) => rank(a) - rank(b)), away: [] }];
     }
     // Going to the bottom (CR 401.4): the order hardly matters to a bot.
-    if (pend.kind === "arrangeTop" && pend.how === "bottom") return [{ type: "arrangeTop", player: pid, top: [...pend.cards], away: [] }];
+    if (pend.kind === "arrangeTop" && (pend.how === "bottom" || pend.how === "look")) return [{ type: "arrangeTop", player: pid, top: [...pend.cards], away: [] }];
     if (pend.kind === "arrangeTop") {
       const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
       return [{ type: "arrangeTop", player: pid, top: keep, away: pend.cards.filter((id) => !keep.includes(id)) }];
@@ -1790,6 +1790,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
+      // "{1}: Look at the top card of your library" (Brutal Deceiver): nothing a bot can use.
+      if (!ab.body.modal && ab.body.effects.every((e) => e.type === "orderTop" && e.n === 1)) continue;
       const problem = abilityProblem(s, pid, id, i);
       if (problem && !/not enough mana/.test(problem)) continue;
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;

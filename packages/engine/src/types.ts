@@ -648,7 +648,7 @@ export type PendingDecision =
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
-  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom"; cards: ObjectId[]; source: string; owner?: PlayerId }
+  | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom" | "look"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
   /**
    * "You may collect evidence N" as a spell or ability resolves (CR 701.59a): pick cards in your graveyard with total

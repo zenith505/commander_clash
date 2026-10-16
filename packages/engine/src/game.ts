@@ -660,6 +660,7 @@ export function moveObject(
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
   o.encoded = undefined; // cards stay encoded only on the permanent as long as it's on the battlefield (CR 702.99c)
+  o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
@@ -850,6 +851,23 @@ export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): Aura
 /** Where an Aura goes as it's put onto the battlefield: the permanent or the player it's attached to. */
 export type AuraHost = { attachTo: ObjectId } | { attachToPlayer: PlayerId };
 export const auraHostName = (s: GameState, h: AuraHost) => ("attachTo" in h ? nameOf(s, h.attachTo) : player(s, h.attachToPlayer).name);
+
+/**
+ * Everything an Aura entering under `pid`'s control without being cast could enchant (CR 303.4f): what its enchant
+ * ability allows, on the battlefield now, not itself (303.4d), nothing with protection from it (702.16c). It isn't
+ * targeted, so hexproof and shroud don't matter.
+ */
+export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): AuraHost[] {
+  const enchant = compileCard(defOf(s, aura)).enchant;
+  if (!enchant) return [];
+  // "Enchant player", "enchant opponent" (CR 702.5d): a player still in the game.
+  if (enchant.kind === "player") return (enchant.opponent ? opponents(s, pid) : livingPlayers(s)).map((p) => ({ attachToPlayer: p }));
+  return s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura))).map((id) => ({ attachTo: id }));
+}
+
+/** An AuraHost as a chooseOption option ("enchant"), and back. */
+export const auraHostKey = (h: AuraHost) => ("attachTo" in h ? h.attachTo : `player:${h.attachToPlayer}`);
+export const auraHostOf = (key: string): AuraHost => (key.startsWith("player:") ? { attachToPlayer: Number(key.slice(7)) } : { attachTo: key });
 
 function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec): ObjectId | undefined {
   const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
@@ -3503,6 +3521,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "damageSource") {
     // The source of damage a prevention or redirection effect is about, chosen as it resolves (CR 609.7a).
     (r.scratch ??= {}).damageSource = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "enchant") {
+    // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
+    const sc = (r.scratch ??= {});
+    if (sc.auraAsking) (sc.auraHosts ??= {})[sc.auraAsking] = choice;
+    sc.auraAsking = undefined;
     continueResolution(s);
     return;
   }

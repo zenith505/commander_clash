@@ -9,6 +9,7 @@ import { printedMatches } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
+import { chooseAuraHosts } from "./run-zones";
 
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -338,19 +339,24 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         };
         return "paused";
       }
-      const found = sc.found;
+      // An Aura found for the battlefield: its controller chooses what it enchants as it enters (CR 303.4f); with nothing
+      // to enchant it stays in the library (303.4g), and is shuffled with it.
+      const dest = (i: number) => (i > 0 && e.others ? e.others : e.dest);
+      const hosts = chooseAuraHosts(s, sc.found.filter((_, i) => dest(i).zone === "battlefield").map((id) => ({ o: obj(s, id), under: p.id })), src);
+      if (hosts === "paused") return "paused";
+      const found = sc.found.filter((id, i) => dest(i).zone !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
       p.library = p.library.filter((id) => !found.includes(id));
       shuffle(s, p.library);
       const names = found.map((id) => defOf(s, obj(s, id)).name);
       // Found cards aren't revealed unless the effect says so (CR 701.23e).
       const shown = e.reveal || e.dest.zone === "battlefield" ? ` (${names.join(", ")})` : "";
       log(s, `${p.name} searches their library${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}, and shuffles.`);
-      found.forEach((id, i) => {
-        const to = i > 0 && e.others ? e.others : e.dest;
+      found.forEach((id) => {
+        const to = dest(sc.found!.indexOf(id));
         if (to.zone === "libraryTop") {
           obj(s, id).zone = "library";
           p.library.unshift(id);
-        } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: p.id, ...(to.tapped ? { tapped: true } : {}) });
+        } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: p.id, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id) });
         else moveObject(s, id, to.zone);
       });
       return;

@@ -1,6 +1,6 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
-import { attackedName, attackedPlaneswalker, auraHostFor, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackedName, attackedPlaneswalker, auraHostFor, auraHostKey, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
@@ -29,6 +29,39 @@ function returnFromExile(s: GameState, c: GameObject, controller: PlayerId, src:
   }
   log(s, `${src} returns ${d.name} to the battlefield.`);
   moveObject(s, c.id, "battlefield", { controller, ...host, ...(counter ? { counters: { [counter]: 1 } } : {}) });
+}
+
+/**
+ * Auras this effect puts onto the battlefield without their being cast (CR 303.4f): the player each one enters under
+ * chooses what it enchants, as it enters, among what's on the battlefield before any of them move (Replenish rulings);
+ * with nothing legal it stays where it is (303.4g). One Aura at a time, in the order given; no question when only one
+ * thing is legal. Returns "paused" while a player chooses, else the host of each Aura that can enter; an Aura missing
+ * from it stays put. Cards that aren't Auras are skipped.
+ */
+export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId }[], src: string): "paused" | Map<ObjectId, AuraHost> {
+  const sc = (s.resolving!.scratch ??= {});
+  const hosts = (sc.auraHosts ??= {});
+  for (const { o, under } of cards) {
+    if (!defOf(s, o).subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
+    const options = auraHostOptions(s, o, under);
+    if (options.length <= 1) {
+      hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
+      continue;
+    }
+    const labels = options.map((h) => ("attachTo" in h ? `${defOf(s, obj(s, h.attachTo)).name} (${player(s, controllerOf(s, obj(s, h.attachTo))).name})` : player(s, h.attachToPlayer).name));
+    // Two of the same name under one player: number them, so each button says which.
+    const seen = new Map<string, number>();
+    const shown = labels.map((l) => (labels.filter((x) => x === l).length > 1 ? `${l} #${seen.set(l, (seen.get(l) ?? 0) + 1).get(l)}` : l));
+    sc.auraAsking = o.id;
+    s.pending = { kind: "chooseOption", player: under, source: src, what: "enchant", options: options.map(auraHostKey), labels: shown, prompt: `choose what ${defOf(s, o).name} enchants as it enters` };
+    return "paused";
+  }
+  const out = new Map<ObjectId, AuraHost>();
+  for (const { o } of cards) {
+    const k = hosts[o.id];
+    if (k && k !== "none") out.set(o.id, auraHostOf(k));
+  }
+  return out;
 }
 
 /**
@@ -406,6 +439,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "cipher":
       return cipher(s, ctx, src);
+    case "haunt": {
+      // "Exile it haunting target creature" (CR 702.55a-b): the card still in the graveyard it was put into, onto the
+      // creature targeted, if that's still legal (a single target that's illegal means the ability does nothing at all,
+      // CR 608.2b, so the card stays in the graveyard).
+      const card = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const t = ctx.targets[0];
+      const host = t?.kind === "object" && ctx.legal[0] ? s.objects[t.id] : undefined;
+      if (!card || card.zone !== "graveyard" || (card.zoneChanges ?? 0) !== (ctx.sourceZc ?? 0) || host?.zone !== "battlefield") return;
+      moveObject(s, card.id, "exile");
+      if (s.objects[card.id]?.zone !== "exile") return;
+      card.haunting = { id: host.id, zc: host.zoneChanges ?? 0 };
+      log(s, `${defOf(s, card).name} is exiled haunting ${defOf(s, host).name}.`);
+      return;
+    }
     case "playLinked": {
       // The card this permanent's hideaway exiled, still the same object in exile (CR 400.7, 607.2a), played as this
       // resolves (rulings: it can't wait). Asked once; a land goes through "you may" since it isn't cast.
@@ -492,19 +539,30 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? cards.length : 1, fromHand: true };
         return "paused";
       }
-      for (const id of sc.found) {
-        const o = s.objects[id];
-        if (o?.zone !== "hand" || o.owner !== p.id) continue;
-        log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}.`);
-        moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}) });
+      const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "hand" && o.owner === p.id);
+      // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g).
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src);
+      if (hosts === "paused") return "paused";
+      for (const o of cards) {
+        const host = hosts.get(o.id);
+        if (defOf(s, o).subtypes.includes("Aura") && !host) {
+          log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in ${p.name}'s hand.`);
+          continue;
+        }
+        log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+        moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
       }
       return;
     }
-    case "putOntoBattlefield":
-      for (const o of objects(s, e.what, ctx)) {
+    case "putOntoBattlefield": {
+      const list = objects(s, e.what, ctx);
+      const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);
+      // Auras: their controller chooses what each enchants as it enters (CR 303.4f), all before any card moves; one with
+      // nothing to enchant stays where it is (303.4g).
+      const hosts = e.attachToSubject ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, list.filter((o) => isPermanentCard(defOf(s, o))).map((o) => ({ o, under: under(o) })), src);
+      if (hosts === "paused") return "paused";
+      for (const o of list) {
         const d = defOf(s, o);
-        // An Aura put onto the battlefield this way needs a choice of what it enchants (CR 303.4f);
-        // the compiler doesn't produce this effect for cards that could be Auras, so this is a safeguard.
         if (e.attachToSubject) {
           // An Aura returned "attached to that creature" (CR 303.4f): only to one it could enchant, protection
           // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.
@@ -519,10 +577,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host.id });
           continue;
         }
-        if (!isPermanentCard(d) || d.subtypes.includes("Aura")) continue;
-        const under = e.owner ? o.owner : ctx.controller;
-        log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under).name}'s control${e.tapped ? ", tapped" : ""}.`);
-        moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}) }); // CR 110.2a
+        if (!isPermanentCard(d)) continue;
+        const host = hosts.get(o.id);
+        if (d.subtypes.includes("Aura") && !host) {
+          log(s, `${d.name} has nothing to enchant, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
+          continue;
+        }
+        log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+        moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...host }); // CR 110.2a
         // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
         // the permanent it became, while it's still that object (CR 400.7, rulings).
         if (o.zone !== "battlefield") continue;
@@ -531,6 +593,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
       }
       return;
+    }
     case "randomFromGraveyard": {
       const p = player(s, ctx.controller);
       const pool = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, s.objects[id]!)));
@@ -564,15 +627,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "returnAllFromGraveyard": {
       // All at once, as one move: under your control (CR 110.2a) or, with "under their owners' control", each owner's.
-      // Only permanent cards can be put onto the battlefield (CR 110.4b); never Auras (see the effect).
-      const ids: ObjectId[] = [];
-      for (const pid of players(s, e.who, ctx))
-        for (const id of player(s, pid).graveyard) {
-          const d = defOf(s, s.objects[id]!);
-          if (isPermanentCard(d) && !d.subtypes.includes("Aura") && printedMatches(e.filter, d)) ids.push(id);
-        }
-      if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
-      for (const id of ids) moveObject(s, id, "battlefield", { controller: e.owners ? s.objects[id]!.owner : ctx.controller, tapped: e.tapped });
+      // Only permanent cards can be put onto the battlefield (CR 110.4b). Which cards is fixed as it starts (Replenish
+      // rulings), before any Aura's host is chosen; an Aura with nothing to enchant stays in the graveyard (CR 303.4g).
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.found) {
+        sc.found = [];
+        // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).
+        for (const pid of apnap(s, players(s, e.who, ctx)))
+          for (const id of player(s, pid).graveyard) {
+            const d = defOf(s, s.objects[id]!);
+            if (isPermanentCard(d) && printedMatches(e.filter, d)) sc.found.push(id);
+          }
+      }
+      const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");
+      const under = (o: GameObject) => (e.owners ? o.owner : ctx.controller);
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: under(o) })), src);
+      if (hosts === "paused") return "paused";
+      const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
+      if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
+      for (const id of ids) moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) });
       return;
     }
     case "putInLibrary":

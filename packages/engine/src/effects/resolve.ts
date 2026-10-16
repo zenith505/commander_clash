@@ -21,6 +21,7 @@ import { runCopiesEffect } from "./run-copies";
 import { runSpellsEffect, addDelayed } from "./run-spells";
 import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
+import { fireEvent } from "./triggers";
 
 export interface ResolveCtx {
   controller: PlayerId;
@@ -451,6 +452,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnLinked":
     case "playLinked":
     case "cipher":
+    case "haunt":
     case "grantFlashback":
     case "pick":
     case "empowerJace":
@@ -583,6 +585,7 @@ function finishSpell(s: GameState, id: ObjectId) {
     return;
   }
   moveObject(s, id, "graveyard");
+  if (s.objects[id]?.zone === "graveyard") fireEvent(s, { type: "resolvedToGraveyard", id });
 }
 
 export function damageRecipients(s: GameState, to: DamageRecipient, ctx: ResolveCtx): { objs: GameObject[]; pids: PlayerId[] } {

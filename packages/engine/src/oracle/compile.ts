@@ -834,6 +834,21 @@ export function compile(d: CardDef): CompiledCard {
       out.entersOptions = [...(out.entersOptions ?? []), "tribute"];
       continue;
     }
+    // Haunt (CR 702.55a): on a permanent, "When this permanent is put into a graveyard from the battlefield, exile it
+    // haunting target creature"; on an instant or sorcery, "When this spell is put into a graveyard during its
+    // resolution, exile it haunting target creature."
+    if (line === "Haunt") {
+      const permanent = !isSpell;
+      out.triggers.push({
+        event: permanent ? "selfToGraveyard" : "selfResolvedToGraveyard",
+        body: {
+          targets: [{ kind: "object", types: ["Creature"], text: "target creature" }],
+          effects: [{ type: "haunt" }],
+          text: `Haunt: when ~ is put into a graveyard ${permanent ? "from the battlefield" : "during its resolution"}, exile it haunting target creature.`,
+        },
+      });
+      continue;
+    }
     // Cipher (CR 702.99a): the spell's last instruction, "you may exile this card encoded on a creature you control".
     if (line === "Cipher" && isSpell) {
       cipher = true;
@@ -1011,7 +1026,7 @@ export function compile(d: CardDef): CompiledCard {
     const twice =
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
-      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies), (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
@@ -1019,7 +1034,9 @@ export function compile(d: CardDef): CompiledCard {
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)
           ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]
-          : [`When ~ enters, ${effect}`, `${/^attacks/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
+          : twice[1] === "the creature it haunts dies"
+            ? [`When ~ enters, ${effect}`, `When the creature ~ haunts dies, ${effect}`]
+            : [`When ~ enters, ${effect}`, `${/^attacks/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);
       else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));

@@ -129,6 +129,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.colorsSpent ?? 0;
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
+    case "players":
+      return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
     case "opponentsAttacked": {
       const a = s.players[ctx.controller]?.attackedPlayers;
       return a?.turn === s.turn ? a.players.filter((pid) => pid !== ctx.controller).length : 0;
@@ -303,6 +305,8 @@ function describeCount(c: Count): string {
       return "life";
     case "speed":
       return "speed";
+    case "players":
+      return c.opponents ? "#opponents" : "#players";
     case "diedThisTurn":
       return "#creatures that died this turn";
     case "attackersThisTurn":

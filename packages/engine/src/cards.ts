@@ -156,6 +156,13 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   return { ...own, triggers: [...own.triggers, ...encoded.map((e) => cipherTrigger(defOf(s, s.objects[e.id]!).name, e))] };
 }
 
+/** The cards in exile haunting this permanent (CR 702.55b), for showing it. */
+export function hauntedBy(s: GameState, o: GameObject): GameObject[] {
+  if (o.zone !== "battlefield") return [];
+  const zc = o.zoneChanges ?? 0;
+  return s.turnOrder.flatMap((pid) => s.players[pid]!.exile.map((id) => s.objects[id]!).filter((c) => c.haunting?.id === o.id && c.haunting.zc === zc));
+}
+
 const cipherTrigger = (name: string, e: { id: ObjectId; zc: number }): TriggeredAbility => ({
   event: "selfDealsCombatDamageToPlayer",
   body: { targets: [], effects: [{ type: "castCipher", card: e.id, zc: e.zc }], text: `Whenever ~ deals combat damage to a player, you may copy the encoded card (${name}) and you may cast the copy without paying its mana cost.` },

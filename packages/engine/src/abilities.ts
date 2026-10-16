@@ -115,6 +115,8 @@ export type Count =
   | { kind: "commanderCasts" }
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
+  /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
+  | { kind: "players"; opponents?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -729,6 +731,11 @@ export type Effect =
    */
   | { type: "castCipher"; card: ObjectId; zc: number }
   /**
+   * Haunt's triggered ability (CR 702.55a): "exile it haunting target creature" (target 0). "It" is this card in the
+   * graveyard it was just put into; it does nothing if the card left (CR 400.7).
+   */
+  | { type: "haunt" }
+  /**
    * "Sacrifice a creature", "each opponent sacrifices a creature of their choice", "return a land you
    * control to its owner's hand": each player picks n of their own permanents that match, in APNAP order,
    * then they're all sacrificed or returned at once (CR 101.4, 701.21). Not targeted.
@@ -1273,6 +1280,13 @@ export type TriggerEvent =
    * (CR 603.3a), never as a leaves-the-battlefield ability (CR 603.6c).
    */
   | "selfToGraveyardAnywhere"
+  /** Haunt on an instant or sorcery (CR 702.55a): "When this spell is put into a graveyard during its resolution". */
+  | "selfResolvedToGraveyard"
+  /**
+   * "When the creature ~ haunts dies" (CR 702.55b-c): it triggers from exile, where the haunting card is, under its
+   * owner's control (CR 108.4a, 113.8).
+   */
+  | "hauntedDies"
   | "selfTargetedByYourSpell" // heroic: "Whenever you cast a spell that targets ~"
   | "selfLastTimeCounterRemoved" // vanishing: "When the last time counter is removed from ~" (CR 702.63a)
   /** "When ~ exploits a creature" (CR 702.110b); the exploited creature is the subject. */

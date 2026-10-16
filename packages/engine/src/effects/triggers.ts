@@ -112,6 +112,8 @@ export type TriggerSourceEvent =
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean }
   /** A card (or token) was put into a graveyard, from any zone. */
   | { type: "toGraveyard"; id: ObjectId }
+  /** A resolved instant or sorcery card was put into its owner's graveyard (CR 608.2n): haunt on a spell (702.55a). */
+  | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number }
   /**
@@ -369,6 +371,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const att = s.objects[a];
       if (att?.zone === "battlefield") add(att, controllerOf(s, att), (e) => e === "selfBecomesUnattached", undefined, undefined, o);
     }
+    // "When the creature ~ haunts dies": the cards in exile haunting it as it was on the battlefield (CR 702.55b-c),
+    // under their owners' control (CR 108.4a, 113.8). Dying means going to a graveyard, creature or not (CR 700.4).
+    if (ev.to === "graveyard")
+      for (const pid of s.turnOrder) {
+        if (player(s, pid).lost) continue;
+        for (const id of player(s, pid).exile) {
+          const card = obj(s, id);
+          if (card.haunting?.id === ev.id && card.haunting.zc === was) add(card, pid, (e) => e === "hauntedDies", compileCard(defOf(s, card)).triggers);
+        }
+      }
     // "Whenever another creature dies", "a creature you control", "equipped creature": abilities of permanents
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     if (ev.to === "graveyard" && ev.snapshot && ev.chars) {
@@ -708,6 +720,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When ~ is put into a graveyard from anywhere": the card's ability, in the graveyard (CR 603.6c).
     const card = s.objects[ev.id];
     if (card?.zone === "graveyard") add(card, card.owner, (e) => e === "selfToGraveyardAnywhere", compileCard(defOf(s, card)).triggers);
+  } else if (ev.type === "resolvedToGraveyard") {
+    // Haunt on an instant or sorcery: "When this spell is put into a graveyard during its resolution" (CR 702.55a). It
+    // triggers in the graveyard, where the card has no controller, so its owner controls it (CR 108.4a, 113.8).
+    const card = s.objects[ev.id];
+    if (card?.zone === "graveyard") add(card, card.owner, (e) => e === "selfResolvedToGraveyard", compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "discarded") {
     // "Whenever you discard a card", "whenever a player cycles a card": once for each card (CR 603.2c). "That player" is
     // the one who discarded.

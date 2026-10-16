@@ -9,6 +9,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ dies, (.+)$/, "selfDies"],
   [/^When(?:ever)? ~ leaves the battlefield, (.+)$/, "selfLeaves"],
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
+  // Haunt (CR 702.55b-c): it triggers from exile, see "hauntedDies".
+  [/^When the creature ~ haunts dies, (.+)$/, "hauntedDies"],
   [/^When(?:ever)? ~ becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget"],
   [/^At the beginning of (?:the|each) end step, (.+)$/, "eachEndStep"],
   [/^When you cast (?:this spell|~), (.+)$/, "selfCast"],

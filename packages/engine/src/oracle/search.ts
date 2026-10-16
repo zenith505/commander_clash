@@ -27,8 +27,7 @@ export function parseSearch(s: string): Effect[] | null {
   if (filter === null) return null;
   const rest = m[4]!;
   let r: RegExpExecArray | null;
-  // An Aura put onto the battlefield this way needs something to enchant chosen (CR 303.4f): not supported.
-  if (/onto the battlefield/.test(rest) && mayBeAura(filter)) return null;
+  // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
   const base = { type: "search" as const, ...(filter ? { filter } : {}), n, upTo, reveal };
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
   if ((r = new RegExp(`^put one ${SEARCH_DEST} and the other ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
@@ -37,15 +36,6 @@ export function parseSearch(s: string): Effect[] | null {
   if (/^then shuffle and put (?:that card|the card|it) on top(?: of your library)?$/i.test(rest) && n === 1) return [{ ...base, dest: { zone: "libraryTop" } }];
   if (/^put (?:it|that card) on top of your library, then shuffle$/i.test(rest)) return null; // shuffled away again: not a real template
   return null;
-}
-
-export function mayBeAura(f: TargetSpec | undefined): boolean {
-  if (!f || f.named) return true;
-  if (f.notTypes?.includes("Enchantment")) return false;
-  if (f.types?.length && !f.types.includes("Enchantment")) return false;
-  if (f.allTypes?.length && !f.allTypes.includes("Enchantment")) return false;
-  if (f.subtypes?.length && f.subtypes.every((st) => CREATURE_TYPES.has(st) || BASIC_TYPES.includes(st))) return false;
-  return true;
 }
 
 /** What a search looks for: undefined for "a card", null when it isn't understood. */

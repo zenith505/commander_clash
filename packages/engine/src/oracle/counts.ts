@@ -54,6 +54,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Life and hands.
   if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
+  if (each && /^player$/i.test(p)) return count({ kind: "players" });
+  if (each && /^opponent(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   if (/^times? you've cast your commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });

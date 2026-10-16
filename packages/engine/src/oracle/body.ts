@@ -151,6 +151,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   let payFirst: { pay: PayCost; text: string } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
+  // A look that a "you may pay ... If you do," before it depends on (see payFirst).
+  let digPaid: { pay: PayCost; text: string } | null = null;
   for (let si = 0; si < sentences.length; si++) {
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     [prevStart, curStart] = [curStart, effects.length];
@@ -239,13 +241,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const done = parseDig(s, dig);
       if (!done) return null;
       if (done === "more") continue;
-      effects.push(done);
+      if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
+      else effects.push(done);
       dig = null;
+      digPaid = null;
       continue;
     }
     if (payFirst) {
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
+      // "You may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the
+      // other into your graveyard." (Marchesa): the whole look depends on the payment.
+      const lookPaid = new RegExp(`^look at the top ${NUMX} cards? of your library$`).exec(then[1]!);
+      if (lookPaid) {
+        dig = { type: "dig", n: amt(lookPaid[1]!), reveal: false };
+        digPaid = { pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` };
+        payFirst = null;
+        continue;
+      }
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
       // "If you do, create a 2/2 black Zombie Berserker creature token, then attach ~ to it": both parts depend
       // on the payment, in order.

@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, mountain, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { castProblem, compileCard, controllerOf, isFullySupported, objHasKeyword, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { castProblem, compileCard, controllerOf, isFullySupported, objHasKeyword, parseManaCost, planCast, planMana, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const ride = card("Take for a Ride", "Sorcery", "{2}{R}", { oracleText: "Take for a Ride has flash as long as you've committed a crime this turn. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)\nGain control of target creature until end of turn. Untap that creature. It gains haste until end of turn." });
@@ -13,6 +13,8 @@ const muscle = card("Overzealous Muscle", "Creature — Ogre Mercenary", "{4}{B}
 const posse = card("Hellspur Posse Boss", "Creature — Lizard Rogue", "{2}{R}{R}", { power: "2", toughness: "4", oracleText: "Other outlaws you control have haste. (Assassins, Mercenaries, Pirates, Rogues, and Warlocks are outlaws.)\nWhen this creature enters, create two 1/1 red Mercenary creature tokens with \"{T}: Target creature you control gets +1/+0 until end of turn. Activate only as a sorcery.\"" });
 const sheriff = card("Shoot the Sheriff", "Instant", "{1}{B}", { oracleText: "Destroy target non-outlaw creature. (Assassins, Mercenaries, Pirates, Rogues, and Warlocks are outlaws. Everyone else is fair game.)" });
 const bards = card("Bard's Company", "Creature — Human Citizen", "{2}{W}{U}", { power: "2", toughness: "3", keywords: ["Recruit"], oracleText: "You may cast this spell as though it had flash if you control a Human.\nOther creatures you control get +1/+1.\nWhenever this creature enters or attacks, recruit. (Draw a card, then discard a card. If you discarded a nonland card, create a 1/1 white Human Soldier creature token.)" });
+const marchesa = card("Marchesa, Dealer of Death", "Legendary Creature — Human Rogue", "{U}{B}{R}", { power: "3", toughness: "4", oracleText: "Whenever you commit a crime, you may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the other into your graveyard. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)" });
+const lookout = card("Freestrider Lookout", "Creature — Human Rogue", "{2}{G}", { power: "3", toughness: "3", keywords: ["Reach"], oracleText: "Reach\nWhenever you commit a crime, look at the top five cards of your library. You may put a land card from among them onto the battlefield tapped. Put the rest on the bottom of your library in a random order. This ability triggers only once each turn. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)" });
 const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
 const opt = card("Opt", "Instant", "{U}", { oracleText: "Scry 1. (Look at the top card of your library. You may put that card on the bottom.)\nDraw a card." });
 
@@ -84,5 +86,33 @@ describe("outlaws, conditional flash, crimes during your turn", () => {
     expect(can(s, ap, ids[1]!)).toBe(false);
     putOnBattlefield(s, ap, bear({ name: "Villager", subtypes: ["Human"], typeLine: "Creature — Human" }));
     expect(can(s, ap, ids[1]!)).toBe(true);
+  });
+
+  it("Marchesa: pay {1} to look at two, one to your hand and the other to your graveyard", () => {
+    let { s, ap, ids, opp } = setup([shock]);
+    supported(marchesa, lookout);
+    putOnBattlefield(s, ap, marchesa);
+    const top = s.players[ap]!.library.slice(0, 2);
+    s = cast(s, ap, ids[0]!, [{ kind: "player", id: opp }]);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", pay: { mana: "{1}" } });
+    for (const a of planMana(s, ap, parseManaCost("{1}"))!) s = act(s, a);
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 1, max: 1, cards: top });
+    s = act(s, { type: "searchLibrary", player: ap, found: [top[1]!] });
+    expect(s.objects[top[1]!]!.zone).toBe("hand");
+    expect(s.objects[top[0]!]!.zone).toBe("graveyard");
+  });
+
+  it("Freestrider Lookout: a land from the top five onto the battlefield tapped, once each turn", () => {
+    let { s, ap, ids, opp } = setup([shock, shock]);
+    putOnBattlefield(s, ap, lookout);
+    s = cast(s, ap, ids[0]!, [{ kind: "player", id: opp }]);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 0, max: 1 });
+    const land = (s.pending as { cards: string[] }).cards[0]!;
+    s = act(s, { type: "searchLibrary", player: ap, found: [land] });
+    expect(s.objects[land]).toMatchObject({ zone: "battlefield", tapped: true });
+    s = passAll(s);
+    s = cast(s, ap, ids[1]!, [{ kind: "player", id: opp }]);
+    expect(s.pending).toBeNull();
   });
 });

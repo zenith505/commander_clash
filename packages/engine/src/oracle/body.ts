@@ -427,9 +427,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       sentences.splice(si, 1, joined[1]!, joined[3]!.charAt(0).toUpperCase() + joined[3]!.slice(1), "Shuffle");
       s = sentences[si]!;
     }
-    const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
-    if (look && !dig) {
-      dig = { type: "dig", n: amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
+    // "Look at the top X cards of your library, where X is the number of tokens you created this turn" (Ellyn Harbreeze):
+    // X counted as it resolves (CR 107.3c, 608.2h).
+    const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);
+    if (look && !dig && (!look[3] || look[2] === "X")) {
+      const def = look[3] ? parseCount(look[3], ctx) : undefined;
+      if (look[3] && !def) return null;
+      dig = { type: "dig", n: def ? replaceX(X, def) : amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
       continue;
     }
     if (dig) {

@@ -630,6 +630,11 @@ export interface CostChoices {
   collect?: ObjectId[];
   /** Teamwork N: the untapped creatures you control, with total power N or more, tapped as you cast it. */
   teamwork?: ObjectId[];
+  /**
+   * Harmonize (CR 702.180a-b): the untapped creature you control tapped as you cast it from your graveyard, its power
+   * taken off the total cost in generic mana.
+   */
+  harmonize?: ObjectId;
   /** Conspire (CR 702.78a): the two untapped creatures you control that share a color with it, tapped to copy it. */
   conspire?: ObjectId[];
   /** Gift (CR 702.174a): the opponent chosen to promise the gift to. */

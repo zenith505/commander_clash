@@ -4681,6 +4681,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c5da5c31-0cf1-4393-8701-eda7880ecebc",
+  "name": "Unending Whisper",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw a card.\nHarmonize {5}{U} (You may cast this card from your graveyard for its harmonize cost. You may tap a creature you control to reduce that cost by {X}, where X is its power. Then exile this spell.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Harmonize"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2fac62be-dcbe-409f-a362-f0e519ec14a9",
   "name": "Venomsac Lagac",
   "manaCost": "{1}{G}",

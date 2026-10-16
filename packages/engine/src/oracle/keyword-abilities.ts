@@ -63,6 +63,14 @@ export function parseGraveyardKeyword(
     if (!parseManaCost(m[1]!).supported || parseManaCost(m[1]!).hasX) return "fail";
     return { fromGraveyard: { kind: "mayhem", mana: m[1]!, costs: [], exile: false } };
   }
+  // Harmonize (CR 702.180a): "You may cast this card from your graveyard by paying [cost] and tapping up to one untapped
+  // creature you control rather than paying this spell's mana cost", less that creature's power; then it's exiled. An
+  // {X} in it only when the mana cost has one too (Nature's Rhythm, Zenith Festival).
+  if ((m = /^Harmonize ((?:\{[^}]+\})+)$/.exec(line))) {
+    const cost = parseManaCost(m[1]!);
+    if (!isSpell || !cost.supported || (cost.hasX && !parseManaCost(d.manaCost).hasX)) return "fail";
+    return { fromGraveyard: { kind: "harmonize", mana: m[1]!, costs: [], exile: true } };
+  }
   if (/^Rebound$/.test(line)) return isSpell ? { rebound: true } : "fail";
   if ((m = /^Buyback ((?:\{[^}]+\})+)$/.exec(line))) return isSpell && parseManaCost(m[1]!).supported && !parseManaCost(m[1]!).hasX ? { buyback: m[1]! } : "fail";
   // "Buyback—Sacrifice a land.", "Buyback—Pay 3 life, Discard a card at random." (CR 702.27a): costs that aren't mana.

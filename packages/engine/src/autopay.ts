@@ -296,6 +296,8 @@ export function planCast(
   // "Costs {3} less if it targets a tapped creature" is worked out before mana abilities (CR 601.2f-g):
   // tapping the target for mana first mustn't make it count.
   const targetIds = compileCard(d).costLessIfTargets ? (targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])) : [];
+  // Creatures tapped for teamwork, conspire or harmonize as it's cast can't also be tapped for mana.
+  const tapping = [...(choices.teamwork ?? []), ...(choices.conspire ?? []), ...(choices.harmonize !== undefined ? [choices.harmonize] : [])];
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
   const pool = poolFor(s, pid, use).pool;
   const rainbow = compileCard(d).countsColors && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
@@ -307,15 +309,15 @@ export function planCast(
   // "If {S} was spent", "for each {S} spent": tap snow sources first (CR 107.4h).
   const wantSnow = !!compileCard(d).wantSnow;
   let taps: Action[] | null = null;
-  for (const r of wanted) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use, avoid, wantSnow))) break;
-  if (!taps) for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use, undefined, wantSnow))) break;
-  taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use, avoid, wantSnow);
+  for (const r of wanted) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds, ...tapping], use, avoid, wantSnow))) break;
+  if (!taps) for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds, ...tapping], use, undefined, wantSnow))) break;
+  taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds, ...tapping], use, avoid, wantSnow);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
   // So when the cost depends on the board, don't sacrifice permanents for its mana.
   if (taps && costDependsOnBoard(s, d)) {
     const sacs = taps.flatMap((a) => ((a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf) || (a.type === "activateAbility" && abilitiesOf(s, obj(s, a.objectId)).activated[a.index]?.sacrificeSelf) ? [a.objectId] : []));
-    if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, [...sacs, ...sacrificedTargets(s, targets)], use, undefined, wantSnow);
+    if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, [...sacs, ...sacrificedTargets(s, targets), ...tapping], use, undefined, wantSnow);
   }
   if (taps) return cast(taps);
   if (convoke !== "auto") return null;

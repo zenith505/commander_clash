@@ -1186,6 +1186,13 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
       const two = conspireCandidates(s, pid, id).filter((o) => !busy(o) && !tw?.includes(o) && spare_(s, pid, o)).slice(0, 2);
       if (two.length === 2) extra.conspire = two;
     }
+    // Harmonize (CR 702.180a): the strongest creature we can spare, for the most generic mana off.
+    if (via === "harmonize") {
+      const h = teamworkCandidates(s, pid)
+        .filter((o) => !busy(o) && !tw?.includes(o) && !extra.conspire?.includes(o) && spare_(s, pid, o) && teamworkPower(s, o) > 0)
+        .sort((a, b) => teamworkPower(s, b) - teamworkPower(s, a))[0];
+      if (h) extra.harmonize = h;
+    }
     // Gift (CR 702.174): promised only for a small gift that turns on something of the spell's own.
     // When it has targets only with the gift promised, it's promised for those.
     const giftee = !c.gift || must("gift") === false ? undefined : (chooseGiftee(s, pid, c) ?? (must("gift") ? [...opponents(s, pid)].sort((a, b) => player(s, a).life - player(s, b).life)[0] : undefined));

@@ -1,6 +1,6 @@
 # Roadmap
 
-18,346 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,429 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -87,9 +87,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
      Auras" (Anti-Magic Aura), Wall of Shadows.
    Left from the snow-mana rounds (snow mana, mana that remembers its source, "was spent", sacrifice the rest):
-   - "Was spent to cast" still out on its own words: Primeval Spawn ("if ~ would enter and it wasn't cast", a
-     replacement effect on entering, and "spells with total mana value 10 or less" from exiled cards). Autopay doesn't
-     try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar.
+   - Autopay doesn't try to spend mana from creatures for Inga and Esika, or a single color for Steel Exemplar. A Clone
+     copying Primeval Spawn isn't exiled by its "if ~ would enter and it wasn't cast" replacement.
    - Snow: all 45 legal {S} cards are supported. Mana Reflection and Nyxbloom Ancient multiply mana as a replacement
      effect while a {T} mana ability resolves (CR 106.12b); other "produces ... instead" replacements (Contamination,
      Infernal Darkness, Pulse of Llanowar) are out.
@@ -99,7 +98,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Return a creature card from your graveyard to the battlefield" (chosen, not targeted) works, also for each player
      (Exhume, Crypt Champion); still out: Infernal Offering and Tempt with Immortality (their other parts), "at random"
      (Moldgraf Monstrosity, Tomb Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a
-     spell's own count, and cards blocked on other lines (Tayam, Tyvar, Sauron, Incarnation Technique's demonstrate).
+     spell's own count, and cards blocked on other lines (Tayam, Tyvar, Sauron).
    Left from the round after Cataclysm (distribute, step-by-step becomes, Cover of Winter, flavor words, Threaten,
    Balancing Act, exhaust and boast):
    - Distributing counters as it resolves works for "among any number of creatures you control"; still out: Crashing
@@ -107,24 +106,19 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Becomes" without a duration works on ~ itself; still out: Tenth District Hero ("named Mileva").
    - Threaten's "untap ... and gain control of it" works; still out: Temporary Insanity's target filter, Spinal
      Embrace (sacrifice "if you do").
-   - Exhaust and boast abilities work, exhaust mana abilities too (CR 702.177a, 702.142a); still out: "as long as you
-     haven't activated an exhaust ability this turn" (Elvish Refueler, 702.177b), and the "whenever you boast /
-     activate an exhaust ability" triggers.
+   - Exhaust and boast abilities work, exhaust mana abilities too (CR 702.177a, 702.142a), and Elvish Refueler; still
+     out: the "whenever you boast / activate an exhaust ability" triggers.
    - Gained abilities in quotes that end a sentence before "until end of turn" (`gains "... draw a card." until end of
      turn`) are split in two by the sentence splitter, so such cards stay out.
    Left from the round after Balancing Act (exhaust mana, protection from players, "when you lose control of", granted
    cascade, abilities being activated, tokens created this turn):
-   - Protection from a player (CR 702.16k) works for "each of your opponents" and "the chosen player" chosen as it
-     enters; still out: Guardian Archon ("secretly choose"), Courageous Resolve, and "you and target permanent you
-     control each gain protection from".
-   - "When you lose control of ..., tap it" works (delayed, 603.7); other "when you lose control of" lines are out
-     (Duplicity, Gustha's Scepter, Khârn, Ogre Geargrabber, Stolen Uniform, Krovikan Vampire's "sacrifice it when").
-   - Cascade given to spells works (Maelstrom Nexus, Rain of Riches, The First Sliver and 4 more); still out: "the next
-     noncreature spell you cast this turn has cascade" (Dark Apostle, Sloppity Bilepiper, Smoldering Stagecoach, TARDIS,
-     Bigger on the Inside), Flamekin Herald (commander spells), Abaddon, Bloodbraid Marauder. A countered X spell's
-     cascade falls back to its printed mana value.
-   - "The number of tokens you created this turn" works as an amount; still out as the X of a look (Ellyn Harbreeze).
-     "Mana from Treasures spent to activate this ability" as an amount (Mr. House) is out.
+   - Protection from a player (CR 702.16k) works for "each of your opponents", "the chosen player" and Guardian
+     Archon's secret choice; still out: Courageous Resolve, and "you and target permanent you control each gain
+     protection from".
+   - Cascade given to spells works, "the next noncreature spell you cast this turn has cascade" too (Dark Apostle,
+     Sloppity Bilepiper, Smoldering Stagecoach); still out: TARDIS (planeswalk), Bigger on the Inside (granted mana
+     ability for another player), Flamekin Herald (commander spells), Abaddon, Bloodbraid Marauder.
+   - "Mana from Treasures spent to activate this ability" as an amount (Mr. House, which also rolls dice) is out.
    - "Whenever a player activates an ability that isn't a mana ability" works; "an ability of an artifact they
      control" (Avalanche of Sector 7, which counts mana abilities too) and Artifact Possession are still out.
    - Courageous Resolve: "gains protection from each of your opponents until end of turn" and "you can't lose the game".
@@ -180,7 +174,24 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      controls ..."), Grizzled Wolverine's "only if a creature blocks it", Ashen Ghoul's "creature cards above it".
      Coastal Wizard, Lady Sun, Diaochan, Maddening Imp, Norritt, Arcum's Whistle, Blood Frenzy and Berserk are out on
      their other lines.
-   - Harmonize, Paradigm, Demonstrate are still out.
+   Left from the round after cascade ("when you lose control of", face-down exile, attach target Equipment,
+   harmonize, paradigm, demonstrate):
+   - "When you lose control of ~" works (603.2, rulings on Khârn: leaving the battlefield or a control change; the
+     player who lost control controls the trigger: Duplicity, Gustha's Scepter, Ogre Geargrabber, Ray of Command).
+     Still out: Khârn, the Betrayer (an opponent's choice inside a damage prevention), Stolen Uniform ("this turn" and
+     "if it's attached to a creature you control"), Krovikan Vampire and Seraph ("Sacrifice it when you lose control
+     of ~"). A control change before the first state check of a newly placed permanent isn't noticed; bots don't use
+     Gustha's Scepter.
+   - Face-down exile with a permission to play the card (Three Wishes, Rogue Class, Intet, Jester's Scepter,
+     Outrageous Robbery) is out.
+   - Attach target Equipment works (Brass Squire, Kemba, Magnetic Theft and 9 more); still out: Frodo ("with mana value
+     2 or 3"), Grip of Phyresis, Weapons Vendor, Barret, Blacksmith's Talent, Captain America, Cloud's other line,
+     Noctis, Raubahn (ward-pay life), Sokka Swordmaster.
+   - Harmonize (CR 702.180) works on 8 cards; still out: Glacial Dragonhunt, Nature's Rhythm, Synchronized Charge,
+     Songcrafter Mage (granting harmonize). Paradigm works on 4 of 5 (Improvisation Capstone's "exile until total mana
+     value 4 or greater ... cast any number" is out). Demonstrate works on 4 of 6 (Creative Technique's "shuffle, then
+     reveal until a nonland card ... cast it" and Transforming Flourish are out).
+   - Secret choices in triggers (Stalking Leonin, Emissary of Grudges) are out.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or

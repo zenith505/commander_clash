@@ -356,6 +356,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.monarch === you;
     case "fullParty":
       return partySize(s, you, (o) => chars.get(o.id)) === 4;
+    case "controlCommander":
+      return s.battlefield.some((id) => {
+        const c = s.objects[id]!.isCommander ? chars.get(id) : undefined;
+        return !!c && c.controller === you && (!cond.types || cond.types.some((t) => c.types.includes(t)));
+      });
     case "ringBearer": {
       // On the battlefield under your control, with the designation (CR 701.54e).
       const b = s.players[you]?.ring?.bearer;

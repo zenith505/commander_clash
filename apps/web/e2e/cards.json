@@ -673,6 +673,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "25012c1f-c069-43d7-b930-a3a5a7eb1389",
+  "name": "Dismantling Wave",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "For each opponent, destroy up to one target artifact or enchantment that player controls.\nCycling {6}{W}{W} ({6}{W}{W}, Discard this card: Draw a card.)\nWhen you cycle this card, destroy all artifacts and enchantments.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "273b339c-964b-4a18-8eb5-ceb8abcdfd9e",
   "name": "Divination",
   "manaCost": "{2}{U}",
@@ -885,6 +913,32 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "d09c9cba-fdd2-479b-ad5d-d05181c3e3f9",
+  "name": "Fierce Guardianship",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nCounter target noncreature spell.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "6fd5e591-fae8-4128-a4d3-a848c8a8ffda",
@@ -2619,6 +2673,32 @@
   "set": "war",
   "releasedAt": "2019-05-03",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "04477339-7ed5-4770-9e5c-6e481ffcc858",
+  "name": "Spell Blast",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Counter target spell with mana value X. (For example, if that spell's mana cost is {3}{U}{U}, X is 5.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m14",
+  "releasedAt": "2013-07-19",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

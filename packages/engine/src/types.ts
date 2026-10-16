@@ -871,6 +871,8 @@ export interface Resolving {
   spellObjects?: (ObjectId | null)[];
   /** The tokens its last "create" made, for "put a counter on it". */
   created?: ObjectId[];
+  /** The permanents its last continuous effect changed, for "untap those creatures" after it (ObjRef "affected"). */
+  affected?: { id: ObjectId; zc: number }[];
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
   /** Players its damage effects dealt damage to, for "players dealt damage this way". */

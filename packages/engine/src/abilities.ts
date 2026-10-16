@@ -153,6 +153,12 @@ export interface TargetSpec {
   power?: Range; // "with power 4 or greater"
   toughness?: Range;
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
+  /**
+   * "Counter target spell with mana value X", "destroy target creature with power X or less": the X announced for the
+   * spell or ability (CR 107.3a), made into that range of `key` as its targets are chosen (settleDivided). Until then,
+   * any value.
+   */
+  xRange?: { key: "power" | "toughness" | "manaValue"; at: "exact" | "most" | "least" };
   /** `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1). */
   combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
@@ -248,6 +254,12 @@ export interface TargetSpec {
    * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
    */
   many?: "any" | "x" | "exactX";
+  /**
+   * "For each opponent, destroy up to one target artifact that player controls": one "up to one" target for each
+   * opponent, controlled by that opponent (CR 601.2c, 115.6). This one entry stands for all of them until the targets
+   * are chosen; `expandPerOpponent` (modes.ts) makes it one target per opponent then, each with `controlledBy`.
+   */
+  perOpponent?: true;
   /** Original text, for display. */
   text: string;
 }
@@ -295,6 +307,11 @@ export type ObjRef =
   | { ref: "created" }
   /** "The sacrificed creature": what was sacrificed to cast the spell, as it last existed (CR 608.2h). */
   | { ref: "sacrificed" }
+  /**
+   * "Creatures you control get +1/+1 until end of turn. Untap those creatures": the permanents this resolution's last
+   * continuous effect changed, locked in as it began (CR 611.2c), while they're still those objects on the battlefield.
+   */
+  | { ref: "affected" }
   /** Battle cry's "each other attacking creature". */
   | { ref: "allCreatures"; controller?: "you" | "opponent"; other?: boolean; attacking?: boolean }
   /** "Enchanted creature", "equipped creature": the permanent the source is attached to, while it's still that source. */
@@ -302,7 +319,11 @@ export type ObjRef =
   /** Joint Assault's "if it's paired with a creature, that creature": what target `index` is paired with as this resolves (CR 702.95b). */
   | { ref: "pairedWithTarget"; index: number }
   /** "all creatures", "each artifact and enchantment", "other creatures you control": every permanent that matches, not targeted. */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number }
+  /**
+   * `of`: "each creature target player controls", "all lands that player controls": only that player's permanents (if
+   * it's still a legal target, CR 608.2b).
+   */
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef }
   /**
    * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
@@ -553,6 +574,11 @@ export type StaticCondition =
   | { kind: "beforeAttackers" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /**
+   * "If you control a commander" (CR 903.3): any player's commander you control (rulings on Fierce Guardianship);
+   * `types`: "a commander that's a creature or planeswalker", one of them.
+   */
+  | { kind: "controlCommander"; types?: string[] }
   /** "If you have a full party" (CR 700.8a): four creatures in your party. */
   | { kind: "fullParty" }
   /** "If you don't control a Ring-bearer" (CR 701.54e); `self`: "as long as ~ is your Ring-bearer". */

@@ -230,6 +230,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "damagedThisWay") return [...new Set(s.resolving?.damagedThisWay ?? [])].map((id) => obj(s, id)).filter((o) => o.zone === "battlefield" && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)));
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
+  if (ref.ref === "affected")
+    return (s.resolving?.affected ?? []).map((a) => s.objects[a.id]).filter((o): o is GameObject => o?.zone === "battlefield" && (o.zoneChanges ?? 0) === s.resolving!.affected!.find((a) => a.id === o.id)!.zc);
   if (ref.ref === "graveyardEnd")
     return players(s, ref.who, ctx)
       .map((pid) => graveyardEnd(s, pid, { ...(ref.filter ? { filter: ref.filter } : {}), ...(ref.bottom ? { bottom: true } : {}), ...(ref.only ? { only: true } : {}) }))
@@ -259,7 +261,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const filter = bindChosen(ref.filter, ctx.chosen);
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : undefined;
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && objectMatches(s, filter, o, ctx.controller, false));
+    const whose = ref.of && players(s, ref.of, ctx);
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false));
   }
   return s.battlefield
     .map((id) => obj(s, id))

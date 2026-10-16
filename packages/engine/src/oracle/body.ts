@@ -301,6 +301,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.splice(before, effects.length - before, ...replaceX(added, def));
       for (let k = targetsBefore; k < ctx.targets.length; k++) {
         const t = ctx.targets[k]!;
+        // "Target creature with power X or less, where X is ...": not the X announced (TargetSpec.xRange).
+        if (t.xRange) return false;
         if (t.divided?.amount) ctx.targets[k] = { ...t, divided: { ...t.divided, amount: replaceX(t.divided.amount, def) } };
       }
       return true;
@@ -401,10 +403,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (insteadIf) s = `If ${insteadIf[2]}, ${insteadIf[1]!.charAt(0).toLowerCase()}${insteadIf[1]!.slice(1)} instead`;
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
-    const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
-    const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+    const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (ifState && insteadOf) {
       const previous = effects.slice(prevStart);
       const t = ifState[2]!.replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "");
@@ -413,7 +415,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e))) return null;
-      effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: inner, otherwise: previous });
+      const done = insteadOfAffected(inner, previous);
+      if (!done) return null;
+      effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
       continue;
     }
     if (ifState && stateCond) {
@@ -643,7 +647,21 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
   if (fx.length > 1 && fx.some((e) => pauses(e))) return null;
   if (instead && previous.some((e) => pauses(e))) return null;
-  return { effects: fx, instead };
+  const done = instead ? insteadOfAffected(fx, previous) : fx;
+  return done && { effects: done, instead };
+}
+
+/**
+ * "Creatures you control get +1/+1 until end of turn. If this spell was kicked, those creatures get +2/+1 until end of
+ * turn instead": the part done instead never ran the one it replaces, so "those creatures" are the ones that one names.
+ */
+function insteadOfAffected(fx: Effect[], previous: Effect[]): Effect[] | null {
+  const uses = (v: unknown): boolean => (Array.isArray(v) ? v.some(uses) : !!v && typeof v === "object" && ((v as { ref?: string }).ref === "affected" || Object.values(v).some(uses)));
+  if (!uses(fx)) return fx;
+  const prev = previous.length === 1 && previous[0]!.type === "continuous" ? previous[0]! : undefined;
+  if (prev?.type !== "continuous") return null;
+  const swap = <T>(v: T): T => (Array.isArray(v) ? (v.map(swap) as T) : v && typeof v === "object" ? ((v as { ref?: string }).ref === "affected" ? (prev.what as T) : (Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swap(x)])) as T)) : v);
+  return swap(fx);
 }
 
 /** One sentence: a plain instruction, two joined by "and", or one with "for each" / "equal to" in it. */
@@ -652,14 +670,43 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
   if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
-  const fx = attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
+  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx));
   const last = fx?.[fx.length - 1];
   if (fx) {
     // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1);
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
+    // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
+    if (last?.type === "continuous" && last.what.ref === "each" && last.duration === "endOfTurn") ctx.lastGroup = { ref: "affected" };
+    // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.
+    if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
   }
+  return fx;
+}
+
+/**
+ * "For each opponent, destroy up to one target artifact or enchantment that player controls", "... tap up to one target
+ * creature that player controls": the instruction with one "up to one" target for each opponent, controlled by that
+ * opponent (TargetSpec.perOpponent, CR 601.2c, 115.6), all done at once as it resolves. "Those creatures" after it are
+ * all of them; "it" and "that player" aren't any one of them.
+ */
+function parsePerOpponent(s: string, ctx: Ctx): Effect[] | null {
+  const m = /^[Ff]or each opponent, (.+)$/.exec(s);
+  if (!m || ctx.targets.some((t) => t.many || t.perOpponent)) return null;
+  const who = / up to one target (.+?) (?:that player|that opponent|they) controls?\b/;
+  const t = who.exec(` ${m[1]!}`);
+  if (!t) return null;
+  const inner = ` ${m[1]!}`.replace(who, ` target ${t[1]} an opponent controls`).trim();
+  if (/\b(?:that player|that opponent|they|their)\b/.test(inner)) return null;
+  const before = ctx.targets.length;
+  const fx = parseSentence(inner.charAt(0).toUpperCase() + inner.slice(1), ctx);
+  if (!fx || ctx.targets.length !== before + 1) return null;
+  const spec = ctx.targets[before]!;
+  if (spec.kind !== "object" || spec.controller !== "opponent" || spec.optional || spec.distinctFrom || spec.notSource) return null;
+  ctx.targets[before] = { ...spec, perOpponent: true, text: `target ${t[1]} that player controls` };
+  ctx.lastObjectTarget = undefined;
+  ctx.lastTargets = { index: before, n: 2 };
   return fx;
 }
 

@@ -2042,7 +2042,8 @@ export function castProblem(
     }
   }
   // "X damage divided as you choose": the X announced (CR 601.2b, 601.2d).
-  let specs = settleDivided(s, { targets: spellTargetSpecs(d, modes, castHow(choices)), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }).targets;
+  // Before targets are chosen, "with mana value X" asks for none in particular: X is announced as it's cast (601.2b).
+  let specs = settleDivided(s, { targets: spellTargetSpecs(d, modes, castHow(choices)), effects: [], text: "" }, { controller: pid, sourceId: id, x: x ?? 0 }, !targets).targets;
   if (targets && manySlot(specs) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c).
     const fit = fitMany({ targets: specs, effects: [], text: "" }, targets, x);
@@ -3019,7 +3020,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id)) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id));
     if (mp) return mp;
   }
-  let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 });
+  let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 }, !targets);
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).
     const fit = fitMany(body, targets, x);

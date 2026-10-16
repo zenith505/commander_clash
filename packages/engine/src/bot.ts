@@ -3,9 +3,10 @@ import { topGraveyardCards } from "./graveyard";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, modsAreHarmful, objectMatches, printedMatches, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
+  livingPlayers,
   abilityProblem,
   faceUpWays,
   assistedRemaining,
@@ -235,9 +236,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const body = compileCard(d).spell;
       // An X counterspell ("unless its controller pays {X}"): as big as we can make it.
       const cost = parseManaCost(d.manaCost);
-      const x = cost.hasX ? Math.max(0, availableMana(s, pid) - manaValue(cost)) : undefined;
+      // "Counter target spell with mana value X" (Spell Blast): X is that spell's mana value (CR 202.3e).
+      const exact = body?.targets.some((t) => t.xRange?.key === "manaValue" && t.xRange.at === "exact");
+      const x = cost.hasX ? (exact ? spellManaValue(s, top) : Math.max(0, availableMana(s, pid) - manaValue(cost))) : undefined;
       if (!body || !worthIt(body, id, x)) continue;
       const targets = chooseTargets(s, pid, body, false, id, x) ?? undefined;
+      // "If you control a commander, you may cast ~ without paying its mana cost" (Fierce Guardianship): free first.
+      if (targets && freeAlt(d)) {
+        const free = planCast(s, pid, id, targets, undefined, "auto", undefined, { alt: "alternative" });
+        if (free && free[free.length - 1]!.type === "castSpell") return free;
+      }
       const plan = planCast(s, pid, id, targets, undefined, "auto", x);
       if (plan && plan[plan.length - 1]!.type === "castSpell" && (plan[plan.length - 1] as { targets?: unknown }).targets) return plan;
       // Its alternative cost when the mana isn't there: Force of Will's blue card, Daze's Island (CR 118.9).
@@ -284,7 +292,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Damage prevention waits for damage coming (chooseDamageShield).
       .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -501,6 +509,16 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       out.push(good.length ? best(s, pid, good, true, 0) : all[0] ?? { kind: "none" });
       continue;
     }
+    // "Creatures target player controls get +2/+2", "tap all creatures target opponent controls": the player whose
+    // permanents it does us the most good on.
+    if (spec.kind === "player" && ofPlayerTargets(body).includes(i)) {
+      const pick = ofPlayerPick(s, pid, body, i, all, sourceId);
+      if (pick || !forced) {
+        if (!pick) return null;
+        out.push(pick);
+        continue;
+      }
+    }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
     const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
     if (!pool.length) {
@@ -687,6 +705,19 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   return null;
+}
+
+/** An alternative cost of nothing at all ("if you control a commander, you may cast ~ without paying its mana cost"). */
+const freeAlt = (d: CardDef) => {
+  const a = altCost(d, "alternative");
+  return !!a && !a.mana && !a.costs?.length;
+};
+
+/** Cast it for nothing when its alternative cost is free and allowed now (CR 118.9): the mana stays for something else. */
+function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "hand" || !freeAlt(defOf(s, o))) return null;
+  return castPlan(s, pid, id, false, undefined, "alternative");
 }
 
 /** Freerunning is cheaper than the mana cost: pay it whenever it's allowed (CR 702.173a). */
@@ -1312,18 +1343,63 @@ function worth(s: GameState, pid: PlayerId, o: GameObject): number {
   return 1 + mv(s, o.id);
 }
 
+/** While working out groupValue for one player as the target of "each creature target player controls": who, by target. */
+let ofPick: Map<number, PlayerId> | undefined;
+
+/** The player targets whose permanents a group effect touches ("tap all creatures target opponent controls"). */
+function ofPlayerTargets(body: AbilityBody): number[] {
+  const out = new Set<number>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== "object") return;
+    const o = v as Record<string, unknown>;
+    const of = o.of as { ref?: string; index?: number } | undefined;
+    if (o.ref === "each" && of?.ref === "target" && of.index !== undefined) out.add(of.index);
+    Object.values(o).forEach(walk);
+  };
+  walk(body.effects);
+  return [...out];
+}
+
+/** The player to target for "... each creature target player controls": the one for whom the group effects do us the most good. */
+function ofPlayerPick(s: GameState, pid: PlayerId, body: AbilityBody, i: number, pool: ChosenTarget[], sourceId?: string): ChosenTarget | undefined {
+  let top: { t: ChosenTarget; v: number } | undefined;
+  for (const t of pool) {
+    if (t.kind !== "player") continue;
+    ofPick = new Map([[i, t.id]]);
+    const v = groupValue(s, pid, body, undefined, sourceId) ?? 0;
+    ofPick = undefined;
+    if (!top || v > top.v) top = { t, v };
+  }
+  return top && top.v > 0 ? top.t : undefined;
+}
+
 /**
  * What effects on groups of permanents ("destroy all creatures", "each creature gets -1/-1", "untap all
  * creatures you control") do for us: the worth of what they hurt of the opponents' and help of ours,
  * less the reverse. Null if the body has none. `card` is the source, for guessing what we'd choose.
  */
 function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, card?: CardDef, sourceId?: string): number | null {
+  // "Destroy all creatures target player controls": as good as it is for the player we'd target (see ofPlayerPick).
+  const of = ofPlayerTargets(body);
+  if (of.length && !ofPick) {
+    let top: number | null = null;
+    for (const p of livingPlayers(s)) {
+      ofPick = new Map(of.map((i) => [i, p]));
+      const v = groupValue(s, pid, body, card, sourceId);
+      ofPick = undefined;
+      if (v !== null && (top === null || v > top)) top = v;
+    }
+    return top;
+  }
   let v: number | null = null;
   const chosen = card ? guessChosen(s, pid, card) : undefined;
   const group = (r: ObjRef) => {
     if (r.ref !== "each") return [];
+    const whose = r.of?.ref === "target" ? ofPick?.get(r.of.index) : undefined;
+    if (r.of && whose === undefined) return [];
     const filter = bindChosen(r.filter, sourceId ? (obj(s, sourceId).chosen ?? chosen) : chosen);
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => !(r.other && o.id === sourceId) && objectMatches(s, filter, o, pid, false));
+    return s.battlefield.map((id) => obj(s, id)).filter((o) => !(r.other && o.id === sourceId) && (whose === undefined || controllerOf(s, o) === whose) && objectMatches(s, filter, o, pid, false));
   };
   const add = (objs: GameObject[], harmful: boolean, scale = (_: GameObject) => 1) => {
     for (const o of objs) v = (v ?? 0) + (controllerOf(s, o) === pid ? -1 : 1) * (harmful ? 1 : -1) * worth(s, pid, o) * scale(o);

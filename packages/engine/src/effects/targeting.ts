@@ -1,12 +1,12 @@
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Range, TargetChoice, TargetSpec } from "../abilities";
-import { manaValue, parseManaCost } from "../mana";
+import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
-import { expandMany, manySlot, modeCountProblem } from "../modes";
+import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
-import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId } from "../types";
+import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
 
@@ -131,6 +131,14 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   return true;
 }
 
+/** A spell's mana value on the stack: its mana cost's, with X as chosen for it (CR 202.3e), or 0 face down (CR 708.2). */
+export function spellManaValue(s: GameState, item: StackItem): number {
+  const o = item.objectId ? s.objects[item.objectId] : undefined;
+  if (!o || o.faceDown) return 0;
+  const cost = parseManaCost(defOf(s, o).manaCost);
+  return manaValue(cost) + (cost.hasX ? (item.x ?? 0) * xCount(cost) : 0);
+}
+
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
 
 /** Hexproof or shroud a player has from a permanent they control ("You have hexproof"). */
@@ -167,8 +175,11 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (item.kind === "ability") return !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered);
     if (spec.noSpells || !item.objectId) return false;
     if (spec.targetsWhat && !targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller)) return false;
-    // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used.
-    return printedMatches(spec, defOf(s, obj(s, item.objectId)));
+    // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used. Its mana value
+    // counts the X chosen for it (CR 202.3e); a face-down spell's is 0 (CR 708.2).
+    if (spec.manaValue && !inRange(spellManaValue(s, item), spec.manaValue)) return false;
+    const { manaValue: _mv, ...rest } = spec;
+    return printedMatches(rest, defOf(s, obj(s, item.objectId)));
   }
   const o = s.objects[t.id];
   if (!o) return false;
@@ -232,11 +243,29 @@ export function offerMany(s: GameState, body0: AbilityBody, controller: PlayerId
 /**
  * The body with each amount to be "divided as you choose" worked out (TargetSpec.divided.amount), as its targets are
  * chosen (CR 601.2d): the spell's X as it's cast, a trigger's as it's put on the stack. Already worked out, as is.
+ * A "for each opponent" target is made into one for each opponent then too (expandPerOpponent). `anyX`: X isn't
+ * announced yet, so "with mana value X" asks nothing of the target (could it be cast with some X?).
  */
-export function settleDivided(s: GameState, body: AbilityBody, ctx: AmountCtx): AbilityBody {
-  if (!body.targets.some((t) => t.divided?.amount && !t.divided.settled)) return body;
-  const targets = body.targets.map((t) => (t.divided?.amount && !t.divided.settled ? { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } } : t));
-  return { ...body, targets };
+export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, anyX = false): AbilityBody {
+  // "For each opponent, ... up to one target ... that player controls": one target for each opponent it has as its
+  // targets are chosen, in turn order from its controller (CR 601.2c, 102.2; players who left aren't, 800.4a).
+  const i = s.turnOrder.indexOf(ctx.controller);
+  const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost)) : body0;
+  if (!body.targets.some((t) => (t.divided?.amount && !t.divided.settled) || t.xRange)) return body;
+  const settle = (t: TargetSpec): TargetSpec => {
+    if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
+    if (t.xRange && anyX) {
+      const { xRange: _, ...rest } = t;
+      t = rest;
+    } else if (t.xRange) {
+      // "With mana value X" (Spell Blast): the X announced (CR 107.3a).
+      const { xRange, ...rest } = t;
+      const x = ctx.x ?? 0;
+      t = { ...rest, [xRange.key]: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "most" ? { max: x } : { min: x }, text: rest.text.replace(/ x( or (?:less|greater))?$/, ` ${x}$1`) };
+    }
+    return t;
+  };
+  return { ...body, targets: body.targets.map(settle) };
 }
 
 /** The targets to choose from, as offerMany offers them. */

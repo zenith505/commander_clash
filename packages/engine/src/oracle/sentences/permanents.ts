@@ -25,7 +25,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [...(m[1] ? [{ type: "untap" as const, what }] : []), { type: "removeFromCombat", what }];
   }
   // Removal and tapping
-  if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|enchanted \w+|equipped \w+)$/i.exec(s))) {
+  if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     if (!what) return null;
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy" | "exile" | "tap" | "untap"];
@@ -161,6 +161,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?)( until end of turn)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
+  }
+  // "Gain control of all creatures until end of turn", "... all creatures target opponent controls", "... all artifacts
+  // your opponents control": the permanents that match as it resolves, locked in then (CR 611.2c).
+  if ((m = /^Gain control of (all .+?)( until end of turn)?$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "each" ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
   // Switching power and toughness (layer 7d).
   if ((m = /^Switch (.+?)'s? power and toughness until end of turn$/i.exec(s))) {

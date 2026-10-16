@@ -32,6 +32,12 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (["destroy", "exile", "bounce", "tap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
+    // "Destroy all creatures target player controls": aimed at an opponent, like the permanents themselves would be.
+    const group = "what" in e && e.what && typeof e.what === "object" && "ref" in e.what ? e.what : e.type === "damage" ? e.to : undefined;
+    if (group?.ref === "each" && group.of?.ref === "target") {
+      const hurts = ["destroy", "exile", "bounce", "tap", "skipUntap", "phaseOut", "damage", "putInLibrary"].includes(e.type) || (e.type === "counters" && harmfulCounter(e.counter)) || (e.type === "continuous" && modsAreHarmful(e.mods));
+      if (hurts) mark(group.of.index, group.of.n);
+    }
     if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "exileGraveyard") && e.who.ref === "target") mark(e.who.index, e.who.n);
     if (e.type === "counterSpell") mark(e.index);
     if ((e.type === "discard" || e.type === "takeFromHand" || (e.type === "lookAtHand" && e.reveal)) && e.who.ref === "target") mark(e.who.index, e.who.n);

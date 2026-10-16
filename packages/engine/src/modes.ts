@@ -6,6 +6,7 @@
 // `withModes` builds.
 
 import type { AbilityBody, SpellCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { PlayerId } from "./types";
 
 /** Why `modes` isn't a valid choice for this modal body (ignoring targets), or null. `both`: see modeRange. */
 export function modeCountProblem(body: AbilityBody, modes: number[], both = false): string | null {
@@ -148,6 +149,29 @@ export function expandMany(body: AbilityBody, k: number, optional = false): Abil
           const distinct = [...(spec.distinctFrom ?? []), ...Array.from({ length: c }, (_, j) => i + j)];
           return { ...spec, ...(optional ? { optional: true as const } : {}), ...(distinct.length ? { distinctFrom: distinct } : {}) };
         });
+  return { ...body, targets: [...body.targets.slice(0, i).map(fix), ...copies, ...body.targets.slice(i + 1).map(fix)], effects: body.effects.map((e) => spreadRefs(e, i, n)) };
+}
+
+/**
+ * The body with its "for each opponent, ... up to one target ... that player controls" entry (TargetSpec.perOpponent)
+ * made into one "up to one" target for each of these opponents, controlled by that opponent (CR 601.2c, 115.6): the
+ * effects' references to it cover them all, and the targets after it move up. With no opponent it stays one target,
+ * cast as if it didn't have it. Already done, as is.
+ */
+export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[]): AbilityBody {
+  const i = body.targets.findIndex((t) => t.perOpponent);
+  if (i < 0) return body;
+  const n = Math.max(1, opponents.length);
+  const shift = (j: number) => (j > i ? j + n - 1 : j);
+  const fix = (t: TargetSpec): TargetSpec => ({
+    ...t,
+    ...(t.distinctFrom ? { distinctFrom: t.distinctFrom.map(shift) } : {}),
+    ...(t.sameGraveyardAs ? { sameGraveyardAs: t.sameGraveyardAs.map(shift) } : {}),
+    ...(t.sharesCreatureTypeWith ? { sharesCreatureTypeWith: t.sharesCreatureTypeWith.map(shift) } : {}),
+    ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
+  });
+  const { perOpponent: _p, controller: _c, ...spec } = body.targets[i]!;
+  const copies: TargetSpec[] = opponents.length ? opponents.map((pid) => ({ ...spec, optional: true, controlledBy: pid })) : [{ ...spec, skip: true }];
   return { ...body, targets: [...body.targets.slice(0, i).map(fix), ...copies, ...body.targets.slice(i + 1).map(fix)], effects: body.effects.map((e) => spreadRefs(e, i, n)) };
 }
 

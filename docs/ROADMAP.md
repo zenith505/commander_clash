@@ -1,6 +1,6 @@
 # Roadmap
 
-18,108 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,142 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -86,12 +86,20 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (Kamahl's Druidic Vow), "When a creature is put onto the battlefield this way" (Vivien's Invocation, Gilgamesh).
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
      Auras" (Anti-Magic Aura), Wall of Shadows.
-   Left from the mana-spent round (autopay colors, copy targets, tokens together, "if {U} was spent", "you may have"):
-   - "Was spent to cast" (69 of 102 legal supported) still out on its own words: snow mana {S} (Berg Strider, Boreal
-     Outrider), colorless mana (Desecrate Reality), mana from creatures or artifacts (Inga and Esika, Shadow the
-     Hedgehog), "it wasn't cast or no mana was spent" (Freestrider Commando, Primeval Spawn, Satoru), "seven red mana"
-     with "instead" (Sundering Stroke), the other Mythoi (Illuna, Snapdax, Vadrok). The rest are blocked on other lines
-     (`npm run blockers`).
+   Left from the snow-mana round (snow mana, kept mana, more "was spent", bots and same-named permanents):
+   - "Was spent to cast" (77 of 101 legal supported) still out on its own words: colorless mana (Desecrate Reality),
+     mana from creatures, artifacts or Treasures (Inga and Esika, Shadow the Hedgehog, Devour Intellect, Rain of Riches,
+     Vazi), "if ~ would enter and it wasn't cast" (Primeval Spawn), Satoru's batch trigger, "seven red mana" with
+     "instead ... each of those permanents and/or players" (Sundering Stroke), "instead return those cards" (Once and
+     Future), the other Mythoi (Illuna, Snapdax, Vadrok). The rest are blocked on other lines (`npm run blockers`).
+   - Snow (28 of 45 legal {S} cards supported): cumulative upkeep {S} (Cover of Winter, Glacial Plating), "If that card
+     is snow" (Frost Augur, Scrying Sheets), lands that become creatures (Faceless Haven, Frostwalk Bastion), Ascendant
+     Spirit's level-like abilities, snow landwalk (Zombie Musher), ice counters (Rimefeather Owl, Rimescale Dragon),
+     "snow and Zombie creatures" (Narfi), Blessing of Frost's distribution, Blood on the Snow, Search for Glory's
+     either-or search, Stalking Yeti, Rimehorn Aurochs, Rime Transfusion. Approximations: mana from a triggered mana
+     ability (Mana Reflection's extra) and restricted mana from a snow source aren't counted as snow; mana kept until
+     end of turn forgets it came from a Treasure once a step ends; autopay doesn't try to spend a single color for
+     Steel Exemplar.
    Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
    counters):
    - Keyword and +1/+1 counters count on cards in other zones (CR 122.1b), but printed-card filters (a card in a
@@ -110,8 +118,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Target X and all other Xs with the same name as that X" works on the battlefield; still out: cards in a graveyard
      (Echoing Return, Rat King), "not named ~" (Detention Sphere), "search its controller's graveyard, hand, and
      library for all cards with the same name" (Eradicate, Splinter, Scour, Sowing Salt, Crumble to Dust, The End),
-     Legion's End's "exiles all cards with that name from their hand". Bots don't check whether a same-named
-     permanent of their own would be hit too.
+     Legion's End's "exiles all cards with that name from their hand".
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
      (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and

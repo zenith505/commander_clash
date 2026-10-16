@@ -201,8 +201,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
     // What an Aura entering without being cast enchants (CR 303.4f): one of ours if it only helps, an opponent's otherwise.
     if (pend.kind === "chooseOption" && pend.what === "enchant") {
-      const aura = s.resolving?.scratch?.auraAsking;
-      const best = aura && s.objects[aura] ? auraHostFor(s, s.objects[aura]!, pid) : undefined;
+      const waiting = s.untilReturns?.auras[0];
+      const aura = waiting?.asking ? waiting.id : s.resolving?.scratch?.auraAsking;
+      const best = aura && s.objects[aura] ? auraHostFor(s, s.objects[aura]!, pid, pend.options) : undefined;
       const key = best && auraHostKey(best);
       return [{ type: "chooseOption", player: pid, choice: key && pend.options.includes(key) ? key : pend.options[0]! }];
     }

@@ -43,3 +43,21 @@ test("Replenish: choose what Pacifism enchants as it comes back", async ({ page 
   expect(after.objects[anthem]!.zone).toBe("battlefield");
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Banishing Light leaves: choose what your exiled Holy Strength enchants as it returns", async ({ page }) => {
+  const s = scene({ hand: ["Disenchant"], board: [...LANDS, "Grizzly Bears"], exile: ["Holy Strength"] }, [{ board: ["Banishing Light", "Hill Giant"] }]);
+  const strength = one(s, "Holy Strength"), light = one(s, "Banishing Light"), bears = one(s, "Grizzly Bears");
+  s.objects[light]!.exiledUntilLeaves = [{ id: strength, zc: s.objects[strength]!.zoneChanges ?? 0 }]; // Ana's Banishing Light exiled it
+  await open(page, s);
+  await card(page, "Disenchant", s).click();
+  await page.locator(`[data-obj="${light}"]`).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption");
+  const pick = page.locator(".controls.enchant-pick");
+  await expect(pick).toContainText("Banishing Light: choose what Holy Strength enchants as it returns");
+  await expect(pick.getByRole("button")).toHaveText(["Grizzly Bears (You)", "Hill Giant (Ana)"]);
+  await pick.getByRole("button", { name: "Grizzly Bears (You)" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[strength]!.zone === "battlefield");
+  expect(after.objects[strength]).toMatchObject({ attachedTo: bears, controller: 0 });
+  expect(after.objects[light]!.zone).toBe("graveyard");
+  expect(pageErrors(page)).toEqual([]);
+});

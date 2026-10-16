@@ -801,8 +801,10 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
 /**
  * "Exile ... until ~ leaves the battlefield" ends: right after the source leaves, the cards come back
  * under their owners' control, all at once (CR 610.3, 610.3c-d). Only if each is still the object it
- * exiled; a token has ceased to exist (CR 111.7). An Aura's owner chooses what it enchants, and with
- * nothing it can enchant it stays in exile (CR 303.4f-g).
+ * exiled; a token has ceased to exist (CR 111.7). An Aura's owner chooses what it enchants as it returns
+ * (CR 303.4f, rulings on Banishing Light and Oblivion Ring): that waits in `s.untilReturns` until the event that made
+ * the source leave is over (askAuraReturns), since a choice can't be asked partway through one. It can't enchant
+ * anything that returned at the same time, and with nothing it can enchant it stays in exile (CR 303.4g).
  */
 function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true }[], source: string) {
   const back = links.filter((l) => {
@@ -818,17 +820,68 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
       moveObject(s, c.id, "hand");
       continue;
     }
-    let host: AuraHost | undefined;
+    const r = (s.untilReturns ??= { auras: [], returned: [] });
     if (d.subtypes.includes("Aura")) {
-      host = auraHostFor(s, c, c.owner);
-      if (!host) {
-        log(s, `${d.name} stays in exile (nothing it can enchant).`);
-        continue;
-      }
+      r.auras.push({ id: c.id, zc: c.zoneChanges ?? 0, under: c.owner, source });
+      continue;
     }
-    log(s, `${d.name} returns to the battlefield (${source} left)${host ? ` attached to ${auraHostName(s, host)}` : ""}.`);
-    moveObject(s, c.id, "battlefield", { controller: c.owner, ...host });
+    log(s, `${d.name} returns to the battlefield (${source} left).`);
+    moveObject(s, c.id, "battlefield", { controller: c.owner });
+    r.returned.push(c.id); // at the same time as the rest of this event's returns (CR 610.3d)
   }
+}
+
+/**
+ * Auras waiting to return from "until ~ leaves" (returnUntilLeaves): each in turn, its owner chooses what it enchants
+ * among what's legal now, apart from what returned with it (CR 303.4f); with one choice there's no question, with none
+ * it stays in exile (303.4g). "asked" when a player has to choose, "moved" when one came back without a question.
+ */
+export function askAuraReturns(s: GameState): "asked" | "moved" | false {
+  let moved = false;
+  const r = s.untilReturns;
+  while (r?.auras.length) {
+    const e = r.auras[0]!;
+    const c = s.objects[e.id];
+    if (!c || c.zone !== "exile" || (c.zoneChanges ?? 0) !== e.zc) {
+      r.auras.shift();
+      continue;
+    }
+    const options = auraHostOptions(s, c, e.under).filter((h) => !("attachTo" in h && r.returned.includes(h.attachTo)));
+    if (options.length > 1) {
+      e.asking = true;
+      s.pending = { kind: "chooseOption", player: e.under, source: e.source, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose what ${defOf(s, c).name} enchants as it returns` };
+      return "asked";
+    }
+    r.auras.shift();
+    returnAura(s, c, e.source, options[0]);
+    moved = true;
+  }
+  s.untilReturns = undefined;
+  return moved ? "moved" : false;
+}
+
+/** The owner chose what a returning Aura enchants (askAuraReturns). */
+function auraReturnChosen(s: GameState, choice: string) {
+  const e = s.untilReturns!.auras.shift()!;
+  const c = s.objects[e.id];
+  if (c && c.zone === "exile" && (c.zoneChanges ?? 0) === e.zc) returnAura(s, c, e.source, auraHostOf(choice));
+}
+
+function returnAura(s: GameState, c: GameObject, source: string, host: AuraHost | undefined) {
+  const d = defOf(s, c);
+  if (!host) {
+    log(s, `${d.name} stays in exile (nothing it can enchant).`);
+    return;
+  }
+  log(s, `${d.name} returns to the battlefield (${source} left) attached to ${auraHostName(s, host)}.`);
+  moveObject(s, c.id, "battlefield", { controller: c.owner, ...host });
+}
+
+/** Button labels for an Aura's possible hosts: "Grizzly Bears (Ana)", numbered when two read the same. */
+export function auraHostLabels(s: GameState, options: AuraHost[]): string[] {
+  const labels = options.map((h) => ("attachTo" in h ? `${defOf(s, obj(s, h.attachTo)).name} (${player(s, controllerOf(s, obj(s, h.attachTo))).name})` : player(s, h.attachToPlayer).name));
+  const seen = new Map<string, number>();
+  return labels.map((l) => (labels.filter((x) => x === l).length > 1 ? `${l} #${seen.set(l, (seen.get(l) ?? 0) + 1).get(l)}` : l));
 }
 
 /**
@@ -836,15 +889,16 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
  * ability allows (it isn't targeted, so hexproof doesn't stop it). The player picks: one of their own
  * if the Aura only helps what it enchants, an opponent's otherwise.
  */
-export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId): AuraHost | undefined {
+export function auraHostFor(s: GameState, aura: GameObject, pid: PlayerId, among?: string[]): AuraHost | undefined {
   const enchant = compileCard(defOf(s, aura)).enchant;
   if (!enchant) return undefined;
   // "Enchant player" (CR 702.5d): a player, not targeted. Curses hurt the player they enchant: an opponent.
   if (enchant.kind === "player") {
-    const p = opponents(s, pid)[0] ?? (enchant.opponent ? undefined : pid);
+    const ok = (p: PlayerId) => !among || among.includes(auraHostKey({ attachToPlayer: p }));
+    const p = opponents(s, pid).find(ok) ?? (enchant.opponent || !ok(pid) ? undefined : pid);
     return p === undefined ? undefined : { attachToPlayer: p };
   }
-  const id = auraObjectHost(s, aura, pid, enchant);
+  const id = auraObjectHost(s, aura, pid, enchant, among);
   return id ? { attachTo: id } : undefined;
 }
 
@@ -869,8 +923,8 @@ export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): 
 export const auraHostKey = (h: AuraHost) => ("attachTo" in h ? h.attachTo : `player:${h.attachToPlayer}`);
 export const auraHostOf = (key: string): AuraHost => (key.startsWith("player:") ? { attachToPlayer: Number(key.slice(7)) } : { attachTo: key });
 
-function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec): ObjectId | undefined {
-  const legal = s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
+function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec, among?: string[]): ObjectId | undefined {
+  const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
     m.kind === "addKeywords" || (m.kind === "addAbility" && !modsAreHarmful([m])) || (m.kind === "modifyPT" && !(typeof m.power === "number" && m.power < 0) && !(typeof m.toughness === "number" && m.toughness < 0));
@@ -3447,6 +3501,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     finishCombatDamage(s);
     return;
   }
+  if (pend.what === "enchant" && s.untilReturns?.auras[0]?.asking) {
+    // An Aura returning from "until ~ leaves": its owner chose what it enchants (CR 303.4f).
+    auraReturnChosen(s, choice);
+    if (s.resolving) continueResolution(s);
+    return;
+  }
   if (pend.objectId) {
     const o = obj(s, pend.objectId);
     const entry = s.entersChoices?.shift();
@@ -4428,12 +4488,15 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
     closeGraveyardBatch(s); // the action before, or the last pass, put those cards there together (CR 404.3)
+    // Auras coming back from "until ~ leaves" as the action before, or the last pass, ended (CR 303.4f, 610.3).
+    const auras = s.pending || holdTriggers ? false : askAuraReturns(s);
+    if (auras === "asked") return;
     invalidateCharacteristics(s);
     endWhileTapped(s);
     syncControl(s);
     checkPairs(s);
     checkAscend(s);
-    let changed = false;
+    let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;
       if (p.life <= 0) changed = playerLoses(s, p.id, "life total reached 0") || changed; // 704.5a

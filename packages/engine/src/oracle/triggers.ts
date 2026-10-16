@@ -262,7 +262,8 @@ function enchantedControls(phrase: string): TargetSpec | null {
   return spec?.kind === "object" && spec.controller === "you" ? { ...spec, controller: "enchanted" } : null;
 }
 
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) dies, (.+)$/;
+// "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (?:dies|is put into a graveyard from the battlefield), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -275,7 +276,13 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
   // "That player" in a trigger about what enchanted player controls is that player.
-  const bodyText = (attached ? attached[2]! : m![3]!).replace(ench ? /\bthat player\b/g : /$^/, "enchanted player");
+  let bodyText = (attached ? attached[2]! : m![3]!).replace(ench ? /\bthat player\b/g : /$^/, "enchanted player");
+  // "That land's controller", and "that player" after "an artifact an opponent controls": who controlled it as it last
+  // existed (CR 603.10a).
+  if (!attached) {
+    bodyText = bodyText.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
+    if (/ an opponent controls$/.test(m![2]!)) bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
+  }
   const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true });
   if (!body) return "fail";
   if (attached) return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };

@@ -163,6 +163,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
   }
+  // "Sacrifice ~ unless you sacrifice a land" (Bog Elemental, The Gitrog Monster): sacrificing one keeps it; with none to
+  // sacrifice, or choosing not to, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
+    if (!filter || / or |,/.test(m[2]!)) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: 1, action: "sacrifice" }], otherwise: [sacrificeSelf], keep: true, text: `Sacrifice ${m[2]} to keep ~` }];
+  }
   // "That player draws an additional card" (Howling Mine): just another draw.
   if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);
   // Poison counters on a player (CR 122.1f): "defending player gets a poison counter", "each opponent gets two".

@@ -2128,6 +2128,16 @@ export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
 
+/**
+ * A creature's {T} ability can't be activated while it's summoning sick (CR 302.6), unless its controller controls a
+ * permanent saying they may activate them as though it had haste (Thousand-Year Elixir). It doesn't let it attack.
+ */
+export function tapAbilitySick(s: GameState, o: GameObject) {
+  if (!isSummoningSick(s, o)) return false;
+  const you = controllerOf(s, o);
+  return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
+}
+
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
@@ -3350,7 +3360,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid)) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
-  if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
+  if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).

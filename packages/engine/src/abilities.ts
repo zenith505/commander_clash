@@ -2324,6 +2324,11 @@ export interface CompiledCard {
    */
   cantLose?: "you" | "opponents";
   cantWin?: "you" | "opponents";
+  /**
+   * "You may activate abilities of creatures you control as though those creatures had haste" (Thousand-Year Elixir,
+   * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).
+   */
+  creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
   /**

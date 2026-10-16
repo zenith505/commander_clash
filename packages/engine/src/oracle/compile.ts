@@ -955,6 +955,10 @@ export function compile(d: CardDef): CompiledCard {
       out.splitSecondIfArtifactMana = true;
       continue;
     }
+    if (/^You may activate abilities of creatures you control as though those creatures had haste\.$/.test(line)) {
+      out.creatureAbilitiesHaste = true;
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
       continue;

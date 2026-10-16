@@ -4,7 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
-import { abilityProblem, isSummoningSick, obj, player, tapCostCandidates } from "./game";
+import { abilityProblem, obj, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -224,7 +224,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (characteristics(s, o).cantActivate === "all") return `${name}'s activated abilities can't be activated`; // Arrest: mana abilities too (CR 605.1a)
   if (ab.tap && o.tapped) return `${name} is tapped`;
-  if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${name} has summoning sickness`; // CR 302.6
+  if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
   if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index) && !(ab.exhaust && mayExhaustAgain(s, pid))) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)

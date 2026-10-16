@@ -23,6 +23,8 @@ const strider = card("Berg Strider", "Snow Creature — Giant Wizard", "{4}{U}",
 const lore = card("Graven Lore", "Snow Instant", "{3}{U}{U}", { oracleText: "Scry X, where X is the amount of {S} spent to cast this spell, then draw three cards. ({S} is mana from a snow source.)" });
 const fumarole = card("Tundra Fumarole", "Snow Sorcery", "{1}{R}{R}", { oracleText: "Tundra Fumarole deals 4 damage to target creature or planeswalker. Add {C} for each {S} spent to cast this spell. Until end of turn, you don't lose this mana as steps and phases end. ({S} is mana from a snow source.)" });
 const astrolabe = card("Arcum's Astrolabe", "Snow Artifact", "{S}", { oracleText: "({S} can be paid with one mana from a snow source.)\nWhen this artifact enters, draw a card.\n{1}, {T}: Add one mana of any color." });
+const outrider = card("Boreal Outrider", "Snow Creature — Elf Warrior", "{2}{G}", { power: "3", toughness: "2", oracleText: "Whenever you cast a creature spell, if {S} of any of that spell's colors was spent to cast it, that creature enters with an additional +1/+1 counter on it. ({S} is mana from a snow source.)" });
+const snowWastes = card("Snow-Covered Wastes", "Basic Snow Land", "", { oracleText: "{T}: Add {C}." });
 const collector = card("Brazen Collector", "Creature — Raccoon Rogue", "{1}{R}", { power: "2", toughness: "1", keywords: ["First strike"], oracleText: "First strike\nWhenever this creature attacks, add {R}. Until end of turn, you don't lose this mana as steps and phases end." });
 
 /** Just these lands for `pid`: the setup's other lands are taken away. */
@@ -32,7 +34,18 @@ function onlyLands(s: GameState, pid: PlayerId, lands: CardDef[]): string[] {
 }
 
 describe("snow mana", () => {
-  it("parses", () => supported(centaur, troll, strider, lore, fumarole, astrolabe, collector));
+  it("parses", () => supported(centaur, troll, strider, lore, fumarole, astrolabe, collector, outrider));
+
+  it("Boreal Outrider: only snow mana of one of the spell's colors gives the creature its counter", () => {
+    for (const [lands, after] of [[[card("Forest", "Basic Land — Forest"), snowForest], "3/3"], [[card("Forest", "Basic Land — Forest"), snowWastes], "2/2"]] as const) {
+      const { s: s0, ap, ids } = setup([bear()]);
+      putOnBattlefield(s0, ap, outrider);
+      onlyLands(s0, ap, [...lands]);
+      const s = settle(passAll(planCast(s0, ap, ids[0]!)!.reduce((x, a) => act(x, a), s0)));
+      expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+      expect(pt(s, ids[0]!)).toBe(after);
+    }
+  });
 
   it("the pool remembers what a snow source made until it's spent or the step ends", () => {
     const { s: s0, ap } = setup([]);

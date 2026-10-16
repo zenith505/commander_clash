@@ -574,6 +574,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterUnlessPays":
     case "counterCause":
     case "counterSpell":
+    case "spellEntersWith":
     case "counterEach":
     case "changeTarget":
       return runSpellsEffect(s, e, ctx, src);

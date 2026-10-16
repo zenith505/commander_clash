@@ -259,6 +259,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "spellEntersWith": {
+      // Only the spell that was cast (a copy isn't), while it's still that spell on the stack (CR 400.7).
+      const item = s.stack.find((x) => x.id === ctx.cause);
+      const o = item?.kind === "spell" && !item.copy && item.objectId ? s.objects[item.objectId] : undefined;
+      const n = amountNow(s, e.n, ctx);
+      if (!o || o.zone !== "stack" || n <= 0) return;
+      (o.extraCounters ??= {})[e.counter] = (o.extraCounters[e.counter] ?? 0) + n;
+      log(s, `${defOf(s, o).name} will enter with ${n} more ${e.counter} counter${n === 1 ? "" : "s"}.`);
+      return;
+    }
     case "counterSpell": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;

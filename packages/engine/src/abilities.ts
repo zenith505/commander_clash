@@ -1201,6 +1201,11 @@ export type Effect =
    */
   /** "Counter each spell you don't control" (overloaded Counterflux): every spell on the stack matching it, not abilities. */
   | { type: "counterEach"; filter: TargetSpec }
+  /**
+   * "That creature enters with an additional +1/+1 counter on it" in a cast trigger (Boreal Outrider): the spell it was
+   * about, if it's still on the stack, enters with these too (CR 614.1c).
+   */
+  | { type: "spellEntersWith"; counter: CounterKind; n: Amount }
   | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean; /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */ ifMvX?: true }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this

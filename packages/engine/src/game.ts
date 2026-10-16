@@ -668,6 +668,7 @@ export function moveObject(
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
+    o.extraCounters = undefined; // and the counters a spell will enter with
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -764,7 +765,11 @@ export function moveObject(
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
-    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
+    const counters = { ...opts.counters };
+    for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
+    o.extraCounters = undefined;
+    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });

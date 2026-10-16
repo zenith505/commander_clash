@@ -271,6 +271,8 @@ export interface GameObject {
   evidence?: true;
   /** As a spell, and as the permanent it became: how much mana from Treasures was spent to cast it (CR 106.3). */
   treasureSpent?: number;
+  /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
+  extraCounters?: Record<string, number>;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**

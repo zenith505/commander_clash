@@ -2610,6 +2610,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "396b943c-b45d-4e5b-a9c1-f70bc603ee9f",
+  "name": "Jester's Scepter",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When this artifact enters, exile the top five cards of target player's library face down. You may look at those cards for as long as they remain exiled.\n{2}, {T}, Put a card exiled with this artifact into its owner's graveyard: Counter target spell if it has the same name as that card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "csp",
+  "releasedAt": "2006-07-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "382bc554-d170-4c19-82dd-829f254e855e",
   "name": "Jilt",
   "manaCost": "{1}{U}",

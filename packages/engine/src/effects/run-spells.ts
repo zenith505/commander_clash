@@ -384,6 +384,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return;
         }
       }
+      // Jester's Scepter: only a spell with the name of the card put into a graveyard for the cost; a split card's either
+      // half (rulings).
+      if (e.ifCostCardName) {
+        const item = s.stack.find((x) => x.id === t.id);
+        const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        const names = (s.resolving?.item.costCardNames ?? []).flatMap((n) => [n, ...n.split(" // ")]);
+        if (!o || !names.includes(defOf(s, o).name)) {
+          log(s, `${src} doesn't counter ${item?.description ?? "it"}: it doesn't have the same name as that card.`);
+          return;
+        }
+      }
       return counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : undefined);
     }
   }

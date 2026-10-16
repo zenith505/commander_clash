@@ -515,6 +515,8 @@ export interface StackItem {
   event?: TriggerEventInfo;
   /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
   sacrificed?: LastKnown[];
+  /** The names of cards moved to pay its cost beyond mana: Jester's Scepter's "that card" (CR 608.2h). */
+  costCardNames?: string[];
   /**
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.

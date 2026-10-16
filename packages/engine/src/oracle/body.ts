@@ -42,6 +42,8 @@ export interface Ctx {
   manyPlayers?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */
   activated?: boolean;
+  /** Its cost puts a card exiled with ~ into a graveyard: "that card" is that one (Jester's Scepter). */
+  costLinked?: boolean;
   /** The last sentence created one token: "put a +1/+1 counter on it" means that token. */
   lastCreated?: boolean;
   /**
@@ -273,7 +275,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -292,6 +294,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.selfIt ? { selfIt: true } : {}),
     ...(opts.selfCard ? { selfCard: true } : {}),
     ...(opts.activated ? { activated: true } : {}),
+    ...(opts.costLinked ? { costLinked: true } : {}),
     ...(opts.spell ? { spell: true } : {}),
     ...(opts.castSpell ? { castSpell: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),

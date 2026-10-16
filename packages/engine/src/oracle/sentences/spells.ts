@@ -242,6 +242,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana
   // value, as it resolves, is countered (rulings).
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
+  // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
+  // cost; any spell can be targeted (rulings).
+  if (/^Counter target spell if it has the same name as that card$/i.test(s) && ctx.activated && ctx.costLinked) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifCostCardName: true }];
   // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
   // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
   if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {

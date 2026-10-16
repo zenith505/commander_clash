@@ -813,6 +813,11 @@ export function compile(d: CardDef): CompiledCard {
       out.revealTop = /^Players/.test(line) ? "players" : "you";
       continue;
     }
+    if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
+      if (out.playLinked) out.unsupported.push(raw);
+      else out.playLinked = true;
+      continue;
+    }
     if (line === "Players play with their hands revealed." || line === "Your opponents play with their hands revealed.") {
       out.revealHands = /^Players/.test(line) ? "players" : "opponents";
       continue;

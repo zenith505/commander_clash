@@ -60,6 +60,7 @@ import {
   auraHostFor,
   auraHostKey,
   payableLife,
+  linkedExileCards,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -2104,6 +2105,13 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const picks = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => hand.includes(x)).slice(0, c.n);
       if (picks.length < c.n) return null;
       out.discard = picks;
+    } else if (c.kind === "exileFromGraveyard" && c.linked) {
+      // Jester's Scepter: the exiled card with the name of the spell we target, or not at all.
+      const spell = targets.map((t) => (t.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined)).find((x) => x?.objectId);
+      const name = spell?.objectId ? defOf(s, obj(s, spell.objectId)).name : undefined;
+      const card = linkedExileCards(s, o).find((x) => name !== undefined && defOf(s, obj(s, x)).name.split(" // ").concat(defOf(s, obj(s, x)).name).includes(name));
+      if (!card) return null;
+      out.exileCards = [card];
     } else if (c.kind === "exileFromGraveyard" && c.top) {
       if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
     } else if (c.kind === "exileFromGraveyard" && !c.x) {

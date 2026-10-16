@@ -1332,7 +1332,17 @@ export type Effect =
    * about, if it's still on the stack, enters with these too (CR 614.1c).
    */
   | { type: "spellEntersWith"; counter: CounterKind; n: Amount }
-  | { type: "counterSpell"; index: number; unless?: UnlessPays; exile?: boolean; top?: boolean; /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */ ifMvX?: true }
+  | {
+      type: "counterSpell";
+      index: number;
+      unless?: UnlessPays;
+      exile?: boolean;
+      top?: boolean;
+      /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
+      ifMvX?: true;
+      /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
+      ifCostCardName?: true;
+    }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
    * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
@@ -2177,8 +2187,12 @@ export type AdditionalCost =
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }
-  /** `top`: "exile the top creature card of your graveyard": the topmost `n` that match, nothing to choose (CR 404.1). */
-  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true }
+  /**
+   * `top`: "exile the top creature card of your graveyard": the topmost `n` that match, nothing to choose (CR 404.1).
+   * `linked`: "Put a card exiled with ~ into its owner's graveyard" (Jester's Scepter): one of the cards the source's
+   * linked exile took (CR 607.2a), moved to its owner's graveyard, chosen in CostChoices.exileCards.
+   */
+  | { kind: "exileFromGraveyard"; filter?: TargetSpec; n: number; x?: true; top?: true; linked?: true }
   /** Ninjutsu (CR 702.49a): "Return an unblocked attacker you control to hand". */
   | { kind: "returnToHand"; filter: TargetSpec; n: number; unblockedAttacker?: boolean; x?: true }
   /**
@@ -2501,6 +2515,13 @@ export interface CompiledCard {
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
+  /**
+   * "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells"
+   * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).
+   */
+  playLinked?: true;
+  /** The same, only while this holds (a Class level's, CR 716.2a). */
+  playLinkedIf?: StaticCondition;
   /**
    * "You may play lands from the top of your library" (Courser of Kruphix), "you may cast creature spells from the top
    * of your library" (Garruk's Horde): its controller may play the top card of their library (CR 401.5).

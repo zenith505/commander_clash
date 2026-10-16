@@ -2016,8 +2016,34 @@ export function checkAscend(s: GameState) {
   for (const p of s.players) giveCitysBlessing(s, p.id);
 }
 
+/**
+ * "You may play cards exiled with ~" (Rogue Class): a permanent `pid` controls with that permission now, whose linked
+ * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
+ */
+function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  if (o.zone !== "exile" || !s.linkedExile) return false;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) return false;
+    const a = abilitiesOf(s, p);
+    if (!a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return false;
+    return (s.linkedExile![`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0));
+  });
+}
+
+/** How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana). */
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free"> | undefined {
+  if (ownExilePermission(s, o, pid)) return o.mayPlay;
+  return linkedPlayPermission(s, o, pid) ? { anyType: true } : undefined;
+}
+
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  return ownExilePermission(s, o, pid) || linkedPlayPermission(s, o, pid);
+}
+
+/** The card's own permission to be played from exile (GameObject.mayPlay), if it's `pid`'s and holds now. */
+function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "exile" || o.mayPlay?.player !== pid || o.mayPlay.zc !== (o.zoneChanges ?? 0)) return false;
   const m = o.mayPlay;
   // "Until your next turn" (Three Wishes): over once that turn begins.
@@ -2459,7 +2485,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const madness = madnessCastOf(s, pid, o.id);
   // Cast from exile with "mana of any type can be spent to cast it" (CR 609.4b): each mana symbol but snow and
   // Phyrexian ones can be paid with any type, so it's generic.
-  const exiled = o.zone === "exile" && !how.via && mayPlayFromExile(s, o, pid) ? o.mayPlay : undefined;
+  const exiled = !how.via ? exilePermission(s, o, pid) : undefined;
   const anyType = (c: ParsedCost): ParsedCost => (exiled?.anyType ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   const freeFromExile = !!exiled?.free && !how.faceDown && !how.alt;
@@ -3258,6 +3284,8 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? returnCandidates(s, pid, c)
           : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand"
           ? p.hand.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))) // it's on the stack by the time costs are paid (CR 601.2a)
+          : c.kind === "exileFromGraveyard" && c.linked
+          ? linkedExileCards(s, o)
           : p.graveyard.filter((id) => id !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, id))))); // "other cards" for escape
     const what =
       c.kind === "sacrifice"
@@ -3268,8 +3296,10 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           ? c.filter
             ? `${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`
             : `${c.n === 1 ? "a card" : `${c.n} cards`}`
+          : c.kind === "exileFromGraveyard" && c.linked
+          ? `a card exiled with ${d.name}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : "exile";
+    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -3301,6 +3331,11 @@ export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObjec
   });
 }
 
+/** The cards still exiled with `o` by its linked exile ability, as this object (CR 607.2a, 400.7): Jester's Scepter's cost. */
+export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
+  return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
+}
+
 /**
  * What can be returned to hand for a cost. Ninjutsu wants an unblocked attacker: one that's attacking once
  * blockers have been declared and wasn't blocked (CR 509.1h, 702.49a).
@@ -3318,9 +3353,19 @@ export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<Additio
  * Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h).
  * `returned` gets whom a creature returned to hand was attacking (ninjutsu, CR 702.49c).
  */
-function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown) {
+function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[]) {
   const sacrificed: LastKnown[] = [];
   for (const c of costs) {
+    if (c.kind === "exileFromGraveyard" && c.linked) {
+      // Jester's Scepter: the chosen card exiled with it goes to its owner's graveyard; "that card" is it (CR 608.2h).
+      for (const id of choices.exileCards ?? []) {
+        moved?.push(defOf(s, obj(s, id)).name);
+        log(s, `${p.name} puts ${nameOf(s, id)} from exile into ${player(s, obj(s, id).owner).name}'s graveyard.`);
+        moveObject(s, id, "graveyard");
+      }
+      closeZoneBatch(s);
+      continue;
+    }
     if (c.kind === "returnToHand") {
       for (const id of choices.returnToHand ?? []) {
         if (returned) {
@@ -3605,7 +3650,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki) : [];
+  const costCardNames: string[] = [];
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki, costCardNames) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
@@ -3625,6 +3671,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(lki ? { lki } : {}),
     ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
+    ...(costCardNames.length ? { costCardNames } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),

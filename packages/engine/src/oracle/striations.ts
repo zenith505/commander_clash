@@ -95,7 +95,7 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     if (!bar || bar.activateIf) return false;
     add.activated.push({ ...bar, activateIf: { kind: "classLevel", min: level - 1, max: level - 1 }, text: part.header });
   }
-  const more = { costMods: [] as NonNullable<CompiledCard["costMods"]>, equipLess: [] as NonNullable<CompiledCard["equipLess"]>, fromTop: [] as NonNullable<CompiledCard["fromTop"]>, lookTop: false, extraLandsIf: [] as StaticCondition[] };
+  const more = { costMods: [] as NonNullable<CompiledCard["costMods"]>, equipLess: [] as NonNullable<CompiledCard["equipLess"]>, fromTop: [] as NonNullable<CompiledCard["fromTop"]>, lookTop: false, playLinked: false, extraLandsIf: [] as StaticCondition[] };
   const lists = ["triggers", "activated", "mana", "statics"] as const;
   const rest = (c: CompiledCard) => JSON.stringify(Object.entries(c).filter(([k]) => !(lists as readonly string[]).includes(k) && k !== "textKeywords").sort(([a], [b]) => a.localeCompare(b)));
   for (const line of part.lines) {
@@ -108,13 +108,14 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     const inner = compileLine(line);
     if (inner.unsupported.length) return false;
     // Static abilities kept in fields of their own, each made conditional the same way.
-    const { costMods, equipLess, fromTop, lookTop, extraLands, ...others } = inner;
+    const { costMods, equipLess, fromTop, lookTop, playLinked, extraLands, ...others } = inner;
     if (rest(others as CompiledCard) !== rest(empty)) return false;
     if (costMods?.some((m) => m.if) || equipLess?.some((m) => m.if) || fromTop?.some((t) => t.if)) return false;
     if (costMods) more.costMods.push(...costMods.map((m) => ({ ...m, if: cond })));
     if (equipLess) more.equipLess.push(...equipLess.map((m) => ({ ...m, if: cond })));
     if (fromTop) more.fromTop.push(...fromTop.map((t) => ({ ...t, if: cond })));
     if (lookTop) more.lookTop = true;
+    if (playLinked) more.playLinked = true;
     for (let i = 0; i < (extraLands ?? 0); i++) more.extraLandsIf.push(cond);
     for (const st of inner.statics) {
       if (st.condition) return false;
@@ -134,11 +135,13 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     }
   }
   if (more.lookTop && (out.lookTopIf || out.lookTop)) return false;
+  if (more.playLinked && (out.playLinkedIf || out.playLinked)) return false;
   if (more.costMods.length) out.costMods = [...(out.costMods ?? []), ...more.costMods];
   if (more.equipLess.length) out.equipLess = [...(out.equipLess ?? []), ...more.equipLess];
   if (more.fromTop.length) out.fromTop = [...(out.fromTop ?? []), ...more.fromTop];
   if (more.extraLandsIf.length) out.extraLandsIf = [...(out.extraLandsIf ?? []), ...more.extraLandsIf];
   if (more.lookTop) out.lookTopIf = cond;
+  if (more.playLinked) out.playLinkedIf = cond;
   out.statics.push(...statics);
   out.triggers.push(...add.triggers);
   out.activated.push(...add.activated);

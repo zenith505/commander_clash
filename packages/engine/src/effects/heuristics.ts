@@ -40,6 +40,9 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     }
     if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "exileGraveyard") && e.who.ref === "target") mark(e.who.index, e.who.n);
     if (e.type === "counterSpell") mark(e.index);
+    // Haunt: the card does something again when the haunted creature dies, which an opponent's creature does when
+    // it's removed or blocked, without costing its owner anything.
+    if (e.type === "haunt") mark(0);
     if ((e.type === "discard" || e.type === "takeFromHand" || (e.type === "lookAtHand" && e.reveal)) && e.who.ref === "target") mark(e.who.index, e.who.n);
     if ((e.type === "fight" || e.type === "bite") && e.b.ref === "target") mark(e.b.index);
     // Removing all counters (loyalty, +1/+1) is aimed at others' permanents, unless it can only be your own.

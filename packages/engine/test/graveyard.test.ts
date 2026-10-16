@@ -47,9 +47,9 @@ describe("targets in graveyards", () => {
     expect(compileCard(necro).spell?.effects[0]).toMatchObject({ type: "putOntoBattlefield" });
     const mv = card("Unearthish", "Sorcery", "{B}", { oracleText: "Return target creature card with mana value 3 or less from your graveyard to the battlefield." });
     expect(compileCard(mv).spell?.targets[0]).toMatchObject({ kind: "card", manaValue: { max: 3 } });
-    // Could be an Aura, which needs a choice of what it enchants (CR 303.4f): not supported yet.
-    expect(isFullySupported(card("X", "Sorcery", "{B}", { oracleText: "Return target permanent card from your graveyard to the battlefield." }))).toBe(false);
-    expect(isFullySupported(card("X", "Sorcery", "{B}", { oracleText: "Return target enchantment card from your graveyard to the battlefield." }))).toBe(false);
+    // Could be an Aura: its controller chooses what it enchants as it enters (CR 303.4f, aura-enters.test.ts).
+    expect(isFullySupported(card("X", "Sorcery", "{B}", { oracleText: "Return target permanent card from your graveyard to the battlefield." }))).toBe(true);
+    expect(isFullySupported(card("X", "Sorcery", "{B}", { oracleText: "Return target enchantment card from your graveyard to the battlefield." }))).toBe(true);
     // An opponent's card can't go "to your hand" by being returned to its owner's hand.
     expect(isFullySupported(card("X", "Sorcery", "{B}", { oracleText: "Return target creature card from a graveyard to your hand." }))).toBe(false);
     // "Destroy" can't aim at a card in a graveyard.

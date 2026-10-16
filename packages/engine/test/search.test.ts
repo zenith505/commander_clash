@@ -46,9 +46,9 @@ const gem = card("Gem", "Artifact", "{2}");
 describe("searching a library (CR 701.23)", () => {
   it("compiles the common templates", () => {
     supported(tutor, cultivate, vampiric, ranger, ent, wilds, wolf);
-    // An Aura put onto the battlefield needs something to enchant chosen (CR 303.4f): not supported.
+    // An Aura put onto the battlefield this way: its controller chooses what it enchants (CR 303.4f, aura-enters.test.ts).
     const auraFetch = card("Aura Fetch", "Sorcery", "{G}", { oracleText: "Search your library for an enchantment card, put it onto the battlefield, then shuffle." });
-    expect(isFullySupported(auraFetch)).toBe(false);
+    expect(isFullySupported(auraFetch)).toBe(true);
     // "you may search ... then shuffle" is one optional instruction: the shuffle is part of it.
     const body = compileCard(ranger).triggers[0]!.body;
     expect(body.effects).toHaveLength(1);

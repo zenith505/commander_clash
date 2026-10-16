@@ -56,6 +56,7 @@ import {
   blockRequirementProblem,
   maxBlocks,
   pairedWith,
+  hauntedBy,
   cardIdOf,
   realDefOf,
   legalTargets,
@@ -1961,6 +1962,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
     .join("\n");
   const stolen = c.controller !== o.owner;
   const paired = pairedWith(s, o);
+  const haunts = hauntedBy(s, o);
   // A copy (CR 707): it looks like what it copies, so say what it really is.
   const copying = !o.faceDown && cardIdOf(o) !== o.cardId ? cardOf(s, o.id) : undefined;
   const copyEnds = o.copyEffects?.[o.copyEffects.length - 1]?.until;
@@ -2022,6 +2024,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {paired && (
           <span className="chip other" title={`Paired with ${cardOf(s, paired.id).name} (soulbond).`}>
             Paired
+          </span>
+        )}
+        {haunts.length > 0 && (
+          <span className="chip other" title={`Haunted by ${haunts.map((h) => cardOf(s, h.id).name).join(" and ")}: when it dies, ${haunts.length === 1 ? "that card's" : "those cards'"} haunt abilities trigger.`}>
+            Haunted
           </span>
         )}
         {o.saddled && (
@@ -3317,6 +3324,26 @@ function Controls({
             </button>
           );
         })}
+      </div>
+    );
+  if (pending?.kind === "chooseOption" && pending.what === "enchant" && pending.player === HUMAN)
+    // An Aura put onto the battlefield without being cast: what it enchants (CR 303.4f).
+    return (
+      <div className="controls enchant-pick">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o, i) => (
+          <button
+            key={o}
+            className="ghost"
+            onMouseEnter={() => s.objects[o] && onHover(cardOf(s, o))}
+            onMouseLeave={() => onHover(null)}
+            onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}
+          >
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
       </div>
     );
   if (pending?.kind === "chooseOption" && pending.what === "basicLandType" && pending.player === HUMAN)

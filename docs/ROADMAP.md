@@ -1,6 +1,6 @@
 # Roadmap
 
-16,622 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,708 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,7 +15,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`): Haunt, Read ahead.
+1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
+   Left from the haunt/Aura-host round:
+   - Auras put onto the battlefield without being cast now ask what they enchant (CR 303.4f) for returns from the
+     graveyard, searches, "put onto the battlefield" and "from your hand"; returns from exile and "until ~ leaves"
+     still pick the host themselves (`auraHostFor`). Still out: Calix, Estrid, Push the Limit, Academy Rector's "you
+     may exile it. If you do", Mount/Vehicle groups.
    Left from the filter lands/divided damage/X costs round:
    - Divided damage still out: Impact Resonance, Ghired's Belligerence's populate, Pollen Remedy (kicker that isn't
      mana). The divide panel says "divide the damage" for prevention too (Remedy).
@@ -58,9 +63,6 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Wills still out: Sakashima's, Kamahl's and Will of the Abzan (above).
    - "Each player may discard their hand and draw ..." works; Snort's "each opponent who discarded their hand this
      way" and Imposing Grandeur's "the greatest mana value of a commander they own" don't.
-   - "Return all ... cards from your graveyard to the battlefield" works for cards that can't be Auras; with
-     enchantments (Replenish, Brilliant Restoration, Open the Vaults, Calix, Estrid) each Aura needs a choice of what it
-     enchants (CR 303.4f), and Mount/Vehicle or "permanent cards" (Push the Limit, Return to the Light Realms) too.
    - Hideaway: Evercoat Ursine, Smuggler's Buggy, Rabble Rousing ("create that many"), Wiretapping.
    Left from the teamwork/conspire/gift/tribute/hideaway/cipher round:
    - Tribute: Flame-Wreathed Phoenix's granted dies trigger, Oracle of Bones' free cast from hand. Cipher: Arcane

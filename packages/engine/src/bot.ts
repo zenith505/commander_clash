@@ -54,6 +54,8 @@ import {
   teamworkCandidates,
   teamworkPower,
   conspireCandidates,
+  auraHostFor,
+  auraHostKey,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf } from "./layers";
@@ -197,6 +199,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
+    // What an Aura entering without being cast enchants (CR 303.4f): one of ours if it only helps, an opponent's otherwise.
+    if (pend.kind === "chooseOption" && pend.what === "enchant") {
+      const aura = s.resolving?.scratch?.auraAsking;
+      const best = aura && s.objects[aura] ? auraHostFor(s, s.objects[aura]!, pid) : undefined;
+      const key = best && auraHostKey(best);
+      return [{ type: "chooseOption", player: pid, choice: key && pend.options.includes(key) ? key : pend.options[0]! }];
+    }
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];

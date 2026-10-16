@@ -237,6 +237,11 @@ export interface GameObject {
   hiddenExile?: { by: ObjectId; seen: PlayerId[] };
   /** Cards exiled encoded on this permanent with cipher (CR 702.99b-c), as they are in exile. Gone when it leaves. */
   encoded?: { id: ObjectId; zc: number }[];
+  /**
+   * Exiled by haunt (CR 702.55b): the creature it haunts, as it was on the battlefield then (its zone changes). "The
+   * creature it haunts" is that object whether or not it's still a creature. Gone when this card leaves exile.
+   */
+  haunting?: { id: ObjectId; zc: number };
   /** As a spell: it was cast using teamwork (its optional "tap creatures with total power N" cost was paid). */
   teamwork?: true;
   /** As a spell, and as the permanent it became: the opponent its gift was promised to (CR 702.174a, k). */
@@ -629,7 +634,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield" | "topOrBottom" | "damageSource"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -924,6 +929,10 @@ export interface Resolving {
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     evidence?: ObjectId[]; // the cards picked to collect evidence with as it resolves (CR 701.59a)
     clash?: { opp?: PlayerId; revealed?: Record<string, ObjectId | null>; queue?: PlayerId[]; bottom?: PlayerId[]; answer?: boolean };
+    /** Auras entering without being cast: what each enchants (an auraHostKey), "none" if nothing (CR 303.4f-g). */
+    auraHosts?: Record<ObjectId, string>;
+    /** The Aura whose host is being chosen. */
+    auraAsking?: ObjectId;
   };
 }
 

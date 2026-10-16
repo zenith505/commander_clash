@@ -720,7 +720,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** For "keep": the player whose permanents these are, when someone else chooses for them (Mythos of Snapdax). */ of?: PlayerId }
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string }
   /**
    * A copy of a spell may get new targets (CR 707.10c): keep them all, or choose new legal ones. `copyOf` is the
@@ -1095,6 +1095,8 @@ export interface Resolving {
     punished?: PlayerId[]; // those who did none of its options, this round
     /** "Sacrifice an artifact, a creature, and a land": players still to pick, the slot being picked, the picks so far. */
     slots?: { queue: PlayerId[]; slot: number; picked: Record<string, ObjectId[]> };
+    /** "Choose ..., then sacrifice the rest": whose turn to choose, which of their choices, and what each player kept. */
+    keepRest?: { queue: PlayerId[]; slot: number; kept: Record<string, ObjectId[]> };
     paid?: boolean; // the answer to "unless that player pays ..."
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
     paidBy?: PlayerId[]; // and those who paid

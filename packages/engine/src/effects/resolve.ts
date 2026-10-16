@@ -489,6 +489,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "grantFlashback":
     case "pick":
     case "sacrificeEach":
+    case "keepRest":
     case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":

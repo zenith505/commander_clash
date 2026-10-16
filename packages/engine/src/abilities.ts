@@ -23,7 +23,7 @@ export type CounterKind = "+1/+1" | "-1/-1" | "stun" | "shield" | "time" | "fade
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -905,6 +905,14 @@ export type Effect =
    * theirs in APNAP order, then they're all sacrificed at once (CR 101.4).
    */
   | { type: "sacrificeEach"; who: PlayerRef; filters: TargetSpec[] }
+  /**
+   * "Each player chooses an artifact, a creature, an enchantment, and a land from among the permanents they control, then
+   * sacrifices the rest" (Cataclysm): each player in turn order chooses, for each of `keep`, that many of their
+   * permanents matching both it and `among` (all of them if they have no more, or any number up to it with `upTo`); one
+   * permanent may be chosen for several (rulings). Then every unchosen permanent matching `among` is sacrificed at once.
+   * `youChoose`: you make every player's choices (Mythos of Snapdax).
+   */
+  | { type: "keepRest"; who: PlayerRef; keep: { filter: TargetSpec; n: number; upTo?: true }[]; among: TargetSpec; youChoose?: true }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**

@@ -942,6 +942,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dd69ef80-d30c-4b15-aec8-4154dc20cb25",
+  "name": "Covetous Elegy",
+  "manaCost": "{4}{W}{B}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player chooses up to two creatures they control, then sacrifices the rest. Then you create a tapped Treasure token for each creature your opponents control.",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "clu",
+  "releasedAt": "2024-02-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6a462a69-3e42-41de-a3aa-a488d9f38d69",
   "name": "Craw Wurm",
   "manaCost": "{4}{G}{G}",
@@ -3729,6 +3759,39 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4b7ac066-e5c7-43e6-9e7e-2739b24a905d",
+  "name": "Serra Angel",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nVigilance (Attacking doesn't cause this creature to tap.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-10-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

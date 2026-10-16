@@ -1,7 +1,7 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, COUNTER, amt, counterKind, num, singularWord } from "../words";
+import { NUM, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
@@ -302,6 +302,43 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = new RegExp(`^Return ${NUM} (.+?) you control to (?:its|their) owners?'s? hands?$`, "i").exec(s))) {
     const filter = pickFilter(m[2]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: amt(m[1]!), action: "bounce" }];
+  }
+  // "Each player chooses from among the permanents they control an artifact, a creature, an enchantment, and a land,
+  // then sacrifices the rest" (Cataclysm), "... an artifact, a creature, an enchantment, and a planeswalker from among the
+  // nonland permanents they control ..." (Cataclysmic Gearhulk), "... up to two creatures they control ..." (Covetous
+  // Elegy), "... a land of each basic land type" (Global Ruin), "... a permanent they control of each permanent type"
+  // (Liliana, Dreadhorde General). The choices aren't targeted, and are made as it resolves (rulings).
+  if ((m = /^(.+?) chooses (.+?),? (?:then|and) sacrifices the rest$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const what = m[2]!;
+    let r: RegExpExecArray | null;
+    let among: TargetSpec | null = null;
+    let list: string | undefined;
+    let keep: { filter: TargetSpec; n: number; upTo?: true }[] | null = null;
+    if ((r = /^from among the permanents they control (.+)$/.exec(what))) [among, list] = [{ kind: "object", text: "permanent" }, r[1]!];
+    else if ((r = /^(.+) from among the (nonland permanents|creatures) they control$/.exec(what))) [among, list] = [pickFilter(r[2]!), r[1]!];
+    else if ((r = /^from the lands they control a land of each basic land type$/.exec(what))) {
+      among = { kind: "object", types: ["Land"], text: "land" };
+      keep = BASIC_TYPES.map((t) => ({ filter: { kind: "object", types: ["Land"], subtypes: [t], text: t }, n: 1 }));
+    } else if (/^a permanent they control of each permanent type$/.test(what)) {
+      // The permanent types (CR 110.4).
+      among = { kind: "object", text: "permanent" };
+      keep = (["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"] as const).map((t) => ({ filter: { kind: "object", types: [t], text: t.toLowerCase() }, n: 1 }));
+    } else if ((r = new RegExp(`^(up to )?${NUM} (.+?) they control$`).exec(what))) {
+      const filter = pickFilter(r[3]!);
+      const n = amt(r[2]!);
+      if (!filter || typeof n !== "number") return null;
+      among = filter;
+      keep = [{ filter, n, ...(r[1] ? { upTo: true as const } : {}) }];
+    }
+    if (list !== undefined) {
+      const parts = list.split(/,? and |, /);
+      const filters = parts.map((x) => /^an? (.+)$/.exec(x)).map((x) => (x ? pickFilter(x[1]!) : null));
+      if (filters.some((f) => !f)) return null;
+      keep = filters.map((filter) => ({ filter: filter!, n: 1 }));
+    }
+    if (!who || !among || among.kind !== "object" || !keep?.length || keep.some((k) => k.filter.kind !== "object")) return null;
+    return [{ type: "keepRest", who, keep, among }];
   }
   // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
   // control with the greatest power" (Szat's Will).

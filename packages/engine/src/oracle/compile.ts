@@ -311,7 +311,7 @@ export function compile(d: CardDef): CompiledCard {
   for (const [li, raw] of lines.entries()) {
     // Converge (CR 207.2c) is an ability word: it has no rules meaning of its own; neither have flavor words, like "Gae
     // Bolg — Equip {4}" (CR 207.2d).
-    const line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
+    let line = raw.trim().replace(/^Converge — /, "").replace(/^[A-Z][^—•"]* — (?=Equip\b)/, "");
     if (!line) continue;
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
@@ -1047,6 +1047,15 @@ export function compile(d: CardDef): CompiledCard {
       out.flashCost = Number(flashCost[1]);
       continue;
     }
+    // "~ enters with a number of +1/+1 counters on it equal to ..." is "with X ... counters on it, where X is ...".
+    const aNumber = new RegExp(`^(?:Undergrowth — )?~ enters(?: the battlefield)? with a number of ${COUNTER} counters on (?:it|him|her) equal to (.+)\\.$`).exec(line);
+    // "The amount of mana spent to cast it" (Marath): the spell it was, only as it enters from the stack.
+    if (aNumber && /^the amount of mana spent to cast (?:it|~)$/.test(aNumber[2]!)) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(aNumber[1]!), n: { count: { kind: "manaSpent" } } };
+      continue;
+    }
+    if (aNumber) line = `~ enters with X ${aNumber[1]} counters on it, where X is ${aNumber[2]}.`;
     const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.

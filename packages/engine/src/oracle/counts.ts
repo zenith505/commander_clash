@@ -53,6 +53,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (spec?.kind !== "object") return null;
     return { count: { kind: "greatestManaValue", filter: { ...spec, text: `${m[1]} you control` } } };
   }
+  // "The greatest number of creatures a player controls" (Investigator's Journal), "... an opponent controls".
+  if (!each && (m = /^the greatest number of (.+?) (a player|an opponent) controls$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
+    if (spec?.kind !== "object" || spec.controller) return null;
+    return { count: { kind: "greatestControlled", filter: { ...spec, text: m[1]! }, ...(m[2] === "an opponent" ? { opponents: true as const } : {}) } };
+  }
+  if (!each && /^the greatest number of cards an opponent has drawn this turn$/i.test(p)) return { count: { kind: "greatestDrawn" } };
   if (!each) {
     const nb = /^the (?:total )?number of (.+)$/i.exec(p);
     if (nb) return parseCount(nb[1]!, ctx, true);

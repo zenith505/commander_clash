@@ -113,6 +113,15 @@ export type Count =
   | { kind: "eventAmount" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
   | { kind: "colorsSpent" }
+  /**
+   * "Enters with a number of +1/+1 counters on it equal to the amount of mana spent to cast it" (Marath): only in an
+   * "enters with" (the spell it was); 0 if it wasn't cast.
+   */
+  | { kind: "manaSpent" }
+  /** "The greatest number of creatures a player controls" (Investigator's Journal), `opponents`: "an opponent controls". */
+  | { kind: "greatestControlled"; filter: TargetSpec; opponents?: true }
+  /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
+  | { kind: "greatestDrawn" }
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
   | { kind: "treasureSpent" }
   /** "For each creature it devoured" (CR 702.82b). */

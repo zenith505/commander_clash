@@ -233,6 +233,8 @@ export interface GameObject {
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
+  /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */
+  manaSpent?: number;
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
   phantomEvent?: string;
   /**

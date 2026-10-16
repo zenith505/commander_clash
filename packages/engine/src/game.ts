@@ -629,6 +629,7 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.colorsSpent = undefined;
+    o.manaSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
@@ -709,7 +710,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) ? undefined : printedCounters;
-  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length })) : 0;
+  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0 })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
@@ -822,7 +823,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
   }
   const printed = compileCard(defOf(s, o));
   const ewc = printed.entersWithCounters;
-  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x })) : 0;
+  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0 })) : 0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 
@@ -2582,6 +2583,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
+  o.manaSpent = manaSpent || undefined;
   o.treasureSpent = paid.treasure || undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;

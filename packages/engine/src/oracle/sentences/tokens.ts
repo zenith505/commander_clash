@@ -14,11 +14,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
 
   // Tokens, maybe "tapped and attacking" (CR 508.4): "Create a tapped and attacking 1/1 red Warrior creature
   // token", "Create two 1/1 white Soldier creature tokens with haste that are tapped and attacking".
-  if ((m = new RegExp(`^Create ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
-    const token = parseToken(Number(m[3]), Number(m[4]), m[5]!, m[6]);
-    const how = `${m[2] ?? ""} ${m[7] ?? ""}`;
+  // Another player can create them: "Target opponent creates three 2/2 white Knight creature tokens", "each opponent
+  // creates ..." (Hunted Dragon, Forbidden Orchard): that player creates and controls them (CR 111.2).
+  if ((m = new RegExp(`^(?:(.+?) creates|Create) ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    const token = parseToken(Number(m[4]), Number(m[5]), m[6]!, m[7]);
+    const how = `${m[3] ?? ""} ${m[8] ?? ""}`;
     const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}) };
-    return token ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...state }] : null;
+    return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token, ...state }] : null;
   }
   // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".

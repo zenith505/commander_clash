@@ -699,6 +699,7 @@ export function moveObject(
   o.preventNext = undefined;
   o.redirectNext = undefined;
   o.activatedThisTurn = undefined;
+  o.activatedEver = undefined; // exhaust (CR 702.177a): a new object can activate it again
   o.targetedThisTurn = undefined;
   o.modesChosen = undefined; // "choose one that hasn't been chosen": a new object starts over (CR 400.7)
   o.skipNextUntap = undefined;
@@ -3328,6 +3329,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
+  if (ab.onceEver && o.activatedEver?.includes(index)) return `${d.name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
@@ -3488,6 +3490,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     invalidateCharacteristics(s);
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
+  if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
   if (ab.tap) tapPermanent(s, o);

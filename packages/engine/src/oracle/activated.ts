@@ -27,7 +27,10 @@ export function stripAbilityWord(raw: string): string {
 export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // An ability word (CR 207.2c), or a flavor word ("Blow Up — {T}, Sacrifice ~: ...", CR 207.2d): no rules meaning.
   const word = /^([A-Z][^—•":{}]*?) — /.exec(raw);
-  const line = word && (ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
+  // "Exhaust — [Cost]: [Effect]" means "[Cost]: [Effect]. Activate only once." (CR 702.177a); "Boast — [Cost]: [Effect]"
+  // means "... Activate only if this creature attacked this turn and only once each turn." (CR 702.142a).
+  const keyword = word && /^(Exhaust|Boast)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast") : undefined;
+  const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
   const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
@@ -76,10 +79,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   }
   let effectText = m[2]!;
   let sorcerySpeed = false;
-  let oncePerTurn = false;
+  let oncePerTurn = keyword === "Boast";
   let maxPerTurn: number | undefined;
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
-  let activateIf: ActivatedAbility["activateIf"];
+  let activateIf: ActivatedAbility["activateIf"] = keyword === "Boast" ? { kind: "self", is: "attackedThisTurn" } : undefined;
   // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
   let costLess: ActivatedAbility["costLess"];
   for (let found = true; found; ) {
@@ -102,7 +105,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     // Restrictions (CR 602.5b, 506.8g): "Activate only as a sorcery", "... only once each turn", "... only during your
     // upkeep", "... only during your turn and only if an opponent lost life this turn", in any combination.
     const only = / Activate only ([^.]+)\.$/.exec(effectText);
-    if (only && !activateIf && !sorcerySpeed && !oncePerTurn) {
+    if (only && !activateIf && !sorcerySpeed && !oncePerTurn && !keyword) {
       const clauses = parseOnlyClauses(only[1]!);
       if (!clauses) return "fail";
       sorcerySpeed = !!clauses.sorcery;
@@ -143,7 +146,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
   // libraries isn't compiled.
   const mana = manaAbilityKind(body);
-  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn))) return "fail";
+  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || keyword))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
   return {
@@ -158,6 +161,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
+    ...(keyword === "Exhaust" ? { onceEver: true as const } : {}),
+    ...(keyword ? { keyword } : {}),
     ...(maxPerTurn ? { maxPerTurn } : {}),
     ...(costLess ? { costLess } : {}),
     ...(activateIf ? { activateIf } : {}),

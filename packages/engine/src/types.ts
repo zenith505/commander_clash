@@ -147,6 +147,8 @@ export interface GameObject {
   redirectNext?: RedirectShield[];
   /** Activated abilities (by index, once per activation) activated this turn, for "activate only once each turn" (CR 602.5b). */
   activatedThisTurn?: number[];
+  /** Exhaust abilities activated since it became this object (CR 702.177a, 400.7): their indexes. */
+  activatedEver?: number[];
   /**
    * Its "triggers only once each turn" abilities that triggered this turn, and ("do:" and the may's text) its "you may
    * ... Do this only once each turn" abilities done this turn (CR 603.2h), as "zoneChanges|text": a new object starts

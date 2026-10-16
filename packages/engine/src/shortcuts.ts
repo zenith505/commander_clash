@@ -372,6 +372,7 @@ export function stateHash(s: GameState): string {
  * so a loop that keeps adding to it repeats once each count reaches that.
  */
 const TURN_LOG_CAP = 3;
+const LIFE_CAP = 5;
 function turnLogSummary(t: TurnLog | undefined) {
   if (!t) return undefined;
   const capped = (r: Record<number, number>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.min(v, TURN_LOG_CAP)]));
@@ -384,6 +385,10 @@ function turnLogSummary(t: TurnLog | undefined) {
     entered,
     damagedBy: capped(Object.fromEntries(Object.entries(t.damagedBy ?? {}).map(([k, v]) => [k, v.length]))),
     toGraveyard: capped(t.toGraveyard ?? {}),
+    // The Cases count to three (sources, creature cards) and to 5 life.
+    toGraveyardTypes: capped(t.toGraveyardTypes ?? {}),
+    damageSources: capped(Object.fromEntries(Object.entries(t.damageSources ?? {}).map(([k, v]) => [k, v.length]))),
+    lifeGained: Object.fromEntries(Object.entries(t.lifeGained ?? {}).map(([k, v]) => [k, Math.min(v, LIFE_CAP)])),
   };
 }
 

@@ -51,6 +51,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "untap", what }, { type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // Ray of Command: "When you lose control of the creature, tap it." A delayed trigger about the creature it took control
+  // of (CR 603.7): it taps when the control effect ends or another player takes it (rulings).
+  if ((m = /^When you lose control of (the creature|the artifact|it|that creature|that artifact), tap it$/i.exec(s))) {
+    const of = parseObject(m[1]!.replace(/^the /i, "that "), ctx) ?? parseObject("it", ctx);
+    return of?.ref === "target" ? [{ type: "delayed", when: "lostControl", of, effects: [{ type: "tap", what: { ref: "subject" } }], text: "tap it" }] : null;
+  }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);

@@ -57,6 +57,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       const body = { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
+      if (e.when === "lostControl") {
+        // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
+        for (const o of objects(s, e.of!, ctx)) if (o.zone === "battlefield") addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+        return;
+      }
       if (e.each === "created") {
         for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
         return;

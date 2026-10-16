@@ -28,7 +28,7 @@ function canShock(s: GameState, pid: number, t: Parameters<typeof planCast>[3]):
   addMana(s, pid, ["R"], {});
   const priority = s.priority;
   s.priority = pid; // an instant, cast whenever they have priority
-  const ok = !!planCast(s, pid, id, t, undefined, "pool");
+  const ok = !!planCast(s, pid, id, t);
   s.priority = priority;
   s.players[pid]!.hand.pop();
   delete s.objects[id];

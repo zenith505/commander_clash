@@ -857,7 +857,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
-            : d.when !== "leaves" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
+            : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep") s.delayed = s.delayed!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
@@ -978,7 +978,23 @@ const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : com
  * State triggers (CR 603.8): one triggers when its state is true, and not again until that instance has
  * resolved or left the stack.
  */
+/**
+ * "When you lose control of the creature, tap it" (Ray of Command): a delayed trigger that triggers once, when its
+ * controller no longer controls that object (CR 603.7). Once the object has left the battlefield it's gone for good.
+ */
+export function checkLostControl(s: GameState) {
+  for (const d of [...(s.delayed ?? [])]) {
+    if (d.when !== "lostControl") continue;
+    const o = s.objects[d.subject.id];
+    const here = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === d.subject.zc;
+    if (here && controllerOf(s, o) === d.controller) continue;
+    s.delayed = s.delayed!.filter((x) => x !== d);
+    if (here) s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
+  }
+}
+
 export function checkStateTriggers(s: GameState) {
+  checkLostControl(s);
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const triggers = abilitiesOf(s, o).triggers;

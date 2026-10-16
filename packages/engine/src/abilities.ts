@@ -1062,7 +1062,8 @@ export type Effect =
    * `each`: about each token just created, or about the object the trigger was about ("destroy that creature at end
    * of combat"), instead of the source.
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" }
+  /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard"; of?: ObjRef }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */

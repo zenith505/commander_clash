@@ -516,7 +516,8 @@ export interface StackItem {
 export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
   /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "endOfCombat" | "nextCleanup" | "leaves";
+  /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
   to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;

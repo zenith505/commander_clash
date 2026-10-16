@@ -847,6 +847,12 @@ export function compile(d: CardDef): CompiledCard {
       out.doubleLifeGain = true;
       continue;
     }
+    const coverX = /^If a creature would deal combat damage to you and\/or one or more creatures you control, prevent X of that damage, where X is (.+)\.$/.exec(line);
+    const coverN = coverX ? parseCount(coverX[1]!, null) : null;
+    if (coverN && !out.preventCombatFromEach) {
+      out.preventCombatFromEach = coverN;
+      continue;
+    }
     const tapTimes = /^If you tap a permanent for mana, it produces (twice|three times) as much of that mana instead\.$/.exec(line);
     if (tapTimes) {
       out.tapManaTimes = (out.tapManaTimes ?? 1) * (tapTimes[1] === "twice" ? 2 : 3);

@@ -2227,6 +2227,13 @@ export interface CompiledCard {
   roomsTwice?: true;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents" | "enchanted";
+  /**
+   * Cover of Winter: "If a creature would deal combat damage to you and/or one or more creatures you control, prevent X
+   * of that damage, where X is the number of age counters on ~" (a prevention effect, CR 615.1a): X of each creature's
+   * combat damage in each combat damage step, divided by this permanent's controller among those it would be dealt to
+   * (rulings).
+   */
+  preventCombatFromEach?: Amount;
   /** "Damage can't be prevented." (CR 615.12) */
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */

@@ -390,6 +390,8 @@ export interface StackItem {
   subject?: { id: ObjectId; zc: number };
   /** For a state trigger: which of its source's triggered abilities it is (CR 603.8). */
   stateIndex?: number;
+  /** A Saga's chapter ability: while it's on the stack, the Saga isn't sacrificed (CR 714.4). */
+  chapter?: true;
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
@@ -471,6 +473,8 @@ export interface PendingTrigger {
   event?: TriggerEventInfo;
   /** A delayed trigger's own ability (its source card has no such printed ability). */
   body?: AbilityBody;
+  /** A Saga's chapter ability (CR 714.4). */
+  chapter?: true;
   /** Its intervening "if" (CR 603.4), checked again as it resolves. */
   ifCond?: StaticCondition;
 }

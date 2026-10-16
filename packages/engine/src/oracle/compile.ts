@@ -122,9 +122,11 @@ const RING_TRIGGERS: TriggeredAbility[] = [
   },
 ];
 
+const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
+
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege"];
+const UNSUPPORTED_SUBTYPES = ["Class", "Case", "Room", "Siege"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
@@ -198,7 +200,7 @@ export function normalizeSelf(d: CardDef): string {
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga)\b/g, "~");
   return t;
 }
 
@@ -287,6 +289,22 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "Start your engines!") {
       out.startYourEngines = true; // CR 702.179a
       continue;
+    }
+    // Sagas (CR 714): read ahead (CR 702.155), and chapter abilities "I, II — [Effect]", each a triggered ability
+    // (CR 714.2b-c).
+    if (d.subtypes.includes("Saga")) {
+      if (line === "Read ahead") {
+        out.readAhead = true;
+        continue;
+      }
+      const chapter = /^((?:I|II|III|IV|V|VI|VII)(?:, (?:I|II|III|IV|V|VI|VII))*) — (.+)$/.exec(line);
+      if (chapter) {
+        // "I, II, III — Pain — You draw a card ...": a chapter's name is a flavor word, with no rules meaning (CR 207.2d).
+        const body = parseBody(chapter[2]!.replace(/^(?!Choose\b)[A-Z][^—•:"]{0,30}? — (?=\S)/, ""), {});
+        if (!body) out.unsupported.push(raw);
+        else for (const n of chapter[1]!.split(", ")) out.triggers.push(bindThisAbility({ event: "chapter", chapter: ROMAN.indexOf(n), body } as TriggeredAbility, line));
+        continue;
+      }
     }
     // "Max speed — [Ability]": "As long as your speed is 4, this object has '[Ability]'" (CR 702.178a).
     const maxSpeed = /^Max speed — (.+)$/.exec(line);

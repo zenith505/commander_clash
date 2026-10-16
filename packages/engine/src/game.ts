@@ -758,11 +758,14 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     const put = putCounters(s, o, counter, o.colorsSpent.length, true);
     log(s, `${defOf(s, o).name} enters with ${put} ${counter} counter${put === 1 ? "" : "s"} (sunburst).`);
   }
+  // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
+  const saga = characteristics(s, o).subtypes.includes("Saga");
+  if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
-  const options: EntersOption[] = [...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
+  const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
 }
@@ -1458,6 +1461,17 @@ function beginStep(s: GameState, step: Step): void {
     case "combatDamage":
       if (askUnblocked(s) || dealCombatDamage(s, false)) return;
       break;
+    case "main1":
+      // As the precombat main phase begins, the active player puts a lore counter on each Saga they control with
+      // one or more chapter abilities (CR 505.4, 714.3c).
+      for (const id of [...s.battlefield]) {
+        const o = obj(s, id);
+        if (controllerOf(s, o) !== ap || !characteristics(s, o).subtypes.includes("Saga") || finalChapter(s, o) < 1) continue;
+        const put = putCounters(s, o, "lore", 1);
+        if (put) log(s, `${player(s, ap).name} puts ${put === 1 ? "a lore counter" : `${put} lore counters`} on ${nameOf(s, id)}.`);
+      }
+      invalidateCharacteristics(s);
+      break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
@@ -1480,6 +1494,34 @@ function beginStep(s: GameState, step: Step): void {
     }
   }
   runStateBasedActions(s);
+}
+
+/** A Saga's final chapter number: the greatest among the chapter abilities it has, 0 with none (CR 714.2d). */
+export function finalChapter(s: GameState, o: GameObject): number {
+  return Math.max(0, ...abilitiesOf(s, o).triggers.map((t) => (t.event === "chapter" ? t.chapter! : 0)));
+}
+
+/** I, II, III ... for chapter numbers. */
+export const roman = (n: number) => ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"][n] ?? String(n);
+
+/**
+ * A Saga with one or more chapter abilities and at least its final chapter number in lore counters is sacrificed,
+ * unless it's the source of a chapter ability that has triggered but not yet left the stack (CR 704.5s, 714.4).
+ */
+function sagaSBAs(s: GameState): boolean {
+  let changed = false;
+  for (const id of [...s.battlefield]) {
+    const o = s.objects[id];
+    if (!o || o.zone !== "battlefield" || !characteristics(s, o).subtypes.includes("Saga")) continue;
+    const last = finalChapter(s, o);
+    if (last < 1 || (o.counters.lore ?? 0) < last) continue;
+    const mine = (x: { sourceId?: ObjectId; sourceZc?: number; chapter?: true }) => !!x.chapter && x.sourceId === id && (x.sourceZc === undefined || x.sourceZc === (o.zoneChanges ?? 0));
+    if (s.triggerQueue.some(mine) || s.stack.some(mine)) continue;
+    log(s, `${player(s, controllerOf(s, o)).name} sacrifices ${nameOf(s, id)} (its last chapter is done).`);
+    moveObject(s, id, "graveyard", { sacrificed: true });
+    changed = true;
+  }
+  return changed;
 }
 
 /** "You have no maximum hand size" on a permanent the player controls (CR 402.2, 514.1). */
@@ -3396,6 +3438,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
       return;
     }
+    if (pend.what === "readAhead") {
+      // Read ahead: it enters with the chosen number of lore counters (CR 702.155b, 714.3b).
+      const n = Number(choice);
+      putCounters(s, o, "lore", n, true);
+      log(s, `${p.name} chooses chapter ${roman(n)}: ${pend.source} enters with ${n} lore counter${n === 1 ? "" : "s"} (read ahead).`);
+      invalidateCharacteristics(s);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
       if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
@@ -3411,7 +3462,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead") throw new RulesError("nothing to choose");
   if (pend.what === "topOrBottom") {
     if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
     (r.scratch ??= {}).topOrBottom = choice;
@@ -3562,6 +3613,18 @@ function askEntersChoice(s: GameState): boolean {
       }
       const n = compileCard(defOf(s, o)).tribute;
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "tribute", options: opps.map(String), labels: opps.map((x) => player(s, x).name), objectId: o.id, prompt: `tribute ${n}: choose an opponent, who may put ${n} +1/+1 counter${n === 1 ? "" : "s"} on it` };
+      return true;
+    }
+    if (c.what === "readAhead") {
+      // "As this Saga enters, choose a number between one and this Saga's final chapter number" (CR 702.155b).
+      const last = finalChapter(s, o);
+      if (last < 1) {
+        q.shift();
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      const options = Array.from({ length: last }, (_, i) => String(i + 1));
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "readAhead", options, labels: options.map((n) => `Chapter ${roman(Number(n))}`), objectId: o.id, prompt: "read ahead: choose the chapter to start on; the chapters before it don't trigger" };
       return true;
     }
     if (c.what === "tributePay") {
@@ -4397,6 +4460,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       } else seen.set(key, id);
     }
     if (attachmentSBAs(s)) changed = true;
+    if (sagaSBAs(s)) changed = true; // 704.5s
     if (dungeonSBAs(s)) changed = true; // 704.5t
     // Commanders in graveyard/exile may return to the command zone (903.9a). Owners always choose yes for now.
     for (const o of Object.values(s.objects)) {

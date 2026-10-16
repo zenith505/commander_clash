@@ -1304,6 +1304,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c15bb7eb-aaaa-4468-9641-8f706d6137e8",
+  "name": "History of Benalia",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI, II — Create a 2/2 white Knight creature token with vigilance.\nIII — Knights you control get +2/+1 until end of turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "mythic",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f6bd2902-7f8b-419e-bbc7-bcab0c1b7e01",
   "name": "Impulse",
   "manaCost": "{1}{U}",
@@ -2646,6 +2674,37 @@
   "releasedAt": "1998-10-12",
   "rarity": "uncommon",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7d723a6f-854f-43df-9401-a4eb0c0f639f",
+  "name": "The Weatherseed Treaty",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "Read ahead (Choose a chapter and start with that many lore counters. Add one after your draw step. Skipped chapters don't trigger. Sacrifice after III.)\nI — Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\nII — Create a 1/1 green Saproling creature token.\nIII — Domain — Target creature you control gets +X/+X and gains trample until end of turn, where X is the number of basic land types among lands you control.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Read Ahead",
+   "Domain"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "uncommon",
+  "layout": "saga",
   "gameChanger": false
  },
  {

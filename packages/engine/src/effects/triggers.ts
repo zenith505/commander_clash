@@ -479,6 +479,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const kindOk = (t: TriggeredAbility) => t.countersKind === undefined || t.countersKind === ev.counter;
     const info = { amount: ev.amount };
     add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && kindOk(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    // Chapter abilities: "if the number of lore counters on it was less than N and became at least N" (CR 714.2b).
+    // With read ahead, the turn it entered only the chapter it has exactly that many lore counters for (CR 702.155a).
+    if (ev.counter === "lore" && o.zone === "battlefield") {
+      const after = o.counters.lore ?? 0;
+      const before = after - ev.amount;
+      const readAhead = !!compileCard(defOf(s, o)).readAhead && characteristics(s, o).hasPrintedAbilities && o.enteredTurn === s.turn;
+      const from = s.triggerQueue.length;
+      add(o, controllerOf(s, o), (e, t) => e === "chapter" && before < t.chapter! && t.chapter! <= after && (!readAhead || t.chapter === after));
+      for (const t of s.triggerQueue.slice(from)) t.chapter = true;
+    }
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
@@ -897,6 +907,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.event ? { event: t.event } : {}),
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
     ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
+    ...(t.chapter ? { chapter: true as const } : {}),
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });

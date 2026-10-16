@@ -1074,7 +1074,7 @@ export type Effect =
 export type ChoiceKind = "creatureType" | "color" | "basicLandType";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
@@ -1123,6 +1123,8 @@ export interface AbilityBody {
 export type TriggerEvent =
   /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
   | "state"
+  /** A Saga's chapter ability (CR 714.2b), see TriggeredAbility.chapter. */
+  | "chapter"
   | "selfEnters" // When this enters
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
@@ -1333,6 +1335,11 @@ export interface TriggeredAbility {
   ifEvidence?: boolean;
   /** "When ~ enters, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR 603.4). */
   ifTreasure?: boolean;
+  /**
+   * A chapter ability "{rN}—[Effect]": "When one or more lore counters are put onto this Saga, if the number of lore
+   * counters on it was less than N and became at least N, [effect]" (CR 714.2b).
+   */
+  chapter?: number;
   /** "When ~ enters, if tribute wasn't paid" (CR 702.104b). */
   ifTributeUnpaid?: boolean;
   /** Conspire's "if its conspire cost was paid" (CR 702.78a). */
@@ -1677,6 +1684,8 @@ export interface CompiledCard {
    * a +1/+1 counter. Chosen as it enters, by its controller.
    */
   entersOptions?: EntersOption[];
+  /** Read ahead (CR 702.155): a Saga that enters with the chapter number its controller chooses in lore counters. */
+  readAhead?: true;
   /**
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.

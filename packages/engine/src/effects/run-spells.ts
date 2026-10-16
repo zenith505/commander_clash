@@ -180,6 +180,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.cascade) {
+        const n = amountNow(s, e.n, ctx);
         const exiled: ObjectId[] = [];
         let hit: ObjectId | undefined;
         while (p.library.length) {
@@ -187,13 +188,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           moveObject(s, id, "exile");
           exiled.push(id);
           const d = defOf(s, obj(s, id));
-          if (!isType(d, "Land") && manaValue(parseManaCost(d.manaCost)) <= e.n) {
+          if (!isType(d, "Land") && manaValue(parseManaCost(d.manaCost)) <= n) {
             hit = id;
             break;
           }
         }
         sc.cascade = { exiled, ...(hit ? { hit } : {}) };
-        log(s, `${p.name} discovers ${e.n}: exiles ${exiled.length} card${exiled.length === 1 ? "" : "s"}${hit ? `, finding ${defOf(s, obj(s, hit)).name}` : ", finding nothing"}.`);
+        // The discovered card (CR 701.57c), cast or not: "the discovered card's mana value" (Hit the Mother Lode).
+        if (hit) s.resolving!.discovered = { id: hit, mv: manaValue(parseManaCost(defOf(s, obj(s, hit)).manaCost)) };
+        log(s, `${p.name} discovers ${n}: exiles ${exiled.length} card${exiled.length === 1 ? "" : "s"}${hit ? `, finding ${defOf(s, obj(s, hit)).name}` : ", finding nothing"}.`);
         if (hit) {
           // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
           s.pending = { kind: "castFree", player: p.id, objectId: hit, source: src, how: "discover" };
@@ -297,6 +300,9 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   }
   s.stack.splice(i, 1);
   if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead ? "library" : "graveyard", instead === "libraryTop" ? { top: true } : {});
+  // "Discover X, where X is that spell's mana value" (Hurl into History): with the X chosen for it (CR 202.3e, rulings).
+  const gone = item.objectId && s.objects[item.objectId];
+  if (gone && item.x && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead ? " and puts it on top of its owner's library" : ""}.`);
 }
 

@@ -77,6 +77,11 @@ export type Count =
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
   | { kind: "destroyedThisWay"; filter: TargetSpec }
+  /**
+   * "If the discovered card's mana value is less than 10, ... equal to the difference" (Hit the Mother Lode): `n` minus the
+   * mana value of the card this spell or ability discovered (CR 701.57c), 0 if it's not less or nothing was discovered.
+   */
+  | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
@@ -1009,7 +1014,7 @@ export type Effect =
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
    * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
    */
-  | { type: "discover"; n: number }
+  | { type: "discover"; n: Amount }
   /**
    * Ripple N as it resolves (CR 702.60a): reveal the top N cards, cast any with the same name as the spell for free,
    * the rest to the bottom in any order. `of`: "cause" when the ripple was given to the spell that triggered it.

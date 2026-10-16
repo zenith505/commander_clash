@@ -100,6 +100,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
+    case "discoveredBelow": {
+      const d = s.resolving?.discovered;
+      return d && d.mv < c.n ? c.n - d.mv : 0;
+    }
     case "destroyedThisWay":
       // As they last existed on the battlefield (CR 608.2h).
       return (s.resolving?.destroyed ?? []).filter(({ o, ch }) => objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)).length;
@@ -174,7 +178,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         // On the stack, X is the value chosen for it (CR 202.3e).
         const cost = parseManaCost(defOf(s, o).manaCost);
         const item = o.zone === "stack" ? (s.stack.find((x) => x.objectId === o.id) ?? (s.resolving?.item.objectId === o.id ? s.resolving.item : undefined)) : undefined;
-        return manaValue(cost) + (item?.x ?? 0) * cost.symbols.filter((x) => x.kind === "x").length;
+        // Countered by this spell or ability earlier: as it last existed on the stack.
+        const countered = s.resolving?.countered?.[o.id];
+        const x = item?.x ?? (countered?.zc === (o.zoneChanges ?? 0) ? countered.x : 0);
+        return manaValue(cost) + x * cost.symbols.filter((x) => x.kind === "x").length;
       }
       if (o.zone !== "battlefield") {
         // It left the battlefield on its last move (destroyed by an earlier part of this effect): as it last existed there.
@@ -311,6 +318,8 @@ function describeCount(c: Count): string {
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
+    case "discoveredBelow":
+      return `${c.n} minus the discovered card's mana value`;
     case "destroyedThisWay":
       return `#${c.filter.text} destroyed`;
     case "cardsInGraveyard":

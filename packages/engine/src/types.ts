@@ -990,6 +990,10 @@ export interface Resolving {
    * counts; one that wasn't destroyed (indestructible, regenerated) doesn't (rulings on Fumigate and Bane of Progress).
    */
   destroyed?: { o: GameObject; ch: Characteristics }[];
+  /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
+  countered?: Record<ObjectId, { zc: number; x: number }>;
+  /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */
+  discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
   countersRemoved?: number;
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */

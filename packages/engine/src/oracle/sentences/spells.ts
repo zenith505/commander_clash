@@ -7,6 +7,7 @@ import { parseUnlessPays, addTarget } from "../body";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
+import { PREDEFINED_TOKENS } from "../tokens";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -93,7 +94,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Scry and surveil (CR 701.22, 701.25)
   if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
   // "Discover 4" (CR 701.57a): exile until a nonland card with mana value 4 or less, cast it free or put it into your hand.
-  if ((m = /^[Dd]iscover (\d+)$/.exec(s))) return [{ type: "discover", n: Number(m[1]) }];
+  // "Discover X, where X is its toughness": X is worked out as the instruction starts (body.ts defineX).
+  if ((m = /^(?:[Yy]ou )?[Dd]iscover (\d+|X)$/.exec(s))) return [{ type: "discover", n: amt(m[1]!) }];
+  // "If the discovered card's mana value is less than 10, create a number of tapped Treasure tokens equal to the
+  // difference" (Hit the Mother Lode, CR 701.57c): none if it isn't less, or if nothing was discovered.
+  if ((m = /^If the discovered card's mana value is less than (\d+), create a number of tapped Treasure tokens equal to the difference$/.exec(s)))
+    return [{ type: "createToken", who: { ref: "you" }, n: { count: { kind: "discoveredBelow", n: Number(m[1]) } }, token: PREDEFINED_TOKENS.Treasure!, tapped: true }];
   // Learn (CR 701.48a): "You may discard a card. If you do, draw a card. If you didn't discard a card, you may reveal a
   // Lesson card you own from outside the game and put it into your hand." Players here have no sideboard (CR 100.4:
   // one is optional) and nothing else outside the game, so only the first part can happen.

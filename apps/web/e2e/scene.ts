@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { applyAction, createGame, invalidateCharacteristics, newObject, waitingOn, type CardDef, type GameState, type PlayerId, type Step, type ZoneName } from "@cc/engine";
+import { applyAction, createGame, invalidateCharacteristics, newObject, PREDEFINED_TOKENS, tokenDef, waitingOn, type CardDef, type GameState, type PlayerId, type Step, type ZoneName } from "@cc/engine";
 
 /** Real card definitions, written by `npm run e2e:cards` from every card name quoted in these files. */
 const CARDS: CardDef[] = JSON.parse(readFileSync(new URL("./cards.json", import.meta.url), "utf8"));
@@ -23,6 +23,8 @@ export interface Seat {
   exile?: string[];
   commander?: string;
   life?: number;
+  /** Predefined tokens on the battlefield: "Treasure", "Clue", "Food". */
+  tokens?: string[];
 }
 
 /** Ten of each basic land: enough mana for anything a test casts. */
@@ -72,6 +74,12 @@ function place(s: GameState, pid: PlayerId, seat: Seat, keepHandSize: boolean) {
   for (const n of seat.exile ?? []) p.exile.push(add(n, "exile").id);
   for (const n of [...(seat.library ?? [])].reverse()) p.library.unshift(add(n, "library").id);
   for (const n of seat.board ?? []) s.battlefield.push(add(n, "battlefield").id);
+  for (const n of seat.tokens ?? []) {
+    const o = newObject(s, tokenDef(PREDEFINED_TOKENS[n]!), pid, "battlefield");
+    o.isToken = true;
+    o.controlledSinceTurn = -1;
+    s.battlefield.push(o.id);
+  }
 }
 
 /** Everyone passes (declaring no attacks or blocks) until `step` of `active`'s turn. */

@@ -103,6 +103,8 @@ export type Count =
   | { kind: "eventAmount" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
   | { kind: "colorsSpent" }
+  /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */
+  | { kind: "treasureSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
@@ -966,6 +968,16 @@ export type Effect =
    * age counter on it; if you don't, sacrifice it.
    */
   | { type: "cumulativeUpkeep"; pay: PayCost } // "If you don't, ...": fabricate (CR 702.123a)
+  /**
+   * "You may collect evidence N" as it resolves (CR 701.59a), always inside a "may": its controller picks cards in their
+   * graveyard with total mana value N or more (they can say yes only if they have them, 701.59b).
+   */
+  | { type: "collectEvidence"; n: number }
+  /**
+   * "When you do, ..." (CR 603.12): a reflexive triggered ability, triggered by doing what the "you may" before it said.
+   * It's put on the stack the next time a player would receive priority, its targets chosen then (603.3d).
+   */
+  | { type: "reflexive"; body: AbilityBody }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
@@ -1062,7 +1074,7 @@ export type Effect =
 export type ChoiceKind = "creatureType" | "color" | "basicLandType";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead";
 
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
@@ -1075,6 +1087,10 @@ export type SpellCondition =
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
+  /** "If evidence was collected" (CR 701.59c): its "you may collect evidence N" additional cost was paid. */
+  | { kind: "evidence" }
+  /** "If mana from a Treasure was spent to cast ~" / "to activate this ability" (CR 106.3). */
+  | { kind: "treasure" }
   /** "If this spell was cast using teamwork": its teamwork cost was paid. */
   | { kind: "teamwork" }
   /** "If the gift was promised" (CR 702.174b, k). */
@@ -1107,6 +1123,8 @@ export interface AbilityBody {
 export type TriggerEvent =
   /** A state trigger (CR 603.8): "When you control no Islands, sacrifice ~", see TriggeredAbility.state. */
   | "state"
+  /** A Saga's chapter ability (CR 714.2b), see TriggeredAbility.chapter. */
+  | "chapter"
   | "selfEnters" // When this enters
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
@@ -1194,6 +1212,8 @@ export type TriggerEvent =
   | "playerDraws"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
+  /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
+  | "youCollectEvidence"
   /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
@@ -1244,7 +1264,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
@@ -1311,6 +1331,15 @@ export interface TriggeredAbility {
   ifCasualty?: boolean;
   /** "When ~ enters, if it was bargained, ..." (CR 702.166b). */
   ifBargained?: boolean;
+  /** "When ~ enters, if evidence was collected, ..." (CR 701.59c, an intervening if). */
+  ifEvidence?: boolean;
+  /** "When ~ enters, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR 603.4). */
+  ifTreasure?: boolean;
+  /**
+   * A chapter ability "{rN}—[Effect]": "When one or more lore counters are put onto this Saga, if the number of lore
+   * counters on it was less than N and became at least N, [effect]" (CR 714.2b).
+   */
+  chapter?: number;
   /** "When ~ enters, if tribute wasn't paid" (CR 702.104b). */
   ifTributeUnpaid?: boolean;
   /** Conspire's "if its conspire cost was paid" (CR 702.78a). */
@@ -1567,7 +1596,12 @@ export type AdditionalCost =
    * "Have an opponent gain 3 life" (Invigorate: the caster picks which, CostChoices.lifeTo), "have each other player gain
    * 6 life" (`each`; Reverent Silence).
    */
-  | { kind: "giveLife"; n: number; each?: true };
+  | { kind: "giveLife"; n: number; each?: true }
+  /**
+   * "Collect evidence N" (CR 701.59a): exile any number of cards from your graveyard with total mana value N or greater,
+   * as a cost (an ability's, Conspiracy Unraveler's alternative cost); paid with CostChoices.collect.
+   */
+  | { kind: "collectEvidence"; n: number };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,
@@ -1588,7 +1622,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "alternative": "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (CR 118.9), maybe with more costs (Borderposts). */
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
-export type AltCostKind = "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak";
+/** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
@@ -1649,6 +1684,8 @@ export interface CompiledCard {
    * a +1/+1 counter. Chosen as it enters, by its controller.
    */
   entersOptions?: EntersOption[];
+  /** Read ahead (CR 702.155): a Saga that enters with the chapter number its controller chooses in lore counters. */
+  readAhead?: true;
   /**
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
@@ -1851,6 +1888,8 @@ export interface CompiledCard {
     if?: StaticCondition;
     /** What's paid, as the card says it: "pay 1 life and exile a blue card from your hand". */
     text?: string;
+    /** Security Rhox: "Spend only mana produced by Treasures to cast it this way" (CR 106.3, 106.6). */
+    treasureOnly?: true;
   }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;
@@ -1873,6 +1912,12 @@ export interface CompiledCard {
   bargain?: true;
   /** "~ costs {2} less to cast if it's bargained." */
   bargainReduction?: number;
+  /** "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a, c): paid with CostChoices.evidence. */
+  evidence?: number;
+  /** "This spell costs {2} less to cast if evidence was collected." */
+  evidenceReduction?: number;
+  /** "You may collect evidence N rather than pay the mana cost for spells you cast" (Conspiracy Unraveler, CR 118.9). */
+  payEvidence?: number;
   /** Teamwork N: as an additional cost, you may tap any number of creatures you control with total power N or more. */
   teamwork?: number;
   /** "You may cast this spell as though it had flash if it's cast using teamwork." */

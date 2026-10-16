@@ -69,6 +69,8 @@ export type TriggerSourceEvent =
   | { type: "lifeGained"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
   | { type: "lifeLost"; player: PlayerId; amount: number }
+  /** A player collected evidence (CR 701.59a), once for each time. */
+  | { type: "evidenceCollected"; player: PlayerId }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
@@ -103,7 +105,7 @@ export type TriggerSourceEvent =
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
   | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
-  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number }
+  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   | { type: "targeted"; stackId: string }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
@@ -301,7 +303,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifSneaked || entering.castAlt === "sneak") && (!t.ifBargained || !!entering.bargained) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifSneaked || entering.castAlt === "sneak") && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) &&  (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -309,7 +311,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       ev.x,
       entering.kicked,
       // Whom its spell's gift was promised to: "the chosen player" (CR 702.174b).
-      entering.gift !== undefined ? { gift: entering.gift } : undefined,
+      entering.gift !== undefined || entering.evidence || entering.treasureSpent ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}) } : undefined,
       entering.colorsSpent?.length,
     );
     if (objIsType(s, entering, "Creature")) {
@@ -439,6 +441,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+  } else if (ev.type === "evidenceCollected") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCollectEvidence", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "lifeLost") {
     // Every other player is an opponent (CR 102.3); "that player" is the one who lost life, "that much" how much.
     for (const id of s.battlefield) {
@@ -472,6 +479,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const kindOk = (t: TriggeredAbility) => t.countersKind === undefined || t.countersKind === ev.counter;
     const info = { amount: ev.amount };
     add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && kindOk(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    // Chapter abilities: "if the number of lore counters on it was less than N and became at least N" (CR 714.2b).
+    // With read ahead, the turn it entered only the chapter it has exactly that many lore counters for (CR 702.155a).
+    if (ev.counter === "lore" && o.zone === "battlefield") {
+      const after = o.counters.lore ?? 0;
+      const before = after - ev.amount;
+      const readAhead = !!compileCard(defOf(s, o)).readAhead && characteristics(s, o).hasPrintedAbilities && o.enteredTurn === s.turn;
+      const from = s.triggerQueue.length;
+      add(o, controllerOf(s, o), (e, t) => e === "chapter" && before < t.chapter! && t.chapter! <= after && (!readAhead || t.chapter === after));
+      for (const t of s.triggerQueue.slice(from)) t.chapter = true;
+    }
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
@@ -627,8 +644,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length !== t.cast.nth) return false;
+        if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
         return printedMatches(bindChosen(t.cast.spell, o.chosen), ev.card);
-      }, undefined, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}) }); // "counter it unless that player pays" acts on the spell cast
+      }, undefined, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.
@@ -889,6 +907,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.event ? { event: t.event } : {}),
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
     ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
+    ...(t.chapter ? { chapter: true as const } : {}),
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });

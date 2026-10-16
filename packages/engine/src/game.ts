@@ -12,7 +12,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
-import { addMana, canPayFromPool, spendFromPool } from "./spend";
+import { addMana, canPayFromPool, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { CREATURE_TYPES } from "./keywords";
@@ -358,6 +358,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "chooseMay":
       chooseMay(s, p, action.yes);
       break;
+    case "collectEvidence":
+      chooseEvidence(s, p, action.ids);
+      break;
     case "chooseOption":
       chooseOption(s, p, action.choice);
       break;
@@ -618,6 +621,8 @@ export function moveObject(
     o.colorsSpent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
+    o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
+    o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -753,11 +758,14 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     const put = putCounters(s, o, counter, o.colorsSpent.length, true);
     log(s, `${defOf(s, o).name} enters with ${put} ${counter} counter${put === 1 ? "" : "s"} (sunburst).`);
   }
+  // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
+  const saga = characteristics(s, o).subtypes.includes("Saga");
+  if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
-  const options: EntersOption[] = [...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
+  const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) fireEvent(s, { type: "enters", id, ...(opts.x ? { x: opts.x } : {}) });
 }
@@ -1257,6 +1265,7 @@ function advanceStep(s: GameState): void {
     const keep = p.combatMana && KEEPS_COMBAT_MANA.has(s.step) ? Math.min(p.combatMana, p.manaPool.R - restrictedRed) : 0;
     p.manaPool = emptyPool();
     p.restrictedMana = undefined;
+    p.treasureMana = undefined;
     p.manaPool.R = keep;
     p.combatMana = keep || undefined;
   }
@@ -1452,6 +1461,17 @@ function beginStep(s: GameState, step: Step): void {
     case "combatDamage":
       if (askUnblocked(s) || dealCombatDamage(s, false)) return;
       break;
+    case "main1":
+      // As the precombat main phase begins, the active player puts a lore counter on each Saga they control with
+      // one or more chapter abilities (CR 505.4, 714.3c).
+      for (const id of [...s.battlefield]) {
+        const o = obj(s, id);
+        if (controllerOf(s, o) !== ap || !characteristics(s, o).subtypes.includes("Saga") || finalChapter(s, o) < 1) continue;
+        const put = putCounters(s, o, "lore", 1);
+        if (put) log(s, `${player(s, ap).name} puts ${put === 1 ? "a lore counter" : `${put} lore counters`} on ${nameOf(s, id)}.`);
+      }
+      invalidateCharacteristics(s);
+      break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
@@ -1474,6 +1494,34 @@ function beginStep(s: GameState, step: Step): void {
     }
   }
   runStateBasedActions(s);
+}
+
+/** A Saga's final chapter number: the greatest among the chapter abilities it has, 0 with none (CR 714.2d). */
+export function finalChapter(s: GameState, o: GameObject): number {
+  return Math.max(0, ...abilitiesOf(s, o).triggers.map((t) => (t.event === "chapter" ? t.chapter! : 0)));
+}
+
+/** I, II, III ... for chapter numbers. */
+export const roman = (n: number) => ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"][n] ?? String(n);
+
+/**
+ * A Saga with one or more chapter abilities and at least its final chapter number in lore counters is sacrificed,
+ * unless it's the source of a chapter ability that has triggered but not yet left the stack (CR 704.5s, 714.4).
+ */
+function sagaSBAs(s: GameState): boolean {
+  let changed = false;
+  for (const id of [...s.battlefield]) {
+    const o = s.objects[id];
+    if (!o || o.zone !== "battlefield" || !characteristics(s, o).subtypes.includes("Saga")) continue;
+    const last = finalChapter(s, o);
+    if (last < 1 || (o.counters.lore ?? 0) < last) continue;
+    const mine = (x: { sourceId?: ObjectId; sourceZc?: number; chapter?: true }) => !!x.chapter && x.sourceId === id && (x.sourceZc === undefined || x.sourceZc === (o.zoneChanges ?? 0));
+    if (s.triggerQueue.some(mine) || s.stack.some(mine)) continue;
+    log(s, `${player(s, controllerOf(s, o)).name} sacrifices ${nameOf(s, id)} (its last chapter is done).`);
+    moveObject(s, id, "graveyard", { sacrificed: true });
+    changed = true;
+  }
+  return changed;
 }
 
 /** "You have no maximum hand size" on a permanent the player controls (CR 402.2, 514.1). */
@@ -1839,6 +1887,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const picked = triggered.find((r) => r.extra.length === extra.length && r.extra.every((m, i) => m === extra[i]));
   if (!picked) throw new RulesError(triggered.length > 1 ? `choose the mana that tapping ${name} also adds` : `${name} adds no other mana to choose`);
   const src = objectSource(s, o);
+  // Mana from a Treasure (CR 106.3): what its source was as it was activated, before it's sacrificed.
+  const treasure = isTreasure(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   if (ab.manaCost) spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o });
   if (ab.tap) tapPermanent(s, o);
@@ -1852,12 +1902,18 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
-  addMana(s, p.id, adds, ab.spendOnly);
+  addMana(s, p.id, adds, ab.spendOnly, treasure);
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addMana(s, p.id, picked.adds);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
 }
+
+/** What mana casting it can spend (CR 106.6): Security Rhox's alternative cost only mana from Treasures (CR 106.3). */
+export const spellUse = (d: CardDef, alt?: AltCostKind): ManaUse => (altCost(d, alt)?.treasureOnly ? { spell: d, treasureOnly: true } : { spell: d });
+
+/** Is this a Treasure now (its mana is "mana from a Treasure", CR 106.3)? */
+export const isTreasure = (s: GameState, o: GameObject) => o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Treasure");
 
 export function commanderTax(p: Player, o: GameObject) {
   return 2 * (p.commanderCasts[o.id] ?? 0); // CR 903.8
@@ -1934,7 +1990,8 @@ export function castProblem(
   if (choices?.buyback && !compileCard(d).buyback) return `${d.name} doesn't have buyback`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
-    if (!altCost(d, choices.alt, s, pid)) return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : `${d.name} doesn't have ${choices.alt}`;
+    if (!altCost(d, choices.alt, s, pid))
+      return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
@@ -2014,14 +2071,14 @@ export function castProblem(
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices, x ?? 0);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
   // The helper's mana is spent on the spell's total cost (CR 702.132a), so restrictions see that spell (CR 106.6).
   if (choices?.assisted && (choices.assist === undefined || !canPayFromPool(s, choices.assist, parseManaCost(`{${choices.assisted}}`), { spell: d })))
     return "the assisting player can't pay that much";
-  if (!canPayFromPool(s, pid, cost.cost, { spell: d }, cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
+  if (!canPayFromPool(s, pid, cost.cost, spellUse(d, choices?.alt), cost.extra, p.life)) return `not enough mana for ${d.name}${tax ? ` (commander tax ${tax})` : ""}`;
   return null;
 }
 
@@ -2029,7 +2086,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain" | "evidence"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -2045,6 +2102,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const mods = costModsFor(s, pid, o, d, x);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
   if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
+  // "This spell costs {2} less to cast if evidence was collected" (CR 601.2f).
+  if (how.evidence && !how.faceDown) mods.less += compileCard(d).evidenceReduction ?? 0;
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];
@@ -2178,6 +2237,10 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
   if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
+  if (alt === "evidence") {
+    const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
+    return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
+  }
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
 
@@ -2189,10 +2252,27 @@ const controlsPayWUBRG = (s: GameState, pid: PlayerId) =>
     return c.controller === pid && c.hasPrintedAbilities;
   });
 
-/** The alternative costs `pid` could cast this card for: its own, and Fist of Suns' (CR 118.9). */
+/**
+ * Conspiracy Unraveler's "You may collect evidence 10 rather than pay the mana cost for spells you cast": the N, the
+ * smallest if `pid` controls several (each is the same choice, CR 118.9).
+ */
+function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
+  let best: number | undefined;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const n = compileCard(defOf(s, o)).payEvidence;
+    if (n === undefined) continue;
+    const c = characteristics(s, o);
+    if (c.controller === pid && c.hasPrintedAbilities && (best === undefined || n < best)) best = n;
+  }
+  return best;
+}
+
+/** The alternative costs `pid` could cast this card for: its own, Fist of Suns' and Conspiracy Unraveler's (CR 118.9). */
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
-  return controlsPayWUBRG(s, pid) && !isType(defOf(s, o), "Land") ? [...own, { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" }] : own;
+  if (isType(defOf(s, o), "Land")) return own;
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? []))];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -2225,15 +2305,16 @@ const convokeProblem = (s: GameState, pid: PlayerId, ids: ObjectId[]) => tapCrea
 export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => spellTargetSpecs(castDef(s, id, alt), modes, how);
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
-export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift">): CastHow => ({
+export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence">): CastHow => ({
   ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
   ...(choices?.bargain ? { bargained: true } : {}),
+  ...(choices?.evidence ? { evidence: true } : {}),
   ...(choices?.teamwork?.length ? { teamwork: true } : {}),
   ...(choices?.gift !== undefined ? { gift: true } : {}),
 });
 const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
 /** Every optional cost paid (each kicker cost too): the most targets a spell can have. */
-const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true };
+const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true };
 
 /** What casting this card puts on the stack: the card, or for a bestowed cast, the Aura it is then (CR 702.103b, d). */
 export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
@@ -2299,7 +2380,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
-  const paid = spendFromPool(s, p.id, cost.cost, { spell: d }, cost.extra, p.life, { spreadColors: sunburst })!;
+  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -2314,6 +2395,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
+  o.treasureSpent = paid.treasure || undefined;
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
   // A once-a-turn permission to cast from the top is used up (Johann).
@@ -2371,7 +2453,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
@@ -2381,7 +2463,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices, x ?? 0), choices, returned);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, choices, x ?? 0, s, p.id), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
@@ -2395,6 +2477,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} sacrifices ${nameOf(s, choices.bargain)} (bargain).`);
     moveObject(s, choices.bargain, "graveyard", { sacrificed: true });
     o.bargained = true;
+  }
+  // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a, c).
+  if (choices.evidence) {
+    collectEvidence(s, p, choices.evidence, compileCard(d).evidence ?? 0);
+    o.evidence = true;
   }
   // Teamwork: "you may tap any number of creatures you control with total power N or more".
   if (choices.teamwork?.length) {
@@ -2420,7 +2507,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors] });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
-  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent });
+  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}) });
   fireEvent(s, { type: "targeted", stackId });
 }
 
@@ -2584,6 +2671,56 @@ function bargainProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDef
   return null;
 }
 
+/** A card's mana value in a graveyard: its mana cost's, X as 0 (CR 202.3). */
+const cardMv = (s: GameState, id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+
+/** The total mana value of these cards, for collecting evidence (CR 701.59a). */
+export const evidenceValue = (s: GameState, ids: ObjectId[]) => ids.reduce((n, id) => n + cardMv(s, id), 0);
+
+/** The cards `pid` could exile to collect evidence: their graveyard, but not `not` (a spell on its way to the stack) or `taken`. */
+export const evidenceCandidates = (s: GameState, pid: PlayerId, not?: ObjectId, taken: ObjectId[] = []) => player(s, pid).graveyard.filter((id) => id !== not && !taken.includes(id));
+
+/**
+ * Why `ids` can't collect evidence N, or null: cards in `pid`'s graveyard with total mana value N or more (CR 701.59a).
+ * Without `ids`, whether they could: without enough, they can't choose to (701.59b).
+ */
+export function evidenceProblem(s: GameState, pid: PlayerId, n: number, ids: ObjectId[] | undefined, not?: ObjectId, taken: ObjectId[] = []): string | null {
+  const pool = evidenceCandidates(s, pid, not, taken);
+  if (!ids) return evidenceValue(s, pool) >= n ? null : `you need cards with total mana value ${n} or more in your graveyard`;
+  if (new Set(ids).size !== ids.length || ids.some((id) => !pool.includes(id))) return "collect evidence with cards from your graveyard";
+  if (evidenceValue(s, ids) < n) return `collect evidence ${n}: those cards have total mana value ${evidenceValue(s, ids)}`;
+  return null;
+}
+
+/** Cards to collect evidence N with when nobody picked them: the fewest, biggest mana values first (null if it can't be done). */
+export function autoEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = []): ObjectId[] {
+  const pool = evidenceCandidates(s, pid, not, taken).sort((a, b) => cardMv(s, b) - cardMv(s, a));
+  const out: ObjectId[] = [];
+  for (const id of pool) {
+    if (evidenceValue(s, out) >= n) break;
+    out.push(id);
+  }
+  // Then drop the biggest ones the rest already make up for, so as little as possible is exiled.
+  for (let i = 0; i < out.length; i++) if (evidenceValue(s, out.filter((_, j) => j !== i)) >= n) out.splice(i--, 1);
+  return out;
+}
+
+/** Collect evidence N with these cards (CR 701.59a): they're exiled, and "whenever you collect evidence" triggers. */
+export function collectEvidence(s: GameState, p: Player, ids: ObjectId[], n: number) {
+  log(s, `${p.name} collects evidence ${n}${ids.length ? `, exiling ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard` : ""}.`);
+  for (const id of ids) moveObject(s, id, "exile");
+  fireEvent(s, { type: "evidenceCollected", player: p.id });
+}
+
+/** "You may collect evidence N" as an additional cost to cast it (CR 701.59a). */
+function evidenceCastProblem(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, choices?: CostChoices): string | null {
+  if (!choices?.evidence) return null;
+  const n = compileCard(d).evidence;
+  if (n === undefined) return `${d.name} doesn't let you collect evidence`;
+  const taken = [...(choices.exileCards ?? []), ...(choices.delve ?? []), ...(choices.collect ?? [])];
+  return evidenceProblem(s, pid, n, choices.evidence, o.id, taken);
+}
+
 function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: CostChoices): string | null {
   const id = choices?.casualty;
   if (id === undefined) return null;
@@ -2597,13 +2734,13 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
 function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, choices, x), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, choices, x, s, pid), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt)?.costs ?? [])];
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -2633,7 +2770,16 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
   const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
+  if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
+  if (costs.filter((c) => c.kind === "collectEvidence").length > 1) return `${d.name} would collect evidence twice`;
   for (const c of costs) {
+    if (c.kind === "collectEvidence") {
+      // Each card pays one cost only: not also exiled for another cost, delve or the spell's own evidence.
+      const taken = [...(choices?.exileCards ?? []), ...(choices?.delve ?? []), ...(choices?.evidence ?? [])];
+      const problem = evidenceProblem(s, pid, c.n, choices?.collect, o.id, taken);
+      if (problem) return `${problem} to ${doing}`;
+      continue;
+    }
     if (c.kind === "payLife") {
       if (p.life < c.n) return `you can't pay ${c.n} life`; // CR 119.4
       continue;
@@ -2776,7 +2922,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const ids = choices.exileFromHand ?? [];
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);
       for (const id of ids) moveObject(s, id, "exile");
-    } else {
+    } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n), c.n);
+    else {
       const ids = choices.exileCards ?? [];
       if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
@@ -2965,6 +3112,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets);
   const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), p.life)!;
+  // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
+  const treasure = !!manaPick && isTreasure(s, o);
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
   const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
@@ -3015,7 +3164,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
-    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}) } } : {}),
+    ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(treasure ? { treasure: true as const } : {}) } } : {}),
+    ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
   };
   if (manaPick) {
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
@@ -3288,6 +3438,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
       return;
     }
+    if (pend.what === "readAhead") {
+      // Read ahead: it enters with the chosen number of lore counters (CR 702.155b, 714.3b).
+      const n = Number(choice);
+      putCounters(s, o, "lore", n, true);
+      log(s, `${p.name} chooses chapter ${roman(n)}: ${pend.source} enters with ${n} lore counter${n === 1 ? "" : "s"} (read ahead).`);
+      invalidateCharacteristics(s);
+      if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+      return;
+    }
     if (pend.what === "riot" || pend.what === "unleash") {
       // Riot: a +1/+1 counter, or haste for as long as it's on the battlefield (CR 702.136a). Unleash: a counter or not (CR 702.98a).
       if (choice === ENTERS_COUNTER) putCounters(s, o, "+1/+1", 1, true);
@@ -3303,7 +3462,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead") throw new RulesError("nothing to choose");
   if (pend.what === "topOrBottom") {
     if (choice !== "top" && choice !== "bottom") throw new RulesError("choose top or bottom");
     (r.scratch ??= {}).topOrBottom = choice;
@@ -3456,6 +3615,18 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "tribute", options: opps.map(String), labels: opps.map((x) => player(s, x).name), objectId: o.id, prompt: `tribute ${n}: choose an opponent, who may put ${n} +1/+1 counter${n === 1 ? "" : "s"} on it` };
       return true;
     }
+    if (c.what === "readAhead") {
+      // "As this Saga enters, choose a number between one and this Saga's final chapter number" (CR 702.155b).
+      const last = finalChapter(s, o);
+      if (last < 1) {
+        q.shift();
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      const options = Array.from({ length: last }, (_, i) => String(i + 1));
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "readAhead", options, labels: options.map((n) => `Chapter ${roman(Number(n))}`), objectId: o.id, prompt: "read ahead: choose the chapter to start on; the chapters before it don't trigger" };
+      return true;
+    }
     if (c.what === "tributePay") {
       const n = compileCard(defOf(s, o)).tribute ?? 0;
       const to = o.tribute?.to;
@@ -3505,6 +3676,21 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   (r.scratch ??= {}).may = yes;
   // The prompt speaks to the player ("discard your hand"); the log is about them.
   if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/\byour\b/g, "their")}.`);
+  s.pending = null;
+  continueResolution(s);
+}
+
+/** "You may collect evidence N" as it resolves: the cards to exile, or none for "no" (CR 701.59a). */
+function chooseEvidence(s: GameState, p: Player, ids: ObjectId[]) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "collectEvidence" || pend.player !== p.id || !r) throw new RulesError("nothing to collect evidence for");
+  if (ids.length) {
+    const problem = evidenceProblem(s, p.id, pend.n, ids, pend.not);
+    if (problem) throw new RulesError(problem);
+  } else log(s, `${p.name} chooses not to collect evidence.`);
+  (r.scratch ??= {}).may = ids.length > 0;
+  if (ids.length) r.scratch.evidence = ids;
   s.pending = null;
   continueResolution(s);
 }
@@ -4274,6 +4460,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       } else seen.set(key, id);
     }
     if (attachmentSBAs(s)) changed = true;
+    if (sagaSBAs(s)) changed = true; // 704.5s
     if (dungeonSBAs(s)) changed = true; // 704.5t
     // Commanders in graveyard/exile may return to the command zone (903.9a). Owners always choose yes for now.
     for (const o of Object.values(s.objects)) {

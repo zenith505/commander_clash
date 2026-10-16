@@ -43,6 +43,9 @@ import {
   castDef,
   casualtyCandidates,
   bargainCandidates,
+  autoEvidence,
+  evidenceProblem,
+  altCostsFor,
   castExtraCosts,
   costsHaveX,
   bothModes,
@@ -92,6 +95,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = chooseDredge(s, pid, pend.options);
       return [{ type: "dredge", player: pid, ...(pick ? { objectId: pick } : {}) }];
     }
+    // "You may collect evidence N": yes, with cards we don't need in the graveyard.
+    if (pend.kind === "collectEvidence") return [{ type: "collectEvidence", player: pid, ids: spareEvidence(s, pid, pend.n, pend.not) ?? [] }];
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
       const { mana, life = 0, energy = 0 } = pend.pay;
@@ -180,6 +185,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Endure (CR 701.63a): every card that endures is a creature, so grow it rather than make a separate Spirit.
     // Its own card back on top, to draw it again; someone else's card can't be on our library.
+    // Read ahead (CR 702.155): start on chapter I, so every chapter happens.
+    if (pend.kind === "chooseOption" && pend.what === "readAhead") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
@@ -670,7 +677,8 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     const plan = planCast(s, pid, id, undefined, undefined, "auto", undefined, { faceDown: true });
     if (plan) return plan;
   }
-  for (const a of c.altCosts ?? []) {
+  // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence")]) {
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
     if (a.kind === "bestow") continue; // tried first, see bestowPlan
     const plan = castPlan(s, pid, id, false, undefined, a.kind);
@@ -908,7 +916,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   // Whether a cost of this kind must be paid (true), must not be (false), or is up to the usual choice (undefined).
   const must = (kind: SpellCondition["kind"]) => (gate && gate.conds.some((c) => c.kind === kind) ? gate.paid : undefined);
   const kickOk = (kicks: number[]) => !gate || !gate.conds.some((c) => c.kind === "kicked") || gate.conds.filter((c) => c.kind === "kicked").every((c) => castConditionMet(c, { kicks }) === gate.paid);
-  const how: CastHow = gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true } : {};
+  const how: CastHow = gate?.paid ? { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true } : {};
   const body = printed && gateBody(withModes(printed, modes), how);
   const specs = body?.targets ?? spellTargets(s, id, modes, alt);
   const targets = specs.length && body ? chooseTargets(s, pid, body, false, id, x) : undefined;
@@ -949,6 +957,12 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
     if (spare && must("bargained") !== false) extra.bargain = spare.id;
     if (must("bargained") && !spare) return null;
     const c = compileCard(defOf(s, obj(s, id)));
+    // "You may collect evidence N" (CR 701.59a): when being collected does something, with cards we can spare.
+    if (c.evidence !== undefined && must("evidence") !== false && (must("evidence") || wantsEvidence(c))) {
+      const ids = spareEvidence(s, pid, c.evidence, id, [...(extra.exileCards ?? []), ...(extra.collect ?? [])]);
+      if (ids) extra.evidence = ids;
+    }
+    if (must("evidence") && !extra.evidence) return null;
     const busy = (o: ObjectId) => o === victim?.id || o === spare?.id || !!extra.sacrifice?.includes(o) || (targets ?? []).some((t) => t.kind === "object" && t.id === o);
     // Teamwork: with creatures that wouldn't be attacking or blocking anyway; a "choose both" spell gets it with both modes.
     const tw = teamwork ?? (c.teamwork !== undefined && !c.spell?.modal?.both && must("teamwork") !== false ? spareTappers(s, pid, id, c.teamwork, busy) : undefined);
@@ -970,9 +984,9 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   // Delve away as much as we can (CR 702.66a): the cards that do nothing more in the graveyard first.
   const room = free ? 0 : delveRoom(s, pid, id, { ...extra, ...(via ? { via } : {}) }, x);
   if (room) {
-    const keep = (c: string) => (compileCard(defOf(s, obj(s, c))).fromGraveyard?.length || abilitiesOf(s, obj(s, c)).activated.some((ab) => ab.zone === "graveyard") ? 1 : 0);
+    const keep = (c: string) => (usefulInGraveyard(s, c) ? 1 : 0);
     extra.delve = player(s, pid)
-      .graveyard.filter((c) => c !== id && !extra.exileCards?.includes(c))
+      .graveyard.filter((c) => c !== id && !extra.exileCards?.includes(c) && !extra.evidence?.includes(c) && !extra.collect?.includes(c))
       .sort((a, b) => keep(a) - keep(b))
       .slice(0, room);
   }
@@ -989,6 +1003,22 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
 }
 
 const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
+
+/** A card that does more from our graveyard: flashback and the like, or an ability that works there. */
+const usefulInGraveyard = (s: GameState, id: ObjectId) => !!compileCard(defOf(s, obj(s, id))).fromGraveyard?.length || abilitiesOf(s, obj(s, id)).activated.some((ab) => ab.zone === "graveyard");
+
+/** Cards to collect evidence N with (CR 701.59a): the fewest that do it, none we'd use from the graveyard; null if there aren't. */
+function spareEvidence(s: GameState, pid: PlayerId, n: number, not?: ObjectId, taken: ObjectId[] = []): ObjectId[] | null {
+  const keepers = player(s, pid).graveyard.filter((c) => usefulInGraveyard(s, c));
+  if (evidenceProblem(s, pid, n, undefined, not, [...taken, ...keepers])) return null;
+  return autoEvidence(s, pid, n, not, [...taken, ...keepers]);
+}
+
+/** Does the spell do more if evidence was collected for it (CR 701.59c): a part of it, its enters trigger, or a lower cost? */
+function wantsEvidence(c: CompiledCard): boolean {
+  if (c.evidenceReduction) return true;
+  return JSON.stringify([c.spell ?? null, c.triggers]).includes('"kind":"evidence"') || c.triggers.some((t) => t.ifEvidence);
+}
 
 /** Kicker choices to try, most kicked first, ending with not kicking it. */
 function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): number[][] {
@@ -1012,7 +1042,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt, costOr }, x)) {
+  for (const c of castExtraCosts(d, { via, alt, costOr }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     if (c.kind === "giveLife") {
       // Invigorate: the opponent with the least life gets it (the least threat to us); "each other player": nothing to choose.
@@ -1082,6 +1112,11 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const others = player(s, pid).hand.filter((x) => x !== id);
       if (others.length < c.n) return null;
       out.discard = chooseDiscards(s, pid, c.n, id);
+    } else if (c.kind === "collectEvidence") {
+      // Conspiracy Unraveler's alternative cost: the fewest cards that make it up.
+      const ids = spareEvidence(s, pid, c.n, id, out.exileCards);
+      if (!ids) return null;
+      out.collect = ids;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -1668,6 +1703,10 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
       if (pool.length < c.n) return null;
       out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+    } else if (c.kind === "collectEvidence") {
+      const ids = spareEvidence(s, pid, c.n);
+      if (!ids) return null;
+      out.collect = ids;
     } else if (c.kind === "discard" && c.random) {
       if (player(s, pid).hand.length < c.n + 4) return null;
     } else if (c.kind === "discard") {

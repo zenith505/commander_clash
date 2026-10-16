@@ -1,7 +1,7 @@
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, altCost, isTreasure, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
 import type { TargetChoice } from "./abilities";
@@ -38,6 +38,7 @@ interface Source {
 }
 
 function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: ManaUse): Source[] {
+  const onlyTreasures = use !== "other" && "spell" in use && !!use.treasureOnly;
   // Current controller, types and mana abilities, after continuous effects (CR 613).
   const isCreature = (id: string) => objIsType(s, obj(s, id), "Creature");
   return s.battlefield
@@ -46,15 +47,16 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
     .filter((o) => controllerOf(s, o) === pid)
     .map((o) => {
       const abs = manaAbilitiesOn(s, o);
+      const treasure = isTreasure(s, o);
       const options = manaOptions(s, o)
-        // Mana that can't be spent on this is no help (CR 106.6).
-        .filter((x) => x.adds.length > 0 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, abs[x.ability]!.spendOnly!, use)))
+        // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
+        .filter((x) => x.adds.length > 0 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, abs[x.ability]!.spendOnly!, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
           return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
         });
-      options.push(...activatedOptions(s, pid, o));
+      if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o));
       return { id: o.id, options, colors: new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds)).size };
     })
     .filter((src) => src.options.length > 0)
@@ -193,7 +195,7 @@ export function planCast(
   const o = obj(s, objectId);
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
   // The spell as it will be on the stack, for mana that can only be spent on some spells (CR 106.6).
-  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" ? prototypedDef(d) : d };
+  const use: ManaUse = { spell: choices.alt === "bestow" ? bestowedDef(d) : choices.alt === "prototype" ? prototypedDef(d) : d, ...(altCost(d, choices.alt)?.treasureOnly ? { treasureOnly: true as const } : {}) };
   const problem = castProblem(s, pid, objectId, targets, modes, undefined, undefined, x, choices);
   if (problem && !/not enough mana/.test(problem)) return null;
   let { cost, extra } = spellCost(s, pid, o, x, choices.kicks, { ...choices, targets, modes });

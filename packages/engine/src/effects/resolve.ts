@@ -42,6 +42,8 @@ export interface ResolveCtx {
   kicked?: number[];
   /** Colors of mana spent to cast it, or the spell its permanent was (CR 207.2c). */
   colorsSpent?: number;
+  /** Mana from Treasures spent to cast it (or the spell its permanent was) or to activate it (CR 106.3). */
+  treasureSpent?: number;
   /** What was sacrificed to cast it, as it last existed. */
   sacrificed?: LastKnown[];
   /** A station ability's tapped creature (CR 702.184a). */
@@ -57,6 +59,13 @@ export type Resolution = "fizzled" | "done" | "paused";
  * The opponent the gift was promised to (CR 702.174a, k): a spell's own choice, or for a permanent's gift trigger, the
  * choice its spell made, carried by the trigger (CR 702.174b). Undefined if no gift was promised.
  */
+/** "If evidence was collected" (CR 701.59c): for a spell, as it was cast; for its permanent's enters trigger, as its spell was. */
+export function evidenceCollected(s: GameState, ctx: ResolveCtx): boolean {
+  const item = s.resolving?.item;
+  if (item?.kind === "spell") return !!s.objects[item.objectId ?? ""]?.evidence;
+  return !!ctx.event?.evidence;
+}
+
 export function gifteeOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
   const item = s.resolving?.item;
   if (item?.kind === "spell") return s.objects[item.objectId ?? ""]?.gift;
@@ -116,6 +125,8 @@ export function continueResolution(s: GameState): Resolution {
     event: item.event,
     kicked: item.kicked,
     colorsSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.colorsSpent?.length ?? 0) : item.colorsSpent,
+    // A spell's own; an activated ability's; an enters or cast trigger's, its spell's (CR 106.3).
+    treasureSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.treasureSpent ?? 0) : (item.treasureSpent ?? item.event?.treasureSpent ?? 0),
     sacrificed: item.sacrificed,
     stationed: item.stationed,
     sourceUntaps: item.sourceUntaps,
@@ -336,6 +347,7 @@ const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   lki: ctx.lki,
   kicked: ctx.kicked,
   colorsSpent: ctx.colorsSpent,
+  treasureSpent: ctx.treasureSpent,
   sacrificed: ctx.sacrificed,
   stationed: ctx.stationed,
   chosen: ctx.chosen,
@@ -523,6 +535,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "may":
     case "eachMay":
     case "cumulativeUpkeep":
+    case "collectEvidence":
+    case "reflexive":
     case "choose":
     case "if":
       return runChoicesEffect(s, e, ctx, src);

@@ -122,9 +122,11 @@ const RING_TRIGGERS: TriggeredAbility[] = [
   },
 ];
 
+const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
+
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Saga", "Class", "Case", "Room", "Siege"];
+const UNSUPPORTED_SUBTYPES = ["Class", "Case", "Room", "Siege"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
@@ -198,7 +200,7 @@ export function normalizeSelf(d: CardDef): string {
   }
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga)\b/g, "~");
   return t;
 }
 
@@ -287,6 +289,22 @@ export function compile(d: CardDef): CompiledCard {
     if (line === "Start your engines!") {
       out.startYourEngines = true; // CR 702.179a
       continue;
+    }
+    // Sagas (CR 714): read ahead (CR 702.155), and chapter abilities "I, II — [Effect]", each a triggered ability
+    // (CR 714.2b-c).
+    if (d.subtypes.includes("Saga")) {
+      if (line === "Read ahead") {
+        out.readAhead = true;
+        continue;
+      }
+      const chapter = /^((?:I|II|III|IV|V|VI|VII)(?:, (?:I|II|III|IV|V|VI|VII))*) — (.+)$/.exec(line);
+      if (chapter) {
+        // "I, II, III — Pain — You draw a card ...": a chapter's name is a flavor word, with no rules meaning (CR 207.2d).
+        const body = parseBody(chapter[2]!.replace(/^(?!Choose\b)[A-Z][^—•:"]{0,30}? — (?=\S)/, ""), {});
+        if (!body) out.unsupported.push(raw);
+        else for (const n of chapter[1]!.split(", ")) out.triggers.push(bindThisAbility({ event: "chapter", chapter: ROMAN.indexOf(n), body } as TriggeredAbility, line));
+        continue;
+      }
     }
     // "Max speed — [Ability]": "As long as your speed is 4, this object has '[Ability]'" (CR 702.178a).
     const maxSpeed = /^Max speed — (.+)$/.exec(line);
@@ -547,6 +565,20 @@ export function compile(d: CardDef): CompiledCard {
           counter: kickedCounters[3] === "-1/-1" ? "-1/-1" : "+1/+1",
           n: { count: { kind: "wasKicked", ...(kickedCounters[1] ? { cost: kickedCounters[1] } : {}) } as Count, times: num(kickedCounters[2]!) },
         };
+      continue;
+    }
+    // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a), maybe with "This spell costs
+    // {2} less to cast if evidence was collected" in the same paragraph.
+    const evidence = !d.types.includes("Land") ? /^As an additional cost to cast ~, you may collect evidence (\d+)\.(?: ~ costs \{(\d+)\} less to cast if evidence was collected\.)?$/.exec(line) : null;
+    if (evidence && out.evidence === undefined) {
+      out.evidence = Number(evidence[1]);
+      if (evidence[2]) out.evidenceReduction = Number(evidence[2]);
+      continue;
+    }
+    // Conspiracy Unraveler: "You may collect evidence 10 rather than pay the mana cost for spells you cast" (CR 118.9).
+    const payEvidence = /^You may collect evidence (\d+) rather than pay the mana cost for spells you cast\.$/.exec(line);
+    if (payEvidence) {
+      out.payEvidence = Number(payEvidence[1]);
       continue;
     }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
@@ -1141,6 +1173,14 @@ function checkCastingLinks(out: CompiledCard) {
     visit(ab);
   }
   if ([...needs].some((k) => !choices.has(k))) bad = true;
+  // "If evidence was collected" needs the "you may collect evidence N" it's linked to (CR 701.59c): in the spell, or its
+  // permanent's enters trigger.
+  const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');
+  if ((evidenceIn(out.spell) || out.triggers.some((t) => t.ifEvidence || evidenceIn(t.body))) && out.evidence === undefined) bad = true;
+  if (out.triggers.some((t) => t.event !== "selfEnters" && evidenceIn(t.body)) || evidenceIn(out.activated) || evidenceIn(out.statics)) bad = true;
+  // Mana from Treasures spent (CR 106.3) is known for a spell, its permanent's enters trigger, and an activated ability.
+  const treasureIn = (v: unknown) => /"kind":"treasure(?:Spent)?"/.test(JSON.stringify(v ?? null));
+  if (out.triggers.some((t) => t.event !== "selfEnters" && treasureIn(t.body)) || treasureIn(out.statics) || JSON.stringify(out.activated ?? null).includes('"kind":"treasureSpent"')) bad = true;
   // "Enters with a counter for each creature of the chosen type" would be counted before the choice is made.
   needs.clear();
   visit(out.entersWithCounters);

@@ -224,6 +224,10 @@ export interface GameObject {
   sneak?: LastKnown;
   /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
   bargained?: true;
+  /** As a spell, and as the permanent it became: its "you may collect evidence N" additional cost was paid (CR 701.59c). */
+  evidence?: true;
+  /** As a spell, and as the permanent it became: how much mana from Treasures was spent to cast it (CR 106.3). */
+  treasureSpent?: number;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**
@@ -298,6 +302,8 @@ export interface Player {
   manaPool: Record<ManaType, number>;
   /** Mana in the pool (counted in manaPool too) that can only be spent some ways (CR 106.6). */
   restrictedMana?: RestrictedMana[];
+  /** Mana in the pool (counted in manaPool too, none of it restricted) that a Treasure produced: "mana from a Treasure" (CR 106.3). */
+  treasureMana?: Partial<Record<ManaType, number>>;
   /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
   combatMana?: number;
   landsPlayedThisTurn: number;
@@ -384,6 +390,8 @@ export interface StackItem {
   subject?: { id: ObjectId; zc: number };
   /** For a state trigger: which of its source's triggered abilities it is (CR 603.8). */
   stateIndex?: number;
+  /** A Saga's chapter ability: while it's on the stack, the Saga isn't sacrificed (CR 714.4). */
+  chapter?: true;
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
@@ -403,7 +411,9 @@ export interface StackItem {
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
    */
-  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[] };
+  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** Its source was a Treasure as it was activated: its mana is "mana from a Treasure" (CR 106.3). */ treasure?: true };
+  /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
+  treasureSpent?: number;
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
   ifCond?: StaticCondition;
   /** For a spell: how many spells were cast before it this turn (storm, CR 702.40a). */
@@ -463,6 +473,8 @@ export interface PendingTrigger {
   event?: TriggerEventInfo;
   /** A delayed trigger's own ability (its source card has no such printed ability). */
   body?: AbilityBody;
+  /** A Saga's chapter ability (CR 714.4). */
+  chapter?: true;
   /** Its intervening "if" (CR 603.4), checked again as it resolves. */
   ifCond?: StaticCondition;
 }
@@ -513,6 +525,10 @@ export interface CostChoices {
   casualty?: ObjectId;
   /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
   bargain?: ObjectId;
+  /** "As an additional cost to cast this spell, you may collect evidence N": the cards exiled for it, if it's paid (CR 701.59a). */
+  evidence?: ObjectId[];
+  /** "Collect evidence N" as a cost (an ability's, Conspiracy Unraveler's): the cards exiled from your graveyard for it. */
+  collect?: ObjectId[];
   /** Teamwork N: the untapped creatures you control, with total power N or more, tapped as you cast it. */
   teamwork?: ObjectId[];
   /** Conspire (CR 702.78a): the two untapped creatures you control that share a color with it, tapped to copy it. */
@@ -568,6 +584,11 @@ export type PendingDecision =
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
   | { kind: "arrangeTop"; player: PlayerId; how: "scry" | "surveil" | "order" | "bottom"; cards: ObjectId[]; source: string; owner?: PlayerId }
   /** "You may ...": whether to do it, decided as the ability resolves (CR 603.5, 608.2d). */
+  /**
+   * "You may collect evidence N" as a spell or ability resolves (CR 701.59a): pick cards in your graveyard with total
+   * mana value N or more, or none to decline. `not`: a card that can't be one of them.
+   */
+  | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
   | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
@@ -822,6 +843,10 @@ export interface TriggerEventInfo {
   player?: PlayerId;
   /** A permanent's enters trigger: the opponent its spell's gift was promised to (CR 702.174b). */
   gift?: PlayerId;
+  /** A permanent's enters trigger: evidence was collected for its spell (CR 701.59c). */
+  evidence?: true;
+  /** A permanent's enters trigger, or a cast trigger: how much mana from Treasures was spent to cast that spell (CR 106.3). */
+  treasureSpent?: number;
 }
 
 export interface Resolving {
@@ -882,6 +907,7 @@ export interface Resolving {
     endure?: string; // "counters" or "token" (CR 701.63a)
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
+    evidence?: ObjectId[]; // the cards picked to collect evidence with as it resolves (CR 701.59a)
     clash?: { opp?: PlayerId; revealed?: Record<string, ObjectId | null>; queue?: PlayerId[]; bottom?: PlayerId[]; answer?: boolean };
   };
 }
@@ -929,6 +955,8 @@ export type Action =
   | { type: "chooseOption"; player: PlayerId; choice: string }
   /** Answer to chooseMay. */
   | { type: "chooseMay"; player: PlayerId; yes: boolean }
+  /** Answer a collectEvidence decision: the cards to exile, or none to not collect evidence. */
+  | { type: "collectEvidence"; player: PlayerId; ids: ObjectId[] }
   /** Answer to mulligan: keep the hand, or shuffle it away and draw a new one. */
   | { type: "mulligan"; player: PlayerId; keep: boolean }
   /** Answer to bottomCards: these cards go on the bottom of the library, the first one lowest. */

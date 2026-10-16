@@ -11,6 +11,8 @@ import { parseSearchFilter } from "./search";
 
 export interface Ctx {
   targets: TargetSpec[];
+  /** Parsing what follows "you may": "collect evidence 4" can only be done by choice. */
+  mayNow?: boolean;
   /** In a trigger about another object ("blocks a creature"), "that creature" is that object. */
   subject?: boolean;
   /** "Whenever a creature you control enters": "it", "its power", "that land" are the entering permanent too. */
@@ -63,6 +65,7 @@ const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" 
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
+  e.type === "collectEvidence" ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
@@ -254,7 +257,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const howCast = parseHowCast(s, ctx);
     if (howCast) {
       const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx, true);
-      if (!fx || (howCast.not && fx.instead)) return null;
+      if (!fx || (howCast.not && fx.instead) || (howCast.noTargets && ctx.targets.length !== curTargets)) return null;
       if (!gateNewTargets(ctx, howCast.cond, howCast.not, fx, effects.slice(prevStart), prevTargets, curTargets)) return null;
       if (howCast.not) effects.push({ type: "if", cond: howCast.cond, effects: [], otherwise: fx.effects });
       else if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: howCast.cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
@@ -342,6 +345,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       prev.otherwise = inner;
       continue;
     }
+    // "You may collect evidence 3. When you do, put a +1/+1 counter on target creature you control": a reflexive
+    // trigger (CR 603.12), with targets of its own chosen as it's put on the stack. The rest of the ability is its.
+    const whenDo = /^When you do, (.+)$/.exec(s);
+    if (whenDo) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence") || si !== sentences.length - 1) return null;
+      const reflexive = parseBody(whenDo[1]!.charAt(0).toUpperCase() + whenDo[1]!.slice(1), {
+        ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
+        ...(ctx.selfIt ? { selfIt: true } : {}),
+        ...(ctx.selfCard ? { selfCard: true } : {}),
+        ...(ctx.activated ? { activated: true } : {}),
+        ...(ctx.eventPlayer ? { eventPlayer: true } : {}),
+        ...(ctx.defending ? { defending: true } : {}),
+      });
+      if (!reflexive || reflexive.modal) return null;
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -387,7 +408,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // don't control": ~ does it, if you choose.
       const rest = (may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1)).replace(/^Have (~|it) (deal|fight) /, (_, w: string, verb: string) => `${w === "it" && !ctx.selfIt && !ctx.selfCard ? "It" : "~"} ${verb}s `)
         .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able");
+      ctx.mayNow = true;
       const inner = parseOne(rest, ctx);
+      ctx.mayNow = false;
       if (!inner) return null;
       // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
       if (inner.length > 1 && inner.some((e) => pauses(e))) return null;
@@ -497,30 +520,38 @@ export function parsePayCost(text: string): PayCost | null {
 }
 
 /** The ways a spell can have been cast that a sentence may depend on, as said in its text. */
-const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true }[] = [
+const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
+  // In a spell, or its permanent's enters trigger (compile checks it's one of those).
+  { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
   { re: "the gift wasn't promised", cond: { kind: "gift" }, not: true },
+  // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
+  { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },
+  { re: "mana from a Treasure was spent to activate this ability", cond: { kind: "treasure" }, activatedOnly: true, noTargets: true },
 ];
 
 /**
  * "If ~ was bargained, X", "X if ~ was cast using teamwork", "Also X if ...", "X instead if ...", "X unless ~ was cast
  * using teamwork" (the same as "if it wasn't"): the condition, and X ("instead" kept for parseKicked).
  */
-function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string } | null {
+function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string; noTargets?: true } | null {
   for (const h of HOW_CAST) {
     if (h.spellOnly && !ctx.spell) continue;
-    const lead = new RegExp(`^If ${h.re}, (.+)$`).exec(s);
-    if (lead) return { cond: h.cond, not: !!h.not, text: lead[1]! };
-    const trail = new RegExp(`^(?:Also )?(.+?)( instead)? (if|unless) ${h.re}$`).exec(s);
-    if (trail) {
-      const not = !!h.not !== (trail[3] === "unless");
-      if (trail[3] === "unless" && trail[2]) return null;
-      return { cond: h.cond, not, text: `${trail[1]!}${trail[2] ?? ""}` };
-    }
+    if (h.activatedOnly && !ctx.activated) continue;
+    const found = howCastText(s, h);
+    if (found) return { ...found, ...(h.noTargets ? { noTargets: true as const } : {}) };
   }
   return null;
+}
+
+function howCastText(s: string, h: (typeof HOW_CAST)[number]): { cond: SpellCondition; not: boolean; text: string } | null {
+  const lead = new RegExp(`^If ${h.re}, (.+)$`).exec(s);
+  if (lead) return { cond: h.cond, not: !!h.not, text: lead[1]! };
+  const trail = new RegExp(`^(?:Also )?(.+?)( instead)? (if|unless) ${h.re}$`).exec(s);
+  if (!trail || (trail[3] === "unless" && trail[2])) return null;
+  return { cond: h.cond, not: !!h.not !== (trail[3] === "unless"), text: `${trail[1]!}${trail[2] ?? ""}` };
 }
 
 /**

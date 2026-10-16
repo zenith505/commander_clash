@@ -24,5 +24,5 @@ export { parseBody, usesX } from "./body";
 export { parseCount } from "./counts";
 export { parseTargetPhrase } from "./targets";
 export { compileGranted } from "./grants";
-export { parseCopyExcept } from "./tokens";
+export { parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
 export { UNDERCITY, DUNGEONS, dungeonByName, dungeonDef, dungeonSupported, roomBody, type Dungeon, type DungeonRoom } from "./dungeons";

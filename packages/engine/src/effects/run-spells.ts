@@ -24,8 +24,9 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   o.castAlt = card.castAlt;
   o.bestowed = card.bestowed; // a copy of a bestowed Aura spell is one too (CR 702.103c)
   o.prototyped = card.prototyped; // and of a prototyped spell (CR 718.3c)
-  // Decisions about additional costs are copied too (CR 707.10): bargain, teamwork, and the gift's opponent.
+  // Decisions about additional costs are copied too (CR 707.10): bargain, evidence, teamwork, and the gift's opponent.
   o.bargained = card.bargained;
+  o.evidence = card.evidence;
   o.teamwork = card.teamwork;
   o.gift = card.gift;
   const name = orig.description.replace(/ \(copy\)$/, "");

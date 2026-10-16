@@ -108,6 +108,10 @@ export function parseCostKeyword(
     const each = m[2] === "each other player";
     return { alt: { kind: "alternative", mana: "", costs: [{ kind: "giveLife", n: Number(m[3]), ...(each ? { each: true as const } : {}) }], if: cond, text: `have ${m[2]} gain ${m[3]} life` } };
   }
+  // "You may pay {R}{G} rather than pay ~'s mana cost. Spend only mana produced by Treasures to cast it this way."
+  // (Security Rhox): only mana a Treasure made can pay it (CR 106.3).
+  if ((m = /^You may pay ((?:\{[^}]+\})+) rather than pay ~'s mana cost\. Spend only mana produced by Treasures to cast it this way\.$/.exec(line)))
+    return plainMana(m[1]!) ? { alt: { kind: "alternative", mana: m[1]!, treasureOnly: true } } : "fail";
   if ((m = /^(?:(?:Raid — )?If ([^,]+), )?[Yy]ou may (.+?) rather than pay ~'s mana cost(?: if ([^,]+?))?\.?$/.exec(line))) {
     const when = m[1] ?? m[3];
     const cond = when ? altCondition(when) : undefined;
@@ -422,6 +426,8 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const filter = parseTargetPhrase(`${num(m[1]!) > 1 ? m[2]!.split(" ").map(singularWord).join(" ") : m[2]}${m[3] ?? ""}`);
     return filter?.kind === "object" && !filter.controller && !filter.combat && filter.tapped === undefined ? { kind: "tap", filter: { ...filter, text: `untapped ${m[2]} you control${m[3] ?? ""}` }, n: num(m[1]!) } : null;
   }
+  // "Collect evidence 3" (CR 701.59a): exile cards from your graveyard with total mana value 3 or more.
+  if ((m = /^collect evidence (\d+)$/i.exec(text))) return { kind: "collectEvidence", n: Number(m[1]) };
   if ((m = /^pay (\d+) life$/i.exec(text))) return { kind: "payLife", n: Number(m[1]) };
   if (allowX && /^pay X life$/i.test(text)) return { kind: "payLife", n: 0, x: true };
   // "Return X Swamps you control to their owner's hand" (Infernal Harvest).

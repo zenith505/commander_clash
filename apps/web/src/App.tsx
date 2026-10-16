@@ -73,6 +73,9 @@ import {
   autoCrew,
   casualtyCandidates,
   bargainCandidates,
+  autoEvidence,
+  evidenceCandidates,
+  evidenceValue,
   bothModes,
   teamworkCandidates,
   teamworkPower,
@@ -288,7 +291,17 @@ type CastDraft = {
   gift?: PlayerId | null;
   /** Invigorate's "have an opponent gain 3 life": who gains it. */
   lifeTo?: PlayerId;
+  /** "You may collect evidence N" as you cast it: the cards exiled, or none (CR 701.59a). */
+  evidence?: string[];
+  /** Collecting evidence for Conspiracy Unraveler's alternative cost: the cards exiled. */
+  collect?: string[];
 };
+
+/**
+ * Picking cards in your graveyard with total mana value `n` or more to collect evidence (CR 701.59a): as you cast a
+ * spell (its optional additional cost, or Conspiracy Unraveler's alternative cost), or activate an ability.
+ */
+type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
 type CostOrPick = { draft: CastDraft; label: string; options: string[] };
@@ -322,7 +335,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; collect?: string[]; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -382,6 +395,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [costOrPick, setCostOrPick] = useState<CostOrPick | null>(null);
   const [costPick, setCostPick] = useState<CostPick | null>(null);
   const [delvePick, setDelvePick] = useState<DelvePick | null>(null);
+  const [evidencePick, setEvidencePick] = useState<EvidencePick | null>(null);
   const [stackHidden, setStackHidden] = useState(false);
   const [handMinimized, toggleHand] = useHandTucked();
 
@@ -526,6 +540,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (!s) return;
     const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
     for (const c of ab.costs ?? []) {
+      if (c.kind === "collectEvidence") {
+        // "Collect evidence 3": click cards in your graveyard until their mana values add up (CR 701.59a).
+        if (d.collect !== undefined) continue;
+        return setEvidencePick({ activate: d, label: cardOf(s, d.objectId).name, n: c.n, candidates: evidenceCandidates(s, HUMAN), optional: false });
+      }
       if (c.kind === "returnToHand") {
         // Ninjutsu: click the unblocked attacker to return (CR 702.49a).
         if (d.returnToHand !== undefined) continue;
@@ -552,7 +571,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.collect ? { collect: d.collect } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -611,8 +630,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Every target skipped: it's cast as if it had none.
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
-    for (const c of castExtraCosts(card, d, d.x ?? 0)) {
+    for (const c of castExtraCosts(card, d, d.x ?? 0, s, HUMAN)) {
       if (c.kind === "payLife" || c.kind === "revealHand" || (c.kind === "discard" && c.random)) continue;
+      // Conspiracy Unraveler: collect evidence 10 rather than pay the mana cost (CR 701.59a, 118.9).
+      if (c.kind === "collectEvidence") {
+        if (d.collect !== undefined) continue;
+        return setEvidencePick({ draft: d, key: "collect", label: card.name, n: c.n, candidates: evidenceCandidates(s, HUMAN, d.objectId, d.exileCards ?? []), optional: false });
+      }
       // "Have an opponent gain 3 life": pick which (a player who can't gain life can't be picked, CR 119.7).
       if (c.kind === "giveLife") {
         if (c.each || d.lifeTo !== undefined) continue;
@@ -657,6 +681,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const candidates = bargainCandidates(s, HUMAN, d.objectId).filter((id) => !d.sacrifice?.includes(id) && !d.casualty?.includes(id));
       if (candidates.length) return setCostPick({ draft: d, kind: "bargain", label: card.name, what: "bargain: you may sacrifice an artifact, enchantment, or token", n: 1, candidates, chosen: [] });
     }
+    // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a): only offered with enough in
+    // the graveyard (701.59b).
+    if (d.evidence === undefined && compiled.evidence !== undefined) {
+      const candidates = evidenceCandidates(s, HUMAN, d.objectId, [...(d.exileCards ?? []), ...(d.collect ?? [])]);
+      if (evidenceValue(s, candidates) >= compiled.evidence) return setEvidencePick({ draft: d, key: "evidence", label: card.name, n: compiled.evidence, candidates, optional: true });
+    }
     // Conspire: you may tap two untapped creatures you control that share a color with it (CR 702.78a).
     if (d.conspire === undefined && compiled.conspire) {
       const candidates = conspireCandidates(s, HUMAN, d.objectId).filter((id) => !d.convoke?.includes(id) && !d.teamwork?.includes(id));
@@ -667,6 +697,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...kicks,
       ...(d.casualty?.length ? { casualty: d.casualty[0]! } : {}),
       ...(d.bargain?.length ? { bargain: d.bargain[0]! } : {}),
+      ...(d.evidence?.length ? { evidence: d.evidence } : {}),
+      ...(d.collect ? { collect: d.collect } : {}),
       ...(d.conspire?.length ? { conspire: d.conspire } : {}),
       ...(d.gift !== undefined && d.gift !== null ? { gift: d.gift } : {}),
       ...(d.lifeTo !== undefined ? { lifeTo: d.lifeTo } : {}),
@@ -683,7 +715,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.delve === undefined && !free) {
       const max = delveRoom(s, HUMAN, d.objectId, choices, d.x ?? 0);
       if (max > 0) {
-        const candidates = s.players[HUMAN]!.graveyard.filter((id) => id !== d.objectId && !d.exileCards?.includes(id));
+        const candidates = s.players[HUMAN]!.graveyard.filter((id) => id !== d.objectId && !d.exileCards?.includes(id) && !d.evidence?.includes(id) && !d.collect?.includes(id));
         let need = 0;
         while (need < max && !planCast(s, HUMAN, d.objectId, d.targets, d.modes, d.convoke ?? "auto", d.x, { ...choices, ...(need ? { delve: candidates.slice(0, need) } : {}) })) need++;
         return setDelvePick({ draft: d, label: card.name, max, candidates, chosen: candidates.slice(0, need) });
@@ -1248,6 +1280,35 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
+          {evidencePick && (
+            <EvidenceChoice
+              key={`${evidencePick.label}:${evidencePick.n}:${evidencePick.key ?? "ability"}`}
+              s={s}
+              title={`${evidencePick.label}: ${evidencePick.optional ? "you may collect" : "collect"} evidence ${evidencePick.n}, exiling cards with total mana value ${evidencePick.n} or more from your graveyard`}
+              n={evidencePick.n}
+              cards={evidencePick.candidates}
+              onHover={setHover}
+              onDone={(ids) => {
+                setEvidencePick(null);
+                if (evidencePick.activate) continueActivate({ ...evidencePick.activate, collect: ids });
+                else continueCast({ ...evidencePick.draft, [evidencePick.key]: ids });
+              }}
+              onSkip={evidencePick.optional ? () => (setEvidencePick(null), continueCast({ ...evidencePick.draft!, evidence: [] })) : undefined}
+              onCancel={() => setEvidencePick(null)}
+            />
+          )}
+          {pending?.kind === "collectEvidence" && pending.player === HUMAN && (
+            <EvidenceChoice
+              key={`${pending.source}:${pending.n}`}
+              s={s}
+              title={`${pending.source}: you may collect evidence ${pending.n}, exiling cards with total mana value ${pending.n} or more from your graveyard`}
+              n={pending.n}
+              cards={evidenceCandidates(s, HUMAN, pending.not)}
+              onHover={setHover}
+              onDone={(ids) => dispatch([{ type: "collectEvidence", player: HUMAN, ids }])}
+              onSkip={() => dispatch([{ type: "collectEvidence", player: HUMAN, ids: [] }])}
+            />
+          )}
           {costPick && costPick.kind !== "sacrifice" && costPick.kind !== "returnToHand" && costPick.kind !== "casualty" && costPick.kind !== "bargain" && costPick.kind !== "conspire" && costPick.kind !== "tap" && (
             <CardChoice
               s={s}
@@ -1306,7 +1367,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak" };
+const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1317,6 +1378,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   alternative: "an alternative cost: it's still the same spell, with the same mana value",
   prototype: "the smaller version: the prototype's mana cost, color, power and toughness",
   wubrg: "instead of its mana cost (Fist of Suns); X is 0",
+  evidence: "instead of its mana cost (Conspiracy Unraveler): exile cards from your graveyard with that much total mana value; X is 0",
   emerge: "sacrifice a creature as you cast it: the cost is reduced by its mana value",
   freerunning: "only if a player was dealt combat damage this turn by an Assassin or a commander you controlled",
   foretell: "a foretold card is cast for its foretell cost",
@@ -1336,6 +1398,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
   if (c.kind === "tap") return `tap ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
+  if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
   if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
 }
@@ -1375,6 +1438,11 @@ function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?
       total += teamworkPower(s, x);
     }
     if (total >= c.teamwork && pick.length && planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork: pick }) !== null) return true;
+  }
+  // Cheaper if you collect evidence as you cast it (Bite Down on Crime): with the cards it would pick (CR 701.59a).
+  if (!convoke && c?.evidence !== undefined && c.evidenceReduction) {
+    const ev = autoEvidence(s, HUMAN, c.evidence, id);
+    if (evidenceValue(s, ev) >= c.evidence && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { evidence: ev }) !== null) return true;
   }
   // With delve's help: as many cards from your graveyard as it can use (CR 702.66a).
   const room = convoke ? 0 : delveRoom(s, HUMAN, id);
@@ -1594,6 +1662,64 @@ function CardChoice({
             const d = cardOf(s, id);
             return (
               <div key={id} className={`card big ${chosen.includes(id) ? "selected" : "targetable"}`} data-pick={id} onClick={() => onToggle(id)} {...hoverProps(d, onHover)}>
+                <CardFace d={d} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Cards from your graveyard to collect evidence N with (CR 701.59a): Done once their mana values add up to N or more. */
+function EvidenceChoice({
+  s,
+  title,
+  n,
+  cards,
+  onHover,
+  onDone,
+  onSkip,
+  onCancel,
+}: {
+  s: GameState;
+  title: string;
+  n: number;
+  cards: string[];
+  onHover: (d: CardDef | null) => void;
+  onDone: (ids: string[]) => void;
+  /** "You may": not collecting evidence at all. */
+  onSkip?: () => void;
+  onCancel?: () => void;
+}) {
+  const [chosen, setChosen] = useState<string[]>([]);
+  const total = evidenceValue(s, chosen);
+  return (
+    <div className="modal-backdrop">
+      <div className="modal evidence-pick">
+        <header>
+          <strong>{title}</strong>
+          <span className="muted"> total mana value {total} of {n}</span>
+          <button disabled={total < n} onClick={() => onDone(chosen)}>
+            Done
+          </button>
+          {onSkip && (
+            <button className="ghost" onClick={onSkip}>
+              Don&apos;t collect evidence
+            </button>
+          )}
+          {onCancel && (
+            <button className="ghost" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+        </header>
+        <div className="modal-cards">
+          {cards.map((id) => {
+            const d = cardOf(s, id);
+            return (
+              <div key={id} className={`card big ${chosen.includes(id) ? "selected" : "targetable"}`} data-pick={id} onClick={() => setChosen(chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id])} {...hoverProps(d, onHover)}>
                 <CardFace d={d} />
               </div>
             );
@@ -2747,6 +2873,7 @@ function AbilityMenu({
                 <>
                   {ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" />
                   {a.text ? ` and ${a.text}` : ""}
+                  {a.treasureOnly ? " (mana from Treasures only)" : ""}
                 </>
               )}
             </button>
@@ -3001,7 +3128,7 @@ function Controls({
       </div>
     );
   }
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tribute" || pending.what === "tributePay") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

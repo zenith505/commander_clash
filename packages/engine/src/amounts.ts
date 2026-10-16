@@ -24,6 +24,8 @@ export interface AmountCtx {
   kicked?: number[];
   /** How many colors of mana were spent to cast the spell (or the spell its permanent was), CR 207.2c. */
   colorsSpent?: number;
+  /** How much mana from Treasures was spent to cast the spell (or the spell its permanent was) or activate the ability (CR 106.3). */
+  treasureSpent?: number;
   /** What was sacrificed to cast the spell, as it last existed. */
   sacrificed?: LastKnown[];
   /** A station ability's tapped creature (CR 702.184a). */
@@ -125,6 +127,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
     case "colorsSpent":
       return ctx.colorsSpent ?? 0;
+    case "treasureSpent":
+      return ctx.treasureSpent ?? 0;
     case "opponentsAttacked": {
       const a = s.players[ctx.controller]?.attackedPlayers;
       return a?.turn === s.turn ? a.players.filter((pid) => pid !== ctx.controller).length : 0;
@@ -325,6 +329,8 @@ function describeCount(c: Count): string {
       return "kicked";
     case "colorsSpent":
       return "colors of mana spent";
+    case "treasureSpent":
+      return "mana from Treasures spent";
     default:
       return c.kind;
   }

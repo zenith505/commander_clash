@@ -1,6 +1,6 @@
 # Roadmap
 
-16,414 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,468 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -141,12 +141,23 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).
-- Alternative costs still out: Security Rhox ("spend only mana produced by Treasures": the mana pool doesn't record
-  where mana came from; the same tracking would unlock "if mana from a Treasure was spent to cast it", Hired Hexblade,
-  Jaded Sell-Sword, Devour Intellect, Price of Loyalty, Smaug and others), Spinning Darkness's "top three black cards
-  of your graveyard" (the order of cards put into a graveyard at once, CR 404.3, isn't modeled), Conspiracy
-  Unraveler's "collect evidence 10 rather than pay the mana cost" (collect evidence, CR 701.59, isn't supported at all:
-  also "you may collect evidence N" as an additional cost, ward—collect evidence, and as an ability's cost). Bots never use Fist of Suns' {W}{U}{B}{R}{G} or the Shoals (an X spell for an
+- Order of cards put into a graveyard at the same time (CR 404.3: their owner arranges them) isn't modeled: the engine
+  moves cards one at a time and has no notion of a simultaneous move, so the cards that read graveyard order stay out
+  (Spinning Darkness's "top three black cards of your graveyard", Corpse Dance, Krovikan Horror, Soldevi Digger,
+  Volrath's Shapeshifter and about a dozen more).
+- Collect evidence (CR 701.59) works as an optional additional cost, an alternative cost, an ability's cost and a "you
+  may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
+  evidence X" (Incinerator of the Guilty, Urgent Necropsy), "if evidence was collected, instead" (Analyze the Pollen,
+  Extract a Confession), and cards blocked by other lines (Cryptex, Polygraph Orb, Hedge Whisperer, Lamplight Phoenix,
+  Memory Vampire, Tenth District Hero, Deadly Cover-Up).
+- Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's
+  "enters with an additional +1/+1 counter" (that static family isn't supported), Alchemist's Talent (Classes aren't
+  supported), Rain of Riches, Vazi, Mr. House, Coin of Mastery (mana from an artifact source).
+- Sagas (CR 714) and read ahead (702.155) work for 35 of 209; still out: the 29 double-faced Sagas (transform after
+  the last chapter), and chapters with lines not parsed yet ("for as long as ~ remains on the battlefield", "until your
+  next turn", triggers that last "this turn", "you and target opponent each ..."). Classes, Cases, Rooms and Sieges
+  are still unsupported. Bots don't read ahead past chapter I.
+- Alternative costs: bots never use Fist of Suns' {W}{U}{B}{R}{G} or the Shoals (an X spell for an
   alternative cost), never cast Invigorate (no combat-trick logic for alternative costs), and use the other
   alternative costs only when they can't pay the mana cost. The game remembers only some of what happened in a turn
   (`GameState.turnLog`: searches, permanents entering, destructions by an opponent, creatures dealing damage to a

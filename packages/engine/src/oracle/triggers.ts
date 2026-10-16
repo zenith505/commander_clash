@@ -47,6 +47,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
+  [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],

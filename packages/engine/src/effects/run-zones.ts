@@ -128,6 +128,56 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     }
 }
 
+/**
+ * "Sacrifice an artifact, a creature, and a land" (see the sacrificeEach effect). For each of the filters in turn, the
+ * player picks among the permanents that still let the most of them be filled; with one such permanent, it's that one,
+ * and with none, nothing is sacrificed for it.
+ */
+function sacrificeEach(s: GameState, e: Extract<Effect, { type: "sacrificeEach" }>, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const sl = (sc.slots ??= { queue: apnap(s, players(s, e.who, ctx)), slot: 0, picked: {} });
+  while (sl.queue.length) {
+    const pid = sl.queue[0]!;
+    const picked = (sl.picked[pid] ??= []);
+    // The answer to the pick it asked for.
+    if (sc.chosen?.[pid]) {
+      picked.push(...sc.chosen[pid]!);
+      sc.chosen = undefined;
+      sl.slot++;
+    }
+    const own = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+    const fits = (i: number, id: ObjectId) => objectMatches(s, { ...e.filters[i]!, controller: "you" }, obj(s, id), pid, false);
+    // The most of filters i.. that permanents other than `used` can fill, each by a different one.
+    const most = (i: number, used: ObjectId[]): number => {
+      if (i >= e.filters.length) return 0;
+      let best = most(i + 1, used);
+      for (const id of own) if (!used.includes(id) && fits(i, id)) best = Math.max(best, 1 + most(i + 1, [...used, id]));
+      return best;
+    };
+    while (sl.slot < e.filters.length) {
+      const target = most(sl.slot, picked);
+      const options = own.filter((id) => !picked.includes(id) && fits(sl.slot, id) && 1 + most(sl.slot + 1, [...picked, id]) === target);
+      if (options.length > 1) {
+        sc.queue = [pid];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: pid, source: src, action: "sacrifice", what: e.filters[sl.slot]!.text, options, count: 1 };
+        return "paused";
+      }
+      picked.push(...options);
+      sl.slot++;
+    }
+    sl.queue.shift();
+    sl.slot = 0;
+  }
+  for (const pid of apnap(s, players(s, e.who, ctx)))
+    for (const id of sl.picked[pid] ?? []) {
+      const o = s.objects[id];
+      if (o?.zone !== "battlefield") continue;
+      log(s, `${player(s, pid).name} sacrifices ${defOf(s, o).name}.`);
+      moveObject(s, id, "graveyard", { sacrificed: true });
+    }
+}
+
 /** The token empower Jace creates (CR 701.71a). */
 const JACE: TokenSpec = { name: "Jace", colors: ["U"], types: ["Planeswalker"], subtypes: ["Jace"], keywords: [], abilities: "−1: Surveil 1.\n−3: Draw a card.", loyalty: 0 };
 
@@ -393,13 +443,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
         const { xRange, ...rest } = e.filter;
         const filter: TargetSpec = xRange ? { ...rest, manaValue: { max: ctx.x ?? 0 } } : rest;
-        const options = p.hand.filter((id) => !isType(defOf(s, obj(s, id)), "Land") && printedMatches(filter, defOf(s, obj(s, id))) && castable(id));
+        // "Draw three cards and reveal them": the ones still in hand, which everyone sees (CR 701.20a).
+        const drawn = e.drawn ? (s.resolving!.drawnThisWay ?? []).filter((id) => p.hand.includes(id)) : undefined;
+        if (drawn?.length) log(s, `${p.name} reveals ${drawn.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+        const options = (drawn ?? p.hand).filter((id) => !isType(defOf(s, obj(s, id)), "Land") && printedMatches(filter, defOf(s, obj(s, id))) && castable(id));
         if (!options.length) {
-          log(s, `${p.name} has no ${filter.text.replace(/^an? /, "")} in hand to cast.`);
+          log(s, drawn ? `${p.name} can't cast any of them.` : `${p.name} has no ${filter.text.replace(/^an? /, "")} in hand to cast.`);
           return;
         }
         const text = filter.text.replace(/^(?!an? )/, /^[aeiou]/i.test(filter.text) ? "an " : "a ");
-        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: `cast ${text} from your hand without paying its mana cost?` };
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "castFromHand", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Don't cast"], prompt: drawn ? "cast one of the cards you drew without paying its mana cost?" : `cast ${text} from your hand without paying its mana cost?` };
         return "paused";
       }
       const id = sc.castFromHand;
@@ -558,6 +611,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "pick":
       return pickPermanents(s, e, ctx, src);
+    case "sacrificeEach":
+      return sacrificeEach(s, e, ctx, src);
     case "empowerJace":
       return empowerJace(s, e.n, ctx, src);
     case "bounce": {
@@ -823,7 +878,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
       }
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"} ${e.until === "thisTurn" ? "this turn" : "until the end of their next turn"}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : ""}.`);
       return;
     }
   }

@@ -138,12 +138,12 @@ function createAttachedTokens(s: GameState, e: Extract<Effect, { type: "createTo
 
 export function tokenDef(t: TokenSpec): CardDef {
   return {
-    oracleId: `token:${t.name}:${t.power ?? ""}/${t.toughness ?? ""}${t.loyalty !== undefined ? `:L${t.loyalty}` : ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
-    name: `${t.name} Token`,
+    oracleId: `token:${t.named ? "named:" : ""}${t.legendary ? "legendary:" : ""}${t.name}:${t.power ?? ""}/${t.toughness ?? ""}${t.loyalty !== undefined ? `:L${t.loyalty}` : ""}:${t.colors.join("")}:${t.types.join("")}:${t.keywords.join(",")}:${t.abilities ?? ""}${t.back ? `|back:${tokenDef(t.back).oracleId}` : ""}`,
+    name: t.named ? t.name : `${t.name} Token`,
     manaCost: "",
     cmc: 0,
-    typeLine: `Token ${t.types.join(" ")} — ${t.subtypes.join(" ")}`,
-    supertypes: ["Token"],
+    typeLine: `${t.legendary ? "Legendary " : ""}Token ${t.types.join(" ")} — ${t.subtypes.join(" ")}`,
+    supertypes: t.legendary ? ["Legendary", "Token"] : ["Token"],
     types: t.types,
     subtypes: t.subtypes,
     oracleText: [t.keywords.join(", "), t.abilities ?? ""].filter(Boolean).join("\n"),

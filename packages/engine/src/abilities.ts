@@ -36,6 +36,9 @@ export interface PayCost {
   energy?: number;
 }
 
+/** One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this, or pay. */
+export type PunisherOption = { discard: number } | { sacrifice: TargetSpec } | { pay: UnlessPays };
+
 export interface UnlessPays {
   cost: string;
   generic?: Amount;
@@ -360,6 +363,8 @@ export type PlayerRef =
   | { ref: "opponentsAttackingEventPlayer" }
   /** The players who chose to in the "each player may ..." being resolved (see the eachMay effect). */
   | { ref: "choseThisWay" }
+  /** The players who did none of a punisher's options (see the punisher effect). */
+  | { ref: "punished" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
@@ -414,6 +419,12 @@ export interface TokenSpec {
   back?: TokenSpec;
   /** A planeswalker token's printed loyalty (CR 306.5b). */
   loyalty?: number;
+  /**
+   * "Create Ragavan, a legendary 2/1 red Monkey creature token": `name` is the token's name as given (CR 111.4), not
+   * its subtypes plus "Token", and it's legendary (CR 205.4d), so the legend rule applies to it (CR 704.5j).
+   */
+  named?: true;
+  legendary?: true;
 }
 
 /**
@@ -589,6 +600,13 @@ export type StaticCondition =
   | { kind: "beforeAttackers" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** "If you have the initiative" (CR 726.1). */
+  | { kind: "initiative" }
+  /**
+   * "As long as you've completed a dungeon" (CR 309.7), in this game, whenever it was (rulings on Nadaar); `name`: "if you
+   * haven't completed Tomb of Annihilation" (with `not`).
+   */
+  | { kind: "completedDungeon"; name?: string; not?: true }
   /**
    * "If you control a commander" (CR 903.3): any player's commander you control (rulings on Fierce Guardianship);
    * `types`: "a commander that's a creature or planeswalker", one of them.
@@ -785,6 +803,13 @@ export type Effect =
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
   | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control": only those, or tied for it. */ greatest?: "power"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  /**
+   * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
+   * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
+   * rulings on returning "an artifact, a creature, ..." with Linessa), as many as possible (CR 609.3). Each player picks
+   * theirs in APNAP order, then they're all sacrificed at once (CR 101.4).
+   */
+  | { type: "sacrificeEach"; who: PlayerRef; filters: TargetSpec[] }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
@@ -916,7 +941,7 @@ export type Effect =
    * "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (the Expertises,
    * Electrodominance's "X or less"): one card, picked and cast as this resolves (rulings).
    */
-  | { type: "castFromHand"; filter: TargetSpec }
+  | { type: "castFromHand"; filter: TargetSpec; /** "Draw three cards and reveal them. You may cast one of them ...": only those, revealed. */ drawn?: true }
   /** Suspend's upkeep trigger (CR 702.62a): if the card (the subject) is still suspended, remove a time counter from it. */
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
@@ -926,7 +951,7 @@ export type Effect =
   /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
   | { type: "warpExile" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /** CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player). */
@@ -1090,6 +1115,15 @@ export type Effect =
    * `wheel`: the number of cards drawn, for the bots' answer.
    */
   | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number }
+  /**
+   * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards
+   * a card". Each player in APNAP order picks one of `options` they can do (or none) and, for a discard or a sacrifice,
+   * which cards or permanent, without revealing a card to be discarded; then the cards are discarded and the permanents
+   * sacrificed all at once, and `effects` happen to those who did none ({ ref: "punished" }) (CR 101.4, rulings on Nicol
+   * Bolas, the Deceiver and Court of Ambition). A player may always choose none. `times`: "Repeat this process X times",
+   * each time all the way through (rulings on Torment of Hailfire).
+   */
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -1364,6 +1398,8 @@ export type TriggerEvent =
   | "youSacrifice"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
   | "youCollectEvidence"
+  /** "Whenever you complete a dungeon" (CR 309.7). */
+  | "youCompleteDungeon"
   /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
@@ -1930,6 +1966,8 @@ export interface CompiledCard {
   lifeFloor?: number;
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
   drawTwoInstead?: true;
+  /** "Room abilities of dungeons you own trigger an additional time" (Hama Pashar, CR 603.2d). */
+  roomsTwice?: true;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents" | "enchanted";
   /** "Damage can't be prevented." (CR 615.12) */

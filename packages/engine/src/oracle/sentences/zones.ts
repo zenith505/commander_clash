@@ -1,6 +1,6 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
-import type { Effect, Modification, ObjRef, PlayerRef } from "../../abilities";
+import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
 import { NUM, amt, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
@@ -10,6 +10,18 @@ import { parseStaticCondition } from "../statics";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // "Discard a card and sacrifice an artifact, a creature, and a land": in that order.
+  if ((m = /^Discard a card and (sacrifice .+)$/.exec(s))) {
+    const rest = parseZonesSentence(m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1), ctx);
+    return rest && [{ type: "discard", who: { ref: "you" }, n: 1 }, ...rest];
+  }
+  // "Sacrifice an artifact, a creature, and a land" (Tomb of Annihilation's Oubliette), "target player sacrifices an
+  // artifact and a land of their choice": a different permanent for each (see the sacrificeEach effect).
+  if ((m = /^(?:(.+?) )?[Ss]acrifices? (an? \w+(?:, an? \w+)*,? and an? \w+)(?: of (?:their|his or her) choice)?$/.exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    const filters = m[2]!.split(/,? and |, /).map((x) => pickFilter(x.replace(/^an? /, "")));
+    return who && filters.every(Boolean) ? [{ type: "sacrificeEach", who, filters: filters as TargetSpec[] }] : null;
+  }
 
   // Manifest dread: "Look at the top two cards of your library. Manifest one of them, then put the cards you looked at
   // that were not manifested this way into your graveyard" (CR 701.62a). With one card left it's manifested; with none,

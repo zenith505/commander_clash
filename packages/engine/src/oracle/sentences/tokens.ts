@@ -23,6 +23,17 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}) };
     return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token, ...state }] : null;
   }
+  // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
+  // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name
+  // means the token itself ("When Smaug dies, ...").
+  if ((m = /^(?:(.+?) creates|[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (\d+)\/(\d+) (.+?) creature token(?: with (.+))?$/.exec(s))) {
+    const name = m[2]!;
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const withText = m[6]?.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`(^"|\\. )?\\b${esc}\\b`, "g"), (_, start?: string) => (start ? `${start}This creature` : "this creature")));
+    const token = parseToken(Number(m[3]), Number(m[4]), m[5]!, withText);
+    return token && who ? [{ type: "createToken", who, n: 1, token: { ...token, name, named: true, legendary: true } }] : null;
+  }
   // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".
   if ((m = new RegExp(`^(?:(.+?) creates|Create) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {

@@ -1,6 +1,6 @@
 # Roadmap
 
-17,208 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,274 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -26,8 +26,24 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Equip still out: "Equip—Pay {3} or discard a card", equip planeswalker, "Equip worthy"; bots never use an equip
      cost that sacrifices a creature (Demonmail Hauberk), only the human player does.
    - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
-     them" and several cards don't. Named legendary tokens (Tuktuk the Explorer's "create Tuktuk the Returned, a
-     legendary 5/5 ... token") aren't parsed.
+     them" and several cards don't.
+   Left from the dungeons and punishers round (venture into the dungeon, completed dungeons, punishers, "X unless
+   [condition]", named legendary tokens):
+   - Venture still out on other lines: Sefris and Varis ("this ability triggers only once each turn"), Wandering
+     Troubadour, Immovable Rod ("becomes untapped"), Intrepid Outlander (pack tactics), Radiant Solar (discard ~ from
+     hand as a cost), Ranger's Hawk, Fifty Feet of Rope. Dungeon Delver (granting Hama Pashar's ability to commanders),
+     Keen-Eared Sentry, Dungeon Crawler, Ellywick's "differently named dungeon" count. Dungeoneer's Pack's four-part
+     sentence ("You take the initiative, gain 3 life, draw a card, and create a Treasure token").
+   - "If you've completed a dungeon" inside an effect (Imoen, Safana, Caves of Chaos Adventurer, Rilsa Rael, White
+     Plume Adventurer, Undermountain Adventurer, Tomb of Horrors Adventurer); as a static condition it works.
+   - Punishers still out: per-opponent ones ("for each opponent, you create ... unless that player sacrifices",
+     Acererak), "unless they discard a nonland card" (Bandit's Talent, Compulsive Research, Wrench Mind), "sacrifices
+     a permanent unless they discard" (Possessed Portal), damage instead of life loss (Demanding Dragon, Mogis, Curse
+     Artifact, Indoraptor), "another nonland permanent" (Torment of Venom), "that many permanents" (Archfiend of
+     Spite), a count of blight counters (Rottenmouth Viper), "any number of times" (Forbidden Ritual). Bots choose a
+     punisher option by simple rules (a spare token, then a spare card, else the life).
+   - "Unless" conditions still out: "an opponent has 10 or less life" (Vampire Lacerator) and other conditions the
+     static parser doesn't read.
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
    epic, free casts from hand, timing points, overload leftovers):
    - Overload still out: Chemister's Trick ("attacks this turn if able": does it bind more than one combat?),
@@ -144,7 +160,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      enchanted player (Bloodletting's doubling, Stalked Prey, Hospitality, Grievous Wound), "untap all nonland
      permanents they control" for Curse of Bounty's "does the same", attaching a Curse to another player (Archnemesis,
      Maddening Hex), "when enchanted player loses the game" (Vengeance), Cruel Reality's "if the player can't",
-     Torment of Scarabs' "unless", Curse of Oblivion's graveyard exile, decayed Zombie tokens (Restless Dead),
+     Curse of Oblivion's graveyard exile, decayed Zombie tokens (Restless Dead),
      Overwhelming Splendor, Curse of Silence, Overencumbered, Paradox Haze, Shadow of the Second Sun, Tenuous Truce.
    - Spree modes that don't parse yet: outlaw groups (Caught in the Crossfire), "search for a basic land or Desert"
      and X/X tokens (Dance of the Tumbleweeds), "choose a creature you control. It gains" (Final Showdown),
@@ -362,9 +378,6 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   permanent"), Thran Power Suit's "for each Aura and Equipment", Plate Armor's equip reduction, Leyline Immersion's
   restricted mana ability; anthems for legendary or nonlegendary creatures and "each creature you control with a counter
   on it" (Flowering of the White Tree, Cathedral Acolyte).
-- Dungeons: "venture into the dungeon" (Lost Mine of Phandelver, Dungeon of the Mad Mage, Tomb of Annihilation) stays
-  unsupported until every room of those three is modeled (Tomb's "unless" rooms, the Mad Mage's last rooms); only
-  Undercity and the initiative work. Dungeoneer's Pack's compound sentence. "Completed a dungeon" conditions.
 - Blitz and warp with non-mana costs; cards that care about warped or plotted cards ("void", "if it was warped").
   Reconfigure with non-mana costs. Transforming anything but an Incubator token (double-faced cards).
 - Restricted mana: "of the chosen type" (Cavern of Souls, Secluded Courtyard), "and that spell can't be countered",

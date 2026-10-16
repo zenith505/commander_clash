@@ -72,6 +72,7 @@ export type TriggerSourceEvent =
   | { type: "lifeLost"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
+  | { type: "dungeonCompleted"; player: PlayerId }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
@@ -455,6 +456,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
+  } else if (ev.type === "dungeonCompleted") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCompleteDungeon", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "evidenceCollected") {
     for (const id of s.battlefield) {

@@ -305,6 +305,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? []).filter((p) => !player(s, p).lost);
+    case "punished":
+      return (s.resolving?.scratch?.punished ?? []).filter((p) => !player(s, p).lost);
     case "damagedThisWay":
       return (s.resolving?.playersDamagedThisWay ?? []).filter((p) => !player(s, p).lost);
     case "giftee": {
@@ -457,6 +459,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "haunt":
     case "grantFlashback":
     case "pick":
+    case "sacrificeEach":
     case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
@@ -561,6 +564,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDungeonsEffect(s, e, ctx, src);
     case "may":
     case "eachMay":
+    case "punisher":
     case "cumulativeUpkeep":
     case "collectEvidence":
     case "reflexive":

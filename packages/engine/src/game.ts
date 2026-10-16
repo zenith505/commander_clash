@@ -1284,6 +1284,7 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
     return false;
   }
   moveObject(s, top, "hand");
+  s.resolving?.drawnThisWay?.push(top);
   // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
   p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
   fireEvent(s, { type: "draw", player: pid, nth: p.draws.n });
@@ -3665,6 +3666,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "tapOrUntap") {
     (r.scratch ??= {}).tapOrUntap = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "punisher") {
+    // An option's index, or "none" to take the penalty (see the punisher effect).
+    const pu = r.scratch?.punish;
+    if (pu) pu.picked[p.id] = choice;
     continueResolution(s);
     return;
   }

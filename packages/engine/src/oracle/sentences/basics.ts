@@ -2,9 +2,9 @@
 
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
-import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
+import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
 import { NUM, NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
-import { parsePayCost, addTarget } from "../body";
+import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { parseCount } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
@@ -17,6 +17,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // Punishers: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards a
+  // card", "that player loses 2 life unless they pay {2}" (see the punisher effect).
+  if ((m = new RegExp(`^(.+?) (?:loses|lose) ${NUMX} life unless (?:they|that player|he or she) (.+)$`).exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const options = parsePunisherOptions(m[3]!, ctx);
+    if (!who || who.ref === "you" || !options) return null;
+    return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
+  }
   // "You may collect evidence 4" as it resolves (CR 701.59a): only after "you may" (a player can't be made to).
   if ((m = /^Collect evidence (\d+)$/.exec(s))) return ctx.mayNow ? [{ type: "collectEvidence", n: Number(m[1]) }] : null;
   // Additional phases (CR 500.8): "After this main phase, there is an additional combat phase followed by an additional
@@ -146,6 +154,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^(?:You )?take the initiative$/i.test(s)) return dungeonSupported(UNDERCITY) ? [{ type: "takeInitiative", who: { ref: "you" } }] : null;
   if (/^(?:You )?venture into Undercity$/i.test(s)) return dungeonSupported(UNDERCITY) ? [{ type: "venture", undercity: true }] : null;
   if (/^(?:You )?venture into the dungeon$/i.test(s)) return DUNGEONS.length > 1 && DUNGEONS.every(dungeonSupported) ? [{ type: "venture" }] : null;
+  // "Venture into the dungeon and you gain 3 life", "Create a Treasure token and venture into the dungeon": in order.
+  if ((m = /^(?:Venture into the dungeon and (.+)|(.+?) and venture into the dungeon)$/.exec(s))) {
+    const other = parseSentence((m[1] ?? m[2])!.replace(/^./, (c) => c.toUpperCase()), ctx);
+    return other && (m[1] ? [{ type: "venture" }, ...other] : [...other, { type: "venture" }]);
+  }
   // The Ring tempts you (CR 701.54).
   if (/^the Ring tempts you$/i.test(s)) return [{ type: "ringTempts" }];
   if (/^Target player becomes the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "target", index: addTarget(ctx, { kind: "player", text: "target player" }) } }];
@@ -298,4 +311,27 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
   for (let k = 0; k < n; k++)
     addTarget(ctx, { ...spec, divided: { first, n, total }, ...(k ? { optional: true, distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
   return { index: first, n, amount: total };
+}
+
+/**
+ * A punisher's ways out: "sacrifices a nonland permanent of their choice or discards a card", "discards two cards or
+ * sacrifices a creature or planeswalker of their choice", "pay {2}". Null if one isn't understood.
+ */
+function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] | null {
+  const out: PunisherOption[] = [];
+  for (const part of text.split(/,? or (?=(?:discards?|sacrifices?|pays?) )/)) {
+    let m: RegExpExecArray | null;
+    if ((m = new RegExp(`^discards? ${NUM} cards?$`).exec(part))) out.push({ discard: num(m[1]!) });
+    else if ((m = /^sacrifices? (?:an?|one) (.+?)(?: of (?:their|his or her) choice)?$/.exec(part))) {
+      // "An artifact, a creature, or a land": one permanent that's any of them.
+      const filter = pickFilter(m[1]!.replace(/, (?:or )?an? /g, (x) => x.replace(/an? $/, "")).replace(/ or an? /, " or "));
+      if (!filter) return null;
+      out.push({ sacrifice: filter });
+    } else if ((m = /^pays? (.+)$/.exec(part))) {
+      const pay = parseUnlessPays(m[1]!, ctx);
+      if (!pay) return null;
+      out.push({ pay });
+    } else return null;
+  }
+  return out.length ? out : null;
 }

@@ -63,11 +63,62 @@ export const UNDERCITY: Dungeon = {
 };
 
 /**
- * "Venture into the dungeon" lets its player choose Lost Mine of Phandelver, Dungeon of the Mad Mage or Tomb of
- * Annihilation (CR 701.49a). Some of their rooms aren't modeled yet (Tomb of Annihilation's "loses 2 life unless they
- * discard a card", the Mad Mage's last room), so cards that venture into the dungeon stay unsupported.
+ * The dungeons "venture into the dungeon" can start (CR 701.49a), from Adventures in the Forgotten Realms. Dungeon of the
+ * Mad Mage's text is the card data's; Lost Mine of Phandelver and Tomb of Annihilation aren't in it (Scryfall lists
+ * them as tokens), so theirs is the printed cards'.
  */
-export const DUNGEONS: Dungeon[] = [UNDERCITY];
+export const LOST_MINE: Dungeon = {
+  name: "Lost Mine of Phandelver",
+  rooms: [
+    { name: "Cave Entrance", text: "Scry 1.", next: [1, 2] },
+    { name: "Goblin Lair", text: "Create a 1/1 red Goblin creature token.", next: [3, 4] },
+    { name: "Mine Tunnels", text: "Create a Treasure token.", next: [4, 5] },
+    { name: "Storeroom", text: "Put a +1/+1 counter on target creature.", next: [6] },
+    { name: "Dark Pool", text: "Each opponent loses 1 life and you gain 1 life.", next: [6] },
+    { name: "Fungi Cavern", text: "Target creature gets -4/-0 until your next turn.", next: [6] },
+    { name: "Temple of Dumathoin", text: "Draw a card.", next: [] },
+  ],
+};
+
+export const MAD_MAGE: Dungeon = {
+  name: "Dungeon of the Mad Mage",
+  rooms: [
+    { name: "Yawning Portal", text: "You gain 1 life.", next: [1] },
+    { name: "Dungeon Level", text: "Scry 1.", next: [2, 3] },
+    { name: "Goblin Bazaar", text: "Create a Treasure token.", next: [4] },
+    { name: "Twisted Caverns", text: "Target creature can't attack until your next turn.", next: [4] },
+    { name: "Lost Level", text: "Scry 2.", next: [5, 6] },
+    { name: "Runestone Caverns", text: "Exile the top two cards of your library. You may play them.", next: [7] },
+    { name: "Muiral's Graveyard", text: "Create two 1/1 black Skeleton creature tokens.", next: [7] },
+    { name: "Deep Mines", text: "Scry 3.", next: [8] },
+    {
+      name: "Mad Wizard's Lair",
+      text: "Draw three cards and reveal them. You may cast one of them without paying its mana cost.",
+      next: [],
+      body: {
+        targets: [],
+        effects: [
+          { type: "draw", who: { ref: "you" }, n: 3 },
+          { type: "castFromHand", filter: { kind: "spell", text: "spell" }, drawn: true },
+        ],
+        text: "Draw three cards and reveal them. You may cast one of them without paying its mana cost.",
+      },
+    },
+  ],
+};
+
+export const TOMB_OF_ANNIHILATION: Dungeon = {
+  name: "Tomb of Annihilation",
+  rooms: [
+    { name: "Trapped Entry", text: "Each player loses 1 life.", next: [1, 2] },
+    { name: "Veils of Fear", text: "Each player loses 2 life unless they discard a card.", next: [3] },
+    { name: "Oubliette", text: "Discard a card and sacrifice an artifact, a creature, and a land.", next: [4] },
+    { name: "Sandfall Cell", text: "Each player loses 2 life unless they sacrifice an artifact, a creature, or a land.", next: [4] },
+    { name: "Cradle of the Death God", text: "Create The Atropal, a legendary 4/4 black God Horror creature token with deathtouch.", next: [] },
+  ],
+};
+
+export const DUNGEONS: Dungeon[] = [UNDERCITY, LOST_MINE, MAD_MAGE, TOMB_OF_ANNIHILATION];
 
 export const dungeonByName = (name: string) => DUNGEONS.find((d) => d.name === name);
 

@@ -673,6 +673,17 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const trailIf = !insteadIf ? /^((?:Draw|Create|You gain|Each opponent loses|Put) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
+    // "If ~ is a Warrior, put a flying counter on it and it becomes a ..." (Figure of Destiny, Ascendant Spirit): its
+    // creature types as it resolves (CR 608.2c; rulings: it doesn't matter how it got them). "It" is ~ there.
+    const ifSelfIs = !ctx.spell ? /^If ~ is an? ([A-Z][a-z]+), ((?:(?!\btarget\b).)+)$/.exec(s) : null;
+    if (ifSelfIs && !/\binstead$/.test(ifSelfIs[2]!)) {
+      const filter = parseTargetPhrase(ifSelfIs[1]!.toLowerCase());
+      const then = ifSelfIs[2]!.replace(/("[^"]*")|\bit\b/g, (w, q) => q ?? "~");
+      const inner = filter?.kind === "object" && parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!inner || filter?.kind !== "object") return null;
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfIs", filter: { ...filter, text: ifSelfIs[1]! } } }, effects: inner });
+      continue;
+    }
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;

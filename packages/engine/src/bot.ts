@@ -1389,6 +1389,15 @@ function chooseRingBearer(s: GameState, pid: PlayerId, options: ObjectId[]): Obj
  * Which of our permanents to sacrifice or return to hand: the least valuable. Returning a land, a
  * tapped one that's already been used this turn, and not the one that asked for it if we can help it.
  */
+/** An untargeted ability that sets its source's base power and toughness for good no higher than they are now. */
+function shrinksSelf(s: GameState, o: GameObject, body: AbilityBody): boolean {
+  const top = body.effects.filter((e) => e.type === "continuous" && e.what.ref === "self" && e.duration === "game");
+  const set = top.flatMap((e) => (e.type === "continuous" ? e.mods : [])).find((m) => m.kind === "setPT");
+  if (!set || set.kind !== "setPT" || typeof set.power !== "number" || typeof set.toughness !== "number" || !objIsType(s, o, "Creature")) return false;
+  const plus = (o.counters["+1/+1"] ?? 0) - (o.counters["-1/-1"] ?? 0);
+  return set.power + set.toughness <= power(s, o) + toughness(s, o) - 2 * plus;
+}
+
 /**
  * Distributing counters among our own permanents: harmful ones all on the least useful one; +1/+1 counters first to
  * creatures they lift to power 4 (what "for each creature you control with power 4 or greater" counts), the nearest
@@ -1874,6 +1883,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
+      // "~ becomes a Kithkin Spirit with base power and toughness 2/2" when it's that big already, or bigger (Figure of
+      // Destiny after its later steps): it would only shrink.
+      if (shrinksSelf(s, o, ab.body)) continue;
       // "{1}: Look at the top card of your library" (Brutal Deceiver): nothing a bot can use.
       if (!ab.body.modal && ab.body.effects.every((e) => e.type === "orderTop" && e.n === 1)) continue;
       const problem = abilityProblem(s, pid, id, i);

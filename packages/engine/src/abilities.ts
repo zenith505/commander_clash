@@ -657,6 +657,12 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" }
+  /**
+   * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
+   * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
+   * on the layers being worked out.
+   */
+  | { kind: "selfIs"; filter: TargetSpec }
   /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
   | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */

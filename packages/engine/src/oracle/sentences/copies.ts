@@ -21,6 +21,13 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Choose ((?:any number of )?target .+)$/.exec(s))) {
     // "Choose any number of target opponents" (Call the Coppercoats): players, likewise.
     if (/^any number of target (?:players|opponents)$/.test(m[1]!)) return parsePlayer(m[1]!, ctx) ? [] : null;
+    // "Choose target creature you control and target Equipment" (Stolen Uniform): two targets, in that order.
+    const two = /^(target .+?) and (target .+)$/.exec(m[1]!);
+    if (two) {
+      const first = parseObject(two[1]!, ctx);
+      const second = first && !isGroup(first) && parseObject(two[2]!, ctx);
+      return second && !isGroup(second) ? [] : null;
+    }
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [] : null;
   }

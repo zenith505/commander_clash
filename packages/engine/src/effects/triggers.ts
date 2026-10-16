@@ -1015,6 +1015,11 @@ const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : com
 export function checkLostControl(s: GameState) {
   for (const d of [...(s.delayed ?? [])]) {
     if (d.when !== "lostControl") continue;
+    // "This turn" is over (Stolen Uniform).
+    if (d.thisTurn !== undefined && d.thisTurn !== s.turn) {
+      s.delayed = s.delayed!.filter((x) => x !== d);
+      continue;
+    }
     const o = s.objects[d.subject.id];
     const here = !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === d.subject.zc;
     // What it would sacrifice is gone (CR 400.7): nothing left to do.

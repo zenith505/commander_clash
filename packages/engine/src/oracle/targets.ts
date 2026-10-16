@@ -145,6 +145,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (ctx.selfCard && /^it$/i.test(x)) return { ref: "selfCard" };
     return ctx.subject && /^that creature$/i.test(x) ? { ref: "subject" } : null;
   }
+  // "Choose target creature you control and target Equipment. Gain control of that Equipment ... Attach it to the chosen
+  // creature." (Stolen Uniform): the one target of that kind.
+  const named = /^(?:that (Equipment|Aura|Vehicle)|the chosen (creature))$/.exec(x);
+  if (named) {
+    const at = ctx.targets.flatMap((t, i) => (t.kind === "object" && (named[1] ? t.subtypes?.includes(named[1]) : t.types?.includes("Creature")) ? [i] : []));
+    return at.length === 1 ? { ref: "target", index: at[0]! } : null;
+  }
   // "Put a +1/+1 counter on target creature you control, then it fights target creature you don't control. ... the
   // creature you control gains indestructible" (Outmuscle): the one target described that way.
   const described = /^the (creature you control|creature you don't control)$/i.exec(x);

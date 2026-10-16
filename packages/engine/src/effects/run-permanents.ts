@@ -558,6 +558,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // CR 701.3d: it stays on the battlefield, attached to nothing.
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "battlefield" || !o.attachedTo) continue;
+        if (e.ifAttachedToYours && !(objIsType(s, obj(s, o.attachedTo), "Creature") && controllerOf(s, obj(s, o.attachedTo)) === ctx.controller)) continue;
         log(s, `${defOf(s, o).name} is unattached from ${defOf(s, obj(s, o.attachedTo)).name}.`);
         fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });
         o.attachedTo = undefined;

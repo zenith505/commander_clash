@@ -543,6 +543,8 @@ export interface DelayedTrigger {
   about?: { id: ObjectId; zc: number };
   /** `lostControl` with `about`: `controller` has controlled the watched object since this was made (Seraph rulings). */
   held?: true;
+  /** `lostControl`: it lasts only until the end of this turn ("When you lose control of that Equipment this turn"). */
+  thisTurn?: number;
   body: AbilityBody;
   /** Made during an end step, "the next end step" is the following turn's (CR 603.7c doesn't fire it in the same step). */
   turn: number;

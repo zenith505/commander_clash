@@ -59,7 +59,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const body = { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
       if (e.when === "lostControl") {
         // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
-        for (const o of objects(s, e.of!, ctx)) if (o.zone === "battlefield") addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+        for (const o of objects(s, e.of!, ctx)) {
+          if (o.zone !== "battlefield") continue;
+          addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+          if (e.thisTurn) s.delayed![s.delayed!.length - 1]!.thisTurn = s.turn;
+        }
         return;
       }
       if (e.each === "created") {

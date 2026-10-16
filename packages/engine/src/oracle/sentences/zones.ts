@@ -280,6 +280,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (source?.ref !== "target" || source.n || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref)) return null;
     return [{ type: "attach", what, source }];
   }
+  // Stolen Uniform: "Attach it to the chosen creature": the target Equipment to the target creature (CR 701.3a); if
+  // either is an illegal target, it doesn't move (rulings).
+  if ((m = /^Attach (?:it|that Equipment) to (the chosen creature)$/.exec(s)) && ctx.spell) {
+    const source = parseObject("that Equipment", ctx);
+    const what = parseObject(m[1]!, ctx);
+    return source?.ref === "target" && what?.ref === "target" && source.index !== what.index ? [{ type: "attach", what, source }] : null;
+  }
   // "Gain control of target Equipment an opponent controls until end of turn. Attach it to ~." (Ogre Geargrabber)
   if ((m = /^Attach (?:it|that Equipment) to (~|him|her)$/i.exec(s)) && !ctx.spell && ctx.lastObjectTarget !== undefined) {
     const t = ctx.targets[ctx.lastObjectTarget];

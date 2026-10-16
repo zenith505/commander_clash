@@ -1098,7 +1098,8 @@ export type Effect =
    * of combat"), instead of the source.
    */
   /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard"; of?: ObjRef }
+  /** `thisTurn`: "When you lose control of that Equipment this turn" (Stolen Uniform): only until the turn ends. */
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard"; of?: ObjRef; thisTurn?: true }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1172,8 +1173,8 @@ export type Effect =
    * Equipment you control to target creature you control", Brass Squire).
    */
   | { type: "attach"; what: ObjRef; source?: ObjRef }
-  /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to. */
-  | { type: "unattach"; what: ObjRef }
+  /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to; `ifAttachedToYours`: "if it's attached to a creature you control" (Stolen Uniform). */
+  | { type: "unattach"; what: ObjRef; ifAttachedToYours?: true }
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
   | { type: "transformSelf" }
   /** Reconfigure's "Unattach this permanent" (CR 702.151a, 701.3d). */

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, addEffect, bear, card, cast, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { characteristics, invalidateCharacteristics, isFullySupported, waitingOn, type CardDef, type GameState } from "../src";
+import { characteristics, invalidateCharacteristics, isFullySupported, planCast, waitingOn, type CardDef, type GameState } from "../src";
 import { dealDamage, objectSource } from "../src/damage";
 import { destroyPermanent, moveObject, runStateBasedActions } from "../src/game";
 
@@ -166,5 +166,53 @@ describe("that creature is a black Zombie in addition to its other colors and ty
     expect(s.objects[b]!.zone).toBe("battlefield");
     expect(s.objects[b]!.controller).toBe(ap);
     expect(characteristics(s, s.objects[b]!).colors).toContain("B");
+  });
+});
+
+// Stolen Uniform (rulings: the trigger fires whenever you lose control of the Equipment this turn, also when "until end
+// of turn" ends in the cleanup step).
+const uniform = card("Stolen Uniform", "Instant", "{U}", { oracleText: "Choose target creature you control and target Equipment. Gain control of that Equipment until end of turn. Attach it to the chosen creature. When you lose control of that Equipment this turn, if it's attached to a creature you control, unattach it." });
+const sword = card("Test Sword", "Artifact — Equipment", "{2}", { oracleText: "Equipped creature gets +2/+0.\nEquip {2}" });
+
+describe("Stolen Uniform", () => {
+  it("parse", () => supported(uniform));
+
+  it("takes the Equipment, attaches it to your creature, and unattaches it as control ends in the cleanup step", () => {
+    const { s: s0, ap, opp, ids } = setup([uniform]);
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Bear" }));
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+    const eq = putOnBattlefield(s0, opp, sword);
+    s0.objects[eq]!.attachedTo = theirs;
+    let s = cast(s0, ap, ids[0]!, [target(mine), target(eq)]);
+    expect(s.objects[eq]!.attachedTo).toBe(mine);
+    expect(characteristics(s, s.objects[eq]!).controller).toBe(ap);
+    s = passUntil(s, "upkeep", opp);
+    expect(characteristics(s, s.objects[eq]!).controller).toBe(opp);
+    expect(s.objects[eq]!.attachedTo).toBeUndefined();
+    expect(s.delayed?.some((d) => d.when === "lostControl")).toBeFalsy();
+  });
+
+  it("an illegal creature target: you still gain control of the Equipment, but it isn't attached (rulings)", () => {
+    const { s: s0, ap, opp, ids } = setup([uniform]);
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Bear" }));
+    const eq = putOnBattlefield(s0, opp, sword);
+    const plan = planCast(s0, ap, ids[0]!, [target(mine), target(eq)])!;
+    let s = s0;
+    for (const a of plan) s = act(s, a);
+    destroyPermanent(s, s.objects[mine]!, "test");
+    s = settle(s);
+    expect(characteristics(s, s.objects[eq]!).controller).toBe(ap);
+    expect(s.objects[eq]!.attachedTo).toBeUndefined();
+  });
+
+  it("another player taking the Equipment this turn: it's unattached from your creature only while it's attached to one you control", () => {
+    const { s: s0, ap, opp, ids } = setup([uniform]);
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Bear" }));
+    const eq = putOnBattlefield(s0, opp, sword);
+    let s = cast(s0, ap, ids[0]!, [target(mine), target(eq)]);
+    const third = s.turnOrder.find((x) => x !== ap && x !== opp)!;
+    addEffect(s, third, [eq], [{ kind: "control" }], "game");
+    s = settle(act(s, { type: "passPriority", player: waitingOn(s)! }));
+    expect(s.objects[eq]!.attachedTo).toBeUndefined();
   });
 });

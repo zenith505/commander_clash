@@ -17,7 +17,7 @@
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
 import { creatureCardAbove } from "./graveyard";
-import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint } from "./abilities";
+import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
@@ -116,6 +116,11 @@ export interface Characteristics {
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
   cantBeBlockedBy: TargetSpec[];
+  /**
+   * "Can't be the target of spells or abilities your opponents control" and the like. `of`: whose opponents, the
+   * controller of the ability saying it (an Aura's controller, not the enchanted creature's: rulings on Canopy Cover).
+   */
+  untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
   preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }[];
   /** "Can't be blocked except by ...": each entry is a group a blocker has to belong to (CR 509.1b). */
@@ -230,6 +235,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   grantedAbilities: [...c.grantedAbilities],
   pt: [...c.pt],
   cantBeBlockedBy: [...c.cantBeBlockedBy],
+  ...(c.untargetable ? { untargetable: [...c.untargetable] } : {}),
   cantBlockCreatures: [...c.cantBlockCreatures],
   attackUnless: [...c.attackUnless],
   goadedBy: [...c.goadedBy],
@@ -806,6 +812,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBeBlockedBy":
       c.cantBeBlockedBy.push(m.filter);
+      return;
+    case "untargetable":
+      c.untargetable = [...(c.untargetable ?? []), { ...m.by, of: e.controller ?? (e.sourceId ? chars.get(e.sourceId)?.controller : undefined) ?? c.controller }];
       return;
     case "preventDamage": {
       const { kind: _, ...p } = m;

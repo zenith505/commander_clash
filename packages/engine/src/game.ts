@@ -16,7 +16,7 @@ import { addMana, canPayFromPool, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
-import { CREATURE_TYPES } from "./keywords";
+import { CREATURE_TYPES, type SourceQuality } from "./keywords";
 import {
   COLORS,
   RulesError,
@@ -2228,11 +2228,13 @@ export function castProblem(
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
+  // A spell's colors are its card's (CR 702.16b), and it's a spell ("can't be the target of spells").
+  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, spell: true };
   if (spell?.modal) {
     if (modes === undefined) {
-      if (!canChooseModes(s, spell, pid, d)) return `${d.name} has no mode that can be chosen`;
+      if (!canChooseModes(s, spell, pid, sq)) return `${d.name} has no mode that can be chosen`;
     } else {
-      const mp = modesProblem(s, spell, modes, pid, d, bothModes(s, pid, spell, choices));
+      const mp = modesProblem(s, spell, modes, pid, sq, bothModes(s, pid, spell, choices));
       if (mp) return mp;
     }
   }
@@ -2254,8 +2256,8 @@ export function castProblem(
   if (specs.length) {
     // A spell's colors are its card's (CR 702.16b: protection stops spells of that color). Before its optional costs
     // are announced, it can be cast if it has legal targets with them paid or without (CR 702.33g).
-    const any = () => hasLegalTargetsFor(s, specs, pid, d) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, spellTargetSpecs(d, modes, ALL_PAID), pid, d));
-    const tp = targets ? targetProblem(s, specs, targets, pid, d) : any() ? null : `${d.name} has no legal targets`;
+    const any = () => hasLegalTargetsFor(s, specs, pid, sq) || (!choices && !!spell && hasGatedTargets(specs) && hasLegalTargetsFor(s, spellTargetSpecs(d, modes, ALL_PAID), pid, sq));
+    const tp = targets ? targetProblem(s, specs, targets, pid, sq) : any() ? null : `${d.name} has no legal targets`;
     if (tp) return tp;
   }
   const tax = fromCommand ? commanderTax(p, o) : 0;

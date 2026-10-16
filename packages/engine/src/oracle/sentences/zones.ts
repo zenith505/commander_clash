@@ -5,7 +5,7 @@ import { NUM, COUNTER, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
-import { parseStaticCondition } from "../statics";
+import { parseStaticCondition, parseUntargetable } from "../statics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -262,6 +262,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const mods: Modification[] =
       m[2] === "block" ? [{ kind: "cantBlock" }] : m[2] === "attack" ? [{ kind: "cantAttack" }] : m[2] === "be blocked" ? [{ kind: "cantBeBlocked" }] : [{ kind: "cantAttack" }, { kind: "cantBlock" }];
     return what ? [{ type: "continuous", what, mods, duration: m[3] === "this turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
+  // "Target creature can't be the target of spells or abilities your opponents control this turn" (Vines of Vastwood): the
+  // opponents of whoever controls the effect, its spell's controller (rulings on Vines of Vastwood).
+  if ((m = /^(.+?) can't be the target of (.+) this turn$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const by = parseUntargetable(m[2]!);
+    return what && by ? [{ type: "continuous", what, mods: [{ kind: "untargetable", by }], duration: "endOfTurn" }] : null;
   }
   // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
   // of their choice", "return a land you control to its owner's hand" (CR 701.21).

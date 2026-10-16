@@ -457,6 +457,20 @@ export interface TokenSpec {
  * One change made by a continuous effect. Each kind belongs to one layer (CR 613.1),
  * see `layerOf` in layers.ts. An effect can have parts in several layers (CR 613.6).
  */
+/**
+ * What can't target a permanent: spells and abilities (`spells`: only spells; `subtype`: "Aura spells") whose source matches. `opponents`: controlled
+ * by an opponent of the permanent's controller; `colors`: from a source of one of these colors; `notColors`: from a source
+ * that's none of these ("nongreen"). A spell's color is its own; an ability's is its source's (CR 113.7a).
+ */
+export interface Untargetable {
+  opponents?: true;
+  spells?: true;
+  colors?: Color[];
+  notColors?: Color[];
+  /** "Aura spells". */
+  subtype?: string;
+}
+
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[] } // layer 4, "in addition to its other types"
@@ -511,6 +525,8 @@ export type Modification =
   | { kind: "mustAttackPlayer"; player: PlayerId }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
   | { kind: "cantBeBlockedBy"; filter: TargetSpec }
+  /** "Can't be the target of spells or abilities your opponents control", "... of black spells or abilities from black sources" (CR 115.4). */
+  | { kind: "untargetable"; by: Untargetable }
   /**
    * "Can't be blocked except by creatures with flying", "... except by black creatures", "... except by Walls and/or
    * creatures with flying" (CR 509.1b): only a creature matching one of `filters` can block it.

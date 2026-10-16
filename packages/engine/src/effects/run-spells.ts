@@ -6,7 +6,7 @@ import { shuffle } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, stampTargets } from "./targeting";
+import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, spellQuality, stampTargets } from "./targeting";
 import { ResolveCtx, objects, amountNow } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
@@ -396,7 +396,7 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
 export function changeTargetOptions(s: GameState, item: StackItem, spec: TargetSpec, current: TargetChoice): TargetChoice[] {
   // A spell's own characteristics, or an ability's source's (CR 113.7a), for protection and hexproof.
   const o = item.objectId ? s.objects[item.objectId] : undefined;
-  const src = o ? sourceQuality(s, undefined, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  const src = o ? spellQuality(s, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
   const all: TargetChoice[] = legalTargets(s, spec, item.controller, item.id, src);
   const self = s.resolving?.item;
   if (spec.kind === "spell" && self && self.id !== item.id && isLegalTarget(s, spec, { kind: "stack", id: self.id }, item.controller, src)) all.push({ kind: "stack", id: self.id });

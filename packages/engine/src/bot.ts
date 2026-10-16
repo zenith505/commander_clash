@@ -466,6 +466,11 @@ function canAlsoPayWard(s: GameState, pid: PlayerId, plan: Action[], targets: Ta
   return !!planMana(s, pid, parseManaCost(ward), 0, undefined, used);
 }
 const isCounterOnly = (b: AbilityBody) => b.effects.some((e) => e.type === "counterSpell");
+/**
+ * The source of what we're choosing targets for: a card that isn't on the battlefield is taken for a spell (it may be a
+ * channel or cycling ability, but then "can't be the target of spells" only makes us skip a target we could have had).
+ */
+const botSource = (s: GameState, id: ObjectId) => (s.objects[id] && s.objects[id]!.zone !== "battlefield" ? { ...sourceQuality(s, id), spell: true as const } : sourceQuality(s, id));
 
 /**
  * Pick targets for an ability body: harmful effects go at opponents (preferring things
@@ -474,7 +479,7 @@ const isCounterOnly = (b: AbilityBody) => b.effects.some((e) => e.type === "coun
  */
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
-  const body = offerMany(s, printed, pid, x, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId);
+  const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
   if (!forced && many >= 0 && !printed.targets[many]!.skip && body.targets[many]!.skip) return null;
   const harm = harmfulTargets(body);
@@ -511,7 +516,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // Bots never pick the same thing twice, which also keeps "another target" apart.
     // "Remove all counters from", "move all counters from": only something with counters on it.
     const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
-    const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
+    const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
       (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
     );
     // Reanimating takes the best creature from any graveyard it may.
@@ -571,7 +576,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
 function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: number, before: TargetChoice[], forced: boolean, sourceId?: string): TargetChoice[] | null {
   const spec = body.targets[first]!;
   const { n, total } = spec.divided!;
-  const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
+  const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
     (t) => !before.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
   );
   const foes = all.filter((t) => !isMine(s, pid, t));
@@ -608,7 +613,7 @@ function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: num
 function distributeCounters(s: GameState, pid: PlayerId, body: AbilityBody, first: number, before: TargetChoice[], forced: boolean, sourceId?: string): TargetChoice[] | null {
   const spec = body.targets[first]!;
   const { n, total, upTo } = spec.divided!;
-  const all = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId).filter(
+  const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
     (t) => !before.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
   );
   const mine = all.filter((t) => isMine(s, pid, t));
@@ -1488,7 +1493,7 @@ function copyGain(s: GameState, pid: PlayerId, e: Extract<Effect, { type: "becom
 export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forced = false, sourceId?: string): { modes: number[]; ranked: number[] } | null {
   const m = body.modal;
   if (!m) return { modes: [], ranked: [] };
-  const legal = legalModes(s, body, pid, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId);
+  const legal = legalModes(s, body, pid, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const scored = m.modes
     .map((mode, i) => {
       if (!legal[i]) return null;
@@ -2202,7 +2207,7 @@ function shieldTargets(s: GameState, pid: PlayerId, body: AbilityBody, t: Damage
   const foe = t.kind === "stack" ? t.item.controller : (t.attackers[0] ? controllerOf(s, t.attackers[0]) : undefined);
   for (const [i, spec] of body.targets.entries()) {
     const rules = body.effects.flatMap((e) => (e.type === "damageRule" ? [e.rule] : []));
-    const legal = legalTargets(s, spec, pid, undefined, sourceId ? sourceQuality(s, sourceId) : undefined, sourceId);
+    const legal = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
     const pick = (want: TargetChoice | undefined) => (want && legal.some((x) => sameTarget(x, want)) ? want : undefined);
     let choice: TargetChoice | undefined;
     if (rules.some((r) => r.to?.target && refCovers(r.to.target, i))) choice = pick(t.toMe > 0 ? { kind: "player", id: pid } : t.creatures[0] ? { kind: "object", id: t.creatures[0].id } : undefined);

@@ -1,4 +1,4 @@
-import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint } from "../abilities";
+import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCondition, CostMod, EntersChoice, EntersCondition, TargetSpec, TurnPoint, Untargetable } from "../abilities";
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
@@ -235,6 +235,30 @@ export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?:
   if (conds.some((c) => c.kind === "during") && conds.some((c) => c.kind === "control" && c.who === "defending")) return null;
   if (conds.length) out.cond = conds.length === 1 ? conds[0]! : { kind: "allOf", conds };
   return out;
+}
+
+/**
+ * What follows "can't be the target of": "spells or abilities your opponents control" (Canopy Cover), "black spells or
+ * abilities from black sources" (Mercenary Informer), "nongreen spells or abilities from nongreen sources" (Gaea's Revenge),
+ * "blue or black spells" (Karplusan Strider), "Aura spells" (Tetsuo Umezawa). Abilities alone (Shanna) aren't modeled: a
+ * spell copy choosing new targets isn't marked as a spell (chooseCopyTargets).
+ */
+export function parseUntargetable(t: string): Untargetable | null {
+  const COLOR = "(white|blue|black|red|green)";
+  const opp = / your opponents control$/.test(t) ? { opponents: true as const } : {};
+  let m: RegExpExecArray | null;
+  if (/^spells or abilities your opponents control$/.test(t)) return { opponents: true };
+  if (/^spells(?: your opponents control)?$/.test(t)) return { spells: true, ...opp };
+  if (/^Aura spells$/.test(t)) return { spells: true, subtype: "Aura" };
+  if ((m = new RegExp(`^${COLOR}(?: or ${COLOR})? spells(?: your opponents control)?$`).exec(t))) return { spells: true, colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])], ...opp };
+  if ((m = new RegExp(`^${COLOR} spells or abilities from ${COLOR} sources$`).exec(t)) && m[1] === m[2]) return { colors: [COLOR_WORDS[m[1]!]!] };
+  if ((m = new RegExp(`^non${COLOR} spells(?: your opponents control)? or abilities from non${COLOR} sources(?: your opponents control)?$`).exec(t)) && m[1] === m[2]) {
+    // "Nongreen spells your opponents control or abilities from nongreen sources your opponents control" (Thrun): both halves.
+    const both = / spells your opponents control or /.test(t);
+    if (both !== / sources your opponents control$/.test(t)) return null;
+    return { notColors: [COLOR_WORDS[m[1]!]!], ...(both ? { opponents: true as const } : {}) };
+  }
+  return null;
 }
 
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
@@ -562,6 +586,10 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
   }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
+  if ((m = /^can't be the target of (.+)$/.exec(rest))) {
+    const by = parseUntargetable(m[1]!);
+    return by ? [{ kind: "untargetable", by }] : null;
+  }
   if (/^can't be blocked$/.test(rest)) return [{ kind: "cantBeBlocked" }];
   if (/^can't be blocked by more than one creature$/.test(rest)) return [{ kind: "maxOneBlocker" }];
   if ((m = new RegExp(`^can't be blocked except by ${NUM} or more creatures$`).exec(rest)) && num(m[1]!) >= 2) return [{ kind: "minBlockers", n: num(m[1]!) }];

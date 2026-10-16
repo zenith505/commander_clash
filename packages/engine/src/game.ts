@@ -664,6 +664,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
+  o.suspected = undefined; // CR 701.60a
   o.classLevel = undefined; // CR 716.2b
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104

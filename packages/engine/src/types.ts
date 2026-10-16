@@ -156,6 +156,12 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /**
+   * Suspected (CR 701.60): a designation, not copiable (701.60b), until it leaves the battlefield or an effect ends it. It
+   * gives menace and "can't block" (701.60c) with the timestamp it became suspected, so losing all abilities later removes
+   * them but not the designation (rulings).
+   */
+  suspected?: number;
   /** A Class's level (CR 716.2a-b), a designation it keeps until it leaves the battlefield; unset is level 1 (716.2d). */
   classLevel?: number;
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */

@@ -495,6 +495,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "warpExile":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
+    case "suspect":
     case "untap":
     case "tapOrUntap":
     case "becomeSaddled":

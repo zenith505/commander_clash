@@ -232,6 +232,8 @@ export interface TargetSpec {
    * "creatures that aren't enchanted".
    */
   status?: "enchanted" | "equipped" | "modified" | "unenchanted";
+  /** "Suspected creature" (CR 701.60). */
+  suspected?: true;
   /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
   commander?: boolean;
   /** "a card named ~": the source's name (only for searches). */
@@ -470,7 +472,8 @@ export type Modification =
   | { kind: "switchPT" } // layer 7d
   // Rules effects about what the object can do (CR 613.11), checked after the layers.
   | { kind: "cantAttack" }
-  | { kind: "cantBlock" }
+  /** `ability`: "This creature can't block" as an ability it has (a suspected creature's, CR 701.60c), so in layer 6. */
+  | { kind: "cantBlock"; ability?: true }
   | { kind: "cantBeBlocked" }
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
@@ -610,6 +613,8 @@ export type StaticCondition =
   | { kind: "beforeAttackers" }
   /** "As long as you're the monarch" (CR 725). */
   | { kind: "monarch" }
+  /** "If ~ is suspected" (CR 701.60); `not`: "if it's not suspected". */
+  | { kind: "suspected"; not?: true }
   /** "If you have the initiative" (CR 726.1). */
   | { kind: "initiative" }
   /**
@@ -872,6 +877,8 @@ export type Effect =
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
+  /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
+  | { type: "suspect"; what: ObjRef; no?: true }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   | { type: "proliferate" }
   /** Amass [subtype] N (CR 701.47): an Army gets N +1/+1 counters, made first if you have none. */
@@ -1272,6 +1279,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
+  | { kind: "suspected"; what: ObjRef }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */

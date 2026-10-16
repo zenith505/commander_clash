@@ -30,6 +30,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "bounce" && e.what.ref === "target" && body.targets[e.what.index]?.kind === "card") continue;
     // Phasing out removes a permanent until its controller's next turn: used against opponents' things.
     if (["destroy", "exile", "bounce", "tap", "tapOrUntap", "skipUntap", "phaseOut"].includes(e.type) && "what" in e && e.what?.ref === "target") mark(e.what.index, e.what.n);
+    // A suspected creature can't block (CR 701.60c): aimed at opponents unless the card says "you control".
+    if (e.type === "suspect" && !e.no && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
     // "Destroy all creatures target player controls": aimed at an opponent, like the permanents themselves would be.

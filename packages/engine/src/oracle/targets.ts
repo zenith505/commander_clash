@@ -460,7 +460,11 @@ export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** 
     const words = alt.trim().split(/\s+/);
     for (let i = 0; i < words.length; i++) {
       const w = words[i]!;
-      if (w === "token" || w === "nontoken") {
+      if (w === "suspected") {
+        // "Suspected creature" (CR 701.60).
+        if (alts.length > 1 || extra.suspected) return null;
+        extra.suspected = true;
+      } else if (w === "token" || w === "nontoken") {
         if (alts.length > 1) return null;
         extra.token = w === "token";
       } else if ((w === "enchanted" || w === "equipped" || w === "modified") && !extra.status) {

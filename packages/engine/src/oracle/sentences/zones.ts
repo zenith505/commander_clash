@@ -263,6 +263,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
+  // "Until your next turn, those permanents can't attack or block and their activated abilities can't be activated" (Mythos
+  // of Vadrok): what detain does, in words (CR 701.35a); mana abilities too (CR 605.1a).
+  if ((m = /^Until your next turn, (.+?) can't attack or block and (?:its|their) activated abilities can't be activated$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantActivate" }], duration: "yourNextTurn" }] : null;
+  }
   // "Until your next turn, those creatures can't block" (Taunt from the Rampart): the same, said first.
   const front = /^Until your next turn, (.+? can't (?:block|attack|attack or block|be blocked))$/.exec(s);
   if (front) s = `${front[1]} until your next turn`;

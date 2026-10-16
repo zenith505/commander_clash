@@ -121,7 +121,10 @@ export function hopeValues(s: GameState, pid: PlayerId, d: CardDef): { req: Spen
       if (!v || typeof v !== "object") return;
       const o = v as { type?: string; kind?: string; cond?: { kind?: string; req?: SpentReq; target?: number }; req?: SpentReq; effects?: Effect[]; otherwise?: Effect[] };
       if (o.type === "if" && o.cond?.kind === "spent" && o.cond.target === undefined && key(o.cond.req!) === key(req)) {
-        value += listValue(s, pid, o.effects ?? [], body) - listValue(s, pid, o.otherwise ?? [], body);
+        // "... instead" (Vigor Mortis's +1/+1 counter, Mythos of Nethroi's "or if {G}{W} was spent"): the paid version
+        // does more, so with nothing to tell them apart it's still a small bonus.
+        const diff = listValue(s, pid, o.effects ?? [], body) - listValue(s, pid, o.otherwise ?? [], body);
+        value += diff === 0 && o.otherwise?.length ? 0.5 : diff;
         return;
       }
       // An amount that counts it (adamant: "enters with a +1/+1 counter").
@@ -146,6 +149,8 @@ export function hopeValues(s: GameState, pid: PlayerId, d: CardDef): { req: Spen
  */
 function listValue(s: GameState, pid: PlayerId, effects: Effect[], body?: AbilityBody): number {
   if (!effects.length) return 0;
+  // "You may have target creature get -3/-3" (Cankerous Thirst): the caster decides then, so it can't hurt them.
+  if (effects.every((e) => e.type === "may")) return 1;
   const all = allEffects(effects);
   if (all.some((e) => e.type === "sacrifice" && "what" in e && (e.what as ObjRef).ref === "self")) return -5;
   const group = groupValue(s, pid, { targets: body?.targets ?? [], effects, text: "" });

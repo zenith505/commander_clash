@@ -1378,6 +1378,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0a88dcb6-a391-408f-8bfc-7b5b2cc34267",
+  "name": "Fatigue",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target player skips their next draw step.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "uds",
+  "releasedAt": "1999-06-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "cf14d4e5-5965-45ad-97f7-26facf2884b5",
   "name": "Fertile Ground",
   "manaCost": "{1}{G}",
@@ -2736,6 +2762,32 @@
   "set": "dsk",
   "releasedAt": "2024-09-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f79f84c9-2023-4348-863b-a3b4bc382904",
+  "name": "Meditate",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw four cards. You skip your next turn.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

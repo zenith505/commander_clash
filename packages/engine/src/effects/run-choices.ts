@@ -1,4 +1,4 @@
-import type { Effect, PayCost, PunisherOption } from "../abilities";
+import type { Effect, PayCost, PunisherOption, TargetSpec } from "../abilities";
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
@@ -6,7 +6,7 @@ import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, 
 import { cardIdOf, defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
-import { choiceOptions, pickOptions, printedMatches } from "./targeting";
+import { choiceOptions, objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, gifteeOf, evidenceCollected } from "./resolve";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
@@ -143,6 +143,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (ctx.treasureSpent ?? 0) > 0
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
+            : e.cond.kind === "targetIs"
+            ? objects(s, { ref: "target", index: e.cond.index }, ctx).some((o) => o.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, o, ctx.controller, false))
             : e.cond.kind === "teamwork"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"

@@ -1,13 +1,13 @@
 import { refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
+import { num, NUMX, X, amt, counterKind, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseCount } from "./counts";
 import { parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
-import { parseObject, parsePlayer } from "./targets";
+import { parseObject, parsePlayer, parseTargetPhrase } from "./targets";
 import { parseSearchFilter } from "./search";
 
 export interface Ctx {
@@ -324,13 +324,45 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // this spell was cast using teamwork", "Then discard a card unless this spell was cast using teamwork"; "If the gift
     // was promised, ..." (CR 702.174b). Targets only the optional part needs are chosen only if it was paid (CR 702.166d,
     // 702.194c, 702.174m).
+    // "Destroy target nonland permanent if it's a creature or if {G}{W} was spent to cast ~" (Mythos of Nethroi): either
+    // one, checked as it resolves (rulings).
+    const orSpent = new RegExp(`^(.+) if it's an? (artifact|creature|enchantment|planeswalker) or if (${SPENT_TO_CAST})$`).exec(s);
+    if (orSpent) {
+      const fx = parseOne(orSpent[1]!, ctx);
+      const spent = spentHowCast(`${orSpent[1]} if ${orSpent[3]}`, ctx);
+      const i = ctx.targets.length - 1;
+      if (!fx || !spent || spent.not || spent.ofTarget || i !== curTargets || ctx.targets[i]!.kind !== "object" || !fx.every((e) => mentionsTarget(e, i))) return null;
+      const filter = parseTargetPhrase(orSpent[2]!);
+      if (filter?.kind !== "object") return null;
+      effects.push({ type: "if", cond: spent.cond, effects: fx, otherwise: [{ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: structuredClone(fx) }] });
+      continue;
+    }
     const howCast = parseHowCast(s, ctx);
+    // "Return target creature card from your graveyard to the battlefield. If {G} was spent to cast ~, that creature enters
+    // with an additional +1/+1 counter on it" (Vigor Mortis): it enters with it (CR 614.1c), so the return itself differs.
+    const more = howCast && !howCast.not && /^(?:that creature|it) enters with an additional (\+1\/\+1|-1\/-1) counter on it$/i.exec(howCast.text);
+    const back = effects[effects.length - 1];
+    if (more && howCast && back?.type === "putOntoBattlefield" && back.what.ref === "target" && !back.what.n && effects.length - 1 === prevStart) {
+      const k = counterKind(more[1]!);
+      effects[effects.length - 1] = { type: "if", cond: howCast.cond, effects: [{ ...back, counters: { ...back.counters, [k]: (back.counters?.[k] ?? 0) + 1 } }], otherwise: [back] };
+      continue;
+    }
     // A spell's targets are chosen whatever was spent (Cankerous Thirst rulings), so they aren't gated.
     if (howCast?.ungated && !howCast.not && !howCast.ofTarget && /^you may /i.test(howCast.text) && !/ instead$/.test(howCast.text)) {
       mayGate = { cond: howCast.cond, start: effects.length };
       s = `Y${howCast.text.slice(1)}`;
     } else if (howCast) {
-      const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx, true);
+      // "If {B} was spent to cast ~, that spell's controller mills X cards, where X is the spell's mana value" (Induce
+      // Paranoia): X is defined by the text (CR 107.3c), read after the rest.
+      const whereIn = /^(.+), where X is (.+)$/.exec(howCast.text);
+      ctx.whereX = !!whereIn;
+      const fx = parseKicked(whereIn ? whereIn[1]! : howCast.text, effects.slice(prevStart), ctx, true);
+      ctx.whereX = false;
+      if (fx && whereIn) {
+        const def = parseCount(whereIn[2]!, ctx);
+        if (!def || ctx.targets.slice(curTargets).some((t) => t.xRange || t.divided)) return null;
+        fx.effects = replaceX(fx.effects, def);
+      }
       if (!fx || (howCast.not && fx.instead) || (howCast.noTargets && ctx.targets.length !== curTargets)) return null;
       if (howCast.ofTarget) {
         // "Counter target spell if no mana was spent to cast it": the one target spell this sentence chose.

@@ -126,6 +126,8 @@ export interface GameObject {
   damage: number;
   deathtouchDamage: boolean;
   counters: Record<string, number>;
+  /** When keyword counters of each kind were last put on it (CR 613.7c): their effect's timestamp in layer 6. */
+  counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
   /** A copy of a spell (CR 707.10): not a card; it ceases to exist off the stack (707.10a), or becomes a token (608.3f). */
@@ -341,6 +343,11 @@ export interface RestrictedMana {
 export interface Player {
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
+  /**
+   * "Skip your next untap step / draw step / combat phase / turn" (CR 614.10): each entry skips one, the next to happen;
+   * `turn`: only during that turn ("skips their next combat phase this turn").
+   */
+  skips?: { what: SkipWhat; turn?: number }[];
   id: PlayerId;
   name: string;
   life: number;
@@ -945,6 +952,9 @@ export interface GameState {
  * made for it so far. No player gets priority and state-based actions aren't checked until
  * it finishes (CR 608.2, 704.3).
  */
+/** What a player can be made to skip (CR 614.10). */
+export type SkipWhat = "untap" | "draw" | "combat" | "turn";
+
 export interface MulliganState {
   /** Mulligans each player has taken so far. */
   taken: Record<string, number>;

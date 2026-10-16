@@ -77,6 +77,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
   // "Target player discards two cards. ... that player discards a card": the player targeted before.
   if (x === "that player" && ctx.lastPlayerTarget !== undefined && !manyNow) return { ref: "target", index: ctx.lastPlayerTarget };
+  // "Counter target spell. ... that spell's controller mills X cards" (Induce Paranoia): who controlled it as it was
+  // countered (CR 608.2h).
+  if (x === "that spell's controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell") return { ref: "targetController", index: ctx.lastObjectTarget };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };

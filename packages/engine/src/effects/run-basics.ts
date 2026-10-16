@@ -12,6 +12,15 @@ import { ringTempts } from "./run-ring";
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "skip": {
+      const words = { untap: "untap step", draw: "draw step", combat: "combat phase", turn: "turn" }[e.skip];
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        for (let i = 0; i < e.n; i++) (p.skips ??= []).push({ what: e.skip, ...(e.thisTurn ? { turn: s.turn } : {}) });
+        log(s, `${p.name} will skip their next ${e.n > 1 ? `${e.n} ${words}s` : words}${e.thisTurn ? " this turn" : ""}.`);
+      }
+      return;
+    }
     case "extraTurn":
       // CR 500.7: taken directly after this turn; the most recently created first.
       for (const pid of players(s, e.who, ctx)) {

@@ -36,6 +36,7 @@ import {
   type ObjectId,
   type Player,
   type PlayerId,
+  type SkipWhat,
   type Step,
   type ZoneName,
   STARTING_LIFE,
@@ -577,6 +578,11 @@ export function moveObject(
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
   }
+  // A finality counter: "If this permanent would be put into a graveyard from the battlefield, exile it instead" (CR 122.1h).
+  if (fromZone === "battlefield" && to === "graveyard" && (o.counters.finality ?? 0) > 0) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead (finality counter).`);
+  }
   o.exileIfDiesTurn = undefined;
   o.noRegenTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
@@ -704,6 +710,7 @@ export function moveObject(
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   o.counters = {};
+  o.counterTimestamps = undefined;
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
   o.attacking = undefined;
@@ -1510,6 +1517,12 @@ function startNextTurn(s: GameState) {
       if (order[i] === s.activePlayer || began.size >= order.length) break;
     }
   }
+  // "Skip your next turn" (CR 614.10): that turn doesn't happen; the one after it is next.
+  if (takeSkip(s, s.activePlayer, "turn")) {
+    log(s, `${player(s, s.activePlayer).name} skips their turn.`);
+    s.extraTurn = extra;
+    return startNextTurn(s);
+  }
   s.extraTurn = extra;
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
   const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
@@ -1519,7 +1532,12 @@ function startNextTurn(s: GameState) {
   }
   releasePhased(s, began);
   s.turn++;
-  for (const p of s.players) p.landsPlayedThisTurn = 0;
+  for (const p of s.players) {
+    p.landsPlayedThisTurn = 0;
+    // "Skips their next combat phase this turn" with that turn over.
+    if (p.skips) p.skips = p.skips.filter((k) => k.turn === undefined || k.turn >= s.turn);
+    if (!p.skips?.length) p.skips = undefined;
+  }
   for (const o of Object.values(s.objects)) {
     o.activatedThisTurn = undefined; // "once each turn" (CR 602.5b)
     o.triggeredThisTurn = undefined;
@@ -1570,12 +1588,33 @@ function untapStep(s: GameState, keep: ObjectId[]): void {
   return advanceStep(s);
 }
 
+/**
+ * Use up one of `pid`'s "skip your next ..." (CR 614.10): true if this one is skipped. A skip waits for the next
+ * occurrence that hasn't started; two skips skip the next two (614.10a).
+ */
+function takeSkip(s: GameState, pid: PlayerId, what: SkipWhat): boolean {
+  const p = player(s, pid);
+  const i = p.skips?.findIndex((k) => k.what === what && (k.turn === undefined || k.turn === s.turn)) ?? -1;
+  if (i < 0) return false;
+  p.skips!.splice(i, 1);
+  if (!p.skips!.length) p.skips = undefined;
+  return true;
+}
+
 /** Enter a step, perform its turn-based actions, and give the active player priority if the step has priority. */
 function beginStep(s: GameState, step: Step): void {
   s.step = step;
   s.passedInSuccession = [];
   s.priority = s.activePlayer;
   const ap = s.activePlayer;
+  // "Skip your next untap step / draw step" replaces the whole step (CR 614.10); a skipped combat phase goes straight to
+  // what comes after it.
+  const skipped = step === "untap" || step === "draw" ? step : step === "beginCombat" ? "combat" : undefined;
+  if (skipped && takeSkip(s, ap, skipped)) {
+    log(s, `${player(s, ap).name} skips their ${{ untap: "untap step", draw: "draw step", combat: "combat phase" }[skipped]}.`);
+    if (skipped === "combat") s.step = "endCombat";
+    return advanceStep(s);
+  }
   switch (step) {
     case "untap": {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
@@ -2053,6 +2092,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
 function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; n: number }) {
   const left = (o.counters[rc.counter] ?? 0) - rc.n;
   o.counters[rc.counter] = left;
+  invalidateCharacteristics(s);
   if (left === 0 && rc.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
 }
 

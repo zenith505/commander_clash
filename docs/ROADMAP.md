@@ -1,6 +1,6 @@
 # Roadmap
 
-17,950 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,999 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -87,17 +87,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Can't be the target of" still out: "unless it attacked or blocked this turn" (Lurker), "can't be enchanted by other
      Auras" (Anti-Magic Aura), Wall of Shadows.
    Left from the mana-spent round (autopay colors, copy targets, tokens together, "if {U} was spent", "you may have"):
-   - "Was spent to cast" (59 of 100 legal supported) still out on its own words: snow mana {S} (Berg Strider, Boreal
+   - "Was spent to cast" (69 of 102 legal supported) still out on its own words: snow mana {S} (Berg Strider, Boreal
      Outrider), colorless mana (Desecrate Reality), mana from creatures or artifacts (Inga and Esika, Shadow the
      Hedgehog), "it wasn't cast or no mana was spent" (Freestrider Commando, Primeval Spawn, Satoru), "seven red mana"
-     with "instead" (Sundering Stroke), "if it's a creature or if {G}{W} was spent" (Mythos of Nethroi), two conditions in
-     one sentence (Moonhold, Repel Intruders, Batwing Brume), a spent condition that adds a "you may" (Cankerous Thirst,
-     River's Grasp: "you may have target creature get"). The rest are blocked on other lines (`npm run blockers`).
-   - Autopay spends the colors a card hopes for whenever it can, even where that hurts (Rolling Spoil's -1/-1 for all
-     creatures); the player can tap lands by hand to choose otherwise. Bots pay the same way.
-   - "If you control a blue creature, draw a card, then discard a card" (Statute of Denial) was compiled with the discard
-     outside the "if"; it's now honestly unsupported: a discard that pauses inside an "if" with other effects isn't
-     modeled.
+     with "instead" (Sundering Stroke), the other Mythoi (Illuna, Snapdax, Vadrok). The rest are blocked on other lines
+     (`npm run blockers`).
+   Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
+   counters):
+   - Keyword counters work on permanents; one on a card in another zone (CR 122.1b) isn't modeled, and decayed counters
+     aren't (the engine has no decayed keyword: Rot-Curse Rakshasa).
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
      (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and

@@ -1,4 +1,4 @@
-import { refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
+import { refCovers, type AbilityBody, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
@@ -156,8 +156,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // A look that a "you may pay ... If you do," before it depends on (see payFirst).
   let digPaid: { pay: PayCost; text: string } | null = null;
+  // "If {B} was spent to cast ~, you may have target creature get -3/-3 until end of turn" (Cankerous Thirst): the "you
+  // may" sentence is parsed as one, then put under the condition.
+  let mayGate: { cond: SpellCondition; start: number } | null = null;
+  const closeGate = () => {
+    if (!mayGate) return true;
+    const inner = effects.splice(mayGate.start);
+    if (inner.length !== 1 || inner[0]!.type !== "may") return false;
+    effects.push({ type: "if", cond: mayGate.cond, effects: inner });
+    mayGate = null;
+    return true;
+  };
   for (let si = 0; si < sentences.length; si++) {
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    if (!closeGate()) return null;
     [prevStart, curStart] = [curStart, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
@@ -313,7 +325,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // was promised, ..." (CR 702.174b). Targets only the optional part needs are chosen only if it was paid (CR 702.166d,
     // 702.194c, 702.174m).
     const howCast = parseHowCast(s, ctx);
-    if (howCast) {
+    // A spell's targets are chosen whatever was spent (Cankerous Thirst rulings), so they aren't gated.
+    if (howCast?.ungated && !howCast.not && !howCast.ofTarget && /^you may /i.test(howCast.text) && !/ instead$/.test(howCast.text)) {
+      mayGate = { cond: howCast.cond, start: effects.length };
+      s = `Y${howCast.text.slice(1)}`;
+    } else if (howCast) {
       const fx = parseKicked(howCast.text, effects.slice(prevStart), ctx, true);
       if (!fx || (howCast.not && fx.instead) || (howCast.noTargets && ctx.targets.length !== curTargets)) return null;
       if (howCast.ofTarget) {
@@ -529,8 +545,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // "Draw another card": one more.
       const then = ifState[2]!.replace(/^(that creature|that player|it|~) also (?=(?:gains?|gets?|deals?|has|loses?) )/i, "$1 ").replace(/^draw another card$/, "draw a card");
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
-      // An effect that waits on a player has to be the only one, so resuming it doesn't repeat the others.
-      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      // Its instructions run one at a time, so one may wait on a player ("draw a card, then discard a card", see the "if"
+      // effect).
+      if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "state", cond: stateCond }, effects: inner });
       continue;
     }
@@ -664,7 +681,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     effects.push(...fx);
     if (!defineX()) return null;
   }
-  if (payFirst || dig) return null;
+  if (payFirst || dig || !closeGate()) return null;
   return effects.length ? { targets: ctx.targets, effects, text } : null;
 }
 
@@ -715,6 +732,9 @@ function splitSpentPair(x: string): string[] {
   const [first, second] = [m[1]!, m[4]!];
   const amount = /^(?:X|\d+) /.test(second) && /^(.+?\b)(?:X|\d+) /.exec(first);
   if (amount) return [first, amount[1] + second];
+  // "Target player can't play lands this turn if {R} was spent to cast ~ and can't cast creature spells this turn if {W}
+  // was spent to cast ~" (Moonhold): the same player, "that player" in the second.
+  if (/^can't /.test(second) && /^target player can't /i.test(first)) return [first, `That player ${second}`];
   return /^(?:creatures|target|each|all|you) /i.test(second) ? [first, second.charAt(0).toUpperCase() + second.slice(1)] : [x];
 }
 
@@ -819,7 +839,9 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   const before = ctx.targets.length;
   const fx = parseOne(t, ctx);
   if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
-  if (fx.length > 1 && fx.some((e) => pauses(e))) return null;
+  // Under an "if", its instructions run one at a time, so one may wait on a player (see the "if" effect); not when done
+  // "instead" of others.
+  if (instead && fx.length > 1 && fx.some((e) => pauses(e))) return null;
   if (instead && previous.some((e) => pauses(e))) return null;
   const done = instead ? insteadOfAffected(fx, previous) : fx;
   return done && { effects: done, instead };
@@ -860,6 +882,15 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
   if (support) s = `Put a +1/+1 counter on each of up to ${num(support[1]!) === 1 ? "one" : support[1]} ${ctx.spell ? "" : "other "}target creature${support[1] === "1" ? "" : "s"}`;
+  // "Target player reveals their hand, you choose a nonland card from it, then that player discards that card" (River's
+  // Grasp): the three-sentence hand disruption in one (see parseBody), another player picking the card (CR 701.9b).
+  const disrupt = /^(.+? reveals (?:their|his or her) hand), you choose an? (.+?) from it, then that player discards that card$/.exec(s);
+  if (disrupt) {
+    const look = attempt(ctx, () => parseSentence(disrupt[1]!, ctx));
+    const filter = parseSearchFilter(disrupt[2]!);
+    if (look?.length !== 1 || look[0]!.type !== "lookAtHand" || !look[0]!.reveal || filter === null) return null;
+    return [look[0]!, { type: "takeFromHand", who: look[0]!.who, ...(filter ? { filter } : {}), action: "discard" }];
+  }
   const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx));
   if (fx) noteLast(ctx, fx);
   return fx;
@@ -976,6 +1007,18 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
   const [main, phrase] = s.startsWith("For each ") ? [m[2]!.charAt(0).toUpperCase() + m[2]!.slice(1), m[1]!] : [m[1]!, m[2]!];
   const fx = parseSentence(main, ctx);
   if (!fx || fx.length !== 1) return null;
+  // "Each player loses 1 life for each creature they control" (Stronghold Discipline), "target player loses 1 life for each
+  // tapped artifact they control" (Burden of Greed): each of those players counts their own.
+  const theirs = /^(.+) they control$/.exec(phrase);
+  if (theirs) {
+    const e = fx[0]!;
+    if (e.type !== "loseLife" && e.type !== "gainLife" && e.type !== "draw") return null;
+    const whose: PlayerRef | null = e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? { ref: "eachOne" } : e.who.ref === "target" && !e.who.n ? e.who : e.who.ref === "eventPlayer" ? e.who : null;
+    const count = whose && parseCount(`${theirs[1]} on the battlefield`, ctx, true);
+    if (!count || count.count.kind !== "permanents" || count.times || count.plus) return null;
+    const scaled = scaleEffect(e, { count: { ...count.count, whose } });
+    return scaled ? [scaled] : null;
+  }
   const per = parseCount(phrase, ctx, true);
   if (!per) return null;
   const scaled = scaleEffect(fx[0]!, per);

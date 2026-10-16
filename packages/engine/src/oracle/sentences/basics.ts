@@ -244,6 +244,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || (filter && filter.kind !== "spell")) return null;
     return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: `${m[2]!.toLowerCase()} spell` } } : {}) }];
   }
+  // "Target player can't play lands this turn" (Moonhold): one player, until the turn ends.
+  if ((m = /^(target player|that player) can't play lands this turn$/i.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "cantPlayLands", who }] : null;
+  }
   // "Prevent all combat damage that would be dealt to and dealt by that creature this turn" (Maze of Ith), "Prevent all
   // damage target creature would deal this turn": a prevention effect on that creature until the turn ends (CR 615.1).
   if ((m = /^(Prevent all .+) this turn$/i.exec(s)) || (m = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s))) {

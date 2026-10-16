@@ -65,6 +65,7 @@ import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_PROTECTION } from "./keywords";
+import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -767,7 +768,7 @@ function overloadPlan(s: GameState, pid: PlayerId, id: string): Action[] | null 
   const o = obj(s, id);
   if (o.zone !== "hand" || !altCost(defOf(s, o), "overload")) return null;
   const body = castingBody(castDef(s, id, "overload"));
-  const v = body ? groupValue(s, pid, body, defOf(s, o), id) : null;
+  const v = body ? groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) : null;
   const best = Math.max(1, ...s.battlefield.map((x) => worth(s, pid, obj(s, x))));
   if (v === null || v <= 1.5 * best) return null;
   return castPlan(s, pid, id, false, undefined, "overload");
@@ -1115,7 +1116,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   // Epic: no more spells for the rest of the game (CR 702.50a), so only as our last spell in hand.
   if (compileCard(defOf(s, obj(s, id))).epic && player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land"))) return null;
   // "Destroy all creatures" and the like: only when it hurts the opponents more than us.
-  if (body && (groupValue(s, pid, body, defOf(s, obj(s, id))) ?? 1) <= 0) return null;
+  if (body && (groupValue(s, pid, body, guessChosen(s, pid, defOf(s, obj(s, id)))) ?? 1) <= 0) return null;
   // "Sacrifice a creature or pay {3}{B}" (CR 601.2b): the first way we're willing and able to pay.
   const ors = compileCard(defOf(s, obj(s, id))).costOr?.map((_, i) => i) ?? [undefined];
   let extra: CostChoices | null = null;
@@ -1205,7 +1206,7 @@ function chooseSplices(s: GameState, pid: PlayerId, id: ObjectId, x: number): { 
   for (const c of spliceCandidates(s, pid, id)) {
     const body = compileCard(defOf(s, obj(s, c))).spell!;
     if (body.effects.every((e) => e.type === "addMana")) continue;
-    if ((groupValue(s, pid, body, defOf(s, obj(s, c))) ?? 1) <= 0) continue;
+    if ((groupValue(s, pid, body, guessChosen(s, pid, defOf(s, obj(s, c)))) ?? 1) <= 0) continue;
     const t = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
     if (!t || t.some((x) => x.kind === "none")) continue;
     out.ids.push(c);
@@ -1532,94 +1533,6 @@ export function chooseModes(s: GameState, pid: PlayerId, body: AbilityBody, forc
 }
 
 /** How much a permanent matters, for weighing effects on many at once. */
-function worth(s: GameState, pid: PlayerId, o: GameObject): number {
-  const c = characteristics(s, o);
-  if (c.types.includes("Creature")) return Math.max(1, power(s, o) + toughness(s, o)) + (o.isCommander ? 6 : 0) + (o.isToken ? 0 : 1);
-  if (c.types.includes("Land")) return 3;
-  return 1 + mv(s, o.id);
-}
-
-/** While working out groupValue for one player as the target of "each creature target player controls": who, by target. */
-let ofPick: Map<number, PlayerId> | undefined;
-
-/** The player targets whose permanents a group effect touches ("tap all creatures target opponent controls"). */
-function ofPlayerTargets(body: AbilityBody): number[] {
-  const out = new Set<number>();
-  const walk = (v: unknown): void => {
-    if (Array.isArray(v)) return v.forEach(walk);
-    if (!v || typeof v !== "object") return;
-    const o = v as Record<string, unknown>;
-    const of = o.of as { ref?: string; index?: number } | undefined;
-    if (o.ref === "each" && of?.ref === "target" && of.index !== undefined) out.add(of.index);
-    Object.values(o).forEach(walk);
-  };
-  walk(body.effects);
-  return [...out];
-}
-
-/** The player to target for "... each creature target player controls": the one for whom the group effects do us the most good. */
-function ofPlayerPick(s: GameState, pid: PlayerId, body: AbilityBody, i: number, pool: ChosenTarget[], sourceId?: string): ChosenTarget | undefined {
-  let top: { t: ChosenTarget; v: number } | undefined;
-  for (const t of pool) {
-    if (t.kind !== "player") continue;
-    ofPick = new Map([[i, t.id]]);
-    const v = groupValue(s, pid, body, undefined, sourceId) ?? 0;
-    ofPick = undefined;
-    if (!top || v > top.v) top = { t, v };
-  }
-  return top && top.v > 0 ? top.t : undefined;
-}
-
-/**
- * What effects on groups of permanents ("destroy all creatures", "each creature gets -1/-1", "untap all
- * creatures you control") do for us: the worth of what they hurt of the opponents' and help of ours,
- * less the reverse. Null if the body has none. `card` is the source, for guessing what we'd choose.
- */
-function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, card?: CardDef, sourceId?: string): number | null {
-  // "Destroy all creatures target player controls": as good as it is for the player we'd target (see ofPlayerPick).
-  const of = ofPlayerTargets(body);
-  if (of.length && !ofPick) {
-    let top: number | null = null;
-    for (const p of livingPlayers(s)) {
-      ofPick = new Map(of.map((i) => [i, p]));
-      const v = groupValue(s, pid, body, card, sourceId);
-      ofPick = undefined;
-      if (v !== null && (top === null || v > top)) top = v;
-    }
-    return top;
-  }
-  let v: number | null = null;
-  const chosen = card ? guessChosen(s, pid, card) : undefined;
-  const group = (r: ObjRef) => {
-    if (r.ref !== "each") return [];
-    const whose = r.of?.ref === "target" ? ofPick?.get(r.of.index) : undefined;
-    if (r.of && whose === undefined) return [];
-    const filter = bindChosen(r.filter, sourceId ? (obj(s, sourceId).chosen ?? chosen) : chosen);
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => !(r.other && o.id === sourceId) && (whose === undefined || controllerOf(s, o) === whose) && objectMatches(s, filter, o, pid, false));
-  };
-  const add = (objs: GameObject[], harmful: boolean, scale = (_: GameObject) => 1) => {
-    for (const o of objs) v = (v ?? 0) + (controllerOf(s, o) === pid ? -1 : 1) * (harmful ? 1 : -1) * worth(s, pid, o) * scale(o);
-  };
-  for (const e of allEffects(body.effects)) {
-    if (e.type === "damage") {
-      const amount = estimate(e.amount);
-      if (e.to.ref === "each") add(group(e.to), true, (o) => (lethalDamage(s, o) <= amount ? 1 : 0.2));
-      // Hitting every player costs us as much as any one opponent; it's worth it against several.
-      if (e.to.ref === "eachPlayer") v = (v ?? 0) + (amount * (opponents(s, pid).length - 2)) / 2;
-      continue;
-    }
-    if (!("what" in e) || typeof e.what !== "object" || e.what.ref !== "each") continue;
-    const objs = group(e.what);
-    if (e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "tap" || e.type === "putInLibrary" || e.type === "phaseOut") add(objs, true);
-    else if (e.type === "untap") add(objs.filter((o) => o.tapped), false, () => 0.5);
-    else if (e.type === "counters") add(objs, harmfulCounter(e.counter), () => estimate(e.n) / 2);
-    else if (e.type === "continuous") add(objs, modsAreHarmful(e.mods), () => 0.5);
-    else v = v ?? 0;
-  }
-  // A group we'd mostly empty of our own things: also nothing gained if both sides are empty.
-  return v;
-}
-
 /** Which creature type or color a choice would hurt or help: "-1/-1 to the chosen type" is aimed at opponents. */
 function choiceHurts(c: CompiledCard): boolean {
   let hurts = false;
@@ -1876,7 +1789,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
       if (ab.body.modal && !modes) continue;
       const body = withModes(ab.body, modes);
-      if ((groupValue(s, pid, body, defOf(s, o), id) ?? 1) <= 0) continue;
+      if ((groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
       const xs = cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
@@ -2476,7 +2389,7 @@ function chooseLoyalty(s: GameState, pid: PlayerId): Action[] | null {
       const modes = ab.body.modal ? chooseModes(s, pid, ab.body, false, id)?.modes : undefined;
       if (ab.body.modal && !modes) continue;
       const body = withModes(ab.body, modes);
-      if ((groupValue(s, pid, body, defOf(s, o), id) ?? 1) <= 0) continue;
+      if ((groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
       if (!targets) continue;
       const score = ultimate ? 100 : cost < 0 ? (after >= 2 ? 50 - cost : -1) : 30 + cost;

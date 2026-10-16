@@ -396,7 +396,12 @@ export type PlayerRef =
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
-  | { ref: "damagedThisWay" };
+  | { ref: "damagedThisWay" }
+  /**
+   * "They" in "Each player loses 1 life for each creature they control" (Stronghold Discipline): the player the instruction
+   * is being done to, one at a time.
+   */
+  | { ref: "eachOne" };
 
 export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
 
@@ -1280,6 +1285,8 @@ export type Effect =
    * is the kind of spell.
    */
   | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec }
+  /** "Target player can't play lands this turn" (Moonhold): no land plays for them until the turn ends (CR 305.2, 101.2). */
+  | { type: "cantPlayLands"; who: PlayerRef }
   /** "Damage can't be prevented this turn" (CR 615.12). */
   | { type: "noPrevention" }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */

@@ -855,6 +855,8 @@ export interface GameState {
   resumeStep?: Step;
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string }[];
+  /** Players who can't play lands this turn (Moonhold), and what said so. */
+  cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
@@ -1036,6 +1038,8 @@ export interface Resolving {
     mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)
     mayers?: PlayerId[]; // and those who chose to
     mayStep?: number; // how many of its instructions are done
+    /** The "if"s running, outermost first: whether each one's condition held as it was reached, and its instructions done. */
+    ifs?: { holds: boolean; step: number }[];
     /** A punisher (see its effect): players still to choose, what each chose (an option's index or "none"), the round. */
     punish?: {
       queue: PlayerId[];

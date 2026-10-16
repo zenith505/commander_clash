@@ -186,11 +186,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // value, as it resolves, is countered (rulings).
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
   // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
-  if ((m = /^Counter target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
-    const spec = parseTargetPhrase(m[1]!, { x: true });
-    const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
+  // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
+  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[2]!, { x: true });
+    const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
     if (!spec || unless === null || (spec.xRange && (!ctx.spell || ctx.whereX))) return null;
-    return [{ type: "counterSpell", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
+    return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (Sram's Expertise),
   // "... with mana value X or less ..." (Electrodominance: its X), "... an instant or sorcery spell from your hand ...".

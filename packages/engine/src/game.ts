@@ -10,13 +10,14 @@ import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
-import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, wantedColors, type ParsedCost } from "./mana";
+import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount } from "./amounts";
 import { addMana, canPayFromPool, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES, type SourceQuality } from "./keywords";
+import { spendPlan } from "./value";
 import {
   COLORS,
   RulesError,
@@ -1540,6 +1541,7 @@ function startNextTurn(s: GameState) {
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
   s.cantCastThisTurn = undefined;
+  s.cantPlayLandsThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
@@ -2010,6 +2012,8 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
 
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
+  // "Can't play lands this turn" wins over anything that lets them (CR 101.2).
+  if (s.cantPlayLandsThisTurn?.some((c) => c.player === pid && c.turn === s.turn)) return 0;
   let n = 1;
   const extra = player(s, pid).extraLands;
   if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
@@ -2608,8 +2612,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
   const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
-  const want = wantedColors(compileCard(d).wantSpent, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst, ...(want ? { want } : {}) })!;
+  // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
+  const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
+  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, p.life, { spreadColors: sunburst, ...hopes })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);

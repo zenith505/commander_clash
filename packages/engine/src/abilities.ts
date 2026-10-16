@@ -2266,6 +2266,13 @@ export interface CompiledCard {
   cantWin?: "you" | "opponents";
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /**
+   * "Sliver spells you cast have cascade", "Instant and sorcery spells you cast from your hand have cascade", "The first
+   * spell you cast each turn has cascade" (CR 702.85a): those spells have cascade as they're cast. `first`: the first such
+   * spell its controller cast this turn, counting ones before this permanent was there; `fromHand` / `fromExile`: cast
+   * from there; `treasure`: "that mana from a Treasure was spent to cast" (CR 106.3).
+   */
+  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
   /**

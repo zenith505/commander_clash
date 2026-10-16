@@ -921,6 +921,25 @@ export function compile(d: CardDef): CompiledCard {
       else [out.cantWin, out.cantLose] = ["you", "opponents"];
       continue;
     }
+    // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you
+    // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
+    const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have cascade\.$/.exec(line);
+    const firstCascade = /^The first spell you cast (from exile )?each turn( that mana from a Treasure was spent to cast)? has cascade\.$/.exec(line);
+    if (giveCascade || firstCascade) {
+      let filter: TargetSpec | undefined;
+      if (giveCascade && (giveCascade[1] || giveCascade[3])) {
+        const words = (giveCascade[1] ?? "").replace(/ and /g, " or ").replace(/^./, (c) => c.toLowerCase());
+        const f = parseTargetPhrase(`${words ? `${words} ` : ""}spell${giveCascade[3] ?? ""}`);
+        if (f?.kind !== "spell") {
+          out.unsupported.push(raw);
+          continue;
+        }
+        filter = f;
+      }
+      const from = giveCascade?.[2] ? "hand" : firstCascade?.[1] ? "exile" : undefined;
+      (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
+      continue;
+    }
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;

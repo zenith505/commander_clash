@@ -2830,7 +2830,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
   s.cards[d.oracleId] ??= d;
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors] });
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
   (s.castItems ??= {})[stackId] = structuredClone(item);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}) });

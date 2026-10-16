@@ -691,6 +691,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
+    // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
+    if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
     const castWatch = (o: GameObject, you: PlayerId) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
@@ -1097,6 +1099,27 @@ function speedTrigger(s: GameState, loser: PlayerId) {
     index: -1,
     body: { targets: [], effects: [{ type: "increaseSpeed" }], text: "Whenever one or more opponents lose life during your turn, if your speed is less than 4, your speed increases by 1." },
   });
+}
+
+const CASCADE_BODY: AbilityBody = { targets: [], effects: [{ type: "cascade" }], text: "Cascade: exile cards from the top of your library until you exile a cheaper nonland card. You may cast it without paying its mana cost." };
+
+/** The cascade abilities the permanents `you` controls give this spell as it's cast ("Sliver spells you cast have cascade"). */
+function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: PlayerId): unknown[] {
+  const cast = (s.castThisTurn ?? []).filter((c) => c.player === you);
+  const out: unknown[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== you) continue;
+    for (const g of abilitiesOf(s, o).spellsHaveCascade ?? []) {
+      if (g.from && spell.castFrom !== g.from) continue;
+      if (g.treasure && !spell.treasureSpent) continue;
+      if (g.filter && !spellMatches(s, g.filter, item)) continue;
+      // "The first spell you cast each turn ...": this one is the first of its kind this turn (it's already counted).
+      if (g.first && cast.filter((c) => (!g.from || c.from === g.from) && (!g.treasure || c.treasure)).length !== 1) continue;
+      out.push(g);
+    }
+  }
+  return out;
 }
 
 /** Is this moved object one that `b` counts, for the permanent `w` (as it is now, or as it last existed: `gone`)? */

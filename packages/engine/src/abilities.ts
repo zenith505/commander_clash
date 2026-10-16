@@ -918,7 +918,14 @@ export type Effect =
    * permanent may be chosen for several (rulings). Then every unchosen permanent matching `among` is sacrificed at once.
    * `youChoose`: you make every player's choices (Mythos of Snapdax).
    */
-  | { type: "keepRest"; who: PlayerRef; keep: { filter: TargetSpec; n: number; upTo?: true }[]; among: TargetSpec; youChoose?: true }
+  | {
+      type: "keepRest";
+      who: PlayerRef;
+      /** `fewest`: "a number of lands they control equal to the number of lands controlled by the player who controls the fewest" (Restore Balance), counted as it resolves; `n` is unused then. */
+      keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[];
+      among: TargetSpec;
+      youChoose?: true;
+    }
   | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
@@ -1182,7 +1189,7 @@ export type Effect =
   | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile"; until?: "sourceLeaves"; linked?: boolean }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }

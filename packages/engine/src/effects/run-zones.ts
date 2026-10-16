@@ -190,6 +190,9 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
   const who = apnap(s, players(s, e.who, ctx));
   const kr = (sc.keepRest ??= { queue: [...who], slot: 0, kept: {} });
   const among = (pid: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, { ...e.among, controller: "you" }, obj(s, id), pid, false));
+  // "Equal to the number of lands controlled by the player who controls the fewest": counted once, before anyone
+  // chooses (Restore Balance rulings).
+  if (e.keep.some((k) => k.fewest)) kr.fewest ??= Math.min(...who.map((pid) => among(pid).length));
   while (kr.queue.length) {
     const pid = kr.queue[0]!;
     const chooser = e.youChoose ? ctx.controller : pid;
@@ -201,7 +204,8 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       kr.slot++;
     }
     while (kr.slot < e.keep.length) {
-      const k = e.keep[kr.slot]!;
+      const k0 = e.keep[kr.slot]!;
+      const k = k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0;
       const options = among(pid).filter((id) => objectMatches(s, { ...k.filter, controller: "you" }, obj(s, id), pid, false));
       const max = Math.min(k.n, options.length);
       // Nothing to choose between: all of them are kept.
@@ -210,7 +214,8 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
         kr.slot++;
         continue;
       }
-      if (!options.length) {
+      // None to keep (Restore Balance when someone controls none): nothing to choose.
+      if (!options.length || max === 0) {
         kr.slot++;
         continue;
       }

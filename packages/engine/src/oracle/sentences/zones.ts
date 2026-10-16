@@ -318,8 +318,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     let r: RegExpExecArray | null;
     let among: TargetSpec | null = null;
     let list: string | undefined;
-    let keep: { filter: TargetSpec; n: number; upTo?: true }[] | null = null;
-    if ((r = /^from among the permanents they control (.+)$/.exec(what))) [among, list] = [{ kind: "object", text: "permanent" }, r[1]!];
+    let keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[] | null = null;
+    // "Each player chooses a number of lands they control equal to the number of lands controlled by the player who
+    // controls the fewest, then sacrifices the rest" (Restore Balance, Balancing Act).
+    if ((r = /^a number of (lands|creatures|permanents) they control equal to the number of \1 controlled by the player who controls the fewest$/.exec(what))) {
+      among = pickFilter(r[1]!.replace(/s$/, ""));
+      keep = among && [{ filter: among, n: 0, fewest: true }];
+    } else if ((r = /^from among the permanents they control (.+)$/.exec(what))) [among, list] = [{ kind: "object", text: "permanent" }, r[1]!];
     else if ((r = /^(.+) from among the (nonland permanents|creatures) they control$/.exec(what))) [among, list] = [pickFilter(r[2]!), r[1]!];
     else if ((r = /^from the lands they control a land of each basic land type$/.exec(what))) {
       among = { kind: "object", types: ["Land"], text: "land" };

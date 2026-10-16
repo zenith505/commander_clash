@@ -67,7 +67,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const who = players(s, e.who, ctx);
       // Worked out once, before anyone discards.
       const sc0 = (s.resolving!.scratch ??= {});
-      const n = (sc0.n ??= amountNow(s, e.n, ctx));
+      // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
+      // discards the rest (n is per player then).
+      const fewest = e.downToFewest ? (sc0.n ??= who.length ? Math.min(...who.map((pid) => player(s, pid).hand.length)) : 0) : 0;
+      const n = e.downToFewest ? 0 : (sc0.n ??= amountNow(s, e.n, ctx));
       if (e.random && !e.hand) {
         for (const pid of apnap(s, who)) {
           const hand = player(s, pid).hand;
@@ -88,6 +91,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
         const hand = player(s, pid).hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        if (e.downToFewest) {
+          if (hand.length > fewest && fewest > 0) {
+            s.pending = { kind: "discard", player: pid, count: hand.length - fewest, source: src };
+            return "paused";
+          }
+          sc.chosen![pid] = fewest > 0 ? [] : [...hand];
+          sc.queue.shift();
+          continue;
+        }
         if (!e.hand && hand.length > n) {
           s.pending = { kind: "discard", player: pid, count: n, source: src, ...(e.filter ? { filter: e.filter } : {}) };
           return "paused";

@@ -1098,7 +1098,7 @@ export interface Resolving {
     /** "Sacrifice an artifact, a creature, and a land": players still to pick, the slot being picked, the picks so far. */
     slots?: { queue: PlayerId[]; slot: number; picked: Record<string, ObjectId[]> };
     /** "Choose ..., then sacrifice the rest": whose turn to choose, which of their choices, and what each player kept. */
-    keepRest?: { queue: PlayerId[]; slot: number; kept: Record<string, ObjectId[]> };
+    keepRest?: { queue: PlayerId[]; slot: number; kept: Record<string, ObjectId[]>; /** Restore Balance: the fewest any of them controls, counted as it starts. */ fewest?: number };
     paid?: boolean; // the answer to "unless that player pays ..."
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
     paidBy?: PlayerId[]; // and those who paid

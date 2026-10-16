@@ -346,6 +346,26 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       si++;
       continue;
     }
+    // "Each player discards cards the same way", "Players sacrifice creatures and discard cards the same way" (Balancing
+    // Act, Restore Balance, Magus of the Balance): after the "chooses a number of lands ... equal to the number ...
+    // controlled by the player who controls the fewest, then sacrifices the rest" before it, the same again for the
+    // creatures and the cards in hand, one after another in the order written, each counted when its turn comes (rulings).
+    const same = /^(?:Each player|Players) (.+) the same way$/.exec(s);
+    if (same) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "keepRest" || !prev.keep[0]?.fewest || prev.keep.length !== 1 || prev.youChoose) return null;
+      const steps = same[1]!.split(" and ");
+      const more: Effect[] = [];
+      for (const step of steps) {
+        if (/^discards? cards$/.test(step)) more.push({ type: "discard", who: prev.who, n: 0, downToFewest: true });
+        else if (/^sacrifices? creatures$/.test(step)) {
+          const among: TargetSpec = { kind: "object", types: ["Creature"], text: "creature" };
+          more.push({ type: "keepRest", who: prev.who, keep: [{ filter: among, n: 0, fewest: true }], among });
+        } else return null;
+      }
+      effects.push(...more);
+      continue;
+    }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
     const rider = parsePreventionRider(s);
     if (rider) {

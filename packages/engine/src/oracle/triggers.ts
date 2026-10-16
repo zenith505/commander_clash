@@ -1,5 +1,5 @@
 import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, SpentReq, StaticCondition, TargetSpec, TriggerEvent } from "../abilities";
-import { NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
+import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -716,7 +716,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
-    const t = parseTrigger(`${intervening[1]}, ${intervening[3]}`);
+    // Feast of the Victorious Dead: "if one or more creatures died this turn, you gain that much life and distribute that
+    // many +1/+1 counters": the number of creatures that died this turn, counted as it resolves.
+    let rest = intervening[3]!;
+    if (/^one or more creatures died this turn$/.test(intervening[2]!) && /\bthat (much|many)\b/.test(rest)) {
+      const died = "the number of creatures that died this turn";
+      rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");
+      if (/\bthat (much|many)\b/.test(rest)) return "fail";
+    }
+    const t = parseTrigger(`${intervening[1]}, ${rest}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
   }
   // "At the beginning of each opponent's upkeep, ~ deals 1 damage to that player": an "each upkeep" trigger that

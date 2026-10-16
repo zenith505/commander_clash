@@ -109,6 +109,8 @@ export type Count =
   | { kind: "kicked"; which?: number }
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */
   | { kind: "wasKicked"; which?: number }
+  /** 1 if the mana spent to cast it meets `req` (adamant, CR 601.2h), else 0. */
+  | { kind: "spentWas"; req: SpentReq }
   /** "That much", "that many" in a triggered ability: the damage its event dealt. */
   | { kind: "eventAmount" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
@@ -1325,6 +1327,18 @@ export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword";
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead";
 
+/**
+ * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
+ * white mana"), of one color (adamant's "three mana of the same color"), in all ("five or more mana"), or none at all.
+ */
+export interface SpentReq {
+  colors?: Partial<Record<Color, number>>;
+  sameColor?: number;
+  total?: number;
+  /** "No mana was spent", "no colored mana was spent". */
+  none?: "mana" | "colored";
+}
+
 /** A fact about how the spell was cast: "if ~ was kicked", "if it was kicked with its {1}{U} kicker" (CR 702.33e-f). */
 export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
@@ -1345,6 +1359,12 @@ export type SpellCondition =
   | { kind: "evidence" }
   /** "If mana from a Treasure was spent to cast ~" / "to activate this ability" (CR 106.3). */
   | { kind: "treasure" }
+  /**
+   * "If {U} was spent to cast ~", "if at least three red mana was spent to cast ~", "if five or more mana was spent to
+   * cast that spell" (CR 601.2h): the mana spent to cast the spell itself, the spell its permanent was, or the spell a cast
+   * trigger is about. `target`: "counter target spell if no mana was spent to cast it" (Nix), that target's.
+   */
+  | { kind: "spent"; req: SpentReq; target?: number }
   /** "If this spell was cast using teamwork": its teamwork cost was paid. */
   | { kind: "teamwork" }
   /** "If the gift was promised" (CR 702.174b, k). */
@@ -1565,7 +1585,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
@@ -1638,6 +1658,8 @@ export interface TriggeredAbility {
   ifEvidence?: boolean;
   /** "When ~ enters, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR 603.4). */
   ifTreasure?: boolean;
+  /** "When ~ enters, if {R} was spent to cast it, ..." (an intervening if, CR 603.4): what its spell's mana was. */
+  ifSpent?: SpentReq;
   /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
   ifCastFromHand?: boolean;
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
@@ -2045,6 +2067,8 @@ export interface CompiledCard {
   sunburst?: { counter?: "+1/+1" };
   /** Something on it counts the colors of mana spent to cast it (sunburst, converge): paying wants many colors. */
   countsColors?: boolean;
+  /** Mana its text hopes was spent to cast it ("if {U} was spent to cast ~", adamant): paying spends those colors if it can. */
+  wantSpent?: SpentReq[];
   /**
    * "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller
    * of the permanent it becomes sacrifices it at the beginning of the next cleanup step."

@@ -4,7 +4,7 @@ import type { ManaSpend } from "./abilities";
 import { defOf } from "./cards";
 import { objectMatches, printedMatches } from "./effects";
 import { emptyPool, payFromPool, type ManaPool, type ParsedCost, type Payment } from "./mana";
-import type { CardDef, GameObject, GameState, ManaType, PlayerId } from "./types";
+import type { CardDef, Color, GameObject, GameState, ManaType, PlayerId } from "./types";
 
 /**
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
@@ -63,7 +63,7 @@ export function canPayFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, us
  * Pay this from `pid`'s pool for `use`, spending restricted mana it allows first. Returns the payment (with the
  * mana spent by type), or null (and nothing changes) if it can't be paid.
  */
-export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number }) | null {
+export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>> } = {}): (Payment & { spent: ManaPool; treasure: number }) | null {
   const p = s.players[pid]!;
   const { pool, prefer, treasure } = poolFor(s, pid, use);
   const first = { ...prefer };

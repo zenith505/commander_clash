@@ -8,7 +8,7 @@ import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./effects";
 import { characteristics, staticConditionNow, type Characteristics } from "./layers";
-import { manaValue, parseManaCost } from "./mana";
+import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
 
 export interface AmountCtx {
@@ -26,6 +26,8 @@ export interface AmountCtx {
   colorsSpent?: number;
   /** The amount of mana spent to cast the spell its permanent was (Marath): 0 if it wasn't cast. */
   manaSpent?: number;
+  /** The mana spent to cast it by type (adamant, CR 601.2h). */
+  spent?: ManaSpent;
   /** How much mana from Treasures was spent to cast the spell (or the spell its permanent was) or activate the ability (CR 106.3). */
   treasureSpent?: number;
   /** What was sacrificed to cast the spell, as it last existed. */
@@ -154,6 +156,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (ctx.kicked ?? []).filter((i) => c.which === undefined || i === c.which).length;
     case "wasKicked":
       return (ctx.kicked ?? []).some((i) => c.which === undefined || i === c.which) ? 1 : 0;
+    case "spentWas":
+      return spentMeets(ctx.spent, c.req) ? 1 : 0;
     case "colorsSpent":
       return ctx.colorsSpent ?? 0;
     case "manaSpent":
@@ -383,6 +387,8 @@ function describeCount(c: Count): string {
       return "times kicked";
     case "wasKicked":
       return "kicked";
+    case "spentWas":
+      return "mana spent";
     case "colorsSpent":
       return "colors of mana spent";
     case "manaSpent":

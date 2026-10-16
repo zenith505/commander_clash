@@ -1,4 +1,4 @@
-import type { Amount, CounterKind, AmountExpr, Effect, ObjRef } from "../abilities";
+import type { Amount, CounterKind, AmountExpr, Effect, ObjRef, SpentReq } from "../abilities";
 import { canonicalKeyword, CHOSEN_PROTECTION } from "../keywords";
 import { parseManaCost } from "../mana";
 import type { Color, ManaType } from "../types";
@@ -63,3 +63,32 @@ export const isSeveral = (r: ObjRef) => r.ref === "target" && (r.n ?? 1) > 1;
 
 /** "Each player discards their hand, then draws seven cards": one sentence, for the subject (see parseSpellsSentence). */
 export const WHEEL = /^(?:.+? )?discards? (?:all the cards in )?(?:your|their|his or her) hand, then draws? /i;
+
+/**
+ * What "... was spent to cast ~" asks of the mana spent (CR 601.2h): "{U}", "{U}{B}" (some of each), "at least three
+ * white mana", "at least three mana of the same color" (adamant), "five or more mana" / "at least four mana" (opus),
+ * "no mana", "no colored mana". `SPENT` matches the phrase, `SPENT_TO_CAST` it with what was cast.
+ */
+export const SPENT = "((?:\\{[WUBRGC]\\})+|at least \\w+ (?:white|blue|black|red|green) mana|at least \\w+ mana of the same color|at least \\w+ mana|\\w+ or more mana|no(?: colored)? mana)";
+export const SPENT_TO_CAST = `${SPENT} was spent to cast (~|it|that spell)`;
+
+export function parseSpentReq(what: string): SpentReq | null {
+  const COLOR_OF: Record<string, Color> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
+  let m: RegExpExecArray | null;
+  if (/^(?:\{[WUBRGC]\})+$/.test(what)) {
+    const colors: Partial<Record<Color, number>> = {};
+    for (const c of what.match(/[WUBRGC]/g)!) {
+      if (c === "C") return null; // {C} isn't a color; no card asks for it
+      colors[c as Color] = (colors[c as Color] ?? 0) + 1;
+    }
+    return { colors };
+  }
+  if ((m = /^at least (\w+) (white|blue|black|red|green) mana$/.exec(what))) return Number.isFinite(num(m[1]!)) ? { colors: { [COLOR_OF[m[2]!]!]: num(m[1]!) } } : null;
+  if ((m = /^at least (\w+) mana of the same color$/.exec(what))) return Number.isFinite(num(m[1]!)) ? { sameColor: num(m[1]!) } : null;
+  if ((m = /^(?:at least (\w+) mana|(\w+) or more mana)$/.exec(what))) {
+    const n = num(m[1] ?? m[2]!);
+    return Number.isFinite(n) ? { total: n } : null;
+  }
+  if ((m = /^no( colored)? mana$/.exec(what))) return { none: m[1] ? "colored" : "mana" };
+  return null;
+}

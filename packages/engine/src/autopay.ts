@@ -4,9 +4,9 @@ import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, activationCost, altCost, isTreasure, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
-import type { TargetChoice } from "./abilities";
+import type { SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
-import { COLORS, type Action, type CardDef, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
+import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** One way to make mana with a permanent, for planning. */
 interface Option {
@@ -271,8 +271,11 @@ export function planCast(
   // Sunburst and converge count the colors of mana spent (CR 702.44a, 207.2c): pay its generic mana with as many other colors as we can.
   const pool = poolFor(s, pid, use).pool;
   const rainbow = compileCard(d).countsColors && !payFromPool(cost, pool, extra, player(s, pid).life) ? rainbowCosts(cost, extra, pool) : [];
+  // "If {U} was spent to cast ~", adamant: ask for those colors where its generic or hybrid mana allows, as many as can be.
+  const wanted = compileCard(d).wantSpent && !payFromPool(cost, pool, extra, player(s, pid).life) ? wantCosts(cost, extra, compileCard(d).wantSpent!) : [];
   let taps: Action[] | null = null;
-  for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
+  for (const r of wanted) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
+  if (!taps) for (const r of rainbow) if ((taps = planMana(s, pid, r.cost, r.extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use))) break;
   taps ??= planMana(s, pid, cost, extra, undefined, [...sacrificedTargets(s, targets), ...targetIds], use);
   // The total cost is locked in before mana abilities are activated (CR 601.2f-g), but here the mana
   // comes first: sacrificing a Treasure for mana would leave affinity for artifacts counting one fewer.
@@ -308,6 +311,46 @@ function rainbowCosts(cost: ParsedCost, extra: number, pool: ManaPool): { cost: 
     }
   const inPool = (c: ParsedCost) => c.symbols.filter((sym) => sym.kind === "colored" && pool[sym.color] > 0).length;
   return out.sort((a, b) => a.extra - b.extra || inPool(b.cost) - inPool(a.cost));
+}
+
+/**
+ * The cost with some of its generic or hybrid mana asked for as the colors its text hopes were spent (`wantSpent`):
+ * every hope met first, then fewer. Paying that, castSpell's payment spends those colors (payFromPool's `want`).
+ */
+function wantCosts(cost: ParsedCost, extra: number, reqs: SpentReq[]): { cost: ParsedCost; extra: number }[] {
+  const g = splitGeneric(cost, extra);
+  // Each hope as the ways to meet it: "three mana of the same color" is any one color three times.
+  const ways = reqs.map((r): Partial<Record<Color, number>>[] => (r.sameColor ? COLORS.map((c) => ({ ...r.colors, [c]: Math.max(r.sameColor!, r.colors?.[c] ?? 0) })) : [r.colors ?? {}]));
+  const out: { cost: ParsedCost; extra: number; met: number }[] = [];
+  const seen = new Set<string>();
+  const tryNeed = (need: Partial<Record<Color, number>>, met: number) => {
+    const symbols = [...g.cost.symbols];
+    let generic = g.extra;
+    for (const c of COLORS) {
+      let have = symbols.filter((sym) => sym.kind === "colored" && sym.color === c).length;
+      for (let i = 0; i < symbols.length && have < (need[c] ?? 0); i++) {
+        const sym = symbols[i]!;
+        if (sym.kind === "hybrid" && sym.options.includes(c)) [symbols[i], have] = [{ kind: "colored", color: c }, have + 1];
+      }
+      const more = Math.max(0, (need[c] ?? 0) - have);
+      if (more > generic) return;
+      generic -= more;
+      for (let k = 0; k < more; k++) symbols.push({ kind: "colored", color: c });
+    }
+    const key = JSON.stringify([symbols, generic]);
+    if (generic === g.extra && symbols.every((sym, i) => sym === g.cost.symbols[i])) return;
+    if (!seen.has(key) && seen.add(key)) out.push({ cost: { ...g.cost, symbols }, extra: generic, met });
+  };
+  for (let mask = (1 << reqs.length) - 1; mask > 0; mask--) {
+    const picked = ways.filter((_, i) => mask & (1 << i));
+    const combos = picked.reduce<Partial<Record<Color, number>>[]>((acc, w) => acc.flatMap((a) => w.map((b) => {
+      const m = { ...a };
+      for (const [c, n] of Object.entries(b)) m[c as Color] = Math.max(m[c as Color] ?? 0, n ?? 0);
+      return m;
+    })), [{}]);
+    for (const need of combos) tryNeed(need, picked.length);
+  }
+  return out.sort((a, b) => b.met - a.met).map(({ cost, extra }) => ({ cost, extra }));
 }
 
 /** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */

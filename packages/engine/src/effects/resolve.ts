@@ -10,6 +10,7 @@ import { RulesError, type CardDef, type Chosen, type Color, type GameObject, typ
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import { addMana } from "../spend";
+import type { ManaSpent } from "../mana";
 import { objectMatches, bindChosen, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
@@ -46,6 +47,8 @@ export interface ResolveCtx {
   colorsSpent?: number;
   /** Mana from Treasures spent to cast it (or the spell its permanent was) or to activate it (CR 106.3). */
   treasureSpent?: number;
+  /** The mana spent to cast the spell, the spell its permanent was, or the spell a cast trigger is about, by type (CR 601.2h). */
+  spent?: ManaSpent;
   /** What was sacrificed to cast it, as it last existed. */
   sacrificed?: LastKnown[];
   /** A station ability's tapped creature (CR 702.184a). */
@@ -129,6 +132,8 @@ export function continueResolution(s: GameState): Resolution {
     colorsSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.colorsSpent?.length ?? 0) : item.colorsSpent,
     // A spell's own; an activated ability's; an enters or cast trigger's, its spell's (CR 106.3).
     treasureSpent: item.kind === "spell" ? (s.objects[item.objectId!]?.treasureSpent ?? 0) : (item.treasureSpent ?? item.event?.treasureSpent ?? 0),
+    // A copy of a spell wasn't cast: no mana was spent on it (rulings on adamant).
+    spent: item.kind === "spell" ? (item.copy ? undefined : s.objects[item.objectId!]?.spent) : item.event?.spent,
     sacrificed: item.sacrificed,
     stationed: item.stationed,
     sourceUntaps: item.sourceUntaps,
@@ -372,6 +377,7 @@ const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   kicked: ctx.kicked,
   colorsSpent: ctx.colorsSpent,
   treasureSpent: ctx.treasureSpent,
+  spent: ctx.spent,
   sacrificed: ctx.sacrificed,
   stationed: ctx.stationed,
   chosen: ctx.chosen,

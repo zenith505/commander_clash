@@ -1,5 +1,5 @@
-import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, TargetSpec, TriggerEvent } from "../abilities";
-import { NUM, X, num, singularWord } from "./words";
+import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, SpentReq, TargetSpec, TriggerEvent } from "../abilities";
+import { NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseTargetPhrase } from "./targets";
@@ -230,10 +230,14 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // 603.4) that can't change once it's cast. A copy wasn't cast, so no mana was spent on it.
   const treasure = /^if mana from a Treasure was spent to cast it, (.+)$/.exec(m[4]!);
   if (treasure && m[2]) return "fail";
+  // "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 601.2h): the same.
+  const spentIf = new RegExp(`^if ${SPENT} was spent to cast (?:it|that spell), (.+)$`).exec(m[4]!);
+  const spent = spentIf ? parseSpentReq(spentIf[1]!) : undefined;
+  if (spentIf && (m[2] || !spent)) return "fail";
   // "That player" is the one who cast it.
-  const body = parseBody(treasure ? treasure[1]! : m[4]!, { castSpell: true, eventPlayer: true });
+  const body = parseBody(treasure ? treasure[1]! : spentIf ? spentIf[2]! : m[4]!, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}) }, body };
 }
 
 /**
@@ -849,6 +853,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifTreasure = true;
         body0 = treasure[1]!;
       }
+      // "When ~ enters, if {R} was spent to cast it, ...", adamant's "if at least three mana of the same color was spent to
+      // cast it": an intervening if (CR 603.4) on the mana spent to cast it (CR 601.2h), which can't change.
+      let ifSpent: SpentReq | undefined;
+      const spentIf = new RegExp(`^if ${SPENT} was spent to cast it, (.+)$`, "i").exec(body0);
+      if (spentIf) {
+        const req = parseSpentReq(spentIf[1]!);
+        if (event !== "selfEnters" || !req) return "fail" as const;
+        ifSpent = req;
+        body0 = spentIf[2]!;
+      }
       // "When ~ enters, if you cast it from your hand, ..." (a commander cast from the command zone wasn't, rulings on
       // Phage the Untouchable): an intervening if (CR 603.4) on how it got there, which can't change.
       let ifCastFromHand: boolean | undefined;
@@ -908,7 +922,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
+        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}) }
         : ("fail" as const);
     }
   }

@@ -89,7 +89,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // New targets for a spell copy: the best ones for us, or keep the old ones (CR 707.10c).
       const sc = s.resolving?.scratch?.copies;
       const orig = sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of]) : undefined;
-      const best = orig?.body ? chooseTargets(s, pid, orig.body, false) : null;
+      // The copy is a spell like the original, for protection and "can't be the target of" (CR 707.10).
+      const best = orig?.body ? chooseTargets(s, pid, orig.body, false, orig.objectId) : null;
       return [{ type: "copyTargets", player: pid, ...(best ? { targets: best } : {}) }];
     }
     if (pend.kind === "changeTarget") return [{ type: "changeTarget", player: pid, target: newTargetFor(s, pid, pend) }];

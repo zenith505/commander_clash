@@ -1,6 +1,6 @@
 import type { Effect, TokenSpec } from "../abilities";
 import { defOf, power, toughness } from "../cards";
-import { auraHostOptions, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
+import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokensToCreate } from "../counters";
 import { copyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameState, ObjectId, PlayerId } from "../types";
@@ -9,18 +9,23 @@ import { inCombat, attackDefault } from "./triggers";
 import { copiedValues } from "./run-copies";
 import { invalidateCharacteristics } from "../layers";
 
-/** Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). */
+/**
+ * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
+ * enter at the same time (CR 608.2f), so each sees the others enter and none counts another as it enters (603.6a, 614.12).
+ */
 export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
   const key = copyKey(s, base, opts.except);
   const k = tokensToCreate(s, pid, s.cards[key]!, n);
   const defender = opts.defender ?? (opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined);
-  for (let i = 0; i < k; i++) {
-    const o = newObject(s, s.cards[key]!, pid, "exile");
-    o.isToken = true;
-    moveObject(s, o.id, "battlefield", opts.tapped || opts.attacking ? { tapped: true } : {});
-    if (defender !== undefined && o.zone === "battlefield") o.attacking = defender;
-    s.resolving?.created?.push(o.id);
-  }
+  enterTogether(s, () => {
+    for (let i = 0; i < k; i++) {
+      const o = newObject(s, s.cards[key]!, pid, "exile");
+      o.isToken = true;
+      moveObject(s, o.id, "battlefield", opts.tapped || opts.attacking ? { tapped: true } : {});
+      if (defender !== undefined && o.zone === "battlefield") o.attacking = defender;
+      s.resolving?.created?.push(o.id);
+    }
+  });
   if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a token that's a copy" : `${k} tokens that are copies`} of ${base.name}.`);
 }
 
@@ -50,8 +55,10 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       r.created = [];
       if (!inCombat(s)) return;
-      for (const pid of Object.keys(sc.chosen!).map(Number) as PlayerId[])
-        if (livingPlayers(s).includes(pid)) tokenCopies(s, ctx.controller, base, 1, ctx, { tapped: true, defender: pid });
+      enterTogether(s, () => {
+        for (const pid of Object.keys(sc.chosen!).map(Number) as PlayerId[])
+          if (livingPlayers(s).includes(pid)) tokenCopies(s, ctx.controller, base, 1, ctx, { tapped: true, defender: pid });
+      });
       return;
     }
     case "encore": {
@@ -61,14 +68,17 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const r = s.resolving;
       if (r) r.created = [];
       const made: string[] = [];
-      for (const opp of apnap(s, opponents(s, ctx.controller))) {
-        const before = r?.created?.length ?? 0;
-        tokenCopies(s, ctx.controller, base, 1, ctx);
-        const ids = (r?.created ?? []).slice(before);
-        made.push(...ids);
-        if (ids.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "endOfTurn", affected: ids, mods: [{ kind: "mustAttackPlayer", player: opp }] });
-      }
-      if (made.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: made, mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      // All the tokens at once (CR 608.2f), with their effects before anything they trigger.
+      enterTogether(s, () => {
+        for (const opp of apnap(s, opponents(s, ctx.controller))) {
+          const before = r?.created?.length ?? 0;
+          tokenCopies(s, ctx.controller, base, 1, ctx);
+          const ids = (r?.created ?? []).slice(before);
+          made.push(...ids);
+          if (ids.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "endOfTurn", affected: ids, mods: [{ kind: "mustAttackPlayer", player: opp }] });
+        }
+        if (made.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: made, mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      });
       invalidateCharacteristics(s);
       return;
     }
@@ -80,7 +90,9 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!base) return;
       const n = amountNow(s, e.n, ctx);
       if (s.resolving) s.resolving.created = [];
-      for (const pid of players(s, e.who, ctx)) tokenCopies(s, pid, base, n, ctx, e);
+      enterTogether(s, () => {
+        for (const pid of players(s, e.who, ctx)) tokenCopies(s, pid, base, n, ctx, e);
+      });
       return;
     }
     case "createToken": {
@@ -92,17 +104,23 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         createAttachedTokens(s, e, hosts, n, ctx, src);
         return;
       }
-      // Token doublers apply per player (CR 614.1a): "twice that many of those tokens".
-      for (const pid of players(s, e.who, ctx)) {
-        const k = tokensToCreate(s, pid, e.token, n);
-        // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
-        const defender = e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
-        const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
-        for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: e.tapped || e.attacking, attacking: defender, ...(counters ? { counters } : {}) });
-        if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${e.tapped || e.attacking ? " tapped" : ""}${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
-      }
+      // Token doublers apply per player (CR 614.1a): "twice that many of those tokens". The tokens enter at the same time,
+      // each player's too (CR 608.2f), so they see each other enter (CR 603.6a).
+      enterTogether(s, () => createTokensFor(s, e, n, ctx, src));
       return;
     }
+  }
+}
+
+/** "Create N ... tokens" for each player it names. */
+function createTokensFor(s: GameState, e: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string) {
+  for (const pid of players(s, e.who, ctx)) {
+    const k = tokensToCreate(s, pid, e.token, n);
+    // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
+    const defender = e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
+    const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
+    for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: e.tapped || e.attacking, attacking: defender, ...(counters ? { counters } : {}) });
+    if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${e.tapped || e.attacking ? " tapped" : ""}${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
   }
 }
 
@@ -113,6 +131,11 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
  * doublers make more, all attached to it; the newest Role stays (704.5z), and those are identical anyway.
  */
 function createAttachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }>, hosts: ObjectId[], n: number, ctx: ResolveCtx, src: string) {
+  enterTogether(s, () => attachedTokens(s, e, hosts, n, ctx, src));
+  invalidateCharacteristics(s);
+}
+
+function attachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }>, hosts: ObjectId[], n: number, ctx: ResolveCtx, src: string) {
   for (const pid of players(s, e.who, ctx))
     for (const host of hosts) {
       if (s.objects[host]?.zone !== "battlefield") continue;
@@ -133,7 +156,6 @@ function createAttachedTokens(s: GameState, e: Extract<Effect, { type: "createTo
       if (made) log(s, `${src} creates ${made === 1 ? "a" : made} ${e.token.name} ${e.token.subtypes.includes("Role") ? "Role " : ""}token${made > 1 ? "s" : ""} attached to ${nameOf(s, host)}.`);
       else if (k) log(s, `${src} can't create a ${e.token.name} token attached to ${nameOf(s, host)}.`);
     }
-  invalidateCharacteristics(s);
 }
 
 export function tokenDef(t: TokenSpec): CardDef {

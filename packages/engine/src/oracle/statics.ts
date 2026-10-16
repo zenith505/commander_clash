@@ -240,8 +240,7 @@ export function parseOnlyClauses(text: string): { cond?: StaticCondition; once?:
 /**
  * What follows "can't be the target of": "spells or abilities your opponents control" (Canopy Cover), "black spells or
  * abilities from black sources" (Mercenary Informer), "nongreen spells or abilities from nongreen sources" (Gaea's Revenge),
- * "blue or black spells" (Karplusan Strider), "Aura spells" (Tetsuo Umezawa). Abilities alone (Shanna) aren't modeled: a
- * spell copy choosing new targets isn't marked as a spell (chooseCopyTargets).
+ * "blue or black spells" (Karplusan Strider), "Aura spells" (Tetsuo Umezawa), "abilities your opponents control" (Shanna).
  */
 export function parseUntargetable(t: string): Untargetable | null {
   const COLOR = "(white|blue|black|red|green)";
@@ -249,6 +248,7 @@ export function parseUntargetable(t: string): Untargetable | null {
   let m: RegExpExecArray | null;
   if (/^spells or abilities your opponents control$/.test(t)) return { opponents: true };
   if (/^spells(?: your opponents control)?$/.test(t)) return { spells: true, ...opp };
+  if (/^abilities(?: your opponents control)?$/.test(t)) return { abilities: true, ...opp };
   if (/^Aura spells$/.test(t)) return { spells: true, subtype: "Aura" };
   if ((m = new RegExp(`^${COLOR}(?: or ${COLOR})? spells(?: your opponents control)?$`).exec(t))) return { spells: true, colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])], ...opp };
   if ((m = new RegExp(`^${COLOR} spells or abilities from ${COLOR} sources$`).exec(t)) && m[1] === m[2]) return { colors: [COLOR_WORDS[m[1]!]!] };

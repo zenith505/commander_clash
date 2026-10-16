@@ -465,6 +465,8 @@ export interface TokenSpec {
 export interface Untargetable {
   opponents?: true;
   spells?: true;
+  /** "Abilities your opponents control" (Shanna): not spells. */
+  abilities?: true;
   colors?: Color[];
   notColors?: Color[];
   /** "Aura spells". */

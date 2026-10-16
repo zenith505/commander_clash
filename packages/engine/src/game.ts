@@ -3,7 +3,7 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -3518,6 +3518,17 @@ function chooseTriggerModes(s: GameState, p: Player, modes: number[]) {
   s.pending = null;
 }
 
+/**
+ * What a spell copy choosing new targets is, for protection and "can't be the target of" (CR 702.16b, 115.4): a spell
+ * with the copied spell's characteristics (CR 707.10).
+ */
+export function copyTargetQuality(s: GameState): SourceQuality | undefined {
+  const sc = s.resolving?.scratch?.copies;
+  const orig = sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of] ?? s.epics?.[sc.of]) : undefined;
+  const card = orig?.objectId ? s.objects[orig.objectId] : undefined;
+  return card ? spellQuality(s, cardIdOf(card)) : undefined;
+}
+
 /** A spell copy's targets (CR 707.10c): any it keeps may be illegal now; any it changes must be legal. */
 function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
   const pend = s.pending;
@@ -3532,7 +3543,7 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     if (targets.some((t, i) => changed[i] && pend.specs[i]?.divided && (t.kind === "none" || pend.current[i]?.kind === "none"))) throw new RulesError("the number of targets of a divided amount can't change");
     const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
     for (let i = 0; i < targets.length; i++)
-      if (changed[i] && !canChooseTarget(s, pend.specs, kept, i, targets[i]!, p.id)) throw new RulesError("that isn't a legal new target");
+      if (changed[i] && !canChooseTarget(s, pend.specs, kept, i, targets[i]!, p.id, copyTargetQuality(s))) throw new RulesError("that isn't a legal new target");
     targets = kept;
   }
   sc.targets = targets ?? pend.current;

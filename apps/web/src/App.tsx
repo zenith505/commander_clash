@@ -38,6 +38,7 @@ import {
   offerTargets,
   sourceQuality,
   spellQuality,
+  copyTargetQuality,
   castHow,
   isSummoningSick,
   legalActions,
@@ -496,7 +497,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : undefined;
   // The spell's own colors, or the ability's source's, for protection and "can't be the target of black spells" (CR 115.4).
   const castObj = targeting?.mode === "cast" && s ? s.objects[targeting.draft.objectId] : undefined;
-  const targetQuality = !s ? undefined : castObj ? spellQuality(s, cardIdOf(castObj)) : targetSource ? sourceQuality(s, targetSource) : undefined;
+  const targetQuality = !s ? undefined : castObj ? spellQuality(s, cardIdOf(castObj)) : targeting?.mode === "copy" ? copyTargetQuality(s) : targetSource ? sourceQuality(s, targetSource) : undefined;
   const runEnd = targeting && targeting.mode !== "change" ? perOpponentRun(targeting.specs, targeting.chosen.length) : 0;
   const inRun = !!targeting && runEnd > targeting.chosen.length;
   /** In a run of per-opponent slots, the slot this target would fill: the one for its controller (CR 601.2c). */

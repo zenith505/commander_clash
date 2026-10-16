@@ -47,7 +47,9 @@ export function pickFilter(phrase: string): TargetSpec | null {
   const words = phrase.trim().replace(/ you control$/i, "").split(" ");
   // "a Plains" is already singular; "two creatures" isn't.
   const asIs = words.join(" ");
-  const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === words.length - 1 ? singular(w) : w)).join(" ");
+  // "creatures with decayed": the noun before "with" is the plural one.
+  const head = words.indexOf("with") > 0 ? words.indexOf("with") - 1 : words.length - 1;
+  const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === head ? singular(w) : w)).join(" ");
   const spec = parseTargetPhrase(one);
   if (spec?.kind !== "object" || spec.controller) return null;
   return { ...spec, text: one };
@@ -195,7 +197,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // many is announced as it's cast, so one entry stands for them all until then (TargetSpec.many).
   // "Destroy X target creatures": exactly X of them (Eliminate the Competition).
   const many = range === "any number of" ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
-  if (count === "X" && (!ctx.spell || ctx.whereX)) return null;
+  // A spell's X, or an activated ability's {X} (CR 107.3a, 602.2b), announced before targets are chosen.
+  if (count === "X" && (!(ctx.spell || ctx.activated) || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
   const [mine0, theirs] = thatPlayerControls(phrase!, ctx);

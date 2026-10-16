@@ -4536,7 +4536,8 @@ const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Isla
  */
 /** "Can't block": from its abilities, or from a rule for the turn like Falter's. */
 export function cantBlockNow(s: GameState, o: GameObject): boolean {
-  return characteristics(s, o).cantBlock || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false));
+  // Decayed means "This creature can't block" (CR 702.147a).
+  return characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false));
 }
 
 export function blockProblem(s: GameState, blocker: GameObject, attacker: GameObject, defender = attacker.attacking): string | null {

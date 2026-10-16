@@ -1451,6 +1451,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       v += harm[i] !== isMine(s, pid, t) ? 1 : -1;
     } else if ((inner.type === "loseLife" || inner.type === "discard") && "who" in inner && inner.who.ref === "you") v -= 1;
     else if (inner.type === "pick" && inner.action === "bounce" && inner.who.ref === "you") v -= 1; // our own permanent back to hand
+    else if (inner.type === "pick" && inner.action === "sacrifice" && inner.who.ref === "you") {
+      // "You may sacrifice a Zombie. If you do, draw a card": a token, a decayed creature or a spare land costs little.
+      const options = pickOptions(s, inner, pid, r.item.sourceId).map((id) => obj(s, id)).filter((o) => !o.isCommander);
+      const cost = (o: GameObject) => (o.isToken || objHasKeyword(s, o, "Decayed") ? 0.5 : objIsType(s, o, "Land") ? (lands(s, pid) >= 7 ? 0.5 : 3) : worth(s, pid, o) <= 3 ? 1.5 : 3);
+      v -= options.length ? Math.min(...options.map(cost)) : 10;
+    }
     else if (inner.type === "moveCounter") {
       // Graft: only onto our own creatures.
       const to = r.item.subject && s.objects[r.item.subject.id];

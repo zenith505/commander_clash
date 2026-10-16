@@ -77,8 +77,9 @@ const checkableMay = (e: Effect) =>
   (e.type === "sacrifice" && e.what.ref === "self") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
   (e.type === "putOntoBattlefield" && e.what.ref === "graveyardEnd" && !e.atEndStep && !e.haste) ||
-  // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return.
-  (e.type === "pick" && e.who.ref === "you" && e.action === "bounce" && e.n === 1 && !e.unless) ||
+  // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return. "You may
+  // sacrifice a Zombie. If you do, ..." (Wilhelt): only with one to sacrifice.
+  (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice") && e.n === 1 && !e.unless) ||
   // "You may have it deal 3 damage to target creature. If you do, ...": done if that target is still legal.
   (e.type === "damage" && (e.to.ref === "target" || e.to.ref === "anyTarget") && !("n" in e.to && e.to.n) && !e.also && !e.divided) ||
   (e.type === "bite" && e.b.ref === "target" && !e.b.n && (e.a.ref === "self" || e.a.ref === "target"));
@@ -1002,6 +1003,7 @@ export function usesX(v: unknown): boolean {
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
     if (o.count && (o.count as Count).kind === "x") return true;
+    if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
     return Object.values(o).some(usesX);
   }
   return false;

@@ -1,7 +1,7 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
-import { controllerOf, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
@@ -223,6 +223,16 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     for (let i = ref.index; i < ref.index + (ref.n ?? 1); i++) {
       const t = ctx.targets[i];
       if (ctx.legal[i] && t?.kind === "object") out.push(obj(s, t.id));
+    }
+    if (ref.sameName && out[0]?.zone === "battlefield" && !out[0].faceDown) {
+      const t = out[0];
+      const name = characteristics(s, t).name;
+      const whose = controllerOf(s, t);
+      const { filter, of } = ref.sameName;
+      for (const id of s.battlefield) {
+        const o = obj(s, id);
+        if (o.id !== t.id && !o.faceDown && characteristics(s, o).name === name && (!of || controllerOf(s, o) === whose) && objectMatches(s, filter, o, ctx.controller, false)) out.push(o);
+      }
     }
     return out;
   }

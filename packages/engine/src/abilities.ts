@@ -77,6 +77,8 @@ export type Count =
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
   | { kind: "destroyedThisWay"; filter: TargetSpec }
+  /** "For each nontoken creature exiled this way" (Declaration in Stone): permanents, as they last existed. */
+  | { kind: "exiledThisWay"; filter: TargetSpec }
   /**
    * "If the discovered card's mana value is less than 10, ... equal to the difference" (Hit the Mother Lode): `n` minus the
    * mana value of the card this spell or ability discovered (CR 701.57c), 0 if it's not less or nothing was discovered.
@@ -335,7 +337,18 @@ export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 /** Which object(s) an effect touches. */
 export type ObjRef =
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
-  | { ref: "target"; index: number; n?: number }
+  | {
+      ref: "target";
+      index: number;
+      n?: number;
+      /**
+       * "Target creature and all other creatures with the same name as that creature" (Maelstrom Pulse): also every other
+       * permanent matching `filter` (controlled by the target's controller, `of`) with the target's name as this resolves.
+       * Only the target is targeted; none are affected if it's illegal (CR 608.2b, rulings). A face-down permanent has no
+       * name (CR 708.2a), so it shares one with nothing.
+       */
+      sameName?: { filter: TargetSpec; of?: true };
+    }
   | { ref: "self" } // the source permanent ("this creature")
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
   | { ref: "castSpell" }

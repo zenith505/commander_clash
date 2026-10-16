@@ -301,7 +301,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+)$`, "i").exec(s))) {
     // "to each creature and each player": dealt to all of them at once (CR 120.3).
     const tos: DamageRecipient[] = [];
-    for (const part of m[2]!.split(/,? and (?=each )/i)) {
+    // "To target creature and each other creature with the same name as that creature" is one recipient.
+    for (const part of /with the same name as that/i.test(m[2]!) ? [m[2]!] : m[2]!.split(/,? and (?=each )/i)) {
       const to = parseDamageRecipient(part, ctx);
       if (!to) return null;
       tos.push(to);

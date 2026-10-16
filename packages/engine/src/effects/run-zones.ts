@@ -526,7 +526,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       for (const o of objects(s, e.what, ctx)) {
         log(s, `${src} exiles ${defOf(s, o).name}${e.until ? ` until ${src} leaves the battlefield` : ""}.`);
+        // As it last existed, for "for each nontoken creature exiled this way" (CR 608.2h).
+        const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) } : undefined;
         moveObject(s, o.id, "exile");
+        if (before && o.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
         if (me && o.zone === "exile") (me.exiledUntilLeaves ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
         // Linked to the source as it was when the ability triggered: if that object has already left, its
         // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).

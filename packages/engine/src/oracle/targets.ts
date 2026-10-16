@@ -77,6 +77,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   }
   const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
   if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
+  // "Exile target creature and all other creatures its controller controls .... That player investigates ...": that
+  // creature's controller (as it last existed, CR 608.2h).
+  if (x === "that player" && ctx.controllerNamed !== undefined && ctx.controllerNamed === ctx.lastObjectTarget && ctx.lastPlayerTarget === undefined) return { ref: "targetController", index: ctx.controllerNamed };
   // "Target player discards two cards. ... that player discards a card": the player targeted before.
   if (x === "that player" && ctx.lastPlayerTarget !== undefined && !manyNow) return { ref: "target", index: ctx.lastPlayerTarget };
   // "Counter target spell. ... that spell's controller mills X cards" (Induce Paranoia): who controlled it as it was
@@ -140,6 +143,21 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^(enchanted|equipped) (creature|permanent|artifact|land)$/i.test(x) && !ctx.spell) {
     ctx.lastAttached = true;
     return { ref: "attached" };
+  }
+  // "Target creature and all other creatures with the same name as that creature" (Maelstrom Pulse, Homing Lightning,
+  // Declaration in Stone's "all other creatures its controller controls", Legions to Ashes' "all tokens that player
+  // controls"): one target, and the others by name as it resolves.
+  const same = /^(target .+?) and (all|each) (?:other )?(.+?) with the same name as that (creature|permanent|artifact|enchantment|land)$/i.exec(x);
+  if (same && !cards) {
+    let rest = same[3]!;
+    const ctl = / (?:its controller|that player) controls$/i.exec(rest);
+    if (ctl) rest = rest.slice(0, ctl.index);
+    const g = /^tokens$/i.test(rest) ? { filter: { kind: "object" as const, token: true, text: "tokens" }, other: false } : parseGroup(`${same[2]} ${rest}`, true);
+    if (!g || g.other || (ctl && g.filter.controller)) return null;
+    const t = parseObjectNow(same[1]!, ctx, cards);
+    if (t?.ref !== "target" || t.n) return null;
+    if (ctl) ctx.controllerNamed = t.index;
+    return { ...t, sameName: { filter: g.filter, ...(ctl ? { of: true as const } : {}) } };
   }
   // "Each creature target player controls", "all lands target opponent controls", "creatures that player controls": the
   // group among that player's permanents (the player targeted here or by an earlier sentence, or a trigger's player).

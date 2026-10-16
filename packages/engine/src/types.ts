@@ -1020,6 +1020,8 @@ export interface Resolving {
    * counts; one that wasn't destroyed (indestructible, regenerated) doesn't (rulings on Fumigate and Bane of Progress).
    */
   destroyed?: { o: GameObject; ch: Characteristics }[];
+  /** The permanents its exile instructions exiled so far while this resolves, as they last existed ("exiled this way"). */
+  exiled?: { o: GameObject; ch: Characteristics }[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
   countered?: Record<ObjectId, { zc: number; x: number }>;
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */

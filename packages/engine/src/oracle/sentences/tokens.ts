@@ -6,6 +6,7 @@ import { NUMX, X, amt, singularWord, isGroup } from "../words";
 import { parsePlayer, parseObject } from "../targets";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept } from "../tokens";
 import { parseSentence } from "../sentence";
+import { parseCount } from "../counts";
 import type { Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -98,6 +99,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Investigate (CR 701.16): create a Clue token.
   if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];
+  // "That player investigates for each nontoken creature exiled this way" (Declaration in Stone).
+  if ((m = /^(.+?) investigates for each (.+)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const n = parseCount(m[2]!, ctx, true);
+    return who && n ? [{ type: "createToken", who, n, token: PREDEFINED_TOKENS.Clue! }] : null;
+  }
   // Explore (CR 701.44)
   if (/^~ explores$/.test(s)) return [{ type: "explore" }];
   // "Target creature you control explores" (a Map token, CR 111.10s): its controller is you.

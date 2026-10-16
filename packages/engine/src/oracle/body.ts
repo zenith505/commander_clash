@@ -35,6 +35,8 @@ export interface Ctx {
   lastGroup?: ObjRef;
   /** Index of the most recent player target, for "that player's hand". */
   lastPlayerTarget?: number;
+  /** "Target creature and all other creatures its controller controls ...": that target, whose controller "that player" is. */
+  controllerNamed?: number;
   /** "Any number of target players": that target (see TargetSpec.many); "those players" are all of them. */
   manyPlayers?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */

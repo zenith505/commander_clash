@@ -3,7 +3,7 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { addTriggeredMana, askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, CHOSEN_TYPE } from "../keywords";
+import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -413,6 +413,13 @@ function subjectEvenIfGone(s: GameState, ctx: ResolveCtx): GameObject[] {
   return zc === ctx.subject!.zc ? [o] : zc === ctx.subject!.zc + 1 && o.zone !== "battlefield" ? [o] : [];
 }
 
+/** The player chosen for the source as it entered ("the chosen player"), as the ability was activated or as it is now. */
+export function chosenPlayerOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
+  if (ctx.lki?.chosenPlayer !== undefined) return ctx.lki.chosenPlayer;
+  const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  return o && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc) ? o.chosen?.player : undefined;
+}
+
 /**
  * A resolving effect's changes with their numbers worked out now: "gets +X/+X" doesn't change
  * later if X's count does (CR 608.2h, 611.2c).
@@ -425,6 +432,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
       : // "Gains protection from the color of your choice": the color chosen as it resolved.
         m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PROTECTION)
         ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
+        : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
+          m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
+        ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_PLAYER_PROTECTION ? [k] : chosenPlayerOf(s, ctx) !== undefined ? [protectionFromPlayer(chosenPlayerOf(s, ctx)!)] : [])) }
         : // "Gains your choice of menace or lifelink": the keyword chosen as it resolved.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_KEYWORD)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_KEYWORD ? [k] : s.resolving?.chosen?.keyword ? [s.resolving.chosen.keyword] : [])) }
@@ -483,6 +493,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "regenerate":
     case "exile":
     case "returnLinked":
+    case "exileFaceDown":
+    case "moveLinked":
     case "playLinked":
     case "cipher":
     case "haunt":
@@ -517,6 +529,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "madness":
     case "miracle":
     case "castFromHand":
+    case "castFromAmong":
     case "suspendTick":
     case "suspendCast":
     case "exileSelfWithTime":
@@ -554,7 +567,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "evolve":
     case "explore":
     case "continuous":
+    case "playerGains":
     case "attach":
+    case "unattach":
     case "unattachSelf":
     case "transformSelf":
       return runPermanentsEffect(s, e, ctx, src);
@@ -567,6 +582,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
     case "castCipher":
+    case "castParadigm":
     case "copySpell":
     case "nextCast":
     case "cascade":
@@ -631,6 +647,18 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     (s.epics ??= {})[item.id] = structuredClone(item);
     addDelayed(s, "eachYourUpkeep", controller, o, { targets: [], effects: [{ type: "copySpell", spell: { epic: item.id }, n: 1, newTargets: true }], text: "Epic: copy ~ except for its epic ability. You may choose new targets for the copy." });
     log(s, `${player(s, controller).name} can't cast spells for the rest of the game (epic).`);
+  }
+  // Paradigm (CR 702.192a): the first time a spell with this name resolves for its controller, a copy of it every
+  // precombat main phase of theirs from now on; then this spell is exiled (a copy ceases to exist there, 704.5e).
+  if (compileCard(d).paradigm) {
+    const p = player(s, controller);
+    if (!(p.paradigms ??= []).includes(d.name)) {
+      p.paradigms.push(d.name);
+      addDelayed(s, "eachYourPrecombatMain", controller, o, { targets: [], effects: [{ type: "castParadigm", card: cardIdOf(o) }], text: `Paradigm: you may cast a copy of ${d.name} from exile without paying its mana cost.` });
+    }
+    moveObject(s, id, "exile");
+    if (s.objects[id]?.zone === "exile") log(s, `${d.name} is exiled (paradigm).`);
+    return;
   }
   if (compileCard(d).rebound && o.castFrom === "hand" && !o.exileIfLeaves) {
     moveObject(s, id, "exile");

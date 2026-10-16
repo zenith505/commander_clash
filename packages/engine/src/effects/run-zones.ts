@@ -3,6 +3,7 @@ import { abilitiesOf, defOf, isPermanentCard, isType, objIsType, power } from ".
 import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
+import { manaValue, parseManaCost } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
@@ -557,6 +558,59 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
       return "paused";
     }
+    case "castFromAmong": {
+      // Exiled face up (CR 406.3), then cast one at a time as this resolves, ignoring timing (CR 608.2g); X is 0 and
+      // no alternative costs (CR 107.3b, 118.9). The total counts the spells' mana values on the stack, which for a
+      // card cast without paying its mana cost is its own with X as 0 (rulings on Primeval Spawn). Lands can't be cast.
+      const sc = (s.resolving!.scratch ??= {});
+      const you = player(s, ctx.controller);
+      if (!sc.castAmong) {
+        const whose = players(s, e.who, ctx)[0];
+        if (whose === undefined) return;
+        const lib = player(s, whose).library;
+        const ids = lib.slice(0, amountNow(s, e.n, ctx));
+        for (const id of ids) moveObject(s, id, "exile");
+        log(s, `${player(s, whose).name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}) };
+      }
+      const st = sc.castAmong;
+      if (st.done) return;
+      const mvOf = (id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
+      if (st.casting) {
+        // Cast: it's on the stack now (a new object, CR 400.7); declined: it stays in exile.
+        if (exiled(st.casting)) st.declined.push(st.casting);
+        else if (st.budget !== undefined) st.budget -= mvOf(st.casting);
+        st.casting = undefined;
+      }
+      if (st.pick !== undefined) {
+        const pick = st.pick;
+        st.pick = undefined;
+        if (pick === "none" || !exiled(pick)) {
+          st.done = true;
+          return;
+        }
+        st.casting = pick;
+        s.pending = { kind: "castFree", player: you.id, objectId: pick, source: src };
+        return "paused";
+      }
+      const castable = (id: ObjectId) => {
+        s.pending = { kind: "castFree", player: you.id, objectId: id, source: src };
+        const problem = castProblem(s, you.id, id);
+        s.pending = null;
+        return problem === null || /^not enough mana/.test(problem);
+      };
+      const options = st.ids
+        .map((x) => x.id)
+        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && castable(id));
+      if (!options.length) {
+        st.done = true;
+        return;
+      }
+      const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the exiled cards without paying its mana cost${left}?` };
+      return "paused";
+    }
     case "suspendTick": {
       // CR 702.62a: "At the beginning of your upkeep, if this card is suspended, remove a time counter from it."
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
@@ -691,6 +745,66 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, card.id, "battlefield");
         log(s, `${p.name} plays ${d.name} from exile.`);
       }
+      return;
+    }
+    case "exileFaceDown": {
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      let ids: ObjectId[];
+      if (e.from === "handCard") {
+        if (!sc.faceDownPick) {
+          if (!p.hand.length) return;
+          sc.faceDownPick = true;
+          delete sc.found;
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards: [...p.hand], min: 1, max: 1, dig: { looked: [...p.hand], to: "to exile face down", rest: "stay in your hand" }, hand: p.id };
+          return "paused";
+        }
+        sc.faceDownPick = undefined;
+        ids = (sc.found ?? []).filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === p.id);
+      } else ids = e.from === "hand" ? [...p.hand] : p.library.slice(0, e.n ?? 1);
+      const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
+      const done: ObjectId[] = [];
+      for (const id of ids) {
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        if (o.zone !== "exile") continue;
+        // Face down: only its controller may look, and only if the ability says so (CR 406.3).
+        o.hiddenExile = { by: ctx.sourceId ?? "", seen: e.look ? [p.id] : [], label: "Face down" };
+        if (ctx.sourceId) ((s.linkedExile ??= {})[key] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        done.push(id);
+      }
+      s.resolving!.faceDownExiled = [...(s.resolving!.faceDownExiled ?? []), ...done];
+      const n = done.length;
+      log(s, `${p.name} exiles ${n === 1 ? "a card" : `${n} cards`} ${e.from === "top" ? "from the top of their library" : "from their hand"} face down with ${src}.`);
+      if (e.look && n) log(s, `You exiled ${done.map((id) => defOf(s, obj(s, id)).name).join(", ")} face down with ${src}.`, p.id);
+      return;
+    }
+    case "moveLinked": {
+      // Linked to the source as it is (an activated ability, a control change) or, after it left the battlefield, as it
+      // was (CR 607.2a, 400.7).
+      const zc = ctx.sourceZc ?? 0;
+      const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
+      const sc = (s.resolving!.scratch ??= {});
+      const linked = (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
+      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)));
+      const p = player(s, ctx.controller);
+      if (e.one) {
+        if (!sc.linkedPick) {
+          if (!cards.length) return;
+          sc.linkedPick = true;
+          delete sc.found;
+          const ids = cards.map((c) => c.id);
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card exiled with " + src, cards: ids, min: 1, max: 1, dig: { looked: ids, to: e.dest === "hand" ? "into your hand" : "into its owner's graveyard", rest: "stay exiled" } };
+          return "paused";
+        }
+        sc.linkedPick = undefined;
+        cards = cards.filter((c) => sc.found?.includes(c.id));
+      }
+      if (!cards.length) return;
+      if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
+      else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
+      for (const c of cards) moveObject(s, c.id, e.dest);
+      if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
       return;
     }
     case "returnLinked": {

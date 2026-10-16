@@ -877,6 +877,18 @@ export type Effect =
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
   | { type: "returnLinked"; dest: "battlefield" | "hand" }
   /**
+   * Cards exiled face down, linked to the source (CR 406.3, 607.2a): `top`, the top `n` of your library (Duplicity);
+   * `hand`, all cards from your hand; `handCard`, one card you choose from your hand (Gustha's Scepter). `look`: its
+   * controller may look at them while they remain exiled; otherwise nobody may (Duplicity rulings).
+   */
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: number; look?: true }
+  /**
+   * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
+   * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
+   * not those exiled earlier in this resolution).
+   */
+  | { type: "moveLinked"; dest: "hand" | "graveyard"; one?: true; yours?: true; other?: true }
+  /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
    */
@@ -893,6 +905,11 @@ export type Effect =
    * cast the copy without paying its mana cost". `card`/`zc`: that card, as it is in exile.
    */
   | { type: "castCipher"; card: ObjectId; zc: number }
+  /**
+   * Paradigm's delayed trigger (CR 702.192a): "create a copy of this object in exile. You may cast the copy without
+   * paying its mana cost". `card`: the card definition (GameState.cards) it copies; the card itself may be gone (rulings).
+   */
+  | { type: "castParadigm"; card: string }
   /**
    * Haunt's triggered ability (CR 702.55a): "exile it haunting target creature" (target 0). "It" is this card in the
    * graveyard it was just put into; it does nothing if the card left (CR 400.7).
@@ -1097,14 +1114,15 @@ export type Effect =
    */
   | { type: "encore" }
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string }
+  /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
    * `newTargets`: "you may choose new targets for the copy" (707.10c).
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
-  | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean }
+  | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }
@@ -1133,7 +1151,13 @@ export type Effect =
    * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped".
    */
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped"; notSource?: boolean; whileControlled?: true }
-  | { type: "attach"; what: ObjRef } // attach the source (an Equipment) to it, CR 701.3
+  /**
+   * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
+   * Equipment you control to target creature you control", Brass Squire).
+   */
+  | { type: "attach"; what: ObjRef; source?: ObjRef }
+  /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to. */
+  | { type: "unattach"; what: ObjRef }
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
   | { type: "transformSelf" }
   /** Reconfigure's "Unattach this permanent" (CR 702.151a, 701.3d). */
@@ -1393,6 +1417,16 @@ export type Effect =
    * "Choose a creature type." / "Choose a color." while it resolves: later instructions use the
    * choice ("of the chosen type", "of that color"). `except`: "other than Wall".
    */
+  /**
+   * "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
+   * among them without paying their mana costs" (Primeval Spawn): `maxMv` each, `totalMv` all together.
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount }
+  /**
+   * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
+   * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
+   */
+  | { type: "playerGains"; keywords: string[] }
   | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[] };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
@@ -1514,6 +1548,11 @@ export type TriggerEvent =
   | "selfDies" // When this dies
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
+  /**
+   * "When you lose control of ~" (Duplicity, Gustha's Scepter): it left the battlefield (looking back, CR 603.10a) or
+   * another player gained control of it; the player who lost control controls the trigger (Khârn rulings).
+   */
+  | "selfLostControl"
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
@@ -1856,6 +1895,8 @@ export interface ActivatedAbility {
   station?: true;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
+  /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
+  revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
   onceEver?: true;
   /** The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). */
@@ -1942,6 +1983,8 @@ export interface ManaAbility {
   oncePerTurn?: boolean;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object: see GameObject.activatedEver. */
   onceEver?: true;
+  /** It's an exhaust ability ("Exhaust — {G}, {T}: Add ..."), which Elvish Refueler lets you activate again (CR 702.177b). */
+  exhaust?: true;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
@@ -2095,7 +2138,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback" | "permission";
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   mana?: string;
@@ -2152,6 +2195,13 @@ export interface CompiledCard {
   entersChoose?: { what: ChoiceKind; except?: string }[];
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
+  /**
+   * Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
+   * judged by the abilities it would have on the battlefield (614.12): under Humility it enters (rulings).
+   */
+  exileUnlessCastWithMana?: true;
+  /** "As ~ enters, secretly choose an opponent" (Guardian Archon): see Chosen.secret. */
+  entersChooseSecret?: true;
   /**
    * Riot (CR 702.136a): enters with a +1/+1 counter or gains haste. Unleash (CR 702.98a): may enter with
    * a +1/+1 counter. Chosen as it enters, by its controller.
@@ -2269,11 +2319,21 @@ export interface CompiledCard {
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
   youHave?: "hexproof" | "shroud" | "protection";
   /**
+   * Elvish Refueler: "During your turn, as long as you haven't activated an exhaust ability this turn, you may activate
+   * exhaust abilities as though they haven't been activated" (CR 702.177b): see Player.exhaustTurn.
+   */
+  exhaustAgain?: true;
+  /**
    * Platinum Angel: "You can't lose the game and your opponents can't win the game" (`cantLose` "you", `cantWin`
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).
    */
   cantLose?: "you" | "opponents";
   cantWin?: "you" | "opponents";
+  /**
+   * "You may activate abilities of creatures you control as though those creatures had haste" (Thousand-Year Elixir,
+   * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).
+   */
+  creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
   /**
@@ -2406,6 +2466,8 @@ export interface CompiledCard {
   rebound?: boolean;
   /** Epic (CR 702.50a): see finishSpell. */
   epic?: true;
+  /** Paradigm (CR 702.192a): see finishSpell. */
+  paradigm?: true;
   /** Evoke, dash, bestow, blitz and warp (CR 702.74, 702.109, 702.103, 702.152, 702.185): alternative costs. */
   altCosts?: {
     kind: AltCostKind;

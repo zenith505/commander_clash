@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf } from "../layers";
 import { shuffle } from "../rng";
-import { castProblem, describeTargets, log, moveObject, newObject, obj, player } from "../game";
+import { castProblem, describeTargets, log, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets } from "./targeting";
@@ -103,6 +103,30 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `The copy of ${defOf(s, card).name} can't be cast.`);
       return;
     }
+    case "castParadigm": {
+      // "Create a copy of this object in exile. You may cast the copy without paying its mana cost" (CR 702.192a): one
+      // not cast ceases to exist (704.5e; rulings).
+      const def = s.cards[e.card];
+      if (!def) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (sc.playLinked) {
+        if (sc.cipherCopy && s.objects[sc.cipherCopy]?.zone === "exile") removeCopy(s, sc.cipherCopy);
+        return;
+      }
+      sc.playLinked = true;
+      const copy = newObject(s, def, p.id, "exile");
+      copy.spellCopy = true;
+      p.exile.push(copy.id);
+      sc.cipherCopy = copy.id;
+      log(s, `${p.name} creates a copy of ${def.name} in exile (paradigm).`);
+      s.pending = { kind: "castFree", player: p.id, objectId: copy.id, source: src };
+      if (castProblem(s, p.id, copy.id) === null) return "paused";
+      s.pending = null;
+      removeCopy(s, copy.id);
+      log(s, `The copy of ${def.name} can't be cast.`);
+      return;
+    }
     case "copySpell": {
       // Copies of a spell go on the stack one at a time, each with its targets chosen first (CR 707.10, 707.10c).
       const r = s.resolving!;
@@ -130,6 +154,26 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         c.targets = undefined;
         c.left--;
       }
+      if (orig && e.demonstrate && !c.oppDone) {
+        // Demonstrate (CR 702.144a): you copied it, so choose an opponent, who copies it too; their copy goes on the
+        // stack above yours, and they choose its new targets knowing the others (rulings).
+        if (c.opp === undefined) {
+          const opps = opponents(s, ctx.controller);
+          if (!opps.length) return;
+          if (opps.length > 1) {
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "demonstrate", options: opps.map(String), labels: opps.map((pid) => player(s, pid).name), prompt: `demonstrate: choose an opponent to also copy ${src}` };
+            return "paused";
+          }
+          c.opp = opps[0]!;
+        }
+        if (e.newTargets && specs.length && c.targets === undefined) {
+          s.pending = { kind: "copyTargets", player: c.opp, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: 1 };
+          return "paused";
+        }
+        putSpellCopy(s, orig, c.opp, c.targets ?? orig.targets);
+        c.targets = undefined;
+        c.oppDone = true;
+      }
       return;
     }
     case "nextCast": {
@@ -143,16 +187,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
         body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
         turn: s.turn,
+        ...(e.cascade ? { cascade: true as const } : {}),
       });
       return;
     }
     case "cascade": {
-      // CR 702.85a. The spell's mana value is its own, even if it has left the stack by now (last known information).
+      // CR 702.85a. The spell's mana value is its own, even if it has left the stack by now: as it last existed there
+      // (CR 113.7a), its X included (CR 202.3e). A countered spell's cascade still resolves (rulings).
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.cascade) {
-        // On the stack, its mana value counts the X chosen for it (CR 202.3e).
-        const spell = ctx.cause !== undefined ? s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") : undefined;
+        const spell = ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") ?? s.castItems?.[ctx.cause]) : undefined;
         const limit = spell ? spellManaValue(s, spell) : manaValue(parseManaCost(ctx.sourceDef.manaCost));
         const exiled: ObjectId[] = [];
         let hit: ObjectId | undefined;

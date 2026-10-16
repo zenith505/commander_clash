@@ -4,7 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
-import { abilityProblem, isSummoningSick, obj, player, tapCostCandidates } from "./game";
+import { abilityProblem, obj, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -208,6 +208,15 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
  * Why `pid` can't activate this mana ability right now, or null if they can, paying any mana
  * part of the cost from their pool. With `ignorePool`, the mana part isn't checked.
  */
+/**
+ * Elvish Refueler (CR 702.177b): during your turn, as long as you haven't begun to activate an exhaust ability this turn,
+ * you may activate exhaust abilities as though they haven't been activated.
+ */
+export function mayExhaustAgain(s: GameState, pid: PlayerId): boolean {
+  if (s.activePlayer !== pid || s.players[pid]?.exhaustTurn === s.turn) return false;
+  return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && !!abilitiesOf(s, s.objects[id]!).exhaustAgain);
+}
+
 export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, index: number, ignorePool = false, tap?: ObjectId[]): string | null {
   const ab = manaAbilitiesOn(s, o)[index];
   const name = characteristics(s, o).name;
@@ -215,9 +224,9 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (characteristics(s, o).cantActivate === "all") return `${name}'s activated abilities can't be activated`; // Arrest: mana abilities too (CR 605.1a)
   if (ab.tap && o.tapped) return `${name} is tapped`;
-  if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${name} has summoning sickness`; // CR 302.6
+  if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
-  if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
+  if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index) && !(ab.exhaust && mayExhaustAgain(s, pid))) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, o.id, pid)) return `${name}'s ability can't be activated now`; // CR 602.5b
   const p = player(s, pid);

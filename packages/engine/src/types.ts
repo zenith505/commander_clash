@@ -286,7 +286,7 @@ export interface GameObject {
    * Exiled face down by hideaway (CR 702.75a): only players who controlled `by`, the permanent that exiled it, may look
    * at it (`seen`). Gone when it changes zones.
    */
-  hiddenExile?: { by: ObjectId; seen: PlayerId[] };
+  hiddenExile?: { by: ObjectId; seen: PlayerId[]; /** What its back says ("Face down"); hideaway's by default. */ label?: string };
   /** Cards exiled encoded on this permanent with cipher (CR 702.99b-c), as they are in exile. Gone when it leaves. */
   encoded?: { id: ObjectId; zc: number }[];
   /**
@@ -367,6 +367,8 @@ export interface ManaLot {
 export interface Player {
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
+  /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */
+  paradigms?: string[];
   /**
    * "Skip your next untap step / draw step / combat phase / turn" (CR 614.10): each entry skips one, the next to happen;
    * `turn`: only during that turn ("skips their next combat phase this turn").
@@ -389,6 +391,13 @@ export interface Player {
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;
   speedTurn?: number;
+  /**
+   * What this player gained until end of turn ("You gain shroud until end of turn", "you gain protection from the chosen
+   * player"): Hexproof, Shroud or a protection keyword (CR 702.11d, 702.16b-e, 702.18d), lost in the cleanup step (514.2).
+   */
+  gained?: string[];
+  /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
+  exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
   commanderCasts: Record<ObjectId, number>;
   /** Poison counters (CR 122.1f); ten or more loses the game (CR 704.5c). */
@@ -480,6 +489,11 @@ export interface StackItem {
   sourceUntaps?: number;
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
+  /**
+   * In `castItems` only: the spell's mana value as it was put on the stack, X included (CR 202.3e), for when it has left
+   * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
+   */
+  castMv?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
   /** For its permanent's enters trigger: how many colors of mana were spent to cast it (converge, CR 207.2c). */
@@ -517,7 +531,7 @@ export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
   /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
-  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
+  when: "nextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
   to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;
@@ -576,6 +590,8 @@ export interface LastKnown {
   controller?: PlayerId;
   /** It was suspected as it last existed (CR 701.60): "if the sacrificed creature was suspected". */
   suspected?: true;
+  /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
+  chosenPlayer?: PlayerId;
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
@@ -616,6 +632,11 @@ export interface CostChoices {
   collect?: ObjectId[];
   /** Teamwork N: the untapped creatures you control, with total power N or more, tapped as you cast it. */
   teamwork?: ObjectId[];
+  /**
+   * Harmonize (CR 702.180a-b): the untapped creature you control tapped as you cast it from your graveyard, its power
+   * taken off the total cost in generic mana.
+   */
+  harmonize?: ObjectId;
   /** Conspire (CR 702.78a): the two untapped creatures you control that share a color with it, tapped to copy it. */
   conspire?: ObjectId[];
   /** Gift (CR 702.174a): the opponent chosen to promise the gift to. */
@@ -716,7 +737,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -827,7 +848,7 @@ export interface GameState {
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
@@ -959,7 +980,7 @@ export interface GameState {
    * in `returned`. `asking`: that one is being asked now.
    */
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; secret?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -1001,6 +1022,8 @@ export interface Chosen {
   keyword?: string;
   /** "As ~ enters, choose a player" (True-Name Nemesis). */
   player?: PlayerId;
+  /** "Secretly choose an opponent" (Guardian Archon): only its controller knows who, until it's revealed. */
+  secret?: true;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
@@ -1049,6 +1072,8 @@ export interface Resolving {
   destroyed?: { o: GameObject; ch: Characteristics }[];
   /** The permanents its exile instructions exiled so far while this resolves, as they last existed ("exiled this way"). */
   exiled?: { o: GameObject; ch: Characteristics }[];
+  /** The cards exiled face down so far (exileFaceDown), for Duplicity's "all other cards you own exiled with ~". */
+  faceDownExiled?: ObjectId[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
   countered?: Record<ObjectId, { zc: number; x: number }>;
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
@@ -1124,12 +1149,21 @@ export interface Resolving {
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
-    copies?: { of: string; left: number; targets?: TargetChoice[] }; // spell copies still to make, and the next one's targets
+    copies?: { of: string; left: number; targets?: TargetChoice[]; /** Demonstrate: the opponent who copies it too, and whether they have. */ opp?: PlayerId; oppDone?: true }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
     tapOrUntap?: string; // "tap", "untap" or "neither", for "tap or untap target permanent"
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */
     castFromHand?: string;
+    /**
+     * "You may cast any number of spells ... from among them" (Primeval Spawn): the exiled cards, the total mana value
+     * still allowed, the card last offered, the cards not cast when offered, and the card picked ("none" to stop).
+     */
+    /** exileFaceDown: a hand card is being chosen. */
+    faceDownPick?: true;
+    /** moveLinked with `one`: the card is being chosen. */
+    linkedPick?: true;
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     evidence?: ObjectId[]; // the cards picked to collect evidence with as it resolves (CR 701.59a)

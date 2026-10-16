@@ -74,6 +74,9 @@ const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
   e.type === "collectEvidence" ||
+  // "You may exile all cards from your hand face down. If you do, ..." (Duplicity): even an empty hand (rulings on
+  // exiling or discarding your hand, Herigast).
+  (e.type === "exileFaceDown" && e.from === "hand") ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
@@ -242,6 +245,17 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "~ gains indestructible until end of turn. Tap it." (Icehide Troll): "it" is the permanent the sentence before was
     // about, when that sentence was about ~ itself and nothing else.
     if (/^(?:Tap|Untap) it$/.test(s) && si > 0 && /^~ (?:gets|gains|has|becomes)\b/.test(sentences[si - 1]!) && !/\btarget\b/.test(sentences[si - 1]!)) s = s.replace(/it$/, "~");
+    // "Put seven +1/+1 counters on ~. It becomes a 0/0 Spirit creature" (Haunted Screen), "~ becomes a Werewolf. Put two
+    // +1/+1 counters on it" (Mild-Mannered Librarian): "it" is ~, when the sentence before was about ~ and nothing else.
+    const aboutSelf = si > 0 && /^(?:~ (?:gets|gains|has|becomes)\b|Put [^.]+ counters? on ~$)/.test(sentences[si - 1]!) && !/\b(?:target|it|them)\b/.test(sentences[si - 1]!);
+    if (aboutSelf && /^It (?:becomes|gains|gets) /.test(s)) s = s.replace(/^It /, "~ ");
+    if (aboutSelf && /^Put [^.]+ counters? on it(?: and |$)/.test(s)) s = s.replace(/ counters? on it\b/, (w) => w.replace(/it$/, "~"));
+    // "Put three +1/+1 counters on ~ and it becomes a black Demon ..." (Possessed Goat): two instructions about ~.
+    const putThen = /^(Put [^.]+ counters? on ~) and it (becomes .+)$/.exec(s);
+    if (putThen) {
+      s = putThen[1]!;
+      sentences.splice(si + 1, 0, `~ ${putThen[2]!}`);
+    }
     if (!closeGate()) return null;
     [prevStart, curStart] = [curStart, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
@@ -264,6 +278,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
       const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
       effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
+      si++;
+      continue;
+    }
+    // "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
+    // among them without paying their mana costs." (Primeval Spawn), "Target opponent exiles the top X cards of their
+    // library. You may cast any number of spells with mana value X or less from among them ..." (Villainous Wealth): cast
+    // one after another as it resolves, ignoring timing (CR 608.2g, 601.2); lands can't be cast, and the rest stay exiled.
+    // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
+    const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
+    const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
+    const castAmong = castAmongHead && /^You may cast any number of spells(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (castAmongHead && castAmong && (castAmongHead[2] || castAmongHead[3] || afterShuffle)) {
+      const n = castAmongHead[1] ?? castAmongHead[4]!;
+      const whose = castAmongHead[2] ? (castAmongHead[2] === "your" ? "you" : castAmongHead[2] === "their" ? "that player" : castAmongHead[2].replace(/'s$/, "")) : castAmongHead[3] ?? "you";
+      const who = parsePlayer(whose, ctx);
+      if (!who) return null;
+      const limit = castAmong[2] ? amt(castAmong[2]) : undefined;
+      effects.push({ type: "castFromAmong", who, n: amt(n), ...(limit !== undefined ? (castAmong[1] ? { totalMv: limit } : { maxMv: limit }) : {}) });
       si++;
       continue;
     }
@@ -398,9 +430,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       sentences.splice(si, 1, joined[1]!, joined[3]!.charAt(0).toUpperCase() + joined[3]!.slice(1), "Shuffle");
       s = sentences[si]!;
     }
-    const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library$`, "i").exec(s);
-    if (look && !dig) {
-      dig = { type: "dig", n: amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
+    // "Look at the top X cards of your library, where X is the number of tokens you created this turn" (Ellyn Harbreeze):
+    // X counted as it resolves (CR 107.3c, 608.2h).
+    const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);
+    if (look && !dig && (!look[3] || look[2] === "X")) {
+      const def = look[3] ? parseCount(look[3], ctx) : undefined;
+      if (look[3] && !def) return null;
+      dig = { type: "dig", n: def ? replaceX(X, def) : amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
       continue;
     }
     if (dig) {
@@ -673,6 +709,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       });
       if (!reflexive || reflexive.modal) return null;
       effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
+    // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."
+    if (/^You may look at it for as long as it remains exiled$/i.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exileFaceDown" || prev.from !== "handCard") return null;
+      effects[effects.length - 1] = { ...prev, look: true };
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);

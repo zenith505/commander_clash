@@ -63,6 +63,14 @@ export function parseGraveyardKeyword(
     if (!parseManaCost(m[1]!).supported || parseManaCost(m[1]!).hasX) return "fail";
     return { fromGraveyard: { kind: "mayhem", mana: m[1]!, costs: [], exile: false } };
   }
+  // Harmonize (CR 702.180a): "You may cast this card from your graveyard by paying [cost] and tapping up to one untapped
+  // creature you control rather than paying this spell's mana cost", less that creature's power; then it's exiled. An
+  // {X} in it only when the mana cost has one too (Nature's Rhythm, Zenith Festival).
+  if ((m = /^Harmonize ((?:\{[^}]+\})+)$/.exec(line))) {
+    const cost = parseManaCost(m[1]!);
+    if (!isSpell || !cost.supported || (cost.hasX && !parseManaCost(d.manaCost).hasX)) return "fail";
+    return { fromGraveyard: { kind: "harmonize", mana: m[1]!, costs: [], exile: true } };
+  }
   if (/^Rebound$/.test(line)) return isSpell ? { rebound: true } : "fail";
   if ((m = /^Buyback ((?:\{[^}]+\})+)$/.exec(line))) return isSpell && parseManaCost(m[1]!).supported && !parseManaCost(m[1]!).hasX ? { buyback: m[1]! } : "fail";
   // "Buyback—Sacrifice a land.", "Buyback—Pay 3 life, Discard a card at random." (CR 702.27a): costs that aren't mana.
@@ -540,6 +548,7 @@ interface KeywordParts {
   undaunted?: number;
   /** Epic (CR 702.50a), on an instant or sorcery. */
   epic?: boolean;
+  paradigm?: boolean;
 }
 
 /** CR 702.189a: "Whenever this creature attacks, add N {R}. Until end of combat, you don't lose this mana as steps and phases end." */
@@ -587,6 +596,11 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // CR 702.40a: "When you cast this spell, copy it for each other spell that was cast before it this turn. If the
       // spell has any targets, you may choose new targets for any of the copies."
       out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." } });
+    } else if (/^demonstrate$/i.test(p)) {
+      // CR 702.144a: "When you cast this spell, you may copy it and you may choose new targets for the copy. If you copy
+      // the spell, choose an opponent. That player copies the spell and may choose new targets for that copy."
+      const copy: Effect = { type: "copySpell", spell: "cause", n: 1, newTargets: true, demonstrate: true };
+      out.triggers.push({ event: "selfCast", body: { targets: [], effects: [{ type: "may", effects: [copy], text: "copy ~ (an opponent you choose then copies it too)" }], text: "Demonstrate: you may copy ~. If you do, choose an opponent to also copy it. Players may choose new targets for their copies." } });
     } else if (/^gravestorm$/i.test(p)) {
       // CR 702.69a: "When you cast this spell, copy it for each permanent that was put into a graveyard from the
       // battlefield this turn. If the spell has any targets, you may choose new targets for any of the copies."
@@ -598,6 +612,12 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // new targets for the copy." Both happen as it resolves, after its other instructions.
       if (!d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return null;
       out.epic = true;
+    } else if (/^paradigm$/i.test(p)) {
+      // CR 702.192a: "If this is the first time a spell you control with this spell's name has resolved this game, at
+      // the beginning of each of your precombat main phases for the rest of the game, create a copy of this object in
+      // exile. You may cast the copy without paying its mana cost" and "Exile this spell", as it resolves.
+      if (!d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return null;
+      out.paradigm = true;
     } else if (/^undaunted$/i.test(p)) {
       // CR 702.125a: "This spell costs {1} less to cast for each opponent you have"; players who left aren't counted
       // (702.125b), and each instance applies (702.125c).

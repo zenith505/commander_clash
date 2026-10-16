@@ -415,7 +415,7 @@ export function compile(d: CardDef): CompiledCard {
     const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(line);
     if (manaAb && exhaust) {
       if (manaAb.oncePerTurn) out.unsupported.push(raw);
-      else out.mana.push({ ...manaAb, text: line, onceEver: true });
+      else out.mana.push({ ...manaAb, text: line, onceEver: true, exhaust: true });
       continue;
     }
     if (manaAb) {
@@ -540,6 +540,7 @@ export function compile(d: CardDef): CompiledCard {
       if (kw.convoke) out.convoke = true;
       if (kw.improvise) out.improvise = true;
       if (kw.epic) out.epic = true;
+      if (kw.paradigm) out.paradigm = true;
       for (let i = 0; i < (kw.undaunted ?? 0); i++) out.costLess = [...(out.costLess ?? []), { count: { kind: "players", opponents: true } }];
       if (kw.affinity.length) out.costLess = [...(out.costLess ?? []), ...kw.affinity.map((filter) => ({ count: { kind: "permanents" as const, filter } }))];
       if (kw.plusCounters) {
@@ -607,10 +608,12 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
-    // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player".
-    const choosePlayer = /^As (?:~|it) enters, choose (a player|an opponent)\.$/.exec(line);
+    // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player". "Secretly choose an opponent"
+    // (Guardian Archon): the same, but only its controller knows who until it's revealed.
+    const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
     if (choosePlayer && !out.entersChoosePlayer) {
-      out.entersChoosePlayer = choosePlayer[1] === "a player" ? "player" : "opponent";
+      out.entersChoosePlayer = choosePlayer[2] === "a player" ? "player" : "opponent";
+      if (choosePlayer[1]) out.entersChooseSecret = true;
       continue;
     }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
@@ -896,6 +899,14 @@ export function compile(d: CardDef): CompiledCard {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
       continue;
     }
+    if (line === "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead.") {
+      out.exileUnlessCastWithMana = true;
+      continue;
+    }
+    if (line === "During your turn, as long as you haven't activated an exhaust ability this turn, you may activate exhaust abilities as though they haven't been activated.") {
+      out.exhaustAgain = true;
+      continue;
+    }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
       out.beginOnBattlefield = true;
       continue;
@@ -943,6 +954,10 @@ export function compile(d: CardDef): CompiledCard {
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;
+      continue;
+    }
+    if (/^You may activate abilities of creatures you control as though those creatures had haste\.$/.test(line)) {
+      out.creatureAbilitiesHaste = true;
       continue;
     }
     if (/^You have no maximum hand size\.$/.test(line)) {

@@ -109,6 +109,7 @@ import {
   power,
   toughness,
   waitingOn,
+  keywordLabel,
   type CardDef,
   type ManaType,
   type GameObject,
@@ -264,7 +265,9 @@ type TapPick =
   | { kind: "station"; objectId: string; index: number; chosen: string[] }
   | { kind: "convoke"; objectId: string; chosen: string[] }
   /** Teamwork N: tap creatures with total power N or more as you cast it, or none. */
-  | { kind: "teamwork"; objectId: string; n: number; chosen: string[]; convoke?: string[] };
+  | { kind: "teamwork"; objectId: string; n: number; chosen: string[]; convoke?: string[] }
+  /** Harmonize (CR 702.180a-b): tap up to one untapped creature you control, its power off the cost. */
+  | { kind: "harmonize"; objectId: string; chosen: string[]; draft: CastDraft };
 
 /**
  * A spell being cast, built up step by step in the order of CR 601.2b-h: modes, kicker, X,
@@ -307,6 +310,8 @@ type CastDraft = {
   costOr?: number;
   /** Creatures tapped for teamwork; empty when it isn't paid. */
   teamwork?: string[];
+  /** Cast using harmonize: the creature tapped for it, or null for none (CR 702.180a-b). */
+  harmonize?: string | null;
   /** The two creatures tapped for conspire (CR 702.78a), or none. */
   conspire?: string[];
   /** The opponent promised the gift (CR 702.174a), or null for no gift. */
@@ -679,8 +684,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}) };
+    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
+    // Harmonize: which creature to tap is chosen as the cost is (CR 702.180b), first of all.
+    if (d.via === "harmonize" && d.harmonize === undefined) {
+      if (!convokers(s).length) return continueCast({ ...d, harmonize: null });
+      return setTapPick({ kind: "harmonize", objectId: d.objectId, chosen: [], draft: d });
+    }
     if (d.kicks === undefined && compiled.kicker)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
@@ -876,6 +886,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setTapPick(null);
     if (tapPick.kind === "convoke") return startCast(tapPick.objectId, tapPick.chosen);
     if (tapPick.kind === "teamwork") return startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, tapPick.chosen);
+    if (tapPick.kind === "harmonize") return continueCast({ ...tapPick.draft, harmonize: tapPick.chosen[0] ?? null });
     const { objectId, index, chosen } = tapPick;
     dispatch(planActivate(s, HUMAN, objectId, index, undefined, undefined, chosen) ?? [{ type: "activateAbility", player: HUMAN, objectId, index, tapCreatures: chosen }]);
   }
@@ -910,7 +921,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     // Crewing or convoking: click your untapped creatures to tap them for it.
     if (tapPick) {
       if (!tapCandidates(s, tapPick).some((c) => c.id === o.id)) return;
-      const chosen = tapPick.chosen.includes(o.id) ? tapPick.chosen.filter((x) => x !== o.id) : tapPick.kind === "station" ? [o.id] : [...tapPick.chosen, o.id];
+      const chosen = tapPick.chosen.includes(o.id) ? tapPick.chosen.filter((x) => x !== o.id) : tapPick.kind === "station" || tapPick.kind === "harmonize" ? [o.id] : [...tapPick.chosen, o.id];
       return setTapPick({ ...tapPick, chosen });
     }
     // Attacking: click a creature, then the player it attacks (an arrow follows the mouse).
@@ -1272,7 +1283,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                       setTapPick(null);
                       startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, []);
                     }
-                  : undefined
+                  : tapPick.kind === "harmonize"
+                    ? () => {
+                        setTapPick(null);
+                        continueCast({ ...tapPick.draft, harmonize: null });
+                      }
+                    : undefined
               }
               onCancel={() => setTapPick(null)}
             />
@@ -1508,7 +1524,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   miracle: "",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", permission: "Cast from graveyard" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
@@ -1528,8 +1544,12 @@ function describeExtraCost(c: AdditionalCost): string {
 
 /** Could you cast this card from your graveyard this way now, tapping mana as needed (costs like discards aside)? */
 function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKind) {
-  const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { via });
-  return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { via }) !== null);
+  const can = (choices: { via: CastFromGraveyardKind; harmonize?: string }) => {
+    const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, choices);
+    return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, choices) !== null);
+  };
+  // Harmonize: tapping a creature can take enough off its cost (CR 702.180a).
+  return can({ via }) || (via === "harmonize" && convokers(s).some((c) => can({ via, harmonize: c.id })));
 }
 
 /** A card exiled with "you may play it until ..." that you could play now. */
@@ -1611,6 +1631,7 @@ const convokers = (s: GameState) => s.battlefield.map((id) => s.objects[id]!).fi
 /** Creatures that can be clicked for a crew or convoke pick: your untapped creatures, other than the Vehicle being crewed. */
 function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
   if (pick.kind === "teamwork") return convokers(s).filter((o) => !pick.convoke?.includes(o.id));
+  if (pick.kind === "harmonize") return convokers(s);
   return convokers(s).filter((o) => !(pick.kind !== "convoke" && o.id === pick.objectId));
 }
 
@@ -1916,6 +1937,24 @@ function TapPickBar({ s, pick, onDone, onSkip, onCancel }: { s: GameState; pick:
       </div>
     );
   }
+  if (pick.kind === "harmonize") {
+    const tapped = pick.chosen[0];
+    const off = tapped ? Math.max(0, power(s, s.objects[tapped]!)) : 0;
+    return (
+      <div className="targeting harmonize-pick">
+        <span title="Tapping a creature this way isn't a {T} cost, so a summoning-sick creature can do it.">
+          <strong>Harmonize:</strong> you may tap an untapped creature you control to cast {name} for less, by its power{tapped ? ` (${cardOf(s, tapped).name}: {${off}} less)` : ""}
+        </span>
+        <button disabled={!tapped} onClick={onDone}>
+          Tap and cast
+        </button>
+        {onSkip && <button onClick={onSkip}>Cast without</button>}
+        <button className="ghost" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
   if (pick.kind === "crew") {
     const total = pick.chosen.reduce((n, id) => n + crewPower(s, s.objects[id]!, pick.saddle), 0);
     const verb = pick.saddle ? "Saddle" : "Crew";
@@ -2070,7 +2109,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
           {m.lostAllAbilities && <span className="kw none">No abilities</span>}
           {m.grantedKeywords.map((k) => (
             <span key={k} className="kw">
-              {k}
+              {keywordLabel(k, (x) => s.players[x]!.name)}
             </span>
           ))}
           {m.grantedAbilities.length > 0 && (
@@ -2356,6 +2395,11 @@ function Seat({
             {ringBearer(s, pid) ? `: ${cardOf(s, ringBearer(s, pid)!.id).name}` : ""}
           </span>
         )}
+        {p.gained?.length ? (
+          <span className="muted" title={`Until end of turn, ${p.name} has ${p.gained.map((k) => keywordLabel(k, (x) => s.players[x]!.name).toLowerCase()).join(" and ")}.`}>
+            🛡 {p.gained.map((k) => keywordLabel(k, (x) => s.players[x]!.name)).join(", ")}
+          </span>
+        ) : null}
         {phasedOut.length > 0 && (
           <span className="muted" title={`Phased out (treated as though they don't exist until they phase in during their controller's untap step): ${phasedOut.map((id) => cardOf(s, id).name).join(", ")}`}>
             ◌ Phased out {phasedOut.length}
@@ -2460,9 +2504,10 @@ function Seat({
 
 function ZoneTop({ s, o, count, onHover }: { s: GameState; o: GameObject | undefined; count: number; onHover: (d: CardDef | null) => void }) {
   if (!o) return <div className="zone-empty">empty</div>;
-  // Someone else's foretold card is face down (CR 702.143a); a hideaway card, to those who haven't controlled its permanent (CR 702.75a).
+  // Someone else's foretold card is face down (CR 702.143a); a hideaway card, to those who haven't controlled its permanent
+  // (CR 702.75a); a card exiled face down by Duplicity or Gustha's Scepter, to those who may not look (CR 406.3).
   if (o.foretold && o.owner !== HUMAN) return <CardBack count={count} label="Foretold" />;
-  if (o.hiddenExile && !o.hiddenExile.seen.includes(HUMAN)) return <CardBack count={count} label="Hideaway" />;
+  if (o.hiddenExile && !o.hiddenExile.seen.includes(HUMAN)) return <CardBack count={count} label={o.hiddenExile.label ?? "Hideaway"} />;
   const d = cardOf(s, o.id);
   return (
     <div className="card" data-obj={o.id} {...hoverProps(d, onHover)}>
@@ -2508,7 +2553,7 @@ function ZoneViewer({
             if (s.objects[id]!.foretold && s.objects[id]!.owner !== HUMAN) return <CardBack key={id} label="Foretold" />;
             // Exiled face down with hideaway: only players who controlled its permanent may look (CR 702.75a).
             const hidden = s.objects[id]!.hiddenExile;
-            if (hidden && !hidden.seen.includes(HUMAN)) return <CardBack key={id} label="Hideaway" />;
+            if (hidden && !hidden.seen.includes(HUMAN)) return <CardBack key={id} label={hidden.label ?? "Hideaway"} />;
             return (
               <div
                 key={id}
@@ -3390,7 +3435,7 @@ function Controls({
     );
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none.
-  if (pending?.kind === "chooseOption" && pending.what === "castFromHand" && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -3626,6 +3671,19 @@ function Controls({
         </span>
         {pending.options.map((o, i) => (
           <button key={o} className={i === 0 ? "" : "ghost"} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+            {pending.labels?.[i] ?? o}
+          </button>
+        ))}
+      </div>
+    );
+  if (pending?.kind === "chooseOption" && pending.what === "demonstrate" && pending.player === HUMAN)
+    return (
+      <div className="controls demonstrate-pick">
+        <span>
+          <strong>{pending.source}:</strong> which opponent also copies it?
+        </span>
+        {pending.options.map((o, i) => (
+          <button key={o} className="ghost" onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
             {pending.labels?.[i] ?? o}
           </button>
         ))}

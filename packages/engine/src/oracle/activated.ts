@@ -32,7 +32,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -81,6 +81,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let sorcerySpeed = false;
   let oncePerTurn = keyword === "Boast";
   let maxPerTurn: number | undefined;
+  let onceEver = keyword === "Exhaust";
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
   let activateIf: ActivatedAbility["activateIf"] = keyword === "Boast" ? { kind: "self", is: "attackedThisTurn" } : undefined;
   // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
@@ -93,6 +94,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       if (!c) return "fail";
       costLess = { ...c, times: (c.times ?? 1) * Number(less[1]) };
       effectText = effectText.slice(0, less.index);
+      found = true;
+    }
+    // "Activate only once." (CR 602.5b): for as long as it's the same object (CR 400.7), like exhaust (702.177a).
+    if (/ Activate only once\.$/.test(effectText) && !onceEver && !keyword) {
+      onceEver = true;
+      effectText = effectText.slice(0, effectText.length - " Activate only once.".length);
       found = true;
     }
     // "Activate no more than twice each turn." (CR 602.5b)
@@ -154,6 +161,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     tap,
     sacrificeSelf: /Sacrifice ~/.test(costs),
     ...(/Exert ~/.test(costs) ? { exertCost: true as const } : {}),
+    ...(/Reveal the player you chose/.test(costs) ? { revealChosen: true as const } : {}),
     sorcerySpeed,
     body,
     text: raw,
@@ -161,7 +169,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
-    ...(keyword === "Exhaust" ? { onceEver: true as const } : {}),
+    ...(onceEver ? { onceEver: true as const } : {}),
     ...(keyword ? { keyword } : {}),
     ...(maxPerTurn ? { maxPerTurn } : {}),
     ...(costLess ? { costLess } : {}),
@@ -176,7 +184,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
 }
 
 /** Instructions that move a card to or from a library (CR 605.1a): an ability with one isn't a mana ability. */
-const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "shuffleZones", "search", "dig", "impulse", "cascade", "discover", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash", "revealTop", "putInGraveyard"]);
+const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "shuffleZones", "search", "dig", "impulse", "cascade", "discover", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash", "revealTop", "putInGraveyard", "castFromAmong"]);
 /** Instructions that don't: what mana abilities do besides adding mana (Pristine Talisman's life, Glittering Stockpile's counter). */
 const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
 

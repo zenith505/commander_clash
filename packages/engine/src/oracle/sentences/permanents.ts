@@ -8,6 +8,7 @@ import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
 import { parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
+import { canonicalKeyword } from "../../keywords";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -53,9 +54,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Ray of Command: "When you lose control of the creature, tap it." A delayed trigger about the creature it took control
   // of (CR 603.7): it taps when the control effect ends or another player takes it (rulings).
-  if ((m = /^When you lose control of (the creature|the artifact|it|that creature|that artifact), tap it$/i.exec(s))) {
-    const of = parseObject(m[1]!.replace(/^the /i, "that "), ctx) ?? parseObject("it", ctx);
-    return of?.ref === "target" ? [{ type: "delayed", when: "lostControl", of, effects: [{ type: "tap", what: { ref: "subject" } }], text: "tap it" }] : null;
+  // Ogre Geargrabber: "When you lose control of that Equipment, unattach it" (CR 701.3d), from whatever it's attached to
+  // then, for any reason it's lost (rulings).
+  if ((m = /^When you lose control of (the creature|the artifact|it|that creature|that artifact|that Equipment), (tap|unattach) it$/i.exec(s))) {
+    const of = /Equipment$/.test(m[1]!) ? (ctx.lastObjectTarget !== undefined ? { ref: "target" as const, index: ctx.lastObjectTarget } : null) : parseObject(m[1]!.replace(/^the /i, "that "), ctx) ?? parseObject("it", ctx);
+    const tap = m[2]!.toLowerCase() === "tap";
+    return of?.ref === "target" ? [{ type: "delayed", when: "lostControl", of, effects: [tap ? { type: "tap", what: { ref: "subject" } } : { type: "unattach", what: { ref: "subject" } }], text: `${m[2]!.toLowerCase()} it` }] : null;
   }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
@@ -285,6 +289,21 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
     const first = what && parseChanges(m[2]!);
     return what && first ? [{ type: "continuous", what, mods: [...first, { kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
+  }
+  // "You gain shroud until end of turn" (Gilded Light), "You and permanents you control gain hexproof until end of turn"
+  // (Lazotep Plating), "You and target permanent you control each gain protection from the chosen player until end of
+  // turn" (Guardian Archon), "you gain protection from the chosen color" (Seht's Tiger): the player gains it too (CR
+  // 702.11d, 702.16b-e, 702.16k, 702.18d).
+  if ((m = /^You(?: and (.+?))?(?: each)? gains? (hexproof|shroud|protection from [a-z ]+?) until end of turn$/i.exec(s))) {
+    const k = canonicalKeyword(m[2]!);
+    if (!k || !/^(?:Hexproof|Shroud|Protection from )/.test(k)) return null;
+    const out: Effect[] = [{ type: "playerGains", keywords: [k] }];
+    if (m[1]) {
+      const what = parseObject(m[1], ctx);
+      if (!what) return null;
+      out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: [k] }], duration: "endOfTurn" });
+    }
+    return out;
   }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

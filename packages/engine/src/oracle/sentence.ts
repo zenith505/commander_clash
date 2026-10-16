@@ -144,10 +144,13 @@ export function parseBecomes(text: string): Modification[] | null {
   }
   // "Becomes a 0/0 Bird creature with flying in addition to its other types" (Case of the Filched Falcon): it keeps its
   // card types and subtypes (CR 205.1b).
+  // "... a black Demon in addition to its other colors and types" (Possessed Goat): it keeps its colors too (CR 105.3).
   let addition = false;
-  if ((m = /^(.+?) in addition to its other types$/i.exec(rest)) && !still) {
+  let addColors = false;
+  if ((m = /^(.+?) in addition to its other (types|colors and types)$/i.exec(rest)) && !still) {
     rest = m[1]!;
     addition = true;
+    addColors = m[2] !== "types";
   }
   // "1/1 Elemental creatures" (Kamahl's Will's "any number of target lands ... become"): each of them becomes one.
   if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
@@ -209,7 +212,10 @@ export function parseBecomes(text: string): Modification[] | null {
     if (!types.includes("Creature") || subtypes.length) return null;
     out.push({ kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true });
   }
-  if (colors.length || /colorless/i.test(rest)) out.push({ kind: "setColors", colors });
+  if (addColors) {
+    if (!colors.length) return null;
+    out.push({ kind: "addColors", colors });
+  } else if (colors.length || /colorless/i.test(rest)) out.push({ kind: "setColors", colors });
   if (pt) out.push({ kind: "setPT", power: pt[0], toughness: pt[1] });
   out.push(...grants);
   return out.length ? out : null;

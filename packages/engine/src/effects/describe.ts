@@ -2,6 +2,7 @@ import type { Amount, Modification, SearchDest, PayCost } from "../abilities";
 import { power, toughness } from "../cards";
 import { player } from "../game";
 import { describeAmount } from "../amounts";
+import { keywordLabel } from "../keywords";
 import type { Color, GameState, PlayerId } from "../types";
 
 export const COLOR_NAMES: Record<Color, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
@@ -53,7 +54,7 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
     if (m.kind === "modifyPT") parts.push(`gets ${sign(m.power)}/${sign(m.toughness)}`);
     else if (m.kind === "setPT") parts.push(`has base power and toughness ${describeAmount(m.power)}/${describeAmount(m.toughness)}`);
     else if (m.kind === "switchPT") parts.push("has its power and toughness switched");
-    else if (m.kind === "addKeywords") parts.push(`gains ${m.keywords.join(", ").toLowerCase()}`);
+    else if (m.kind === "addKeywords") parts.push(`gains ${m.keywords.map((k) => keywordLabel(k, (x) => player(s, x).name)).join(", ").toLowerCase()}`);
     else if (m.kind === "addAbility") parts.push(`gains "${m.text.replace(/~/g, "this creature")}"`);
     else if (m.kind === "removeKeywords") parts.push(`loses ${m.keywords.join(", ").toLowerCase()}`);
     else if (m.kind === "loseAllAbilities") parts.push("loses all abilities");

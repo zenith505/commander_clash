@@ -215,8 +215,19 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
     }
+    // "You may cast any number of spells ... from among them": the biggest each time, until none is left or worth it.
+    if (pend.kind === "chooseOption" && pend.what === "castFromAmong") {
+      const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));
+      const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
+    // Demonstrate: the opponent who also copies the spell is the one with the least on the battlefield.
+    if (pend.kind === "chooseOption" && pend.what === "demonstrate") {
+      const owned = (o: string) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(o)).length;
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => owned(a) - owned(b))[0]! }];
+    }
     // Which opponent to clash with: nothing is known about their libraries, so the next one in turn order.
     if (pend.kind === "chooseOption" && pend.what === "clash") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
@@ -1180,6 +1191,13 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
       const two = conspireCandidates(s, pid, id).filter((o) => !busy(o) && !tw?.includes(o) && spare_(s, pid, o)).slice(0, 2);
       if (two.length === 2) extra.conspire = two;
     }
+    // Harmonize (CR 702.180a): the strongest creature we can spare, for the most generic mana off.
+    if (via === "harmonize") {
+      const h = teamworkCandidates(s, pid)
+        .filter((o) => !busy(o) && !tw?.includes(o) && !extra.conspire?.includes(o) && spare_(s, pid, o) && teamworkPower(s, o) > 0)
+        .sort((a, b) => teamworkPower(s, b) - teamworkPower(s, a))[0];
+      if (h) extra.harmonize = h;
+    }
     // Gift (CR 702.174): promised only for a small gift that turns on something of the spell's own.
     // When it has targets only with the gift promised, it's promised for those.
     const giftee = !c.gift || must("gift") === false ? undefined : (chooseGiftee(s, pid, c) ?? (must("gift") ? [...opponents(s, pid)].sort((a, b) => player(s, a).life - player(s, b).life)[0] : undefined));
@@ -1484,6 +1502,15 @@ function provokeGood(s: GameState, attacker: GameObject, target: GameObject): bo
   return (power(s, attacker) >= toughness(s, target) || deadly(attacker)) && power(s, target) < toughness(s, attacker) && !deadly(target);
 }
 
+/** Cards `pid` owns exiled with this permanent (any of its linked exile piles, CR 607.2a). */
+function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId): number {
+  if (!sourceId) return 0;
+  return Object.entries(s.linkedExile ?? {})
+    .filter(([k]) => k.startsWith(`${sourceId}@`))
+    .flatMap(([, v]) => v)
+    .filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && s.objects[l.id]!.owner === pid).length;
+}
+
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
@@ -1492,6 +1519,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   // smaller loss (only asked when it can be done).
   if (e.keep && e.otherwise?.some((x) => (x.type === "sacrifice" || x.type === "exile") && x.what.ref === "self") && e.effects.every((x) => x.type === "discard" || x.type === "pick")) return true;
   if (e.keep && e.otherwise?.length === 1 && e.otherwise[0]!.type === "discard" && e.effects.length === 1 && e.effects[0]!.type === "discard") return true;
+  // Duplicity: swap our hand for the cards exiled with it when that's at least as many cards.
+  if (e.effects.length === 1 && e.effects[0]!.type === "exileFaceDown" && e.effects[0]!.from === "hand") return linkedOwned(s, r.item.sourceId, pid) >= player(s, pid).hand.length;
+  // Demonstrate: a copy for us and one for one opponent, ahead of the other two (CR 702.144a).
+  if (e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0]!.demonstrate) return true;
   const provoke = e.effects.find((x) => x.type === "mustBlockSource");
   if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
     const t = r.item.targets?.[provoke.what.index];
@@ -1883,6 +1914,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
+      // Gustha's Scepter: bots don't hide cards from their hand, so there's nothing to take back either.
+      if (ab.body.effects.some((e) => e.type === "exileFaceDown" || (e.type === "moveLinked" && !linkedOwned(s, id, pid)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
@@ -1908,7 +1941,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
-        if (!targets) continue;
+        if (!targets || pointlessAttach(s, body, targets, id)) continue;
         const costs = abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
         plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x, costs);
@@ -1920,6 +1953,19 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/** "Attach target Equipment you control to target creature you control" (Brass Squire) where it already is, or with no Equipment chosen. */
+function pointlessAttach(s: GameState, body: AbilityBody, targets: TargetChoice[], sourceId: ObjectId): boolean {
+  const e = body.effects.find((x) => x.type === "attach" && x.source);
+  if (e?.type !== "attach" || e.source?.ref !== "target") return false;
+  const pick = (r: typeof e.what) => {
+    const c = r.ref === "target" ? targets[r.index] : r.ref === "self" ? { kind: "object" as const, id: sourceId } : undefined;
+    return c && !Array.isArray(c) && c.kind === "object" ? c.id : undefined;
+  };
+  const eq = pick(e.source);
+  const host = pick(e.what);
+  return !eq || !host || s.objects[eq]?.attachedTo === host;
 }
 
 /**

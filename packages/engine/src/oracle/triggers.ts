@@ -8,6 +8,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
   [/^When(?:ever)? ~ dies, (.+)$/, "selfDies"],
   [/^When(?:ever)? ~ leaves the battlefield, (.+)$/, "selfLeaves"],
+  [/^When you lose control of ~, (.+)$/, "selfLostControl"],
   [/^When(?:ever)? ~ is put into (?:a|your) graveyard from the battlefield, (.+)$/, "selfToGraveyard"],
   // Haunt (CR 702.55b-c): it triggers from exile, see "hauntedDies".
   [/^When the creature ~ haunts dies, (.+)$/, "hauntedDies"],
@@ -67,7 +68,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfLeaves", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
+  "selfEnters", "selfDies", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous",

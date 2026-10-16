@@ -1,9 +1,9 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { playerProtectedFrom } from "./effects/targeting";
+import { playerProtectedFrom, spellManaValue } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, type DamageEvent } from "./damage";
@@ -576,6 +576,13 @@ export function moveObject(
     delete s.objects[id];
     return;
   }
+  // Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
+  // with the abilities it would have there (614.12). Mana paid for any cost to cast it counts; a copy of a spell, or a
+  // token, wasn't cast (rulings).
+  if (to === "battlefield" && fromZone !== "battlefield" && entersRulesOf(s, opts.controller ?? o.controller, id).exileUnlessCastWithMana && !(fromZone === "stack" && !o.spellCopy && (o.manaSpent ?? 0) > 0)) {
+    log(s, `${defOf(s, o).name} is exiled instead of entering: ${fromZone === "stack" && !o.spellCopy ? "no mana was spent to cast it" : "it wasn't cast"}.`);
+    to = "exile";
+  }
   // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
   o.exileIfLeaves = undefined;
@@ -850,7 +857,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
-  if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}) });
+  if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
   const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
@@ -1695,6 +1702,7 @@ function beginStep(s: GameState, step: Step): void {
         if (put) log(s, `${player(s, ap).name} puts ${put === 1 ? "a lore counter" : `${put} lore counters`} on ${nameOf(s, id)}.`);
       }
       invalidateCharacteristics(s);
+      fireEvent(s, { type: "step", step: "main1", active: ap }); // paradigm's "at the beginning of each of your precombat main phases"
       break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
@@ -1771,6 +1779,7 @@ function finishCleanup(s: GameState) {
   }
   invalidateCharacteristics(s);
   for (const p of s.players) {
+    p.gained = undefined; // "until end of turn" (CR 514.2)
     p.preventNext = undefined;
     p.redirectNext = undefined;
   }
@@ -2120,6 +2129,16 @@ export function isSummoningSick(s: GameState, o: GameObject) {
   return o.controlledSinceTurn >= s.turn && !objHasKeyword(s, o, "Haste");
 }
 
+/**
+ * A creature's {T} ability can't be activated while it's summoning sick (CR 302.6), unless its controller controls a
+ * permanent saying they may activate them as though it had haste (Thousand-Year Elixir). It doesn't let it attack.
+ */
+export function tapAbilitySick(s: GameState, o: GameObject) {
+  if (!isSummoningSick(s, o)) return false;
+  const you = controllerOf(s, o);
+  return !s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).creatureAbilitiesHaste && controllerOf(s, obj(s, id)) === you);
+}
+
 function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, index?: number, tap?: ObjectId[], extra: ManaType[] = [], combo?: number) {
   const o = obj(s, id);
   const name = characteristics(s, o).name;
@@ -2150,6 +2169,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
   if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
+  if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
   if (ab.sacrificeSelf) {
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
@@ -2358,7 +2378,7 @@ export function castProblem(
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
   const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined);
   if (ap) return ap;
-  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? giftProblem(s, pid, d, choices);
+  const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
   const cost = costToPay(s, pid, o, convoke, improvise, x, choices?.kicks, { ...choices, targets, modes });
   if (typeof cost === "string") return cost;
@@ -2373,7 +2393,7 @@ export function castProblem(
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice" | "harmonize"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -2417,6 +2437,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // chosen as the emerge cost is (702.119c), so it's known when the total cost is (601.2f).
   const emerged = how.alt === "emerge" && how.sacrifice?.[0] !== undefined ? s.objects[how.sacrifice[0]] : undefined;
   if (emerged?.zone === "battlefield") less += manaValue(parseManaCost(defOf(s, emerged).manaCost));
+  // Harmonize (CR 702.180a-b): less generic mana equal to the tapped creature's power (none for 0 or less).
+  const harmonizer = how.via === "harmonize" && how.harmonize !== undefined ? s.objects[how.harmonize] : undefined;
+  if (harmonizer?.zone === "battlefield") less += Math.max(0, power(s, harmonizer));
   // "You may cast ~ as though it had flash if you pay {2} more to cast it": cast when a sorcery couldn't be, it costs more
   // (CR 601.2f). Not when something else lets it be cast then: a resolving madness trigger, or Flash from elsewhere.
   const flashCost = compileCard(d).flashCost;
@@ -2591,6 +2614,15 @@ function tapCreaturesProblem(s: GameState, pid: PlayerId, ids: ObjectId[], what:
   return null;
 }
 const convokeProblem = (s: GameState, pid: PlayerId, ids: ObjectId[]) => tapCreaturesProblem(s, pid, ids, "convoke");
+
+/** Harmonize's creature: one untapped creature you control, only when it's cast using harmonize (CR 702.180a-b). */
+function harmonizeProblem(s: GameState, pid: PlayerId, choices?: CostChoices, convoke?: ObjectId[]): string | null {
+  const id = choices?.harmonize;
+  if (id === undefined) return null;
+  if (choices?.via !== "harmonize") return "a creature is tapped that way only when it's cast using harmonize";
+  if (convoke?.includes(id) || choices?.teamwork?.includes(id) || choices?.conspire?.includes(id)) return "a creature can't be tapped twice to cast it";
+  return tapCreaturesProblem(s, pid, [id], "pay for harmonize");
+}
 
 /** Target specs a card needs when cast (empty for most permanents). For a modal spell, those of the chosen modes. */
 export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => spellTargetSpecs(castDef(s, id, alt), modes, how);
@@ -2817,6 +2849,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} taps ${choices.teamwork.map((c) => nameOf(s, c)).join(", ")} (teamwork).`);
     o.teamwork = true;
   }
+  // Harmonize: the creature chosen is tapped as the total cost is paid (CR 702.180b).
+  if (choices.harmonize !== undefined && via?.kind === "harmonize") {
+    tapPermanent(s, obj(s, choices.harmonize));
+    log(s, `${p.name} taps ${nameOf(s, choices.harmonize)} (harmonize).`);
+  }
   // Conspire: "you may tap two untapped creatures you control that each share a color with it" (CR 702.78a).
   if (choices.conspire?.length) {
     for (const c of choices.conspire) tapPermanent(s, obj(s, c));
@@ -2833,7 +2870,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   s.spellsCastThisTurn = item.castNth + 1;
   s.cards[d.oracleId] ??= d;
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
-  (s.castItems ??= {})[stackId] = structuredClone(item);
+  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}) });
   fireEvent(s, { type: "targeted", stackId });
@@ -3341,9 +3378,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid)) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
-  if (ab.tap && objIsType(s, o, "Creature") && isSummoningSick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
+  if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
-  if (ab.onceEver && o.activatedEver?.includes(index)) return `${d.name}'s exhaust ability can be activated only once`; // CR 702.177a
+  if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
+  // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
+  if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
@@ -3488,7 +3527,11 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
-  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters } } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
+  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
+  if (ab.revealChosen && o.chosen?.player !== undefined) {
+    o.chosen = { ...o.chosen, secret: undefined };
+    log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
+  }
   loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -3507,6 +3550,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
   if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
+  if (ab.keyword === "Exhaust") p.exhaustTurn = s.turn; // CR 702.177b
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
   if (ab.tap) tapPermanent(s, o);
@@ -3853,8 +3897,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (pend.what === "player") {
       const pid = Number(choice);
       if (!pend.options.includes(choice)) throw new RulesError("choose one of the players offered");
-      o.chosen = { ...o.chosen, player: pid };
-      log(s, `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
+      // "Secretly choose an opponent": nobody else learns who until it's revealed (Guardian Archon).
+      o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
+      log(s, entry?.secret ? `${p.name} secretly chooses an opponent for ${pend.source}.` : `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
       invalidateCharacteristics(s);
       return;
     }
@@ -3894,6 +3939,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "castFromAmong") {
+    const st = r.scratch?.castAmong;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "tapOrUntap") {
     (r.scratch ??= {}).tapOrUntap = choice;
     continueResolution(s);
@@ -3908,6 +3960,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "endure") {
     (r.scratch ??= {}).endure = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "demonstrate") {
+    const c = r.scratch?.copies;
+    if (!c) throw new RulesError("nothing to demonstrate");
+    c.opp = Number(choice) as PlayerId; // the opponent who also copies the spell (CR 702.144a)
+    log(s, `${p.name} chooses ${player(s, c.opp).name} to also copy ${pend.source} (demonstrate).`);
     continueResolution(s);
     return;
   }
@@ -4069,7 +4129,7 @@ function askEntersChoice(s: GameState): boolean {
         q.shift();
         continue;
       }
-      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `choose ${c.except === "you" ? "an opponent" : "a player"}` };
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
       return true;
     }
     if (c.what === "readAhead") {
@@ -4978,7 +5038,7 @@ function attachmentSBAs(s: GameState): boolean {
       const p = o.attachedToPlayer;
       const enchant = compileCard(defOf(s, o)).enchant!;
       // Nor can it stay on a player with protection from its controller (CR 702.16c, 702.16k).
-      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller);
+      const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller, c);
       if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
         moveObject(s, id, "graveyard");
@@ -5068,7 +5128,9 @@ function syncControl(s: GameState) {
     }
     if (o.seenController === undefined) o.seenController = now;
     else if (o.seenController !== now) {
+      const was = o.seenController;
       o.seenController = now;
+      fireEvent(s, { type: "controlChanged", id: o.id, from: was });
       loseRingBearer(s, o.id); // CR 701.54a
       o.controlledSinceTurn = s.turn;
       if (o.attacking !== undefined || o.blocking !== undefined) {

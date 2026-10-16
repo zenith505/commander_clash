@@ -15,3 +15,4 @@ export * from "./modes";
 export * from "./damage";
 export * from "./shortcuts";
 export { partySize, PARTY_TYPES } from "./amounts";
+export { keywordLabel } from "./keywords";

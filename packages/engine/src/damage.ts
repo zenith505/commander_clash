@@ -439,7 +439,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         ops.push({ kind: "preventAll", srcName: e.src.name, toName });
         continue;
       }
-      if (preventing && "player" in to && playerProtectedFrom(s, to.player, e.src.controller)) {
+      if (preventing && "player" in to && playerProtectedFrom(s, to.player, e.src.controller, e.src)) {
         ops.push({ kind: "protection", srcName: e.src.name, toName });
         continue;
       }

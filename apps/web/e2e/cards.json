@@ -1287,6 +1287,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "01072a45-ab1c-4d19-b493-76cf4aae351e",
+  "name": "Duplicity",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, exile the top five cards of your library face down.\nAt the beginning of your upkeep, you may exile all cards from your hand face down. If you do, put all other cards you own exiled with this enchantment into your hand.\nAt the beginning of your end step, discard a card.\nWhen you lose control of this enchantment, put all cards exiled with this enchantment into their owner's graveyard.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f96f1b4c-f06a-4374-8d8f-aaa06c6108c3",
   "name": "Eagle Vision",
   "manaCost": "{4}{U}",
@@ -1397,6 +1423,35 @@
   "commanderLegal": "legal",
   "set": "sok",
   "releasedAt": "2005-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "bcd3e6a1-7b76-408d-9236-3791c3e1064a",
+  "name": "Excavation Technique",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Demonstrate (When you cast this spell, you may copy it. If you do, choose an opponent to also copy it. Players may choose new targets for their copies.)\nDestroy target nonland permanent. Its controller creates two Treasure tokens.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Treasure",
+   "Demonstrate"
+  ],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -2100,6 +2155,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c7748659-0206-448f-8567-83565cb0b51a",
+  "name": "Guardian Archon",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Archon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Archon"
+  ],
+  "oracleText": "Flying\nAs this creature enters, secretly choose an opponent.\nReveal the player you chose: You and target permanent you control each gain protection from the chosen player until end of turn. Activate only once.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8e04a5e0-e22c-430b-a39a-c9f38e16ea86",
   "name": "Guardian of Faith",
   "manaCost": "{1}{W}{W}",
@@ -2129,6 +2216,28 @@
   "commanderLegal": "legal",
   "set": "afr",
   "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "120e9013-b07b-49d9-8b86-f6c26315581d",
+  "name": "Gustha's Scepter",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Exile a card from your hand face down. You may look at it for as long as it remains exiled.\n{T}: Return a card you own exiled with this artifact to your hand.\nWhen you lose control of this artifact, put all cards exiled with this artifact into their owner's graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -4601,6 +4710,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c5da5c31-0cf1-4393-8701-eda7880ecebc",
+  "name": "Unending Whisper",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw a card.\nHarmonize {5}{U} (You may cast this card from your graveyard for its harmonize cost. You may tap a creature you control to reduce that cost by {X}, where X is its power. Then exile this spell.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Harmonize"
+  ],
+  "commanderLegal": "legal",
+  "set": "tdm",
+  "releasedAt": "2025-04-11",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2fac62be-dcbe-409f-a362-f0e519ec14a9",
   "name": "Venomsac Lagac",
   "manaCost": "{1}{G}",
@@ -4697,6 +4834,36 @@
   "set": "afr",
   "releasedAt": "2021-07-23",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f2fae95d-074b-4c0c-99cd-f9385a424c05",
+  "name": "Villainous Wealth",
+  "manaCost": "{X}{B}{G}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent exiles the top X cards of their library. You may cast any number of spells with mana value X or less from among them without paying their mana costs.",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ktk",
+  "releasedAt": "2014-09-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

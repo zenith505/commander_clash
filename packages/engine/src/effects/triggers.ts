@@ -64,6 +64,8 @@ export type TriggerSourceEvent =
   /** `sacrificed`: its controller sacrificed it (CR 701.21a). */
   /** An Aura or Equipment that stays on the battlefield became unattached from `host` (moved, or unattached). */
   | { type: "unattached"; id: ObjectId; host: ObjectId }
+  /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
+  | { type: "controlChanged"; id: ObjectId; from: PlayerId }
   | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
@@ -109,7 +111,7 @@ export type TriggerSourceEvent =
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
-  | { type: "step"; step: "upkeep" | "draw" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "main1" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -365,6 +367,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
     locked = null;
+  } else if (ev.type === "controlChanged") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, ev.from, (e) => e === "selfLostControl");
   } else if (ev.type === "unattached") {
     const o = s.objects[ev.id];
     const host = s.objects[ev.host];
@@ -385,7 +390,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       ev.controller,
       (e, t) =>
         (((e === "selfDies" && ev.wasCreature) || e === "selfToGraveyard") && ev.to === "graveyard" && !(t.ifNoCounter && (ev.counters[t.ifNoCounter] ?? 0) > 0)) ||
-        e === "selfLeaves",
+        e === "selfLeaves" ||
+        e === "selfLostControl",
       withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers,
       undefined,
       undefined,
@@ -689,7 +695,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
       if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card)) continue;
       s.nextCast = s.nextCast!.filter((x) => x !== d);
-      s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
+      // "Has cascade": the spell's own cascade ability triggers (CR 702.85a).
+      if (d.cascade && spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+      else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
@@ -877,9 +885,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
-            : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
+            : d.when === "eachYourPrecombatMain"
+              ? ev.step === "main1" && ev.active === d.controller
+              : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
-      if (d.when !== "eachYourUpkeep") s.delayed = s.delayed!.filter((x) => x !== d);
+      if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
       s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).

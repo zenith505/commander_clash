@@ -1,6 +1,6 @@
 import { allEffects } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
-import { CHOSEN_LAND_TYPE, CHOSEN_PROTECTION, stripReminder } from "../keywords";
+import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -607,6 +607,12 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player".
+    const choosePlayer = /^As (?:~|it) enters, choose (a player|an opponent)\.$/.exec(line);
+    if (choosePlayer && !out.entersChoosePlayer) {
+      out.entersChoosePlayer = choosePlayer[1] === "a player" ? "player" : "opponent";
+      continue;
+    }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
     const asEnters = /^(~ enters tapped\. )?As (?:~|it) enters, choose (an? (?:creature type|color)(?: other than \w+)?(?: and an? (?:creature type|color))?)\.$/.exec(line);
     if (asEnters) {
@@ -883,9 +889,11 @@ export function compile(d: CardDef): CompiledCard {
       out.drawTwoInstead = true;
       continue;
     }
-    const youHave = /^You have (hexproof|shroud)\.$/.exec(line);
-    if (youHave) {
-      out.youHave = youHave[1] as "hexproof" | "shroud";
+    // "You have protection from each of your opponents" (CR 702.16k): their spells and abilities can't target you, their
+    // Auras can't enchant you, and damage from their sources is prevented.
+    const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
+    if (youHave && !out.youHave) {
+      out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
       continue;
     }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
@@ -1484,6 +1492,7 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PROTECTION)) needs.add("color");
+    if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     Object.values(o).forEach(visit);
   };

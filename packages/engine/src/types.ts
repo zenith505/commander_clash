@@ -996,6 +996,8 @@ export interface Chosen {
   landType?: string;
   /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
   keyword?: string;
+  /** "As ~ enters, choose a player" (True-Name Nemesis). */
+  player?: PlayerId;
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

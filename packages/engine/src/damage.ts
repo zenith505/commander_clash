@@ -9,7 +9,7 @@ import { abilitiesOf } from "./cards";
 import { evalAmount } from "./amounts";
 import { putCounters } from "./counters";
 import { fireEvent } from "./effects";
-import { objectMatches } from "./effects/targeting";
+import { objectMatches, playerProtectedFrom } from "./effects/targeting";
 import { canPreventDamage, gainLife, log, loseLife, obj, player, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
@@ -52,6 +52,9 @@ export const cardSource = (d: CardDef, controller: PlayerId, ref?: DamageSource[
 const has = (src: DamageSource, k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 
 export { protectedFrom };
+
+/** Who has a permanent's protection, for protection from a player (CR 702.16k): its controller and its chosen player. */
+export const protectionHolder = (s: GameState, o: GameObject) => ({ controller: controllerOf(s, o), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}) });
 
 /**
  * Deal `n` damage from `src` to a permanent or player. Returns how much was dealt (0 if it
@@ -436,7 +439,11 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         ops.push({ kind: "preventAll", srcName: e.src.name, toName });
         continue;
       }
-      if (preventing && "object" in to && protectedFrom(characteristics(s, obj(s, to.object)).keywords, e.src)) {
+      if (preventing && "player" in to && playerProtectedFrom(s, to.player, e.src.controller)) {
+        ops.push({ kind: "protection", srcName: e.src.name, toName });
+        continue;
+      }
+      if (preventing && "object" in to && protectedFrom(characteristics(s, obj(s, to.object)).keywords, e.src, protectionHolder(s, obj(s, to.object)))) {
         ops.push({ kind: "protection", srcName: e.src.name, toName });
         continue;
       }

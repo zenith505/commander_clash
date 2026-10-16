@@ -1,6 +1,6 @@
 # Roadmap
 
-18,429 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,559 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -113,15 +113,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Left from the round after Balancing Act (exhaust mana, protection from players, "when you lose control of", granted
    cascade, abilities being activated, tokens created this turn):
    - Protection from a player (CR 702.16k) works for "each of your opponents", "the chosen player" and Guardian
-     Archon's secret choice; still out: Courageous Resolve, and "you and target permanent you control each gain
-     protection from".
-   - Cascade given to spells works, "the next noncreature spell you cast this turn has cascade" too (Dark Apostle,
-     Sloppity Bilepiper, Smoldering Stagecoach); still out: TARDIS (planeswalk), Bigger on the Inside (granted mana
-     ability for another player), Flamekin Herald (commander spells), Abaddon, Bloodbraid Marauder.
-   - "Mana from Treasures spent to activate this ability" as an amount (Mr. House, which also rolls dice) is out.
+     Archon's secret choice; still out: "you and target permanent you control each gain protection from".
+   - Cascade given to spells works, "the next noncreature spell you cast this turn has cascade" too; still out: Bigger
+     on the Inside (a granted {T} ability that makes another player add mana, then their next spell has cascade),
+     Yidris ("as you cast spells from your hand this turn"), Zhulodok ("Cascade, cascade" granted in quotes), Aurora
+     Phoenix ("whenever you cast a spell with cascade").
    - "Whenever a player activates an ability that isn't a mana ability" works; "an ability of an artifact they
      control" (Avalanche of Sector 7, which counts mana abilities too) and Artifact Possession are still out.
-   - Courageous Resolve: "gains protection from each of your opponents until end of turn" and "you can't lose the game".
    Left from the round after mana spent (a discard inside an "if", autopay that avoids harm, skips, keyword and finality
    counters):
    - Keyword and +1/+1 counters count on cards in other zones (CR 122.1b), but printed-card filters (a card in a
@@ -177,21 +175,40 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Left from the round after cascade ("when you lose control of", face-down exile, attach target Equipment,
    harmonize, paradigm, demonstrate):
    - "When you lose control of ~" works (603.2, rulings on Khârn: leaving the battlefield or a control change; the
-     player who lost control controls the trigger: Duplicity, Gustha's Scepter, Ogre Geargrabber, Ray of Command).
-     Still out: Khârn, the Betrayer (an opponent's choice inside a damage prevention), Stolen Uniform ("this turn" and
-     "if it's attached to a creature you control"), Krovikan Vampire and Seraph ("Sacrifice it when you lose control
-     of ~"). A control change before the first state check of a newly placed permanent isn't noticed; bots don't use
-     Gustha's Scepter.
-   - Face-down exile with a permission to play the card (Three Wishes, Rogue Class, Intet, Jester's Scepter,
-     Outrageous Robbery) is out.
+     player who lost control controls the trigger). A control change before the first state check of a newly placed
+     permanent isn't noticed; bots don't use Gustha's Scepter.
    - Attach target Equipment works (Brass Squire, Kemba, Magnetic Theft and 9 more); still out: Frodo ("with mana value
      2 or 3"), Grip of Phyresis, Weapons Vendor, Barret, Blacksmith's Talent, Captain America, Cloud's other line,
      Noctis, Raubahn (ward-pay life), Sokka Swordmaster.
    - Harmonize (CR 702.180) works on 8 cards; still out: Glacial Dragonhunt, Nature's Rhythm, Synchronized Charge,
-     Songcrafter Mage (granting harmonize). Paradigm works on 4 of 5 (Improvisation Capstone's "exile until total mana
-     value 4 or greater ... cast any number" is out). Demonstrate works on 4 of 6 (Creative Technique's "shuffle, then
-     reveal until a nonland card ... cast it" and Transforming Flourish are out).
+     Songcrafter Mage (granting harmonize). Paradigm works on all 5 cards and demonstrate on all 6.
    - Secret choices in triggers (Stalking Leonin, Emissary of Grudges) are out.
+   Left from the round after harmonize (Khârn, dice, face-down exile you may play, main phase triggers, more cascade
+   grants, exile until a nonland card):
+   - Khârn the Betrayer: damage dealt to it by several sources at once is one control change, and the opponent for
+     non-combat damage is chosen automatically (the opponent with the most life). Stolen Uniform's "if it's attached to
+     a creature you control" is checked only as the trigger resolves.
+   - Dice (CR 706) work with results tables, modifiers, "ignore the lower roll", natural results and Pixie Guide-style
+     advantage; still out: d2-style "choose one" Endeavors, "roll again" / "reroll" (Delina, Pixie Guide's Wyll-style
+     rerolls of others), Iron Mastiff, Chaos Dragon, Neverwinter Hydra, Loathsome Troll (activated from the graveyard),
+     Treasure Chest, Ancient Silver/Brass/Bronze Dragon, Farideh, Vexing Puzzlebox, planar die.
+   - Face-down exile you may play works (Three Wishes, Outrageous Robbery, Intet, Gonti, Rev and 3 more); "mana of any
+     type" doesn't cover Phyrexian symbols' life option (they still need their color or 2 life). Three Wishes' upkeep
+     cleanup is one delayed trigger per card. Still out: Jester's Scepter (a cost that moves a card exiled with it),
+     Rogue Class (level 3 static permission), Klaw ("whenever you play a card from exile"), Mindleecher (mutate),
+     Blightwing Bandit, Edward Kenway, Apple of Eden, Predators' Hour, Bloodsoaked Insight.
+   - Main phase triggers work for "your first / precombat main phase", "each player's first main phase", "each of your
+     postcombat main phases" and "your second main phase" (505.1); still out: "each of your main phases" (Carpet of
+     Flowers, Frontier Siege), "the active player adds" (Belbe), "that player adds" (Eladamri's Vineyard, Blinkmoth
+     Urn), mana "Spend this mana only ..." from a trigger (Abstract Paintmage, Smoky Lounge), "add mana in any combination
+     of colors" from a trigger (Cosmic Crucible).
+   - "Exile / reveal until a nonland card" works for casting it now or this turn and for Treasure Hunt; still out:
+     damage or +X/-X by its mana value (Erratic Explosion, Kaboom!, Undying Flames, Goblin Machinist), "if the spell's
+     mana value is ..." (Bre, Breaching Dragonstorm, Ryan Sinclair, Solstice Revelations), paying life or energy instead
+     (Bismuth Mindrender, Amped Raptor), each opponent / each player (Fevered Suspicion, Etali, Plargg and Nassari),
+     suspend and time counters (Kang Prime, The Tenth Doctor), Neera, Demonlord Belzenlok ("repeat this process").
+   - The shared card data in /mnt/project-files/commander-clash-data/cards.json.gz still splits "Time Lord" into two
+     subtypes (it was built before the type-line fix); rebuilding cards.json on Ken's PC fixes it.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
@@ -354,7 +371,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   Memory Vampire, Tenth District Hero, Deadly Cover-Up).
 - Mana from a Treasure (CR 106.3) is tracked; still out: Devour Intellect ("instead" with a choice), Kalain's
   "enters with an additional +1/+1 counter" (that static family isn't supported), Alchemist's Talent (Classes aren't
-  supported), Mr. House, Coin of Mastery (mana from an artifact source).
+  supported), Coin of Mastery (mana from an artifact source).
 - Sagas (CR 714) and read ahead (702.155) work for 35 of 209; still out: the 29 double-faced Sagas (transform after
   the last chapter), and chapters with lines not parsed yet ("for as long as ~ remains on the battlefield", "until your
   next turn", triggers that last "this turn", "you and target opponent each ..."). Classes, Cases, Rooms and Sieges

@@ -7,7 +7,7 @@ import { castProblem, describeTargets, log, moveObject, newObject, obj, opponent
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets } from "./targeting";
-import { ResolveCtx, objects, amountNow } from "./resolve";
+import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
 
@@ -229,6 +229,50 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       shuffle(s, rest);
       for (const id of rest) moveObject(s, id, "library"); // to the bottom, in a random order
       if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+      return;
+    }
+    case "exileUntilNonland": {
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.untilNonland) {
+        const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+        if (pid === undefined) return;
+        const p = player(s, pid);
+        if (e.shuffleFirst) {
+          shuffle(s, p.library);
+          log(s, `${p.name} shuffles their library.`);
+        }
+        const at = p.library.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land"));
+        // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
+        const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
+        const hit = at < 0 ? undefined : p.library[at];
+        const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : ", finding no nonland card"}.`);
+        if (e.then === "hand") {
+          for (const id of seen) moveObject(s, id, "hand");
+          return;
+        }
+        if (e.reveal) {
+          // "Exile that card and put the rest on the bottom of your library in a random order" (Creative Technique).
+          if (hit) moveObject(s, hit, "exile");
+          const rest = seen.filter((id) => id !== hit);
+          shuffle(s, rest);
+          for (const id of rest) moveObject(s, id, "library");
+        } else for (const id of seen) moveObject(s, id, "exile");
+        const caster = e.ownerCasts ? pid : ctx.controller;
+        sc.untilNonland = { ...(hit ? { hit } : {}), caster };
+        if (!hit) return;
+        if (e.then !== "castFree") {
+          // "Until end of turn, you may cast that card (without paying its mana cost)": with its usual timing (rulings).
+          const o = obj(s, hit);
+          o.mayPlay = { player: caster, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true, ...(e.then === "freeThisTurn" ? { free: true as const } : {}) };
+          return;
+        }
+        // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
+        s.pending = { kind: "castFree", player: caster, objectId: hit, source: src };
+        if (castProblem(s, caster, hit) === null) return "paused";
+        s.pending = null;
+        log(s, `${defOf(s, obj(s, hit)).name} can't be cast.`);
+      }
       return;
     }
     case "discover": {

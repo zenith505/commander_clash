@@ -1170,6 +1170,15 @@ export type Effect =
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**
+   * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
+   * card" (then that card is exiled and the rest go on the bottom in a random order, or all of them go into your hand):
+   * `who` has the library (default you). `then`: "castFree", that player (`ownerCasts`) or you may cast it now without
+   * paying its mana cost; "freeThisTurn" / "thisTurn", you may cast it this turn (for free), with its usual timing;
+   * "hand", every revealed card into your hand (Treasure Hunt). A card not cast stays in exile, and so do the other
+   * exiled cards.
+   */
+  | { type: "exileUntilNonland"; who?: PlayerRef; reveal?: true; shuffleFirst?: true; then: "castFree" | "freeThisTurn" | "thisTurn" | "hand"; ownerCasts?: true }
+  /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
    * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
    */
@@ -1508,6 +1517,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
+  | { kind: "destroyedThisWay" }
   /**
    * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).

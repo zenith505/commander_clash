@@ -596,6 +596,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "copySpell":
     case "nextCast":
     case "cascade":
+    case "exileUntilNonland":
     case "discover":
     case "ripple":
     case "counterUnlessPays":

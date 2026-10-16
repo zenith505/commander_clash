@@ -186,6 +186,50 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   return { effect, next };
 }
 
+/**
+ * "Exile cards from the top of your library until you exile a nonland card. You may cast that card without paying its
+ * mana cost." (Sarevok's Tome), "Target opponent exiles cards ... until they exile a nonland card. Until end of turn, you
+ * may cast that card without paying its mana cost." (Stolen Goods), "Shuffle your library, then reveal cards from the top
+ * of it until you reveal a nonland card. Exile that card and put the rest on the bottom of your library in a random
+ * order. You may cast the exiled card without paying its mana cost." (Creative Technique), "Reveal cards ... until you
+ * reveal a nonland card, then put all cards revealed this way into your hand" (Treasure Hunt), and Transforming
+ * Flourish's "If that permanent is destroyed this way, its controller exiles ..., then they may cast that card without
+ * paying its mana cost". Null when it isn't one of these; any other use of the found card leaves the line unsupported.
+ */
+function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
+  // "Shuffle your library, then reveal ...", "..., then put all cards revealed this way ...": split at ", then" by now.
+  const shuffleFirst = /^[Ss]huffle your library$/.test(sentences[at]!);
+  const s = sentences[shuffleFirst ? at + 1 : at] ?? "";
+  const reveal = (shuffleFirst ? /^Reveal cards from the top of it until you reveal a nonland card$/ : /^[Rr]eveal cards from the top of your library until you reveal a nonland card$/).test(s);
+  const exile = !shuffleFirst && /^[Ee]xile cards from the top of your library until you exile a nonland card$/.test(s);
+  const they = shuffleFirst ? null : /^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s);
+  const flourish = !shuffleFirst && /^If that (?:permanent|creature) is destroyed this way, its controller exiles cards from the top of their library until they exile a nonland card, then they may cast that card without paying its mana cost$/.test(s);
+  if (!reveal && !exile && !they && !flourish) return null;
+  if (flourish) {
+    if (ctx.targets.length !== 1) return "fail";
+    const inner: Effect = { type: "exileUntilNonland", who: { ref: "targetController", index: 0 }, then: "castFree", ownerCasts: true };
+    return { effect: { type: "if", cond: { kind: "destroyedThisWay" }, effects: [inner] }, next: at + 1 };
+  }
+  if (reveal && !shuffleFirst && sentences[at + 1] === "Put all cards revealed this way into your hand") return { effect: { type: "exileUntilNonland", reveal: true, then: "hand" }, next: at + 2 };
+  let next = (shuffleFirst ? at + 1 : at) + 1;
+  if (reveal) {
+    if (sentences[next] !== "Exile that card and put the rest on the bottom of your library in a random order") return null;
+    next++;
+  }
+  const cast = sentences[next] ?? "";
+  const then: Extract<Effect, { type: "exileUntilNonland" }>["then"] | undefined = /^You may cast (?:that card|it|the exiled card) without paying its mana cost$/.test(cast)
+    ? "castFree"
+    : /^Until end of turn, you may cast that card without paying its mana cost$/.test(cast)
+      ? "freeThisTurn"
+      : /^You may cast that card this turn$/.test(cast)
+        ? "thisTurn"
+        : undefined;
+  if (!then) return null;
+  const who = they ? parsePlayer(they[1]!, ctx) : undefined;
+  if (they && !who) return "fail";
+  return { effect: { type: "exileUntilNonland", ...(who ? { who } : {}), ...(reveal ? { reveal: true as const } : {}), ...(shuffleFirst ? { shuffleFirst: true as const } : {}), then }, next: next + 1 };
+}
+
 /** One thing done with the revealed card ("put it into your hand", "you may put it into your graveyard"), or "draw a card". */
 function revealedAction(text: string, ctx: Ctx): Effect[] | null {
   // "You may reveal it and put it into your hand" (Frost Augur): a card only looked at is revealed as it's put there.
@@ -363,6 +407,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (faceDown) {
       effects.push(faceDown.effect);
       si = faceDown.next - 1;
+      continue;
+    }
+    const untilNonland = parseUntilNonland(sentences, si, ctx);
+    if (untilNonland === "fail") return null;
+    if (untilNonland) {
+      effects.push(untilNonland.effect);
+      si = untilNonland.next - 1;
       continue;
     }
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."

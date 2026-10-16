@@ -296,6 +296,7 @@ export function parseTypeLine(typeLine: string): Pick<CardDef, "supertypes" | "t
   return {
     supertypes: words.filter((w) => SUPER.includes(w)),
     types: words.filter((w) => !SUPER.includes(w)),
-    subtypes: right.trim().split(/\s+/).filter(Boolean),
+    // "Time Lord" is one creature type of two words (CR 205.3m).
+    subtypes: right.trim().replace(/\bTime Lord\b/g, "Time_Lord").split(/\s+/).filter(Boolean).map((w) => (w === "Time_Lord" ? "Time Lord" : w)),
   };
 }

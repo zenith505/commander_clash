@@ -64,7 +64,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
@@ -487,7 +487,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     }
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
-    const may = /^[Yy]ou may (?!play the exiled card )(.+)$/.exec(s);
+    // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -495,7 +496,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         .replace(/^Have ((?:up to one )?target .+?) block (~|it) this (turn|combat) if able$/, "$1 blocks $2 this $3 if able")
         // "You may have target opponent discard a card", "you may have that player lose 1 life": that player does it, if
         // you choose (the choice is yours, CR 608.2d).
-        .replace(/^Have (target player|target opponent|that player|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `);
+        .replace(/^Have (target player|target opponent|that player|its controller|each opponent) (discard|lose|draw|mill|sacrifice|gain) /, (_, who: string, verb: string) => `${who.charAt(0).toUpperCase()}${who.slice(1)} ${verb}s `);
       ctx.mayNow = true;
       const inner = parseOne(rest, ctx);
       ctx.mayNow = false;
@@ -505,8 +506,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // "You may put a land card from your hand onto the battlefield": choosing none is the "may" (one question).
       const only = inner.length === 1 ? inner[0]! : undefined;
       // "You may tap or untap target permanent": tap, untap or neither, as one question.
-      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
-        effects.push(only.type === "castFromHand" ? only : { ...only, may: true }); // castFromHand offers "Don't cast" itself
+      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
+        // castFromHand offers "Don't cast" itself; returning cards from the graveyard can take none.
+        effects.push(only.type === "castFromHand" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
         if (!defineX()) return null;
         continue;
       }

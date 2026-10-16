@@ -1,10 +1,10 @@
-import type { AbilityBody, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
+import type { AbilityBody, BatchTrigger, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
-import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneName } from "../types";
+import type { CardDef, GameObject, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
 import { nextRandom } from "../rng";
 import { objectMatches, bindChosen, sourceQuality, printedMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
@@ -123,7 +123,9 @@ export type TriggerSourceEvent =
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
    */
-  | { type: "exploits"; exploiter: ObjectId; controller: PlayerId; victim: GameObject; chars: Characteristics; watchers: { id: ObjectId; triggers: TriggeredAbility[] }[] };
+  | { type: "exploits"; exploiter: ObjectId; controller: PlayerId; victim: GameObject; chars: Characteristics; watchers: { id: ObjectId; triggers: TriggeredAbility[] }[] }
+  /** An event (one instruction, one pass of state-based actions, one action's costs) ended, having moved these objects. */
+  | { type: "batch"; moves: ZoneMove[] };
 
 /**
  * Echo (CR 702.30a): "if this permanent came under your control since the beginning of your last
@@ -306,6 +308,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       return lock && c!.hasPrintedAbilities && (!lock.types || lock.types.some((t) => types.includes(t))) ? [{ lock, by: c!.controller }] : [];
     });
     if (locks.length) locked = (ctrl) => locks.some((l) => !l.lock.opponents || l.by !== ctrl);
+    (s.zoneBatch ??= []).push({
+      id: entering.id,
+      zc: entering.zoneChanges ?? 0,
+      to: "battlefield",
+      owner: entering.owner,
+      ...(entering.isToken ? { notCard: true as const } : {}),
+      card: cardIdOf(entering),
+      controller: you,
+      entered: true,
+      ...(locks.length ? { locks: locks.map((l) => ({ by: l.by, ...(l.lock.opponents ? { opponents: true } : {}) })) } : {}),
+    });
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
     // "if it was kicked" is an intervening if (CR 603.4), and that can't change by the time it resolves.
     // Evoke's sacrifice trigger only if the evoke cost was paid (CR 702.74a).
@@ -752,6 +765,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const card = s.objects[ev.id];
     if (card?.zone === "graveyard") add(card, card.owner, (e) => e === "selfResolvedToGraveyard", compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "discarded") {
+    const card = s.objects[ev.id];
+    const moved = card && s.zoneBatch?.find((m) => m.id === ev.id && m.zc === (card.zoneChanges ?? 0));
+    if (moved) moved.discardedBy = ev.player;
+    else if (card) (s.zoneBatch ??= []).push({ id: ev.id, zc: card.zoneChanges ?? 0, from: "hand", to: card.zone, owner: card.owner, card: card.cardId, discardedBy: ev.player });
     // "Whenever you discard a card", "whenever a player cycles a card": once for each card (CR 603.2c). "That player" is
     // the one who discarded.
     for (const id of s.battlefield) {
@@ -766,7 +783,6 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
-    const card = s.objects[ev.id];
     if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers);
   } else if (ev.type === "draw") {
     for (const id of s.battlefield) {
@@ -779,6 +795,36 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+  } else if (ev.type === "batch") {
+    // "One or more" triggers: once for the whole event, if anything it moved matches (CR 603.2c). Leaving the battlefield
+    // or a graveyard looks back in time (CR 603.10a): permanents leaving at the same time see it, as they were, and ones
+    // that just arrived don't.
+    const arrived = new Set(ev.moves.filter((m) => m.to === "battlefield").map((m) => `${m.id}@${m.zc}`));
+    const lookBack = (b: BatchTrigger) => b.what === "leaves" || b.what === "leavesGraveyard";
+    const batchWatch = (w: GameObject, you: PlayerId, triggers: TriggeredAbility[], gone: boolean) => {
+      for (const t of triggers) {
+        if (t.event !== "batch" || !t.batch) continue;
+        const b = t.batch;
+        if (gone ? !lookBack(b) : lookBack(b) && arrived.has(`${w.id}@${w.zoneChanges ?? 0}`)) continue;
+        const n = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone)).length;
+        if (!n) continue;
+        if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
+        add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: n, ...(b.whose === "you" ? { player: you } : {}) });
+      }
+    };
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      batchWatch(w, controllerOf(s, w), abilitiesOf(s, w).triggers, false);
+    }
+    for (const m of ev.moves) {
+      const w = s.objects[m.id];
+      if (!w || m.from !== "battlefield" || !m.snapshot || w.zone === "battlefield") continue; // back already: a new object
+      batchWatch(w, m.controller!, withGranted(m.hadAbilities ? compileCard(s.cards[m.card]!) : NO_ABILITIES, m.granted ?? []).triggers, true);
+    }
+    // "For the first time each turn" looks at the events before this one.
+    const discards = new Map<PlayerId, string[]>();
+    for (const m of ev.moves) if (m.discardedBy !== undefined) discards.set(m.discardedBy, [...(discards.get(m.discardedBy) ?? []), m.card]);
+    for (const [player, cards] of discards) ((s.turnLog ??= {}).discards ??= []).push({ player, cards });
   } else if (ev.type === "step") {
     // Delayed triggers whose moment this is (CR 603.7): each triggers once.
     for (const d of [...(s.delayed ?? [])]) {
@@ -994,4 +1040,38 @@ function speedTrigger(s: GameState, loser: PlayerId) {
     index: -1,
     body: { targets: [], effects: [{ type: "increaseSpeed" }], text: "Whenever one or more opponents lose life during your turn, if your speed is less than 4, your speed increases by 1." },
   });
+}
+
+/** Is this moved object one that `b` counts, for the permanent `w` (as it is now, or as it last existed: `gone`)? */
+function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObject, you: PlayerId, gone: boolean): boolean {
+  const whose = (p: PlayerId | undefined) => !b.whose || (b.whose === "you" ? p === you : p !== undefined && p !== you);
+  if (b.what === "enters") {
+    const o = s.objects[m.id];
+    if (!m.entered || !o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== m.zc) return false;
+    // Torpor Orb: "creatures entering don't cause abilities to trigger" for these controllers.
+    if (m.locks?.some((l) => !l.opponents || l.by !== you)) return false;
+    if (b.other && o.id === w.id) return false;
+    return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, o, you, false));
+  }
+  if (b.what === "leaves") {
+    if (m.from !== "battlefield" || !m.snapshot || !m.chars) return false;
+    if (b.dies && m.to !== "graveyard") return false;
+    if (b.notDies && m.to === "graveyard" && m.chars.types.includes("Creature")) return false; // CR 700.4
+    if (b.other && m.id === w.id && (gone || (w.zoneChanges ?? 0) === m.zc)) return false;
+    return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, m.snapshot, you, false, undefined, m.chars));
+  }
+  // The rest are about cards (not tokens or copies of spells, CR 111.1, 707.10), as they are in that zone.
+  if (m.notCard) return false;
+  const card = s.cards[m.card];
+  if (!card || (b.filter && !printedMatches(b.filter, card))) return false;
+  if (b.what === "leavesGraveyard") return m.from === "graveyard" && m.to !== "graveyard" && whose(m.owner) && (!b.to || m.to === b.to);
+  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && whose(m.owner) && (!b.from || m.from === b.from);
+  return m.discardedBy !== undefined && whose(m.discardedBy);
+}
+
+/** The current event is over: its "one or more" triggers trigger (CR 603.2c). */
+export function closeZoneBatch(s: GameState) {
+  const moves = s.zoneBatch;
+  s.zoneBatch = undefined;
+  if (moves?.length) fireEvent(s, { type: "batch", moves });
 }

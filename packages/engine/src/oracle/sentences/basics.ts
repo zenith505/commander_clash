@@ -17,6 +17,17 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   let m: RegExpExecArray | null;
 
   if (/^Search your library /i.test(s)) return parseSearch(s);
+  // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
+  // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
+  // player" after "target ... an opponent controls" (Boseiju) is that permanent's controller. Last known information
+  // says who controlled it if it's gone by then (CR 608.2h).
+  if ((m = /^(Its controller|That creature's controller|That permanent's controller|That player) may search their library for (.+)$/.exec(s))) {
+    const who = m[1] === "That player" ? (ctx.lastPlayerTarget === undefined && ctx.lastObjectTarget !== undefined ? { ref: "targetController" as const, index: ctx.lastObjectTarget } : null) : parsePlayer(m[1]!.toLowerCase(), ctx);
+    if (!who || / your /.test(m[2]!)) return null;
+    const fx = parseSearch(`Search your library for ${m[2]!.replace(/ their hand\b/, " your hand")}`);
+    if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
+    return [{ type: "eachMay", who, text: `search their library for ${m[2]!}`, effects: [{ ...fx[0]!, who: { ref: "choseThisWay" } }] }];
+  }
   // "For each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their
   // choice or discards a card" (Rottenmouth Viper): each player makes all the choices, then they all happen (rulings).
   if ((m = /^[Ff]or each ([a-z+\/0-9-]+) counter on (?:it|~), (.+)$/.exec(s)) && (ctx.selfIt || /on ~,/.test(s))) {
@@ -152,6 +163,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
   }
+  // "Sacrifice ~ unless you sacrifice a land" (Bog Elemental, The Gitrog Monster): sacrificing one keeps it; with none to
+  // sacrifice, or choosing not to, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
+    if (!filter || / or |,/.test(m[2]!)) return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true }, n: 1, action: "sacrifice" }], otherwise: [sacrificeSelf], keep: true, text: `Sacrifice ${m[2]} to keep ~` }];
+  }
   // "That player draws an additional card" (Howling Mine): just another draw.
   if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);
   // Poison counters on a player (CR 122.1f): "defending player gets a poison counter", "each opponent gets two".
@@ -177,6 +195,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
+  // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).
+  if ((m = new RegExp(`^You may play (?:an|up to ${NUM}) additional lands? this turn$`, "i").exec(s))) return [{ type: "extraLandThisTurn", n: m[1] ? num(m[1]) : 1 }];
   // The initiative (CR 726), which ventures into Undercity; and venturing into Undercity itself (CR 701.49d). Plain
   // "venture into the dungeon" lets its player pick a dungeon that isn't modeled yet (see oracle/dungeons.ts).
   if (/^(?:You )?take the initiative$/i.test(s)) return dungeonSupported(UNDERCITY) ? [{ type: "takeInitiative", who: { ref: "you" } }] : null;

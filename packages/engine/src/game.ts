@@ -3,7 +3,7 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -603,6 +603,7 @@ export function moveObject(
   const hadAbilities = last.hasPrintedAbilities && !o.faceDown;
   // The permanent as it last existed, for "whenever a creature you control with a +1/+1 counter dies".
   const snapshot: GameObject | undefined = fromZone === "battlefield" ? { ...o, counters: lastCounters } : undefined;
+  const snapshotKey = cardIdOf(o);
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
@@ -709,6 +710,18 @@ export function moveObject(
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
+  // For "one or more" triggers, checked as the event ends (CR 603.2c).
+  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard")
+    (s.zoneBatch ??= []).push({
+      id,
+      zc: o.zoneChanges,
+      from: fromZone,
+      to,
+      owner: o.owner,
+      ...(o.isToken || o.spellCopy ? { notCard: true as const } : {}),
+      card: fromZone === "battlefield" ? snapshotKey : o.cardId,
+      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}) } : {}),
+    });
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
@@ -1640,6 +1653,7 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
   s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).noMaxHandSize);
 
 function finishCleanup(s: GameState) {
+  closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
   s.flashbackGrants = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");
@@ -1949,6 +1963,8 @@ export function handRevealed(s: GameState, pid: PlayerId, viewer: PlayerId): boo
 /** One land a turn, plus one for each "you may play an additional land on each of your turns" (CR 305.2, 305.2a). */
 export function landsAllowed(s: GameState, pid: PlayerId): number {
   let n = 1;
+  const extra = player(s, pid).extraLands;
+  if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
   if (s.activePlayer === pid)
     for (const id of s.battlefield) {
       if (controllerOf(s, obj(s, id)) !== pid) continue;
@@ -2115,6 +2131,7 @@ export function castProblem(
   const via = graveyardWay(s, o, choices?.via);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
+  if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
@@ -2565,6 +2582,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
+  // Cast from a graveyard, it left the graveyard (CR 601.2a), an event of its own: paying the costs comes later (601.2h).
+  if (castFrom === "graveyard") {
+    (s.zoneBatch ??= []).push({ id, zc: o.zoneChanges ?? 0, from: "graveyard", to: "stack", owner: o.owner, card: o.cardId });
+    closeZoneBatch(s);
+  }
   o.castFrom = castFrom;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
@@ -2620,6 +2642,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (o.faceDown) log(s, `${p.name} casts a face-down creature spell (${o.faceDown})${tax ? ` (commander tax ${tax})` : ""}.`);
   else log(s, `${p.name} casts ${d.name}${howText}${hasX ? ` with X=${x ?? 0}` : ""}${kickText}${free ? " without paying its mana cost" : ""}${tax ? ` (commander tax ${tax})` : ""}${chosen ? ` choosing "${body!.text.replace(/~/g, d.name).replace(/\.$/, "")}"` : ""}${describeTargets(s, targets)}${convoked}.`);
   for (const c of choices.delve ?? []) moveObject(s, c, "exile"); // CR 702.66a
+  // Each cost paid is an event of its own for "one or more" triggers (rulings on Conspiracy Unraveler).
+  closeZoneBatch(s);
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
   const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
@@ -2630,17 +2654,20 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
     moveObject(s, choices.casualty, "graveyard", { sacrificed: true });
     item.casualty = true;
+    closeZoneBatch(s);
   }
   // Bargain: "you may sacrifice an artifact, enchantment, or token" (CR 702.166a).
   if (choices.bargain) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.bargain)} (bargain).`);
     moveObject(s, choices.bargain, "graveyard", { sacrificed: true });
     o.bargained = true;
+    closeZoneBatch(s);
   }
   // "As an additional cost to cast this spell, you may collect evidence N" (CR 701.59a, c).
   if (choices.evidence) {
     collectEvidence(s, p, choices.evidence, compileCard(d).evidence ?? 0);
     o.evidence = true;
+    closeZoneBatch(s);
   }
   // Teamwork: "you may tap any number of creatures you control with total power N or more".
   if (choices.teamwork?.length) {
@@ -2736,7 +2763,7 @@ export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyar
 }
 
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
-  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via;
+  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "permission" ? "a way to cast it from your graveyard" : via;
 }
 
 /** ", kicked", ", kicked twice", ", kicked with {1}{U}", for the log. */
@@ -3128,6 +3155,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
     }
+    closeZoneBatch(s); // each cost is an event of its own (rulings on Conspiracy Unraveler)
   }
   return sacrificed;
 }
@@ -3233,10 +3261,10 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
  */
 export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
   const cost = parseManaCost(ab.manaCost);
-  if (!ab.equip) return cost;
-  let less = 0;
+  if (!ab.equip && !ab.costLess) return cost;
+  let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
-  for (const id of s.battlefield) {
+  for (const id of ab.equip ? s.battlefield : []) {
     const src = obj(s, id);
     const mods = compileCard(defOf(s, src)).equipLess;
     if (!mods) continue;
@@ -4618,6 +4646,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   if (!s.pending && askEntersChoice(s)) return;
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
+    closeZoneBatch(s); // the action before, or the last pass, was one event for "one or more" triggers (CR 603.2c)
     closeGraveyardBatch(s); // the action before, or the last pass, put those cards there together (CR 404.3)
     // Auras coming back from "until ~ leaves" as the action before, or the last pass, ended (CR 303.4f, 610.3).
     const auras = s.pending || holdTriggers ? false : askAuraReturns(s);

@@ -172,6 +172,13 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "becomeMonarch":
       for (const pid of players(s, e.who, ctx)) becomeMonarch(s, pid);
       return;
+    case "extraLandThisTurn": {
+      // Only this turn; on another player's turn it lets them play none (rulings on Explore).
+      const p = player(s, ctx.controller);
+      p.extraLands = { turn: s.turn, n: (p.extraLands?.turn === s.turn ? p.extraLands.n : 0) + e.n };
+      log(s, `${p.name} may play ${e.n === 1 ? "an additional land" : `${e.n} additional lands`} this turn.`);
+      return;
+    }
     case "increaseSpeed": {
       // The intervening "if your speed is less than 4" again as it resolves (CR 603.4).
       const p = player(s, ctx.controller);

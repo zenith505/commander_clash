@@ -43,6 +43,8 @@ export function parseSearchFilter(phrase: string): TargetSpec | undefined | null
   const p = phrase.replace(/\bcards\b/g, "card");
   if (/^card$/i.test(p)) return undefined;
   if (/^card named ~$/.test(p)) return { kind: "card", named: "~", text: "card named ~" };
+  // "A land card with a basic land type" (Boseiju, Who Endures): a Plains, Island, Swamp, Mountain or Forest card (CR 205.3i).
+  if (/^land card with a basic land type$/.test(p)) return { kind: "card", types: ["Land"], subtypes: [...BASIC_TYPES], text: "land card with a basic land type" };
   // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled.
   if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater))?$/i.test(p)) return null;
   const spec = parseTargetPhrase(`${p} from your graveyard`);

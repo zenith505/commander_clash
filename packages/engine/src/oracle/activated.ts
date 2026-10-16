@@ -6,6 +6,7 @@ import { parseSearchFilter } from "./search";
 import { parseAdditionalCost } from "./keyword-abilities";
 import { pickFilter } from "./targets";
 import { parseOnlyClauses } from "./statics";
+import { parseCount } from "./counts";
 
 /** The ability words (CR 207.2c): no rules meaning, unlike keyword abilities written the same way ("Boast — {1}{R}: ..."). */
 const ABILITY_WORDS = new Set(["adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort", "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8", "disappear", "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable", "grandeur", "hellbent", "heroic", "imprint", "infusion", "inspired", "join forces", "kinship", "landfall", "lieutenant", "magecraft", "metalcraft", "morbid", "opus", "pack tactics", "paradox", "parley", "radiance", "raid", "rally", "renew", "repartee", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold", "undergrowth", "valiant", "vivid", "void", "will of the council"]);
@@ -20,7 +21,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
   const line = word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -50,6 +51,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     } else if ((c = /^Collect evidence (\d+)$/.exec(part))) {
       // CR 701.59a: exile cards from your graveyard with total mana value N or more.
       extra.push({ kind: "collectEvidence", n: Number(c[1]) });
+    } else if (/^Exile (?!~|the top )/.test(part)) {
+      // "Exile a card from your graveyard" (Relic of Progenitus' cousins, Sigarda): cards chosen as it's activated.
+      const c2 = parseAdditionalCost(part);
+      if (c2?.kind !== "exileFromGraveyard" || c2.top || c2.x) return "fail";
+      extra.push(c2);
     } else if (/^Exile the top /.test(part)) {
       // "Exile the top creature card of your graveyard" (Necratog): no choice, the topmost one (CR 404.1).
       const top = parseAdditionalCost(part);
@@ -66,8 +72,18 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let maxPerTurn: number | undefined;
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
   let activateIf: ActivatedAbility["activateIf"];
+  // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
+  let costLess: ActivatedAbility["costLess"];
   for (let found = true; found; ) {
     found = false;
+    const less = / This ability costs \{(\d+)\} less to activate for each ([^.]+)\.$/.exec(effectText);
+    if (less && !costLess) {
+      const c = parseCount(less[2]!, null, true);
+      if (!c) return "fail";
+      costLess = { ...c, times: (c.times ?? 1) * Number(less[1]) };
+      effectText = effectText.slice(0, less.index);
+      found = true;
+    }
     // "Activate no more than twice each turn." (CR 602.5b)
     const most = / Activate no more than (twice|three times) each turn\.$/.exec(effectText);
     if (most && !maxPerTurn) {
@@ -100,6 +116,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf;
   if (fromYard && (tap || /Sacrifice ~|Remove /.test(costs))) return "fail";
   if (returnsSelf && /Exile ~ from your graveyard/.test(costs)) return "fail";
+  // "{1}{G}, Discard this card: ..." (channel and the like): it works only while the card is in your hand, and
+  // discarding it is part of the cost (CR 602.2b, 701.9a).
+  const fromHand = /Discard ~/.test(costs);
+  if (fromHand && (tap || fromYard || /Sacrifice ~|Exert ~|Remove |on ~/.test(costs))) return "fail";
   const manaCost = symbols
     .filter((x) => x !== "T")
     .map((x) => `{${x}}`)
@@ -111,7 +131,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
   // libraries isn't compiled.
   const mana = manaAbilityKind(body);
-  if (mana === "fail") return "fail";
+  if (mana === "fail" || (mana === "mana" && fromHand)) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
   return {
@@ -123,8 +143,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     body,
     text: raw,
     ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf ? {} : { exileSelf: true }) } : {}),
+    ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(maxPerTurn ? { maxPerTurn } : {}),
+    ...(costLess ? { costLess } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
     ...(energy ? { energyCost: energy } : {}),

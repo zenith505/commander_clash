@@ -21,7 +21,7 @@ import { runCopiesEffect } from "./run-copies";
 import { runSpellsEffect, addDelayed } from "./run-spells";
 import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
-import { fireEvent } from "./triggers";
+import { closeZoneBatch, fireEvent } from "./triggers";
 
 export interface ResolveCtx {
   controller: PlayerId;
@@ -139,6 +139,7 @@ export function continueResolution(s: GameState): Resolution {
     // the next one, and before the spell itself goes to the graveyard (CR 404.3, 608.2n). Not inside a mana ability,
     // which can't stop for a choice: the event it's part of ends later.
     if (!r.scratch && !item.manaAbility) {
+      closeZoneBatch(s); // its "one or more" triggers (CR 603.2c)
       closeGraveyardBatch(s);
       // Auras coming back because the last instruction made an "until ~ leaves" source leave (CR 303.4f, 610.3).
       if (askAuraReturns(s) === "asked") return "paused";
@@ -429,6 +430,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "getEnergy":
     case "poison":
     case "becomeMonarch":
+    case "extraLandThisTurn":
     case "ringTempts":
     case "increaseSpeed":
     case "ascend":
@@ -464,6 +466,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "bounce":
     case "putOntoBattlefield":
     case "randomFromGraveyard":
+    case "chooseFromGraveyard":
     case "reorderGraveyard":
     case "returnAllFromGraveyard":
     case "putFromHand":

@@ -1,6 +1,6 @@
 # Roadmap
 
-17,316 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+17,618 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -28,11 +28,10 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "It" after returning a card works for one target or "return ~"; "return up to N target ... Put a counter on each of
      them" and several cards don't.
    Left from the dungeons, punishers, once-each-turn and Classes rounds:
-   - Batch triggers "whenever one or more ... ": "cards leave your graveyard" (Garrison Excavator, Quintorius, Soul
-     Enervation, Spirit Mascot, Willow Geist, Fuming Effigy, Amzu, Attuned Hunter, Chalk Outline), "tokens / creatures
-     / noncreature, nonland permanents you control enter" (Caretaker's, Builder's and Scavenger's Talent, Baron Bertram
-     Graywater, Enduring Innocence, Welcoming Vampire), "creature cards are put into your graveyard from anywhere"
-     (Sefris). One event can move many cards, and the ability triggers once for it (CR 603.2c).
+   - Batch triggers ("whenever one or more ...", CR 603.2c) still out: "for the first time each turn" on cards put into
+     a graveyard (Crawling Sensation), irregular plurals ("Mice"), "experience counters", "with base power and
+     toughness N/N", decayed tokens (Ghoulish Procession), "entered from a graveyard", and anything about the moved
+     cards as a group ("those cards", "one of them", "the greatest mana value among them").
    - Venture still out on other lines: Wandering Troubadour ("if you had a land enter this turn"), Ranger's Hawk ("tap
      another untapped creature you control" as a cost), Immovable Rod, Intrepid Outlander (pack tactics), Radiant
      Solar, Fifty Feet of Rope, Dungeon Delver (granting Hama Pashar's ability to commanders), Keen-Eared Sentry,
@@ -52,10 +51,24 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      Copying a Class doesn't copy its level (716.2b); no supported card copies one yet.
    - "Unless" conditions still out: "an opponent has 10 or less life" (Vampire Lacerator) and other conditions the
      static parser doesn't read.
+   Left from the batch triggers, channel and graveyard round:
+   - Channel and "Discard this card" abilities work from the hand; "Equip—Pay {3} or discard a card" still doesn't.
+     "That player may search" works for one player; "each player searches their library" (Field of Ruin, Avatar of
+     Growth) and "that many basic land cards" (Settle the Wreckage) don't.
+   - "You may cast this card from your graveyard" works with a condition or extra costs; still out: "or from exile"
+     (Squee, the Immortal), "but not from anywhere else" (Haakon), "if a creature not named ~ died this turn"
+     (Ebondeath), "and/or" in its cost (Demilich), "rather than paying its mana cost" (Worldheart Phoenix, Scourge of
+     Nel Toth), "using its blitz / bestow / mutate / warp ability".
+   - Exiling from a graveyard: one player's choice works; "each player exiles a card from their graveyard" (Augusta),
+     "any player may" (Carrion Rats), "If it's a creature card" after it (Graveyard Shovel), and Relic of Progenitus'
+     "{1}, Exile ~" cost are out.
+   - Triggers still out: "When ~ enters and whenever ..." (Exuberant Fuseling), "another creature you control or a land
+     you control" (Long Feng), "they create a Treasure token" (Pain Distributor), "Players can't play lands"
+     (Territorial Dispute). "Return a card from your graveyard to your hand" inside modes (Gix's Command, Kairi) and
+     "You return ..." (Dark Intimations, Cruel Ultimatum) are out.
    Left from the spell keywords round (tap or untap, buyback costs, undaunted, gravestorm, splice, awaken, miracle,
    epic, free casts from hand, timing points, overload leftovers):
-   - Overload still out: Chemister's Trick ("attacks this turn if able": does it bind more than one combat?),
-     Dragonshift, Fangs of Kalonia, March of Progress, Winds of Abandon, Mizzix's Mastery (copy an exiled card and
+   - Overload still out: Dragonshift, Fangs of Kalonia, March of Progress, Winds of Abandon, Mizzix's Mastery (copy an exiled card and
      cast the copy), Break the Ice, Rise and Shine, Spectacular Showdown, Eldritch Immunity, Corporeal Projection, Bail
      Out (their "each" lines). Fall of the Titans' Surge {X}{R}. Bots never overload Counterflux.
    - Splice with a cost that isn't mana (Horobi's Whisper, Hundred-Talon Strike, Torrent of Stone, Veil of Secrecy,

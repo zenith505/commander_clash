@@ -100,6 +100,23 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = parseSearchFilter(m[1]!);
     return filter === null ? null : [{ type: "randomFromGraveyard", dest: "hand", ...(filter ? { filter } : {}) }];
   }
+  // "Return a creature or planeswalker card from your graveyard to your hand" (Takenuma), "return up to two instant
+  // and/or sorcery cards ...": chosen as it resolves, not targeted.
+  if ((m = /^[Rr]eturn (an?|one|two|three|up to one|up to two|up to three) (.+?) from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {
+    const filter = parseSearchFilter(m[2]!.replace(/ and\/or /g, " or "));
+    const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
+    if (filter === null || !Number.isInteger(n) || n < 1) return null;
+    return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
+  }
+  // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
+  // (Decaying Soil): that player chooses as it resolves.
+  if ((m = /^(?:(Target player|Target opponent) exiles|[Ee]xile) (an?|one|two|three) (.+?) from (their|your) graveyard$/.exec(s)) && (m[4] === "their") === !!m[1]) {
+    const who = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : undefined;
+    const filter = parseSearchFilter(m[3]!);
+    const n = num(m[2]!.replace(/^an?$/, "one"));
+    if (who === null || filter === null || !Number.isInteger(n)) return null;
+    return [{ type: "chooseFromGraveyard", n, dest: "exile", ...(who ? { who } : {}), ...(filter ? { filter } : {}) }];
+  }
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
   if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];
   if ((m = /^Put the top card of your graveyard on (top|the bottom) of your library$/i.exec(s))) return [{ type: "putInLibrary", what: { ref: "graveyardEnd", who: { ref: "you" } }, position: m[1] === "top" ? "top" : "bottom" }];
@@ -220,6 +237,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = /^Creatures( without flying)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(m[1] ? "creature without flying" : "creature");
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;
+  }
+  // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
+  if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
   }
   if (/^Creatures can't attack this turn$/.test(s)) return [{ type: "cantAttackRule", filter: { kind: "object", types: ["Creature"], text: "creatures" } }];
   if ((m = /^(?!.* until end of turn and )(.+?) can't (block|attack|attack or block|be blocked) (this turn|until your next turn)$/i.exec(s))) {

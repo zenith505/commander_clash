@@ -159,6 +159,8 @@ export interface TargetSpec {
   /** Or one of these subtypes instead of one of `types`: "creature or Vehicle". */
   orSubtypes?: string[];
   notSupertypes?: string[]; // "nonbasic land", "nonlegendary creature"
+  /** "Artifact, enchantment, or nonbasic land": it also fits one of these (each alternative with its own qualities). */
+  anyOf?: TargetSpec[];
   keywords?: string[]; // "creature with flying"
   notKeywords?: string[]; // "creature without flying"
   power?: Range; // "with power 4 or greater"
@@ -837,6 +839,11 @@ export type Effect =
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
    */
   | { type: "randomFromGraveyard"; filter?: TargetSpec; dest: "hand" | "creatureOrExile" }
+  /**
+   * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
+   * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
+   */
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** Exiled instead ("Target player exiles a card from their graveyard"). */ dest?: "exile"; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1157,6 +1164,8 @@ export type Effect =
   | { type: "castFromExileFree" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
+  /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */
+  | { type: "extraLandThisTurn"; n: number }
   /** "~ becomes saddled until end of turn" (CR 702.171b): a designation it has until end of turn or until it leaves. */
   | { type: "becomeSaddled"; what: ObjRef }
   /** A class level bar's "This Class's level becomes N" (CR 716.2a). */
@@ -1210,7 +1219,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef }
   /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
@@ -1443,7 +1452,13 @@ export type TriggerEvent =
   /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
-  | "creaturesYouControlDealCombatDamageToPlayer";
+  | "creaturesYouControlDealCombatDamageToPlayer"
+  /**
+   * "Whenever one or more cards leave your graveyard", "one or more tokens you control enter", "one or more other creatures
+   * die", "you discard one or more cards": once for each event that moves one or more matching objects (CR 603.2c), see
+   * TriggeredAbility.batch. "That many" is how many of them matched.
+   */
+  | "batch";
 
 
 export interface TriggeredAbility {
@@ -1584,6 +1599,34 @@ export interface TriggeredAbility {
   enchantedPlayersTurn?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
+  /** For "batch": what the event has to move, see BatchTrigger. */
+  batch?: BatchTrigger;
+}
+
+/**
+ * A "one or more" trigger (CR 603.2c): it triggers once for an event that moves one or more objects that match, however
+ * many there are. `what`:
+ * - "enters": permanents entering the battlefield (`filter` as they are there, CR 603.6a);
+ * - "leaves": permanents leaving the battlefield, as they last existed (CR 603.10a); `dies`, only those put into a graveyard
+ *   (CR 700.4), `notDies`, only those that went anywhere else ("without dying");
+ * - "leavesGraveyard": cards leaving their owner's graveyard (a look-back trigger, CR 603.10a), `to` where they went;
+ * - "toGraveyard": cards put into their owner's graveyard, `from` where they came from ("from anywhere": unset);
+ * - "discards": cards discarded (CR 701.9), `by` who discarded them.
+ * `whose`: who has to control the permanents (or own the cards) relative to this ability's controller.
+ */
+export interface BatchTrigger {
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards";
+  /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
+  filter?: TargetSpec;
+  whose?: "you" | "opponent";
+  /** "One or more other creatures": not this permanent. */
+  other?: true;
+  dies?: true;
+  notDies?: true;
+  from?: "library" | "battlefield";
+  to?: "exile";
+  /** "For the first time each turn": only the first such event this turn (counting the ones before this permanent was there). */
+  first?: true;
 }
 
 export interface ActivatedAbility {
@@ -1599,6 +1642,8 @@ export interface ActivatedAbility {
   zone?: "hand" | "graveyard";
   /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
+  /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */
+  costLess?: Amount;
   /** It's a cycling ability (CR 702.29a, 702.29f): discarding this card to pay for it is cycling it. */
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
@@ -1842,12 +1887,14 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback" | "permission";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   mana?: string;
   costs: AdditionalCost[];
   exile: boolean;
+  /** "You may cast this card from your graveyard as long as you control a Zombie" (Gravecrawler). */
+  if?: StaticCondition;
 }
 
 /**

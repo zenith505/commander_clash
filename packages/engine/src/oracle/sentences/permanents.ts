@@ -237,6 +237,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const second = first && parseStaticMods(m[3] === "must be blocked" ? "must be blocked if able" : m[3]!);
     return what && first && second ? [{ type: "continuous", what, mods: [...first, ...second], duration: "endOfTurn" }] : null;
   }
+  // "... gets -2/-0 until end of turn and attacks this turn if able" (Chemister's Trick): an attack requirement for each
+  // combat this turn (CR 508.1d), ending with the turn like the rest.
+  if ((m = /^(.+?) ((?:gets?|gains?) .+) until end of turn and attacks? this turn if able$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    const first = what && parseChanges(m[2]!);
+    return what && first ? [{ type: "continuous", what, mods: [...first, { kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
+  }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);

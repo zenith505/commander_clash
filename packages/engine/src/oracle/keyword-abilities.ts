@@ -37,6 +37,24 @@ export function parseGraveyardKeyword(
     }
     return { fromGraveyard: { kind, ...(mana ? { mana } : {}), costs, exile: kind === "flashback" } };
   }
+  // "You may cast this card from your graveyard" (Skaab Ruinator), "... as long as you control a Zombie" (Gravecrawler),
+  // "... by discarding a card in addition to paying its other costs" (Dragon Man): a permission to cast it from there,
+  // paying its mana cost (CR 601.2, 118.9 doesn't apply: it's not an alternative cost).
+  if ((m = /^You may cast (?:~|this card|this creature) from your graveyard(?: (?:as long as|if) (.+?))?(?: by (.+?) in addition to paying its other costs)?$/.exec(line.replace(/\.$/, "")))) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
+    const cond = m[1] ? parseStaticCondition(m[1], self) : undefined;
+    if (cond === null) return "fail";
+    const costs: AdditionalCost[] = [];
+    // "Paying 3 life and discarding a card": the gerunds as the costs they name.
+    const gerund: Record<string, string> = { discarding: "Discard", paying: "Pay", sacrificing: "Sacrifice", exiling: "Exile", tapping: "Tap" };
+    for (const part of m[2] ? m[2].split(/,? and (?=discarding|paying|sacrificing|exiling|tapping)|, (?=discarding|paying|sacrificing|exiling|tapping)/) : []) {
+      const w = /^(\w+) (.+)$/.exec(part);
+      const c = w && gerund[w[1]!] ? parseAdditionalCost(`${gerund[w[1]!]} ${w[2]}`, true) : null;
+      if (!c) return "fail";
+      costs.push(c);
+    }
+    return { fromGraveyard: { kind: "permission", costs, exile: false, ...(cond ? { if: cond } : {}) } };
+  }
   if (/^Jump-start$/.test(line)) return isSpell ? { fromGraveyard: { kind: "jumpStart", costs: [{ kind: "discard", n: 1 }], exile: true } } : "fail";
   if (/^Retrace$/.test(line)) return { fromGraveyard: { kind: "retrace", costs: [{ kind: "discard", n: 1, filter: { kind: "card", types: ["Land"], text: "land card" } }], exile: false } };
   // Mayhem (CR 702.187b): "As long as you discarded this card this turn, you may cast it from your graveyard by paying

@@ -391,6 +391,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "bf1341dd-41a3-49f6-87ec-63170dde4324",
+  "name": "Boseiju, Who Endures",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {G}.\nChannel — {1}{G}, Discard this card: Destroy target artifact, enchantment, or nonbasic land an opponent controls. That player may search their library for a land card with a basic land type, put it onto the battlefield, then shuffle. This ability costs {1} less to activate for each legendary creature you control.",
+  "colors": [],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Channel"
+  ],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "36cd2364-d113-47d1-b2c4-b088d9eb88dd",
   "name": "Brainstorm",
   "manaCost": "{U}",
@@ -638,6 +669,35 @@
   "set": "akh",
   "releasedAt": "2017-04-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0895c9b7-ae7d-4bb3-af17-3b75deb50a25",
+  "name": "Command Tower",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "frc",
+  "releasedAt": "2026-10-02",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -1662,6 +1722,36 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "09ff28b1-b6c9-48e6-b12e-2f0e644f709f",
+  "name": "Gravecrawler",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "This creature can't block.\nYou may cast this card from your graveyard as long as you control a Zombie.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drc",
+  "releasedAt": "2025-02-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3164,6 +3254,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4538ec2c-867e-412b-b6e3-a57f8e29ba84",
+  "name": "Scrabbling Claws",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Target player exiles a card from their graveyard.\n{1}, Sacrifice this artifact: Exile target card from a graveyard. Draw a card.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rna",
+  "releasedAt": "2019-01-25",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "31b5d0ad-3a4d-4f43-b0a9-c9f7a362680f",
   "name": "Season of Loss",
   "manaCost": "{3}{B}{B}",
@@ -3553,6 +3665,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9fbab5bc-c651-46dc-89b6-0bcfeadb3891",
+  "name": "Stonerise Spirit",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Spirit Bird",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit",
+   "Bird"
+  ],
+  "oracleText": "Flying\n{4}, Exile a card from your graveyard: Target creature gains flying until end of turn.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a494fcee-6885-434c-aad5-6f83640c4472",
   "name": "Stonespeaker Crystal",
   "manaCost": "{4}",
@@ -3633,6 +3778,38 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ac2dd694-d2f1-4025-8400-12332bdc882a",
+  "name": "Takenuma, Abandoned Mire",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {B}.\nChannel — {3}{B}, Discard this card: Mill three cards, then return a creature or planeswalker card from your graveyard to your hand. This ability costs {1} less to activate for each legendary creature you control.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Mill",
+   "Channel"
+  ],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3941,6 +4118,36 @@
   "commanderLegal": "legal",
   "set": "afr",
   "releasedAt": "2021-07-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fea95888-e16a-4209-9cd4-623f7f4d2f67",
+  "name": "Walking Corpse",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

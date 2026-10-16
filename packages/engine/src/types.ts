@@ -1,5 +1,6 @@
 import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
 import type { DamageEvent } from "./damage";
+import type { Characteristics } from "./layers";
 
 // Core data model for the rules engine. Everything in GameState is plain JSON so a
 // game can be serialized, replayed, sent over a network, or snapshotted for undo.
@@ -342,6 +343,8 @@ export interface Player {
   /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
   combatMana?: number;
   landsPlayedThisTurn: number;
+  /** "You may play an additional land this turn" (CR 305.2a): how many more this turn (`turn`). */
+  extraLands?: { turn: number; n: number };
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;
   speedTurn?: number;
@@ -661,7 +664,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** Not a search: cards in the graveyard to return to the hand, or to exile. */ fromGraveyard?: "hand" | "exile"; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -713,6 +716,37 @@ export interface TurnLog {
   gainedLife?: PlayerId[];
   /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */
   toGraveyard?: Record<number, number>;
+  /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
+  discards?: { player: PlayerId; cards: string[] }[];
+}
+
+/**
+ * One object an event moved, for the "one or more" triggers (CR 603.2c) checked as the event ends: `id` and `zc` are
+ * the object after the move. A permanent that left the battlefield carries itself as it last existed there (CR
+ * 603.10a). `entered`: it entered the battlefield and finished entering (its enters event, after "as it enters"
+ * choices). `discardedBy`: a discarded card.
+ */
+export interface ZoneMove {
+  id: ObjectId;
+  zc: number;
+  from?: ZoneName;
+  to: ZoneName;
+  owner: PlayerId;
+  /** A token or a copy of a spell, not a card (CR 111.1, 707.10). */
+  notCard?: true;
+  /** Its copiable values as it moved (a key into `cards`), for "creature cards". */
+  card: string;
+  /** Who controlled it: as it left the battlefield, or as it entered. */
+  controller?: PlayerId;
+  entered?: true;
+  discardedBy?: PlayerId;
+  /** Torpor Orb: the controllers whose abilities its entering can't trigger (`opponents`: only those of `by`'s opponents). */
+  locks?: { by: PlayerId; opponents?: boolean }[];
+  /** Leaving the battlefield: it as it last existed there, whether it had its abilities then, and those granted to it. */
+  snapshot?: GameObject;
+  chars?: Characteristics;
+  hadAbilities?: boolean;
+  granted?: string[];
 }
 
 export interface GameState {
@@ -728,6 +762,8 @@ export interface GameState {
    * state-based actions, one action's costs), as they are there: their owner arranges them (CR 404.3). See graveyard.ts.
    */
   graveyardBatch?: { id: ObjectId; zc: number }[];
+  /** The objects the current event (as `graveyardBatch` counts events) moved, for "one or more" triggers (CR 603.2c). */
+  zoneBatch?: ZoneMove[];
   /** Groups of two or more cards that went to one graveyard at the same time, waiting for their owner to arrange them. */
   graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[] }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */

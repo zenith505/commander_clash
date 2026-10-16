@@ -15,6 +15,7 @@ import { evalAmount } from "./amounts";
 import { addMana, canPayFromPool, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
+import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES } from "./keywords";
 import {
   COLORS,
@@ -348,6 +349,9 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "arrangeTop":
       arrangeTop(s, p, action.top, action.away);
+      break;
+    case "orderGraveyard":
+      orderGraveyard(s, p, action.order);
       break;
     case "searchLibrary":
       searchLibrary(s, p, action.found);
@@ -694,6 +698,7 @@ export function moveObject(
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length })) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
+  if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
@@ -2802,6 +2807,15 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       if (!canGainLife(s, to)) return `${player(s, to).name} can't gain life`;
       continue;
     }
+    // "Exile the top creature card of your graveyard": those cards and no others, nothing to choose (CR 404.1).
+    if (c.kind === "exileFromGraveyard" && c.top) {
+      const top = topGraveyardCards(s, pid, c.n, c.filter);
+      const what = `the top ${c.n === 1 ? (c.filter?.text ?? "card") : `${c.n} ${c.filter?.text ?? "card"}s`} of your graveyard`;
+      if (top.length < c.n) return `you need to exile ${what} to ${doing}`;
+      const chosen = choices?.exileCards;
+      if (chosen?.length && (chosen.length !== top.length || chosen.some((id) => !top.includes(id)))) return `you exile ${what}, not cards of your choice`;
+      continue;
+    }
     const pool =
       c.kind === "sacrifice"
         ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id) && objectMatches(s, c.filter, obj(s, id), pid, false))
@@ -2924,7 +2938,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of ids) moveObject(s, id, "exile");
     } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n), c.n);
     else {
-      const ids = choices.exileCards ?? [];
+      const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);
       if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
       for (const id of ids) moveObject(s, id, "exile");
@@ -4385,6 +4399,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   if (!s.pending && askEntersChoice(s)) return;
   for (let guard = 0; guard < 100; guard++) {
     s.leftTogether = undefined; // each pass happens all at once (CR 704.3)
+    closeGraveyardBatch(s); // the action before, or the last pass, put those cards there together (CR 404.3)
     invalidateCharacteristics(s);
     endWhileTapped(s);
     syncControl(s);
@@ -4484,6 +4499,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
   }
   s.leftTogether = undefined;
   checkGameOver(s);
+  // Cards that went to a graveyard together are arranged as they get there, before triggers go on the stack (CR 404.3).
+  if (!s.over && !s.pending && !holdTriggers && askGraveyardOrder(s)) return;
   checkStateTriggers(s);
   // Then waiting triggered abilities go on the stack before anyone gets priority (CR 117.5).
   if (!s.over && !holdTriggers && processTriggerQueue(s, turnOrderFrom(s, s.activePlayer))) s.passedInSuccession = [];

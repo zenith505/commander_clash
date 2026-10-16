@@ -509,6 +509,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         text: "If it was a creature, return it to the battlefield under its owner's control. It's an enchantment.",
       },
     };
+  // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {1}{B}{B}. If you do, return it to your hand"
+  // (Pyre Zombie), "... with a creature card directly above it" (Krovikan Horror, Death Spark): an ability of the card
+  // in the graveyard (CR 113.6b) with an intervening if (CR 603.4), so it does nothing if the card has left by then
+  // (nothing is paid). "Directly above" is the next card put there after it (rulings; see graveyard.ts).
+  const inYard = /^(At the beginning of [^,]+), if ~ is in your graveyard( with a creature card directly above it)?, ((?:you may )?(?:pay [^.]+\. If you do, )?)return (?:~|it) to your hand\.$/.exec(line);
+  if (inYard) {
+    const t = parseTrigger(`${inYard[1]}, ${inYard[3]}return ~ from your graveyard to your hand.`);
+    if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
+    return { ...t, ifCond: { kind: "selfInGraveyard", ...(inYard[2] ? { creatureAbove: true as const } : {}) } };
+  }
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.

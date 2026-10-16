@@ -1,4 +1,5 @@
 import { allEffects, refCovers, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
+import { topGraveyardCards } from "./graveyard";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
@@ -211,6 +212,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
       return [{ type: "arrangeTop", player: pid, top: keep, away: pend.cards.filter((id) => !keep.includes(id)) }];
     }
+    if (pend.kind === "orderGraveyard") return [{ type: "orderGraveyard", player: pid, order: orderOwnGraveyard(s, pend.cards) }];
     if (pend.kind === "mulligan") return [{ type: "mulligan", player: pid, keep: !pend.canMulligan || keepsHand(s, pid, pend.taken) }];
     if (pend.kind === "bottomCards") return [{ type: "bottomCards", player: pid, objectIds: chooseBottom(s, pid, pend.count) }];
     if (pend.kind === "discardToHandSize") {
@@ -1117,6 +1119,9 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       const ids = spareEvidence(s, pid, c.n, id, out.exileCards);
       if (!ids) return null;
       out.collect = ids;
+    } else if (c.kind === "exileFromGraveyard" && c.top) {
+      // "The top three black cards of your graveyard": no choice (CR 404.1).
+      if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -2344,4 +2349,22 @@ function chooseLandType(s: GameState, pid: PlayerId, options: string[]): string 
   const want = new Map<string, number>();
   for (const id of player(s, pid).hand) for (const c of defOf(s, obj(s, id)).colors) want.set(c, (want.get(c) ?? 0) + 1);
   return [...options].sort((a, b) => (want.get(LAND_COLOR[b]!) ?? 0) + (identity.has(LAND_COLOR[b]!) ? 1 : 0) - (want.get(LAND_COLOR[a]!) ?? 0) - (identity.has(LAND_COLOR[a]!) ? 1 : 0))[0]!;
+}
+
+/**
+ * Cards going into our graveyard together, or all of it (CR 404.3), top first: the biggest creature cards on top (for
+ * Corpse Dance and Mistmoon Griffin), and a card that wants "a creature card directly above it" (Krovikan Horror,
+ * Death Spark) just under one.
+ */
+function orderOwnGraveyard(s: GameState, cards: ObjectId[]): ObjectId[] {
+  const d = (id: ObjectId) => defOf(s, obj(s, id));
+  const creature = (id: ObjectId) => d(id).types.includes("Creature");
+  const below = (id: ObjectId) => /directly above it/.test(d(id).oracleText ?? "");
+  const order = [...cards].sort((a, b) => Number(creature(b)) - Number(creature(a)) || mv(s, b) - mv(s, a));
+  for (const id of order.filter(below)) {
+    order.splice(order.indexOf(id), 1);
+    const over = order.findIndex((x) => creature(x) && !below(x));
+    order.splice(over < 0 ? order.length : over + 1, 0, id);
+  }
+  return order;
 }

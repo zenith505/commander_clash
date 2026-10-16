@@ -8,6 +8,8 @@ import { objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
+import { nextRandom, shuffle } from "../rng";
+import { askWholeGraveyardOrder } from "../graveyard";
 import { addDelayed, paidUnless } from "./run-spells";
 import { fireEvent, inCombat } from "./triggers";
 
@@ -521,8 +523,45 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const under = e.owner ? o.owner : ctx.controller;
         log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under).name}'s control${e.tapped ? ", tapped" : ""}.`);
         moveObject(s, o.id, "battlefield", { controller: under, tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}) }); // CR 110.2a
+        // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
+        // the permanent it became, while it's still that object (CR 400.7, rulings).
+        if (o.zone !== "battlefield") continue;
+        if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+        if (e.atEndStep)
+          addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
       }
       return;
+    case "randomFromGraveyard": {
+      const p = player(s, ctx.controller);
+      const pool = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, s.objects[id]!)));
+      if (!pool.length) return;
+      const o = obj(s, pool[Math.floor(nextRandom(s) * pool.length)]!);
+      const d = defOf(s, o);
+      if (e.dest === "hand") {
+        log(s, `${src} returns ${d.name}, chosen at random, from ${p.name}'s graveyard to their hand.`);
+        moveObject(s, o.id, "hand");
+      } else if (isPermanentCard(d) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
+        log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield.`);
+        moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
+      } else {
+        log(s, `${src}: ${d.name} is chosen at random and exiled.`);
+        moveObject(s, o.id, "exile");
+      }
+      return;
+    }
+    case "reorderGraveyard": {
+      const p = player(s, ctx.controller);
+      if (e.random) {
+        shuffle(s, p.graveyard);
+        log(s, `${src}: ${p.name} reorders their graveyard at random.`);
+        return;
+      }
+      // Its owner arranges all of it (an exception to CR 404.2), then the resolution carries on (see graveyard.ts).
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.ordered) return;
+      sc.ordered = true;
+      return askWholeGraveyardOrder(s, p.id, src) ? "paused" : undefined;
+    }
     case "returnAllFromGraveyard": {
       // All at once, as one move: under your control (CR 110.2a) or, with "under their owners' control", each owner's.
       // Only permanent cards can be put onto the battlefield (CR 110.4b); never Auras (see the effect).

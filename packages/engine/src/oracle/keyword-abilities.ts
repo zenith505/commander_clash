@@ -452,6 +452,15 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     const filter = parseSearchFilter(m[1]!);
     return filter ? { kind: "reveal", filter, n: 1 } : null;
   }
+  // "Exile the top creature card of your graveyard" (Necratog), "exile the top three black cards of your graveyard"
+  // (Spinning Darkness): the topmost cards there that match, so nothing to choose (CR 404.1; see graveyard.ts).
+  if ((m = new RegExp(`^exile the top (?:${NUM} )?(.+?) of your graveyard$`, "i").exec(text))) {
+    const n = m[1] ? num(m[1]) : 1;
+    if (!Number.isInteger(n) || n < 1 || (n === 1 ? !/\bcard$/.test(m[2]!) : !/\bcards$/.test(m[2]!))) return null;
+    const filter = parseSearchFilter(n > 1 ? m[2]!.replace(/cards$/, "card") : m[2]!);
+    if (filter === null) return null;
+    return { kind: "exileFromGraveyard", n, top: true, ...(filter ? { filter } : {}) };
+  }
   if ((m = new RegExp(`^exile (${NUM.slice(1, -1)}|X) (.+?) from your graveyard$`, "i").exec(text)) && (m[1] !== "X" || allowX)) {
     const filter = parseSearchFilter(m[1] === "X" ? m[2]!.replace(/cards$/, "card") : m[2]!);
     if (filter === null) return null;

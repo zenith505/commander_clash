@@ -93,6 +93,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const away: Effect = /^sacrifice/i.test(m[1]!) ? sacrificeSelf : { type: "exile", what: { ref: "self" } };
     return [{ type: "may", effects: [{ type: "discard", who: { ref: "you" }, n: 1, filter }], otherwise: [away], keep: true, text: `Discard ${m[3]} to keep ~` }];
   }
+  // "Sacrifice ~ unless you exile the top creature card of your graveyard" (Barrow Ghoul): with none there, it's sacrificed;
+  // without ~, it can still be exiled (rulings).
+  if ((m = /^[Ss]acrifice (~|it) unless you exile the top (.+?) of your graveyard$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = parseSearchFilter(m[2]!);
+    if (filter === null) return null;
+    const exile: Effect = { type: "exile", what: { ref: "graveyardEnd", who: { ref: "you" }, ...(filter ? { filter } : {}) } };
+    return [{ type: "may", effects: [exile], otherwise: [sacrificeSelf], keep: true, text: `Exile the top ${m[2]} of your graveyard to keep ~` }];
+  }
   // "Then discard two cards unless you discard a creature card" (Mystic Meditation, Thirst for Knowledge): a card of
   // that kind, or two cards. With none of that kind, two cards (rulings).
   if ((m = new RegExp(`^(?:[Tt]hen )?[Dd]iscard (two|three|\\d+) cards unless you discard (an? .+? card)$`).exec(s))) {

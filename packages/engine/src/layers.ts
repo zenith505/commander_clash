@@ -16,6 +16,7 @@
 // another (CR 613.8). Once an effect starts applying, it keeps applying to the same
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
+import { creatureCardAbove } from "./graveyard";
 import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
@@ -331,6 +332,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
+    case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)
+      return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src));
     case "graveyardAtLeast": // threshold
       return (s.players[you]?.graveyard.length ?? 0) >= cond.n;
     case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)

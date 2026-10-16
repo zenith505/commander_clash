@@ -59,7 +59,7 @@ export interface Ctx {
 }
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
 
@@ -69,6 +69,8 @@ const checkableMay = (e: Effect) =>
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
+  // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
+  (e.type === "putOntoBattlefield" && e.what.ref === "graveyardEnd" && !e.atEndStep && !e.haste) ||
   // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return.
   (e.type === "pick" && e.who.ref === "you" && e.action === "bounce" && e.n === 1 && !e.unless) ||
   // "You may have it deal 3 damage to target creature. If you do, ...": done if that target is still legal.
@@ -113,6 +115,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
+  // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
+  // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
+  text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   const sentences = splitSentences(text.trim())
@@ -319,6 +324,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const under = (later[1] ?? later[2]) === "your" ? "you" : "owner";
       effects[effects.length - 1] = { type: "flicker", what: prev.what, under, at: "nextEndStep", ...(later[3] ? { counter: "+1/+1" as const } : {}) };
       continue;
+    }
+    // "Return target creature card from your graveyard to the battlefield. That creature gains haste until end of turn.
+    // Exile it at the beginning of the next end step." (Dawn of the Dead, Corpse Dance): about the permanent that card
+    // became (CR 400.7), so part of putting it there.
+    const haste = /^(?:That creature|It) gains haste( until end of turn)?$/.exec(s);
+    const atEnd = /^(Exile|Sacrifice) (?:it|that creature) at the beginning of the next end step$/.exec(s);
+    if (haste || atEnd) {
+      const last = effects[effects.length - 1];
+      const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
+      const one = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") ? put : undefined;
+      if (one && haste && !one.haste && !one.atEndStep) {
+        one.haste = haste[1] ? "endOfTurn" : "game";
+        continue;
+      }
+      if (one && atEnd && !one.atEndStep) {
+        one.atEndStep = atEnd[1] === "Exile" ? "exile" : "sacrifice";
+        continue;
+      }
     }
     if (/^You may choose new targets for the cop(?:y|ies)$/i.test(s)) {
       const prev = effects[effects.length - 1];

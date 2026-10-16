@@ -1,6 +1,6 @@
 # Roadmap
 
-16,468 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+16,499 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -141,10 +141,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 - Aura and Equipment triggers: "whenever ~ or equipped creature ..." that then says "it", "blocks or becomes blocked by
   a creature", Extra Arms's "it deals"; granted target taxes (Callaphe); "if it had counters on it, put its counters"
   (Host of the Hereafter).
-- Order of cards put into a graveyard at the same time (CR 404.3: their owner arranges them) isn't modeled: the engine
-  moves cards one at a time and has no notion of a simultaneous move, so the cards that read graveyard order stay out
-  (Spinning Darkness's "top three black cards of your graveyard", Corpse Dance, Krovikan Horror, Soldevi Digger,
-  Volrath's Shapeshifter and about a dozen more).
+- Graveyard order (CR 404.3) is modeled: cards put into a graveyard at the same time are arranged by their owner when
+  a card in the game reads the order. Still out: Volrath's Shapeshifter (its text changes with the top card, layer 1/3),
+  Bösium Strip (cast the top instant or sorcery of your graveyard, exile it after), Phyrexian Grimoire (an opponent
+  picks one of the top two), Circling Vultures, Genesis and Kheru Lich
+  Lord (blocked by other lines).
 - Collect evidence (CR 701.59) works as an optional additional cost, an alternative cost, an ability's cost and a "you
   may" on resolution; still out: ward—collect evidence (Axebane Ferox), bestow with it (Detective's Phoenix), "collect
   evidence X" (Incinerator of the Guilty, Urgent Necropsy), "if evidence was collected, instead" (Analyze the Pollen,

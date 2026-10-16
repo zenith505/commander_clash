@@ -1031,6 +1031,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "97b97728-bfe6-483a-a323-c758f41ff9dc",
+  "name": "Fossil Find",
+  "manaCost": "{R/G}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return a card at random from your graveyard to your hand, then reorder your graveyard as you choose.",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "shm",
+  "releasedAt": "2008-05-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "93a0e938-b916-47ec-9803-369e885e253c",
   "name": "Future Sight",
   "manaCost": "{2}{U}{U}{U}",
@@ -2519,6 +2547,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b526962e-be8a-4803-b038-57869bb96751",
+  "name": "Soldevi Digger",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{2}: Put the top card of your graveyard on the bottom of your library.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "all",
+  "releasedAt": "1996-06-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0f5b79ca-9f80-420b-a6c5-bb2a9a95c7e7",
   "name": "Soul Summons",
   "manaCost": "{1}{W}",
@@ -2909,6 +2959,32 @@
   "set": "tdc",
   "releasedAt": "2025-04-11",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "34515b16-c9a4-4f98-8c77-416a7a523407",
+  "name": "Wrath of God",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy all creatures. They can't be regenerated.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "v14",
+  "releasedAt": "2014-08-22",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

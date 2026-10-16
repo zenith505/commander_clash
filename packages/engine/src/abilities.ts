@@ -103,6 +103,8 @@ export type Count =
   | { kind: "speed" }
   /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
   | { kind: "party" }
+  /** "The total amount of life your opponents have lost this turn", "for each 1 life your opponents have lost this turn" (CR 119.3). */
+  | { kind: "opponentsLifeLost" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
@@ -1655,6 +1657,12 @@ export type TriggerEvent =
   | "eachBeginCombat" // At the beginning of each combat
   | "yourEndCombat" // At end of combat on your turn
   | "eachEndCombat" // At end of combat (CR 511.2)
+  /** "At the beginning of your first (precombat) main phase": only the turn's first main phase is one (CR 505.1a). */
+  | "yourFirstMain"
+  | "eachFirstMain" // "At the beginning of each player's first main phase" ("that player" is the active player)
+  /** "At the beginning of each of your postcombat main phases": every main phase but the first (CR 505.1a); see `secondMain`. */
+  | "yourPostcombatMain"
+  | "eachPostcombatMain"
   | "selfAttacksOrBlocks" // Whenever ~ attacks or blocks
   | "eachEndStep" // At the beginning of the end step (every turn's)
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
@@ -1887,6 +1895,8 @@ export interface TriggeredAbility {
   hostControllersUpkeep?: true;
   /** "At the beginning of each opponent's upkeep / draw step / end step": an "each" step trigger only on an opponent's turn. */
   opponentsTurn?: true;
+  /** "At the beginning of your second main phase": the turn's second main phase only, not later ones (CR 505.1b). */
+  secondMain?: true;
   /** "At the beginning of enchanted player's upkeep": an "each" step trigger only on the turn of the player this Aura enchants. */
   enchantedPlayersTurn?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
@@ -2406,7 +2416,12 @@ export interface CompiledCard {
    * spell its controller cast this turn, counting ones before this permanent was there; `fromHand` / `fromExile`: cast
    * from there; `treasure`: "that mana from a Treasure was spent to cast" (CR 106.3).
    */
-  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; text: string }[];
+  /**
+   * `commander`: "Commander spells you cast have cascade" (Flamekin Herald), a commander card cast as a spell (CR 903.3);
+   * `yourTurn` and `maxMv`: "During your turn, spells you cast from your hand with mana value X or less have cascade,
+   * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
+   */
+  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
   /**

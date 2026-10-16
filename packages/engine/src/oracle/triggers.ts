@@ -58,6 +58,11 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of your draw step, (.+)$/, "yourDrawStep"],
   [/^At the beginning of each player's draw step, (.+)$/, "eachDrawStep"],
   [/^At the beginning of your end step, (.+)$/, "yourEndStep"],
+  // Main phases (CR 505.1a): the first one is the precombat main phase, every other one a postcombat main phase.
+  [/^At the beginning of (?:your (?:first|precombat) main phase|each of your precombat main phases), (.+)$/, "yourFirstMain"],
+  [/^At the beginning of each player's (?:first|precombat) main phase, (.+)$/, "eachFirstMain"],
+  [/^At the beginning of (?:your postcombat main phase|each of your postcombat main phases), (.+)$/, "yourPostcombatMain"],
+  [/^At the beginning of each postcombat main phase, (.+)$/, "eachPostcombatMain"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
@@ -803,6 +808,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
   }
+  // "At the beginning of your second main phase": the turn's second main phase, a postcombat one (CR 505.1a-b).
+  const second = /^At the beginning of your second main phase, (.+)$/.exec(line);
+  if (second) {
+    const t = parseTrigger(`At the beginning of your postcombat main phase, ${second[1]}`);
+    return t && t !== "fail" ? { ...t, secondMain: true } : "fail";
+  }
   // "At the beginning of each opponent's upkeep, ~ deals 1 damage to that player": an "each upkeep" trigger that
   // triggers only on its controller's opponents' turns; "that player" is the active player.
   const oppStep = /^At the beginning of each opponent's (upkeep|draw step|end step), (.+)$/.exec(line);
@@ -1030,7 +1041,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);

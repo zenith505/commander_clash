@@ -1177,6 +1177,8 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   if (!canLoseLife(s, pid)) return;
   player(s, pid).life -= n;
   if (!(s.lostLifeThisTurn ??= []).includes(pid)) s.lostLifeThisTurn.push(pid);
+  const lost = ((s.turnLog ??= {}).lifeLost ??= {});
+  lost[pid] = (lost[pid] ?? 0) + n;
   fireEvent(s, { type: "lifeLost", player: pid, amount: n });
 }
 
@@ -1585,6 +1587,7 @@ function startNextTurn(s: GameState) {
   s.toGraveyardThisTurn = undefined;
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
+  s.mainPhasesThisTurn = undefined;
   s.blockersStep = undefined;
   s.addedPhases = undefined;
   s.resumeStep = undefined;
@@ -1712,6 +1715,7 @@ function beginStep(s: GameState, step: Step): void {
       if (askUnblocked(s) || dealCombatDamage(s, false)) return;
       break;
     case "main1":
+      s.mainPhasesThisTurn = (s.mainPhasesThisTurn ?? 0) + 1;
       // As the precombat main phase begins, the active player puts a lore counter on each Saga they control with
       // one or more chapter abilities (CR 505.4, 714.3c).
       for (const id of [...s.battlefield]) {
@@ -1722,6 +1726,11 @@ function beginStep(s: GameState, step: Step): void {
       }
       invalidateCharacteristics(s);
       fireEvent(s, { type: "step", step: "main1", active: ap }); // paradigm's "at the beginning of each of your precombat main phases"
+      break;
+    case "main2":
+      // Every main phase after the first is a postcombat main phase, an added one too (CR 505.1a).
+      s.mainPhasesThisTurn = (s.mainPhasesThisTurn ?? 0) + 1;
+      fireEvent(s, { type: "step", step: "main2", active: ap });
       break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;

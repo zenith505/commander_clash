@@ -193,7 +193,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "The next noncreature spell you cast this turn has cascade" (Dark Apostle), "the next instant spell and the next sorcery
   // spell you cast this turn each have cascade" (Smoldering Stagecoach): the spell gains cascade as it's cast and it
   // triggers then; each such effect is an instance of its own (rulings, CR 702.85c).
-  if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? you cast this turn (?:has|each have) cascade$/.exec(s)) && !!m[2] === /each have/.test(s)) {
+  // TARDIS's "and you may planeswalk": only in a Planechase game; in any other, nothing happens (CR 701.31a, rulings).
+  if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? you cast this turn (?:has|each have) cascade(?: and you may planeswalk)?$/.exec(s)) && !!m[2] === /each have/.test(s)) {
     const out: Effect[] = [];
     for (const w of [m[1]!, m[2]].filter((x): x is string => !!x)) {
       const filter = parseTargetPhrase(w);

@@ -815,6 +815,8 @@ export interface TurnLog {
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
   lifeGained?: Record<number, number>;
+  /** Life each player lost in total, paid life included (CR 119.4): "the total amount of life your opponents have lost this turn". */
+  lifeLost?: Record<number, number>;
   /**
    * Creatures that died this turn having been dealt damage that turn: the card in the graveyard (`id`, `zc`) and the
    * permanents that dealt it damage (Krovikan Vampire's "if a creature dealt damage by ~ this turn died").
@@ -921,6 +923,8 @@ export interface GameState {
   attackersThisTurn?: number;
   /** Combat phases begun this turn: "if it's the first combat phase of the turn" (CR 506.1, 500.8). */
   combatsThisTurn?: number;
+  /** Main phases begun this turn: "your second main phase" is the second (CR 505.1b). */
+  mainPhasesThisTurn?: number;
   /**
    * The combat phase whose declare blockers step began (the turn and which combat of it): "only during combat after
    * blockers are declared" can't be used in a combat that skipped that step (CR 506.8f).

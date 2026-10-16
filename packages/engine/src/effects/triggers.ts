@@ -8,7 +8,8 @@ import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, Ob
 import { RulesError } from "../types";
 import { spentMeets } from "../mana";
 import { nextRandom } from "../rng";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, spellMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
+import { evalAmount } from "../amounts";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -23,6 +24,8 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
   end: ["yourEndStep", "eachEndStep"],
   beginCombat: ["yourBeginCombat", "eachBeginCombat"], // CR 507.1
   endCombat: ["yourEndCombat", "eachEndCombat"], // "at end of combat" (CR 511.2)
+  main1: ["yourFirstMain", "eachFirstMain"], // CR 505.1a
+  main2: ["yourPostcombatMain", "eachPostcombatMain"],
 };
 
 /** Who controls the permanent `o` is attached to, if it's attached to one on the battlefield. */
@@ -113,7 +116,7 @@ export type TriggerSourceEvent =
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
-  | { type: "step"; step: "upkeep" | "draw" | "main1" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
+  | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
@@ -932,7 +935,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const [want, each] = pair;
     // "That player" in "at the beginning of each player's upkeep" is the active player.
     const stepWatch = (o: GameObject, you: PlayerId) =>
-      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you))) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
+      add(o, you, (e, t) => (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
   }
@@ -1175,6 +1178,9 @@ function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: 
     if (controllerOf(s, o) !== you) continue;
     for (const g of abilitiesOf(s, o).spellsHaveCascade ?? []) {
       if (g.from && spell.castFrom !== g.from) continue;
+      if (g.commander && !spell.isCommander) continue;
+      if (g.yourTurn && s.activePlayer !== you) continue;
+      if (g.maxMv !== undefined && spellManaValue(s, item) > evalAmount(s, g.maxMv, { controller: you, sourceId: o.id })) continue;
       if (g.treasure && !spell.treasureSpent) continue;
       if (g.filter && !spellMatches(s, g.filter, item)) continue;
       // "The first spell you cast each turn ...": this one is the first of its kind this turn (it's already counted).

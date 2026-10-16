@@ -949,6 +949,28 @@ export function compile(d: CardDef): CompiledCard {
     // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
     const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have cascade\.$/.exec(line);
     const firstCascade = /^The first spell you cast (from exile )?each turn( that mana from a Treasure was spent to cast)? has cascade\.$/.exec(line);
+    if (/^Commander spells you cast have cascade\.$/.test(line)) {
+      (out.spellsHaveCascade ??= []).push({ commander: true, text: line });
+      continue;
+    }
+    const xCascade = /^During your turn, spells you cast from your hand with mana value X or less have cascade, where X is (.+)\.$/.exec(stripAbilityWord(line));
+    if (xCascade) {
+      const maxMv = parseCount(xCascade[1]!, null);
+      if (!maxMv) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      (out.spellsHaveCascade ??= []).push({ from: "hand", yourTurn: true, maxMv, text: line });
+      continue;
+    }
+    // Delirium: "This spell has cascade as long as there are four or more card types among cards in your graveyard"
+    // (Bloodbraid Marauder): it has cascade as it's cast, so cascade triggers, only while that's true (CR 702.85a).
+    const cascadeIf = /^~ has cascade as long as (.+)\.$/.exec(stripAbilityWord(line));
+    if (cascadeIf) {
+      const cond = parseStaticCondition(cascadeIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || !conditionalAbility(d, "Cascade", out, cond)) out.unsupported.push(raw);
+      continue;
+    }
     if (giveCascade || firstCascade) {
       let filter: TargetSpec | undefined;
       if (giveCascade && (giveCascade[1] || giveCascade[3])) {

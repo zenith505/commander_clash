@@ -52,6 +52,8 @@ export const STARTING_LIFE = 40;
 export type Color = "W" | "U" | "B" | "R" | "G";
 export const COLORS: readonly Color[] = ["W", "U", "B", "R", "G"];
 export type ManaType = Color | "C";
+/** The mana spent to cast a spell by type (CR 601.2h), and how much of each type a snow source made (`snow`, CR 107.4h). */
+export type SpentMana = Partial<Record<ManaType, number>> & { snow?: Partial<Record<ManaType, number>> };
 
 export type PlayerId = number;
 export type ObjectId = string;
@@ -238,7 +240,7 @@ export interface GameObject {
   /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */
   manaSpent?: number;
   /** The mana spent to cast it by type (CR 601.2h), kept by the permanent the spell becomes ("if {U} was spent"). */
-  spent?: Partial<Record<ManaType, number>>;
+  spent?: SpentMana;
   /** A Phantom creature's last combat damage step ("turn:step") that removed a counter: one per damage event. */
   phantomEvent?: string;
   /**
@@ -361,6 +363,10 @@ export interface Player {
   restrictedMana?: RestrictedMana[];
   /** Mana in the pool (counted in manaPool too, none of it restricted) that a Treasure produced: "mana from a Treasure" (CR 106.3). */
   treasureMana?: Partial<Record<ManaType, number>>;
+  /** Mana in the pool (counted in manaPool too, none of it restricted) that a snow source produced, for {S} (CR 107.4h). */
+  snowMana?: Partial<Record<ManaType, number>>;
+  /** "Until end of turn, you don't lose this mana as steps and phases end": how much of each type is kept, this `turn`. */
+  keptMana?: { turn: number; mana: Partial<Record<ManaType, number>> };
   /** Red mana in the pool from firebending, kept until end of combat (CR 702.189a). */
   combatMana?: number;
   landsPlayedThisTurn: number;
@@ -472,7 +478,7 @@ export interface StackItem {
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
    */
-  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** Its source was a Treasure as it was activated: its mana is "mana from a Treasure" (CR 106.3). */ treasure?: true };
+  manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** Its source was a Treasure as it was activated: its mana is "mana from a Treasure" (CR 106.3). */ treasure?: true; /** Its source was a snow permanent: its mana is snow mana (CR 107.4h). */ snow?: true };
   /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
   treasureSpent?: number;
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
@@ -989,7 +995,7 @@ export interface TriggerEventInfo {
   /** A permanent's enters trigger: its spell's surge or spectacle cost was paid (CR 702.117a, 702.137a). */
   castAlt?: "surge" | "spectacle";
   /** A permanent's enters trigger, or a cast trigger: the mana spent to cast that spell by type (CR 601.2h). */
-  spent?: Partial<Record<ManaType, number>>;
+  spent?: SpentMana;
 }
 
 export interface Resolving {

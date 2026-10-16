@@ -230,9 +230,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   };
   for (let si = 0; si < sentences.length; si++) {
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    // "~ gains indestructible until end of turn. Tap it." (Icehide Troll): "it" is the permanent the sentence before was
+    // about, when that sentence was about ~ itself and nothing else.
+    if (/^(?:Tap|Untap) it$/.test(s) && si > 0 && /^~ (?:gets|gains|has|becomes)\b/.test(sentences[si - 1]!) && !/\btarget\b/.test(sentences[si - 1]!)) s = s.replace(/it$/, "~");
     if (!closeGate()) return null;
     [prevStart, curStart] = [curStart, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
+    // "Add {R}. Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4): the mana the sentence
+    // before added, unless it can only be spent some ways.
+    if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
+      const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
+      if (!added.length || si === 0 || /[Ss]pend this mana only|can't be spent/.test(sentences[si - 1]!)) return null;
+      for (const e of added) e.keep = "turn";
+      continue;
+    }
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(s);
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).

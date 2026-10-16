@@ -8,7 +8,7 @@ import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./effects";
 import { characteristics, staticConditionNow, type Characteristics } from "./layers";
-import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "./mana";
+import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
 
 export interface AmountCtx {
@@ -165,6 +165,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.manaSpent ?? 0;
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
+    case "snowSpent":
+      return snowSpent(ctx.spent);
     case "players":
       return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
     case "opponentsAttacked": {
@@ -402,6 +404,8 @@ function describeCount(c: Count): string {
       return "the greatest number of cards an opponent has drawn this turn";
     case "treasureSpent":
       return "mana from Treasures spent";
+    case "snowSpent":
+      return "{S} spent";
     default:
       return c.kind;
   }

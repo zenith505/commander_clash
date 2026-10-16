@@ -27,6 +27,12 @@ export function Pip({ sym, size }: { sym: string; size?: "sm" | "lg" }) {
         <span className="pip-label">⚡</span>
       </span>
     );
+  if (base === "S")
+    return (
+      <span className={[...cls, "pip-generic"].join(" ")} title="{S}: one mana from a snow source">
+        <span className="pip-label">❄</span>
+      </span>
+    );
   const isColor = /^[WUBRGC]$/.test(base);
   return (
     <span className={[...cls, isColor ? `pip-${base}` : "pip-generic"].join(" ")} title={`{${sym}}`}>

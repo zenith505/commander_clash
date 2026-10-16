@@ -1887,12 +1887,14 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback";
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "grantedFlashback" | "permission";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   mana?: string;
   costs: AdditionalCost[];
   exile: boolean;
+  /** "You may cast this card from your graveyard as long as you control a Zombie" (Gravecrawler). */
+  if?: StaticCondition;
 }
 
 /**

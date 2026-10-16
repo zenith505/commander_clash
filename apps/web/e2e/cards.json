@@ -1726,6 +1726,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "09ff28b1-b6c9-48e6-b12e-2f0e644f709f",
+  "name": "Gravecrawler",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "This creature can't block.\nYou may cast this card from your graveyard as long as you control a Zombie.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drc",
+  "releasedAt": "2025-02-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "83c8a3a6-2e1a-4e26-8847-6d066f42d906",
   "name": "Gray Ogre",
   "manaCost": "{2}{R}",
@@ -4033,6 +4063,36 @@
   "commanderLegal": "legal",
   "set": "afr",
   "releasedAt": "2021-07-23",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fea95888-e16a-4209-9cd4-623f7f4d2f67",
+  "name": "Walking Corpse",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

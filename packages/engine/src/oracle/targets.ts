@@ -132,6 +132,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (ctx.subjectIt && /^that (land|artifact|enchantment|token|[A-Z][a-z]+)$/.test(x) && ctx.lastObjectTarget === undefined) return { ref: "subject" };
   // A legendary character's "him" or "her" is the card itself ("Then put a +1/+1 counter on her").
   if (/^(him|her)$/i.test(x) && !ctx.spell) return ctx.selfCard ? { ref: "selfCard" } : { ref: "self" };
+  // "Untap target creature and gain control of it ... the creature gains ..." (Flash Conscription): the one creature it
+  // targets.
+  if (/^the creature$/i.test(x) && ctx.lastObjectTarget !== undefined && ctx.targets.filter((t) => t.kind === "object").length === 1 && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };

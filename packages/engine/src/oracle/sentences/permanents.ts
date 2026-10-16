@@ -45,6 +45,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const type = m[1]!.toLowerCase() as "destroy" | "exile";
     return a?.ref === "target" && b?.ref === "target" ? [{ type, what: a }, { type, what: b }] : null;
   }
+  // Threaten: "Untap target creature and gain control of it until end of turn" (Spinal Embrace without a duration: for as
+  // long as it stays on the battlefield, CR 611.2a).
+  if ((m = /^Untap ((?:another )?target .+?) and gain control of it( until end of turn)?$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "untap", what }, { type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
+  }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);

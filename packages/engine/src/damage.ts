@@ -110,6 +110,8 @@ export function dealDamage(
   const key = src.ref ? `${src.ref.object}@${src.ref.zc}` : src.name;
   const sources = (((s.turnLog ??= {}).damageSources ??= {})[src.controller] ??= []);
   if (!sources.includes(key)) sources.push(key);
+  const totals = ((s.turnLog.sourceDamage ??= {})[src.controller] ??= {});
+  totals[key] = (totals[key] ?? 0) + n;
   if ("object" in to) {
     const o = to.object;
     const c = characteristics(s, o);

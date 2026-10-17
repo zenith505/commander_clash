@@ -320,6 +320,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^${NUM} or more (creature|artifact|enchantment|land|instant|sorcery) cards were put into graveyards from anywhere this turn$`).exec(text)))
     return { kind: "cardsToGraveyard", n: num(m[1]!), types: [capital(m[2]!)] };
   if ((m = new RegExp(`^${NUM} or more sources you controlled dealt damage this turn$`).exec(text))) return { kind: "sourcesDealtDamage", n: num(m[1]!) };
+  if ((m = /^a source you controlled dealt (\d+) or more damage this turn$/.exec(text))) return { kind: "sourceDealtAtLeast", n: Number(m[1]) };
+  // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
+  if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
     const filter = parseSearchFilter(`${m[2]!.replace(/ and /g, " or ")} card`);
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
@@ -553,6 +556,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = others.map((o) => parseStaticMods(o));
     return more.every(Boolean) ? [...more.flatMap((x) => x!), { kind: "addTypes", types: [], subtypes: [t] }] : null;
   };
+  // Raised by Giants: "have base power and toughness 10/10 and are Giants in addition to their other types" (layers 4
+  // and 7b, CR 613.1d, 613.4b).
+  if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)(?: and (?:is an? ([A-Z][a-z]+)|are ([A-Z][a-z]+)) in addition to (?:its|their) other types)?$/.exec(rest))) {
+    const t = m[3] ?? (m[4] && singular(m[4]));
+    if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
+    return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
+  }
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -871,7 +881,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   const cda = parseDefinedPT(text);
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };
-  const where = /^(.+), where X is (.+)$/.exec(text);
+  // Not a "where X is" inside a quoted ability: that X belongs to the ability granted (Hardy Outlander).
+  const where = /^([^"]+), where X is ([^"]+)$/.exec(text);
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };

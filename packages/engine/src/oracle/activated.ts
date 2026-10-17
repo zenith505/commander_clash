@@ -54,6 +54,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const rc = removeCounterCost(part);
       if (!rc || !Number.isFinite(rc.n)) return "fail"; // "Remove X counters" isn't modeled
       removeCounters = rc;
+    } else if ((c = /^Sacrifice another (\w+) or an? (\w+)$/.exec(part))) {
+      // "Sacrifice another creature or an artifact" (Street Urchin): this permanent too if it's an artifact (rulings).
+      const filter = pickFilter(`${c[1]} or ${c[2]}`);
+      const selfIf = pickFilter(c[2]!);
+      if (!filter || !selfIf) return "fail";
+      extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or ${/^[aeiou]/i.test(c[2]!) ? "an" : "a"} ${c[2]}` }, n: 1, other: true, selfIf });
     } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|${NUM}) (.+)$`).exec(part))) {
       const filter = pickFilter(c[3]!); // NUM is a group of its own
       if (!filter) return "fail";

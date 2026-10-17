@@ -242,6 +242,15 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
       activated: [...base.activated, ...extra.flatMap((x) => x.activated)],
       mana: [...base.mana, ...extra.flatMap((x) => x.mana)],
     };
+    // Granted static abilities that aren't layer effects (grants.ts GRANTED_FIELDS); the layer ones are in layers.ts.
+    const more = <K extends "costMods" | "countMods" | "othersEnterWithCounters" | "entersWithAdditional">(k: K) => {
+      const all: unknown[] = [...(base[k] ?? []), ...extra.flatMap((x): unknown[] => x[k] ?? [])];
+      if (all.length) hit![k] = all as CompiledCard[K];
+    };
+    more("costMods");
+    more("countMods");
+    more("othersEnterWithCounters");
+    more("entersWithAdditional");
     byKey.set(key, hit);
   }
   return hit;

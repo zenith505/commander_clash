@@ -1,6 +1,6 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
+import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -94,6 +94,8 @@ export interface Ctx {
 function thenSubject(first: string, next: string): string {
   const who = /^(Target player|Target opponent|That player|Each player|Each opponent) /.exec(first);
   if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : who[1]} ${next}`;
+  // Oblation: "The owner of target nonland permanent shuffles it into their library, then draws two cards": that owner.
+  if (/^The owner of target [^,]+ shuffles it into their library$/.test(first) && /^draws /.test(next)) return `Its owner ${next}`;
   return next.charAt(0).toUpperCase() + next.slice(1);
 }
 
@@ -681,6 +683,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!r) return null;
       effects.push({ type: "revealTop", look: true }, r.effect);
       si = r.next - 1;
+      continue;
+    }
+    // Kinship: "you may look at the top card of your library. If it shares a creature type with ~, you may reveal it. If
+    // you do, [effect]." Looking is only information, so it's always done; revealing is up to the controller even when
+    // the card shares a type (rulings on Mudbutton Clanger), and the card stays on top.
+    if (/^(?:[Yy]ou may )?look at the top card of your library$/.test(s) && /^If it shares a creature type with ~, you may reveal it$/.test(sentences[si + 1] ?? "")) {
+      const ifDo = /^If you do, (.+)$/.exec(sentences[si + 2] ?? "");
+      if (!ifDo || si + 3 !== sentences.length || /(?:it|that card)/.test(ifDo[1]!)) return null;
+      const before = ctx.targets.length;
+      const then = parseSentence(capital(ifDo[1]!), ctx);
+      if (!then || ctx.targets.length !== before) return null;
+      effects.push({ type: "revealTop", look: true }, { type: "if", cond: { kind: "revealedSharesCreatureType" }, effects: [{ type: "may", effects: [{ type: "revealRevealed" }, ...then], text: `reveal the revealed card (if you do, ${ifDo[1]!.replace(/\.$/, "")})` }] });
+      si += 2;
       continue;
     }
     if (lookTop && si === sentences.length - 1) {

@@ -2,7 +2,8 @@ import { allEffects, type Effect, type PayCost, type PunisherOption, type Target
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, obj, opponents, payableLife, player } from "../game";
+import { autoEvidence, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { CREATURE_TYPES } from "../keywords";
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
@@ -40,7 +41,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         } else {
           // About the card "reveal/look at the top card" found: it's named, and shown (the controller has seen it).
           const rv = s.resolving?.revealed;
-          const card = rv && allEffects(e.effects).some((x) => "what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed") ? s.objects[rv.id] : undefined;
+          const card = rv && allEffects(e.effects).some((x) => x.type === "revealRevealed" || ("what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed")) ? s.objects[rv.id] : undefined;
           const prompt = card ? e.text.replace("the revealed card", defOf(s, card).name) : e.text;
           s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(e.keep ? { keep: true } : {}) };
           return "paused";
@@ -220,6 +221,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
             : e.cond.kind === "revealedIs"
             ? revealedIs(s, bindChosen(e.cond.filter, ctx.chosen)) !== !!e.cond.not
+            : e.cond.kind === "revealedSharesCreatureType"
+            ? revealedSharesType(s, ctx)
             : e.cond.kind === "milledIs"
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
@@ -291,6 +294,21 @@ function revealedIs(s: GameState, filter: TargetSpec): boolean {
   const rv = s.resolving?.revealed;
   const o = rv && s.objects[rv.id];
   return !!o && (o.zoneChanges ?? 0) === rv.zc && printedMatches(filter, defOf(s, o));
+}
+
+/**
+ * Does the revealed card share a creature type with this ability's source (kinship)? The source as it is on the
+ * battlefield; once gone, its card (its creature types as it last existed aren't kept). Changeling counts in any zone
+ * (CR 702.73a).
+ */
+function revealedSharesType(s: GameState, ctx: ResolveCtx): boolean {
+  const rv = s.resolving?.revealed;
+  const o = rv && s.objects[rv.id];
+  if (!o || (o.zoneChanges ?? 0) !== rv.zc) return false;
+  const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  const here = src && src.zone === "battlefield" && (ctx.sourceZc === undefined || (src.zoneChanges ?? 0) === ctx.sourceZc);
+  const mine = here ? creatureTypesOf(s, src) : ctx.sourceDef.keywords.includes("Changeling") ? "all" : new Set(ctx.sourceDef.subtypes.filter((t) => CREATURE_TYPES.has(t)));
+  return shareCreatureType(mine, creatureTypesOf(s, o));
 }
 
 /** How many "if" instructions are running inside one another right now: each keeps its place in `scratch.ifs`. */

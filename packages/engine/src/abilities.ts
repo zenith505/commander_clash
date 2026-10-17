@@ -921,6 +921,10 @@ export type StaticCondition =
   | { kind: "cardsToGraveyard"; n: number; types: string[] }
   /** "Three or more sources you controlled dealt damage this turn": different sources, as the objects they were (CR 400.7), controlled by you as they dealt it. */
   | { kind: "sourcesDealtDamage"; n: number }
+  /** "If a creature card was put into your graveyard from anywhere this turn" (Cloakwood Hermit): one of these types. */
+  | { kind: "cardToYourGraveyard"; types: string[] }
+  /** "If a source you controlled dealt 5 or more damage this turn" (Dragon Cultist): all of it from one source (rulings). */
+  | { kind: "sourceDealtAtLeast"; n: number }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
   | { kind: "castCount"; n: number; filter: TargetSpec }
   /** "There are five colors among permanents you control" (CR 105.2). */
@@ -1383,6 +1387,8 @@ export type Effect =
       token: TokenSpec;
       tapped?: boolean;
       attacking?: boolean;
+      /** "For each opponent, create ... that's tapped and attacking that player": `n` for each opponent, attacking them. */
+      attackingEach?: boolean;
       /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */
       counters?: { counter: CounterKind; n: Amount };
       /**
@@ -1818,6 +1824,8 @@ export type SpellCondition =
   | { kind: "targetWasYours"; index: number }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
+  /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */
+  | { kind: "revealedSharesCreatureType" }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
   | { kind: "milledIs"; filter: TargetSpec }
   /**
@@ -2104,7 +2112,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[] };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /**
@@ -2515,7 +2523,7 @@ export interface CostMod {
  */
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up" }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up" }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }
@@ -2633,6 +2641,8 @@ export interface CompiledCard {
   othersEnterTapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
   othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; text: string }[];
+  /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
+  entersWithAdditional?: { counter: CounterKind; n: number }[];
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */

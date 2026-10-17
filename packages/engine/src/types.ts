@@ -934,6 +934,10 @@ export interface TurnLog {
   diedDamaged?: { id: ObjectId; zc: number; by: ObjectId[] }[];
   /** The sources that dealt damage, as `id@zoneChanges` (a card's name without one), by the player who controlled each as it did. */
   damageSources?: Record<number, string[]>;
+  /** The damage each source dealt in total, by the player who controlled it as it dealt it (Dragon Cultist). */
+  sourceDamage?: Record<number, Record<string, number>>;
+  /** The card types of the cards put into each player's graveyard from anywhere (Cloakwood Hermit). */
+  toOwnGraveyardTypes?: Record<number, string[]>;
 }
 
 /**

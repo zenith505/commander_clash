@@ -22,7 +22,7 @@ import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { bindChosenKeywords, subtypeSet } from "./keywords";
-import { compileCard } from "./oracle";
+import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
 export type Layer = "2" | "4" | "5" | "6" | "7a" | "7b" | "7c" | "7d" | "rules";
@@ -89,8 +89,10 @@ export interface Characteristics {
   hasPrintedAbilities: boolean;
   /** It lost all abilities, the mana abilities of its basic land types too (CR 305.6). */
   landAbilitiesLost?: true;
-  /** Triggered, activated and mana abilities effects gave it, as text ("~" is this object), in layer 6 order. */
+  /** Abilities effects gave it, as text ("~" is this object), in layer 6 order. */
   grantedAbilities: string[];
+  /** The timestamp of the effect that gave each of `grantedAbilities` (CR 613.7a). */
+  grantedAt?: number[];
   controller: PlayerId;
   power: number;
   toughness: number;
@@ -237,6 +239,7 @@ const copyChars = (c: Characteristics): Characteristics => ({
   keywords: [...c.keywords],
   ...(c.sparedBy ? { sparedBy: { ...c.sparedBy } } : {}),
   grantedAbilities: [...c.grantedAbilities],
+  ...(c.grantedAt ? { grantedAt: [...c.grantedAt] } : {}),
   pt: [...c.pt],
   cantBeBlockedBy: [...c.cantBeBlockedBy],
   ...(c.untargetable ? { untargetable: [...c.untargetable] } : {}),
@@ -274,6 +277,8 @@ interface Inst {
   condition?: StaticAbility["condition"];
   /** Set when it first applies (CR 613.6). */
   locked?: ObjectId[];
+  /** A static ability an effect gave its source, not one of its card's (grantedStatics). */
+  granted?: true;
 }
 
 function gather(s: GameState): Inst[] {
@@ -347,7 +352,7 @@ const sameCI = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 function exists(s: GameState, e: Inst, chars: CharMap): boolean {
   if (!e.affects) return true;
   const src = chars.get(e.sourceId!);
-  if (!src || !src.hasPrintedAbilities) return false;
+  if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
   if (e.condition && !conditionMet(s, e.condition, e.sourceId!, src.controller, chars)) return false;
   if (e.affects.kind === "attached") {
     const host = s.objects[e.sourceId!]!.attachedTo;
@@ -604,6 +609,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return src.chosen?.anchor === cond.word; // CR 614.12b
     case "cardsToGraveyard":
       return Math.min(...cond.types.map((t) => s.turnLog?.toGraveyardTypes?.[t] ?? 0)) >= cond.n;
+    case "cardToYourGraveyard":
+      return cond.types.some((t) => !!s.turnLog?.toOwnGraveyardTypes?.[you]?.includes(t));
+    case "sourceDealtAtLeast":
+      return Object.values(s.turnLog?.sourceDamage?.[you] ?? {}).some((n) => n >= cond.n);
     case "sourcesDealtDamage":
       return (s.turnLog?.damageSources?.[you]?.length ?? 0) >= cond.n;
     case "castCount":
@@ -783,6 +792,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.sparedBy = undefined;
       c.hasPrintedAbilities = false;
       c.grantedAbilities = [];
+      c.grantedAt = undefined;
       c.unblockedDamage = false;
       c.cantBlock = false; // only abilities' "can't block" is set before the rules layer
       return;
@@ -791,6 +801,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addAbility":
       c.grantedAbilities.push(m.text);
+      (c.grantedAt ??= []).push(e.timestamp);
       return;
     case "definePT":
       if (m.power !== undefined) c.power = num(m.power);
@@ -946,11 +957,47 @@ function dependsOn(s: GameState, a: Inst, b: Inst, layer: Layer, chars: CharMap)
   return signature(s, a, chars) !== signature(s, a, trial);
 }
 
-function computeAll(s: GameState): CharMap {
+/**
+ * Static abilities effects gave permanents (Criminal Past's 'Commander creatures you own have "This creature gets +X/+0,
+ * where X is ..."', Inspiring Leader's '"Creature tokens you control get +2/+2"'), once layer 6 has settled which
+ * permanents have them. Only those whose effects all come in later layers can be granted (grants.ts grantedStaticOk).
+ * Each has the later of its permanent's timestamp and the granting effect's (CR 613.7a). Whether one counts something
+ * goes in `counted`, for the cache.
+ */
+function grantedStatics(s: GameState, chars: CharMap, order: number, counted: { yes: boolean }): Inst[] {
+  const out: Inst[] = [];
+  for (const [id, c] of chars)
+    c.grantedAbilities.forEach((text, i) =>
+      compileGranted(text).statics.forEach((st, j) => {
+        if (countsSomething(st)) counted.yes = true;
+        out.push({
+          key: `${id}^${i}#${j}`,
+          timestamp: Math.max(s.objects[id]!.timestamp, c.grantedAt?.[i] ?? 0),
+          order: order++,
+          sourceId: id,
+          sourceName: c.name,
+          untilEndOfTurn: false,
+          // A granted "This creature's power and toughness are each equal to ..." isn't a characteristic-defining ability
+          // (CR 604.3a): it sets them in layer 7b (613.4b), so a later one overrides it (rulings on Chimeric Mass).
+          mods: st.mods.map((m) => (m.kind === "definePT" ? { kind: "setPT", power: m.power!, toughness: m.toughness! } : m)),
+          affects: st.affects,
+          condition: st.condition,
+          granted: true,
+        });
+      }),
+    );
+  return out;
+}
+
+function computeAll(s: GameState, counted = { yes: false }): CharMap {
   const chars: CharMap = new Map();
   for (const id of s.battlefield) chars.set(id, printed(s, s.objects[id]!));
-  const insts = gather(s).sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
+  let insts = gather(s).sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
   for (const layer of LAYERS) {
+    if (layer === "7a") {
+      const more = grantedStatics(s, chars, insts.length, counted);
+      if (more.length) insts = [...insts, ...more].sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
+    }
     // Suspend's "it gains haste until you lose control of the spell or the permanent it becomes" (CR 702.62a): from
     // when it was cast, so before the other layer 6 effects; only while its caster controls it (layer 2 is done).
     if (layer === "6")
@@ -1014,19 +1061,20 @@ function countSignature(s: GameState): string {
 }
 
 const isCounted = (a: Amount) => typeof a !== "number";
-/** Does any static ability on the battlefield count something? */
-function usesCounts(s: GameState): boolean {
-  for (const id of s.battlefield) {
-    for (const st of compileCard(defOf(s, s.objects[id]!)).statics) {
-      if (st.condition) return true; // "as long as": attacking, tapped lands, the graveyard, whose turn it is
-      if (st.affects.kind === "filter" && (st.affects.spec?.combat || st.affects.spec?.tapped !== undefined || st.affects.spec?.status)) return true; // "attacking/untapped/modified creatures you control"
-      for (const m of st.mods) {
-        if (m.kind === "definePT") return true;
-        if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
-      }
-    }
+/** Does a static ability count something, or look at something that changes without invalidating the cache? */
+function countsSomething(st: StaticAbility): boolean {
+  if (st.condition) return true; // "as long as": attacking, tapped lands, the graveyard, whose turn it is
+  if (st.affects.kind === "filter" && (st.affects.spec?.combat || st.affects.spec?.tapped !== undefined || st.affects.spec?.status)) return true; // "attacking/untapped/modified creatures you control"
+  for (const m of st.mods) {
+    if (m.kind === "definePT") return true;
+    if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
   }
   return false;
+}
+
+/** Does any static ability on the battlefield count something? */
+function usesCounts(s: GameState): boolean {
+  return s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some(countsSomething));
 }
 
 /** Turn the cache off to check that invalidation is complete (tests compare both ways). */
@@ -1044,7 +1092,8 @@ export function characteristics(s: GameState, o: GameObject): Characteristics {
   let hit = cacheEnabled ? cache.get(s) : undefined;
   if (hit?.sig !== undefined && hit.sig !== countSignature(s)) hit = undefined;
   if (!hit || !hit.map.has(o.id)) {
-    hit = { map: computeAll(s), ...(usesCounts(s) ? { sig: countSignature(s) } : {}) };
+    const counted = { yes: false };
+    hit = { map: computeAll(s, counted), ...(counted.yes || usesCounts(s) ? { sig: countSignature(s) } : {}) };
     if (cacheEnabled) cache.set(s, hit);
   }
   return hit.map.get(o.id) ?? printed(s, o);

@@ -246,8 +246,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
  * "Whenever you cast a noncreature spell", "Whenever an opponent casts a creature spell",
  * "Whenever a player casts a spell", magecraft's "whenever you cast or copy an instant or sorcery spell".
  */
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|a player|enchanted player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
-const CAST_BY = { you: "you", "an opponent": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
+// "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
+const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
 
 /**
  * "When ~ becomes the target of a spell, sacrifice it", "Whenever ~ becomes the target of a spell or ability for the first
@@ -284,6 +285,19 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
   let what = m[3]!.replace(/^an? /, "");
+  // "Whenever you cast a spell from exile", "... from anywhere other than your hand", "... from your graveyard": the zone
+  // it was cast from (CR 601.2a); "your graveyard" and "your library" are its caster's own.
+  const fromM = / from (anywhere other than (?:your|their) hand|(?:your|their) hand|exile|your graveyard|a graveyard|your library)$/.exec(what);
+  let from: NonNullable<TriggeredAbility["cast"]>["from"];
+  if (fromM) {
+    what = what.slice(0, fromM.index);
+    const z = fromM[1]!;
+    from = /^anywhere/.test(z) ? "notHand" : /hand$/.test(z) ? "hand" : z === "exile" ? "exile" : z === "a graveyard" ? "graveyard" : z === "your graveyard" ? "ownGraveyard" : "ownLibrary";
+  }
+  // Folk Hero's "Whenever you cast a spell that shares a creature type with this creature": one creature type in common,
+  // a changeling having every one (CR 702.73a).
+  const shares = / that shares a creature type with ~$/.exec(what);
+  if (shares) what = what.slice(0, shares.index);
   // "Whenever you cast a spell that targets a creature you control" (Season of Growth), "an instant or sorcery spell that
   // targets a creature" (repartee), "... that targets an opponent or a creature an opponent controls" (Danitha): what
   // one of its targets is as it's cast. "That targets only ..." isn't modeled.
@@ -328,7 +342,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}) }, body };
 }
 
 /**

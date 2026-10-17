@@ -377,6 +377,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // "Whenever ~ attacks, if it's not suspected" (Rubblebelt Braggart), "if ~ is suspected" (CR 701.60).
   if ((m = /^(?:~|it)(?:'s| is) (not )?suspected$/.exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "suspected", ...(m[1] ? { not: true as const } : {}) };
+  // "~ can't be blocked as long as it's attacking alone" (Dream Prowler): attacking with no other creature attacking (CR 506.5).
+  if (/^(?:~|it)(?:'s| is) attacking alone$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "attackingAlone" };
   // "It" is the source only when the ability is about the source itself.
   const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };

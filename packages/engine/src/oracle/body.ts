@@ -334,6 +334,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   }
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
+  // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
+  text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.

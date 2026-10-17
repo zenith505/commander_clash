@@ -58,6 +58,8 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "When ~ dies, shuffle it into its owner's library", "When ~ is put into a graveyard from anywhere, ...": the card where
   // it went. "At the beginning of the end step, ~'s owner shuffles it into their library": the permanent.
   if (ctx.selfCard && /^[Ss]huffle (?:it|~) into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
+  // "When ~ dies, put it on top of its owner's library" (Dark Revenant): the card in the graveyard, if it's still there.
+  if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
   // "The owner of target nonland permanent shuffles it into their library."
   if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {

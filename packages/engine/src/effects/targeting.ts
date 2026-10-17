@@ -617,13 +617,14 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" | "manaValue" }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
   const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false));
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
-  // player chooses among those tied (rulings on Crackling Doom).
-  if (e.greatest === "power") {
-    const max = Math.max(...ids.map((id) => power(s, obj(s, id))));
-    return ids.filter((id) => power(s, obj(s, id)) === max);
+  // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
+  if (e.greatest) {
+    const of = (id: ObjectId) => (e.greatest === "power" ? power(s, obj(s, id)) : manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)));
+    const max = Math.max(...ids.map(of));
+    return ids.filter((id) => of(id) === max);
   }
   if (e.least !== "toughness") return ids;
   // Bolster: the least toughness, or tied for it (CR 701.39a).

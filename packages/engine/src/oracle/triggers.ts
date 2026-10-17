@@ -1,4 +1,4 @@
-import type { BatchTrigger, Effect, TriggeredAbility, SpellCondition, SpentReq, StaticCondition, TargetSpec, TriggerEvent } from "../abilities";
+import { allEffects, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
 import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
@@ -644,6 +644,30 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
   return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : "any", ...(of ? { of } : {}) }, body };
 }
 
+/**
+ * "Whenever you tap ~ for mana, target opponent creates a 1/1 colorless Spirit creature token" (Forbidden Orchard),
+ * "whenever a player taps a land for mana, ~ deals 1 damage to that player" (Manabarbs), "whenever an opponent taps a
+ * Mountain for mana": tapped for mana (CR 106.12). A body that adds mana is a triggered mana ability instead (CR 605.1b,
+ * mana-abilities.ts); one that doesn't uses the stack like any other trigger.
+ */
+function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
+  const self = /^Whenever you tap ~ for mana, (.+)$/.exec(line);
+  const other = !self ? /^Whenever (you|a player|an opponent) taps? an? (.+?) for mana, (.+)$/.exec(line) : null;
+  if (!self && !other) return null;
+  let filter: TargetSpec | undefined;
+  if (other) {
+    const f = parseTargetPhrase(other[2]!);
+    if (f?.kind !== "object" || f.controller || f.chosen) return "fail";
+    filter = { ...f, text: other[2]! };
+  }
+  // Zhur-Taa Druid: "it deals 1 damage to each opponent", "it" being ~.
+  const text = self ? self[1]!.replace(/^it deals /, "~ deals ") : other![3]!;
+  const body = parseBody(theyAreThatPlayer(text), self ? { eventPlayer: true, selfIt: true } : { eventPlayer: true, subjectIt: true });
+  if (!body || allEffects(body.effects).some((e) => e.type === "addMana")) return "fail";
+  const by = self || other![1] === "you" ? "you" : other![1] === "an opponent" ? "opponent" : "any";
+  return { event: "tappedForMana", manaTap: { by, ...(filter ? { filter } : {}) }, body };
+}
+
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
   if (!m) return null;
@@ -974,6 +998,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (draws) return draws;
   const activates = parseActivatesTrigger(line);
   if (activates) return activates;
+  const manaTap = parseManaTapTrigger(line);
+  if (manaTap) return manaTap;
   const dies = parseDiesTrigger(line);
   if (dies) return dies;
   const dealer = parseDealerTrigger(line);

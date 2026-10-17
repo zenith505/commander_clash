@@ -1,7 +1,7 @@
-import type { AmountExpr, Modification, Effect } from "../abilities";
+import type { Amount, AmountExpr, Modification, Effect } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind } from "./words";
+import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X } from "./words";
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseKeywordList, parseObject } from "./targets";
@@ -73,11 +73,27 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
+  const controlled = /^(.+?) for as long as you control ~$/.exec(s);
+  if (controlled) return parseWhileTapped(controlled[1]!, "controlled", ctx);
+  // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
+  // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.
+  const both = /^[Yy]ou and (target opponent|target player|that player|that opponent) each (draw|create|gain|lose|mill) (.+)$/.exec(s);
+  if (both) {
+    const mine = parseSentence(`You ${both[2]} ${both[3]}`, ctx);
+    const theirs = mine && parseSentence(`${both[1]!.replace(/^./, (c) => c.toUpperCase())} ${both[2]}s ${both[3]}`, ctx);
+    return mine && theirs ? [...mine, ...theirs] : null;
+  }
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;
   }
   return null;
+}
+
+/** "3/3", or "X/X" with the X of the spell or ability (or its "where X is ..."), worked out as it resolves (CR 608.2h). */
+function basePT(p: string, t: string): [Amount, Amount] | null {
+  if ((p === "X") !== (t === "X")) return null;
+  return p === "X" ? [X, X] : [Number(p), Number(t)];
 }
 
 /**
@@ -100,7 +116,11 @@ export function parseChanges(text: string): Modification[] | null {
       const k = parseKeywordList(m[1]!);
       if (!k) return null;
       out.push({ kind: "removeKeywords", keywords: k });
-    } else if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)$/i.exec(p))) out.push({ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) });
+    } else if ((m = /^(?:has|have) base power and toughness (\d+|X)\/(\d+|X)$/i.exec(p))) {
+      const base = basePT(m[1]!, m[2]!);
+      if (!base) return null;
+      out.push({ kind: "setPT", power: base[0], toughness: base[1] });
+    }
     // Doran (CR 510.1a as modified) and defender (CR 702.3b), for a while.
     else if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/i.test(p)) out.push({ kind: "assignsToughness" });
     else if (/^can attack (?:this turn )?as though (?:it|they) didn't have defender$/i.test(p)) out.push({ kind: "attackDespiteDefender" });
@@ -172,14 +192,16 @@ export function parseBecomes(text: string): Modification[] | null {
     grants.push(...g);
     rest = m[1]!;
   }
-  let pt: [number, number] | null = null;
-  if ((m = /^(\d+)\/(\d+) (.+)$/.exec(rest))) {
-    pt = [Number(m[1]), Number(m[2])];
+  let pt: [Amount, Amount] | null = null;
+  if ((m = /^(\d+|X)\/(\d+|X) (.+)$/.exec(rest))) {
+    pt = basePT(m[1]!, m[2]!);
+    if (!pt) return null;
     rest = m[3]!;
   }
   // "... with base power and toughness 8/8, flying, and first strike" (Figure of Destiny): it gains those too.
-  if ((m = /^(.+?) with base power and toughness (\d+)\/(\d+)(?:(?:,? and |, )(.+))?$/i.exec(rest))) {
-    pt = [Number(m[2]), Number(m[3])];
+  if ((m = /^(.+?) with base power and toughness (\d+|X)\/(\d+|X)(?:(?:,? and |, )(.+))?$/i.exec(rest))) {
+    pt = basePT(m[2]!, m[3]!);
+    if (!pt) return null;
     rest = m[1]!;
     if (m[4]) {
       const g = parseGrants(m[4]);
@@ -226,13 +248,16 @@ export function parseBecomes(text: string): Modification[] | null {
  * "Target creature gets +1/+1 for as long as ~ remains tapped", "gain control of target creature for as long as you
  * control ~ and ~ remains tapped", "it doesn't untap during its controller's untap step for as long as ~ remains
  * tapped" (CR 611.2b): one continuous effect lasting while its source stays tapped. Only a permanent's ability.
+ * `controlled` "only": "gain control of target artifact for as long as you control ~" (Master Thief), "another target
+ * permanent gains indestructible for as long as you control ~" (Aegis Angel): lasting while you control the source.
  */
-function parseWhileTapped(inner: string, controlled: boolean, ctx: Ctx): Effect[] | null {
+function parseWhileTapped(inner: string, controlled: boolean | "controlled", ctx: Ctx): Effect[] | null {
   if (ctx.spell) return null;
   inner = inner.charAt(0).toUpperCase() + inner.slice(1);
   const lasting = (fx: Effect[] | null): Effect[] | null => {
     const e = fx?.length === 1 ? fx[0]! : undefined;
-    return e?.type === "continuous" ? [{ ...e, duration: "whileTapped", ...(controlled ? { whileControlled: true as const } : {}) }] : null;
+    if (e?.type !== "continuous") return null;
+    return [controlled === "controlled" ? { ...e, duration: "whileControlled" } : { ...e, duration: "whileTapped", ...(controlled ? { whileControlled: true as const } : {}) }];
   };
   const m = /^(.+?) (?:doesn't|don't) untap during (?:its|their) controllers?'s? untap steps?$/i.exec(inner);
   if (m) {
@@ -243,7 +268,12 @@ function parseWhileTapped(inner: string, controlled: boolean, ctx: Ctx): Effect[
     const fx = parseSentence(inner, ctx);
     return fx?.[0]?.type === "continuous" && fx[0].duration === "game" ? lasting(fx) : null;
   }
-  if (!/ (?:gets?|has|have|loses?) /.test(inner)) return null;
+  // "That creature can't attack or block for as long as ..." (Extraction Specialist): as "this turn", for longer.
+  if (/^[^,]+ can't (?:attack|block|attack or block)$/.test(inner)) {
+    const fx = parseSentence(`${inner} this turn`, ctx);
+    return fx?.[0]?.type === "continuous" && fx[0].duration === "endOfTurn" ? lasting(fx) : null;
+  }
+  if (!/ (?:gets?|has|have|loses?|gains?) /.test(inner)) return null;
   // "Gets +2/+2 and has trample" for as long as it lasts is "gains trample" from when it starts.
   const fx = parseSentence(`${inner.replace(/ (has|have) /, (_, w: string) => (w === "has" ? " gains " : " gain "))} until end of turn`, ctx);
   return fx?.[0]?.type === "continuous" && fx[0].duration === "endOfTurn" ? lasting(fx) : null;

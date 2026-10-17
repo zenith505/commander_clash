@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { cardIdOf, defOf, isType, objIsType, power, toughness } from "../cards";
-import { clearCombat, draw, enterTogether, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent, whileTappedHolds } from "../game";
+import { clearCombat, draw, enterTogether, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
@@ -535,6 +535,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           return;
         }
       }
+      // "For as long as you control ~": over already if it left or changed control since (CR 611.2b, Master Thief).
+      let whileControlled: ContinuousEffect["whileControlled"];
+      if (e.duration === "whileControlled") {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        whileControlled = me && { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0, controller: ctx.controller };
+        if (!whileControlled || !whileControlledHolds(s, whileControlled)) {
+          log(s, `${src}'s effect does nothing: its controller no longer controls it.`);
+          return;
+        }
+      }
       s.effects.push({
         id: `e${s.nextId++}`,
         timestamp: s.nextTimestamp++, // CR 613.7b
@@ -544,11 +554,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         duration: e.duration,
         ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}),
         ...(whileTapped ? { whileTapped } : {}),
+        ...(whileControlled ? { whileControlled } : {}),
         affected,
         mods,
       });
       const names = affected.map((id) => defOf(s, obj(s, id)).name);
-      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : ""}.`);
+      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
       return;
     }
     case "playerGains": {

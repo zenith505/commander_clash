@@ -119,8 +119,11 @@ export type Count =
   | { kind: "basicLandTypes" }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
   | { kind: "graveyardCardTypes"; who: PlayerRef }
-  /** "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). */
-  | { kind: "greatestPower"; filter: TargetSpec; other?: boolean }
+  /**
+   * "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). `toughness`: "the greatest
+   * toughness among". `whose`: "among creatures they control" (Inscription of Abundance), that player's creatures only.
+   */
+  | { kind: "greatestPower"; filter: TargetSpec; other?: boolean; toughness?: true; whose?: PlayerRef }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   | { kind: "greatestManaValue"; filter: TargetSpec }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
@@ -1030,7 +1033,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control": only those, or tied for it. */ greatest?: "power"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -1301,9 +1304,10 @@ export type Effect =
   | { type: "evolve" }
   /**
    * `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). "whileTapped": "for as long as ~
-   * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped".
+   * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped". Duration
+   * "whileControlled": "for as long as you control ~" alone (CR 611.2b).
    */
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped"; notSource?: boolean; whileControlled?: true }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -1334,6 +1338,11 @@ export type Effect =
       attacking?: boolean;
       /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */
       counters?: { counter: CounterKind; n: Amount };
+      /**
+       * "An X/X ... token": its power and toughness, worked out once as the token is created and fixed after that (rulings
+       * on Inscription of Insight); `token.power` and `token.toughness` are placeholders then.
+       */
+      pt?: Amount;
       /**
        * An Aura token "attached to" this object (a Role, CR 303.7): one for each object it means. It isn't created if it
        * couldn't legally enchant that object (rulings on Roles).
@@ -1797,6 +1806,11 @@ export type TriggerEvent =
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   /**
+   * "Whenever you tap ~ for mana", "whenever a player taps a land for mana" (CR 106.12: activating a mana ability with {T}
+   * in its cost), with a body that adds no mana, so it isn't a mana ability and uses the stack (CR 605.1b). See manaTap.
+   */
+  | "tappedForMana"
+  /**
    * "Whenever one or more +1/+1 counters are put on ~" (once for each time counters are put on it, also as it enters
    * with them, CR 122.6); "on a creature you control" with TriggeredAbility.tappedFilter as the filter. See countersKind.
    */
@@ -1975,6 +1989,11 @@ export interface TriggeredAbility {
    * you control / an opponent controls"; `first`, "for the first time each turn" (counting only those `by` names, as valiant does).
    */
   targeted?: { spell?: true; by?: "you" | "opponent"; first?: true; /** "Another permanent you control". */ other?: boolean };
+  /**
+   * For "tappedForMana": who taps it (`by`, relative to this ability's controller; "that player") and which permanent
+   * (`filter`, the subject: "that land"); without a filter, ~ itself.
+   */
+  manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec };
   /** For "permanentBecomesTapped": which permanent ("a Dwarf you control"); it's the subject ("put a wind counter on it"). */
   tappedFilter?: TargetSpec;
   /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */

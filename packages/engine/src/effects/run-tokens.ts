@@ -114,7 +114,10 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
 }
 
 /** "Create N ... tokens" for each player it names. */
-function createTokensFor(s: GameState, e: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string) {
+function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string) {
+  // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
+  const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
+  const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: xx } } : e0;
   for (const pid of players(s, e.who, ctx)) {
     const k = tokensToCreate(s, pid, e.token, n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.

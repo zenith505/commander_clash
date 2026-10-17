@@ -750,7 +750,7 @@ export function moveObject(
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
     for (const e of s.effects) e.affected = e.affected.filter((x) => x !== id);
     // "For as long as ~ remains tapped": it isn't tapped anymore (rulings on Vedalken Shackles).
-    s.effects = s.effects.filter((e) => e.affected.length && e.whileTapped?.id !== id);
+    s.effects = s.effects.filter((e) => e.affected.length && e.whileTapped?.id !== id && e.whileControlled?.id !== id);
     for (const other of s.battlefield)
       if (s.objects[other]!.attachedTo === id) {
         s.objects[other]!.attachedTo = undefined;
@@ -1279,14 +1279,20 @@ export function untapPermanent(s: GameState, o: GameObject) {
 
 /**
  * End "for as long as ~ remains tapped" effects (CR 611.2b) whose permanent untapped, left the battlefield (it's no
- * longer tapped, rulings), phased out (CR 702.26f), or, with "for as long as you control ~", changed control.
+ * longer tapped, rulings), phased out (CR 702.26f), or, with "for as long as you control ~", changed control; and "for
+ * as long as you control ~" effects whose permanent left, phased out or changed control.
  */
 export function endWhileTapped(s: GameState): boolean {
-  const ended = s.effects.filter((e) => e.whileTapped && !whileTappedHolds(s, e.whileTapped));
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)));
   if (!ended.length) return false;
   s.effects = s.effects.filter((e) => !ended.includes(e));
   invalidateCharacteristics(s);
   return true;
+}
+
+export function whileControlledHolds(s: GameState, w: NonNullable<ContinuousEffect["whileControlled"]>): boolean {
+  const o = s.objects[w.id];
+  return !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === w.zc && controllerOf(s, o) === w.controller;
 }
 
 export function whileTappedHolds(s: GameState, w: NonNullable<ContinuousEffect["whileTapped"]>): boolean {
@@ -2323,6 +2329,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   const manaPaid = ab.manaCost ? spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o }) : null;
   if (ab.tap) tapPermanent(s, o);
+  // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3).
+  if (ab.tap) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
@@ -2867,6 +2875,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const specs = withSplices({ targets: spellTargets(s, id, modes, undefined, castHow(choices)), effects: [], text: "" }, splicedBodies(s, choices.splice)).targets;
   const problem = castProblem(s, p.id, id, specs.length ? (targets ?? []) : undefined, spell?.modal ? modes : undefined, convoke, improvise, x, choices);
   if (problem) throw new RulesError(problem);
+  // What pays a cost beyond mana (which creatures are sacrificed, which cards discarded) is chosen as it's cast (CR
+  // 601.2h): a cast that doesn't say can't skip the cost. As for abilities (activateAbility).
+  const unpicked = castExtraCosts(d, { ...choices, ...(spell?.modal && modes ? { modes } : {}) }, x ?? 0, s, p.id).find((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !choices[costPickKey(c)]?.length);
+  if (unpicked) throw new RulesError(`choose what to pay ${d.name}'s additional cost with`);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
   let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHow(choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   if (body && manySlot(body.targets) >= 0) {
@@ -3313,6 +3325,12 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
 }
 
 const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
+
+/** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
+const costNeedsPick = (c: AdditionalCost) =>
+  c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top);
+const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" =>
+  c.kind === "exileFromGraveyard" ? "exileCards" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand");
 
 /** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
 export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {

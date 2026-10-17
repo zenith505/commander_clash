@@ -173,6 +173,8 @@ export type TriggerSourceEvent =
   | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
   | { type: "draw"; player: PlayerId; nth: number }
+  /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
+  | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
   | { type: "activated"; player: PlayerId; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number }
   /**
@@ -625,6 +627,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    }
+  } else if (ev.type === "tappedForMana") {
+    // "Whenever you tap ~ for mana", "whenever an opponent taps a Mountain for mana" (the land is the subject, "that
+    // land"; "that player" is who tapped it).
+    const o = obj(s, ev.id);
+    const info = { player: ev.player };
+    const byOk = (t: TriggeredAbility, you: PlayerId) => !!t.manaTap && (t.manaTap.by === "any" || (t.manaTap.by === "you") === (ev.player === you));
+    add(o, controllerOf(s, o), (e, t) => e === "tappedForMana" && !t.manaTap?.filter && byOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "tappedForMana" && !!t.manaTap?.filter && byOk(t, ctrl) && objectMatches(s, t.manaTap.filter, o, ctrl, false), undefined, undefined, o, undefined, undefined, undefined, info);
     }
   } else if (ev.type === "countersPut") {
     // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control": "that many" is how many.

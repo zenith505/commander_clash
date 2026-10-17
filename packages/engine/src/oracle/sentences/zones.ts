@@ -221,7 +221,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return what ? [{ type: "bounce", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?(?: with (?:an additional|a) (${COUNTER}) counter on it)?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?(?: with (?:an additional|an?) (${COUNTER}) counter on it)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control.
     const underYou = !!m[4];
@@ -434,10 +434,15 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return [{ type: "keepRest", who, keep, among }];
   }
   // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
-  // control with the greatest power" (Szat's Will).
+  // control with the greatest power" (Szat's Will), "a creature or planeswalker with the greatest mana value among
+  // creatures and planeswalkers they control" (Soul Shatter).
   if ((m = /^(.+?) sacrifices? a creature (?:with the greatest power among creatures (?:they control|that player controls)|they control with the greatest power)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
+  }
+  if ((m = /^(.+?) sacrifices? a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: "sacrifice", greatest: "manaValue" }] : null;
   }
   // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
   // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before

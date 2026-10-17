@@ -710,13 +710,19 @@ export interface ContinuousEffect {
    * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
    * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m).
    */
-  duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped";
+  duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
   /**
    * "For as long as ~ remains tapped" (CR 611.2b): it ends when that object (`zc` as it was) untaps, leaves the
    * battlefield or phases out (CR 702.26f); `controller`: "for as long as you control ~" too.
    */
   whileTapped?: { id: ObjectId; zc: number; untaps: number; controller?: PlayerId };
+  /**
+   * "For as long as you control ~" (CR 611.2b): it ends when that object (`zc` as it was) leaves the battlefield, phases
+   * out (CR 702.26f) or comes under another player's control, and doesn't start again if `controller` regains it (rulings
+   * on Dragonlord Silumgar, Aegis Angel).
+   */
+  whileControlled?: { id: ObjectId; zc: number; controller: PlayerId };
   affected: ObjectId[];
   mods: Modification[];
 }

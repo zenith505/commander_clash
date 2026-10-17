@@ -37,11 +37,18 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const c = m[1] === "X" ? { count: { kind: "x" } as Count } : parseCount(m[1]!, ctx);
     return round && c && !c.half && !c.negate ? { ...c, half: round } : null;
   }
-  // "The greatest power among creatures you control" (0 with none), "among other creatures you control".
-  if (!each && (m = /^the greatest power among (other )?(creatures you control|creatures on the battlefield)$/i.exec(p))) {
-    const spec = parseTargetPhrase(/you control/i.test(m[2]!) ? "creature you control" : "creature", { chosen: true });
+  // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
+  // toughness among Wurms you control", "among creatures they control" (that player's).
+  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the")))) {
+    const words = m[3]!.split(/\s+/).map(singularWord).join(" ");
+    const who = m[4]!;
+    const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : ""}`, { chosen: true });
     if (spec?.kind !== "object") return null;
-    return { count: { kind: "greatestPower", filter: { ...spec, text: m[2]! }, ...(m[1] ? { other: true as const } : {}) } };
+    const theirs = /^(?:they|that player|target player|target opponent) control/.test(who);
+    const whose = theirs ? whosePlayer(who === "they control" ? "their" : who.replace(/ controls$/, "'s"), ctx) : undefined;
+    if (whose === null) return null;
+    const text = `${m[3]!} ${who}`;
+    return { count: { kind: "greatestPower", filter: { ...spec, text }, ...(m[2] ? { other: true as const } : {}), ...(m[1] === "toughness" ? { toughness: true as const } : {}), ...(whose ? { whose } : {}) } };
   }
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };

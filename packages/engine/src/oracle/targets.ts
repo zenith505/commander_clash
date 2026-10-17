@@ -255,9 +255,10 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "cardsInGraveyard":
     case "life":
       return mine(c.who);
+    case "greatestPower":
+      return mine(c.whose);
     case "devotion":
     case "party":
-    case "greatestPower":
     case "greatestManaValue":
     case "lifeGainedThisTurn":
       return true;

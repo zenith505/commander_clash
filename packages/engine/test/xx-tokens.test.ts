@@ -1,11 +1,12 @@
 // "An X/X token" (Inscription of Insight, Miming Slime, Devastating Summons and others): X is worked out once, as the token
 // is created, and is its printed power and toughness from then on (rulings on Inscription of Insight). "The greatest power
 // among creatures they control" counts the target player's creatures (Inscription of Abundance); "the greatest toughness
-// among creatures you control" (Kin-Tree Invocation, Ghalta the Immovable, Last March of the Ents).
+// among creatures you control" (Kin-Tree Invocation, Ghalta the Immovable, Last March of the Ents). "Has base power and
+// toughness X/X" and "becomes an X/X ... creature" from a resolving spell or ability: X fixed as it resolves (CR 608.2h).
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, putOnBattlefield, setup, target } from "./helpers";
-import { isFullySupported, planActivate, planCast, power, spellCost, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
+import { characteristics, isFullySupported, planActivate, planCast, power, spellCost, toughness, waitingOn, type Action, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 import { defOf } from "../src/cards";
 
@@ -24,6 +25,11 @@ const factory = card("Vulshok Factory", "Artifact", "{2}{R}", { oracleText: "{T}
 const broodmaster = card("Hydra Broodmaster", "Creature \u2014 Hydra", "{4}{G}{G}", { power: "7", toughness: "7", keywords: ["Monstrosity"], oracleText: "{X}{X}{G}: Monstrosity X. (If this creature isn't monstrous, put X +1/+1 counters on it and it becomes monstrous.)\nWhen this creature becomes monstrous, create X X/X green Hydra creature tokens." });
 const ghalta = card("Ghalta the Immovable", "Legendary Creature \u2014 Elder Dinosaur", "{8}{W}", { power: "0", toughness: "7", oracleText: "This spell costs {X} less to cast, where X is the greatest toughness among creatures you control.\nCreatures you control can attack as though they didn't have defender.\nEach creature you control with toughness greater than its power assigns combat damage equal to its toughness rather than its power." });
 const lastMarch = card("Last March of the Ents", "Sorcery", "{6}{G}{G}", { oracleText: "This spell can't be countered.\nDraw cards equal to the greatest toughness among creatures you control, then put any number of creature cards from your hand onto the battlefield." });
+const biomass = card("Biomass Mutation", "Instant", "{X}{G/U}{G/U}", { oracleText: "Creatures you control have base power and toughness X/X until end of turn." });
+const staff = card("Chimeric Staff", "Artifact", "{4}", { oracleText: "{X}: This artifact becomes an X/X Construct artifact creature until end of turn." });
+const branchbender = card("Elvish Branchbender", "Creature \u2014 Elf Druid", "{2}{G}", { power: "2", toughness: "2", oracleText: "{T}: Until end of turn, target Forest becomes an X/X Treefolk creature in addition to its other types, where X is the number of Elves you control." });
+const minsc = card("Minsc, Beloved Ranger", "Legendary Creature \u2014 Human Ranger", "{R}{G}{W}", { power: "3", toughness: "3", oracleText: "When Minsc enters, create Boo, a legendary 1/1 red Hamster creature token with trample and haste.\n{X}: Until end of turn, target creature you control has base power and toughness X/X and becomes a Giant in addition to its other types. Activate only as a sorcery." });
+const testament = card("Testament of Faith", "Enchantment", "{W}", { oracleText: "{X}: This enchantment becomes an X/X Wall creature with defender in addition to its other types until end of turn." });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState) => {
@@ -196,6 +202,46 @@ describe("X/X tokens from the spell's X, a count or a stat", () => {
     expect(generic()).toBe(3);
   });
 });
+
+describe("base power and toughness X/X, becomes an X/X", () => {
+  it("parse", () => supported(biomass, staff, branchbender, minsc, testament));
+
+  it("Biomass Mutation: X/X base, counters still on top (CR 613.4b-c), until end of turn", () => {
+    const { s: s0, ap, ids, opp } = setup([biomass]);
+    const a = putOnBattlefield(s0, ap, bear());
+    const b = putOnBattlefield(s0, ap, big(1, 6));
+    s0.objects[b]!.counters["+1/+1"] = 1;
+    const theirs = putOnBattlefield(s0, opp, bear());
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 4)));
+    expect([pt(s, a), pt(s, b), pt(s, theirs)]).toEqual(["4/4", "5/5", "2/2"]);
+    // A creature that comes later isn't affected (CR 611.2c).
+    const late = putOnBattlefield(s, ap, bear());
+    expect(pt(s, late)).toBe("2/2");
+  });
+
+  it("Chimeric Staff: an X/X Construct artifact creature until end of turn", () => {
+    const { s: s0, ap } = setup([]);
+    const st = putOnBattlefield(s0, ap, staff);
+    const s = settle(run(s0, planActivate(s0, ap, st, 0, undefined, undefined, undefined, 3)));
+    expect(pt(s, st)).toBe("3/3");
+    expect(defOfTypes(s, st)).toEqual(expect.arrayContaining(["Artifact", "Creature"]));
+  });
+
+  it("Elvish Branchbender: X is the Elves as it resolves, and stays (rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    const bb = putOnBattlefield(s0, ap, branchbender);
+    putOnBattlefield(s0, ap, card("Elf Two", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    const f = s0.battlefield.find((id) => s0.objects[id]!.controller === ap && defOf(s0, s0.objects[id]!).name === "Forest")!;
+    let s = settle(run(s0, planActivate(s0, ap, bb, 0, [target(f)])));
+    expect(pt(s, f)).toBe("2/2");
+    putOnBattlefield(s, ap, card("Elf Three", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    expect(pt(s, f)).toBe("2/2");
+  });
+});
+
+function defOfTypes(s: GameState, id: ObjectId) {
+  return characteristics(s, s.objects[id]!).types;
+}
 
 function characteristicsColors(s: GameState, id: ObjectId) {
   return defOf(s, s.objects[id]!).colors;

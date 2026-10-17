@@ -1,7 +1,7 @@
-import type { AmountExpr, Modification, Effect } from "../abilities";
+import type { Amount, AmountExpr, Modification, Effect } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind } from "./words";
+import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X } from "./words";
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseKeywordList, parseObject } from "./targets";
@@ -80,6 +80,12 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   return null;
 }
 
+/** "3/3", or "X/X" with the X of the spell or ability (or its "where X is ..."), worked out as it resolves (CR 608.2h). */
+function basePT(p: string, t: string): [Amount, Amount] | null {
+  if ((p === "X") !== (t === "X")) return null;
+  return p === "X" ? [X, X] : [Number(p), Number(t)];
+}
+
 /**
  * The changes in "gets +2/+2 and gains flying", "loses all abilities and becomes a blue
  * Frog with base power and toughness 1/1", "becomes a 3/3 Elemental creature", ...
@@ -100,7 +106,11 @@ export function parseChanges(text: string): Modification[] | null {
       const k = parseKeywordList(m[1]!);
       if (!k) return null;
       out.push({ kind: "removeKeywords", keywords: k });
-    } else if ((m = /^(?:has|have) base power and toughness (\d+)\/(\d+)$/i.exec(p))) out.push({ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) });
+    } else if ((m = /^(?:has|have) base power and toughness (\d+|X)\/(\d+|X)$/i.exec(p))) {
+      const base = basePT(m[1]!, m[2]!);
+      if (!base) return null;
+      out.push({ kind: "setPT", power: base[0], toughness: base[1] });
+    }
     // Doran (CR 510.1a as modified) and defender (CR 702.3b), for a while.
     else if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/i.test(p)) out.push({ kind: "assignsToughness" });
     else if (/^can attack (?:this turn )?as though (?:it|they) didn't have defender$/i.test(p)) out.push({ kind: "attackDespiteDefender" });
@@ -172,14 +182,16 @@ export function parseBecomes(text: string): Modification[] | null {
     grants.push(...g);
     rest = m[1]!;
   }
-  let pt: [number, number] | null = null;
-  if ((m = /^(\d+)\/(\d+) (.+)$/.exec(rest))) {
-    pt = [Number(m[1]), Number(m[2])];
+  let pt: [Amount, Amount] | null = null;
+  if ((m = /^(\d+|X)\/(\d+|X) (.+)$/.exec(rest))) {
+    pt = basePT(m[1]!, m[2]!);
+    if (!pt) return null;
     rest = m[3]!;
   }
   // "... with base power and toughness 8/8, flying, and first strike" (Figure of Destiny): it gains those too.
-  if ((m = /^(.+?) with base power and toughness (\d+)\/(\d+)(?:(?:,? and |, )(.+))?$/i.exec(rest))) {
-    pt = [Number(m[2]), Number(m[3])];
+  if ((m = /^(.+?) with base power and toughness (\d+|X)\/(\d+|X)(?:(?:,? and |, )(.+))?$/i.exec(rest))) {
+    pt = basePT(m[2]!, m[3]!);
+    if (!pt) return null;
     rest = m[1]!;
     if (m[4]) {
       const g = parseGrants(m[4]);

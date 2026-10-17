@@ -176,7 +176,8 @@ describe("X/X tokens from the spell's X, a count or a stat", () => {
     const { s: s0, ap } = setup([]);
     const f = putOnBattlefield(s0, ap, factory);
     s0.objects[f]!.counters.charge = 3;
-    const s = settle(run(s0, planActivate(s0, ap, f, 1)));
+    // Its "{T}: Add {R}. Put a charge counter on ~." is a mana ability (CR 605.1a), so this is its only other one.
+    const s = settle(run(s0, planActivate(s0, ap, f, 0)));
     expect(s.objects[f]!.zone).toBe("graveyard");
     const [g] = tokens(s, ap, /Golem/);
     expect(pt(s, g!)).toBe("3/3");

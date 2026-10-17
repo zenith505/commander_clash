@@ -203,6 +203,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
       if (!army) return;
+      if (s.resolving) s.resolving.amassed = { id: army.id, zc: army.zoneChanges ?? 0 };
       invalidateCharacteristics(s);
       if (n > 0) putCounters(s, army, "+1/+1", n);
       log(s, `${player(s, ctx.controller).name} amasses ${e.subtype} ${n}.`);

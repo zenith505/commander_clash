@@ -975,6 +975,11 @@ export function compile(d: CardDef): CompiledCard {
       out.enterLock = { ...(lock[1] === "Creatures" ? { types: ["Creature"] } : lock[1] === "Artifacts and creatures" ? { types: ["Artifact", "Creature"] } : {}), ...(lock[2] ? { opponents: true as const } : {}) };
       continue;
     }
+    const again = triggersAgainLine(line);
+    if (again) {
+      (out.triggersAgain ??= []).push(again);
+      continue;
+    }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
       out.payWUBRG = true;
       continue;
@@ -1840,4 +1845,41 @@ export function parseFromTop(text: string): FromTop | null | undefined {
     spells.push(chosen ? { ...f, chosen: "type", text: `${f.text} of the chosen type` } : f);
   }
   return { lands, spells, ...(m[1] ? { once: true as const } : {}) };
+}
+
+/**
+ * "If a permanent entering causes a triggered ability of a permanent you control to trigger, that ability triggers an
+ * additional time" (Yarok), "if a creature dying causes ..." (Teysa Karlov), "if a creature attacking causes ..." (Isshin),
+ * "if a triggered ability of a Ninja creature you control triggers, ..." (Splinter): CR 603.2d.
+ */
+function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgain"]>[number] | null {
+  // "Wolf or battle you control", "land or Bird you control": any of them.
+  const kinds = (phrase: string, other: boolean): { filter: TargetSpec; other?: true }[] | null => {
+    const yours = / you control$/.test(phrase);
+    const parts = phrase.replace(/ you control$/, "").split(/,? or (?!less\b|greater\b|more\b)/);
+    const out: { filter: TargetSpec; other?: true }[] = [];
+    for (const p of parts) {
+      const another = /^another /.test(p);
+      const f = parseTargetPhrase(`${p.replace(/^another /, "")}${yours ? " you control" : ""}`);
+      if (f?.kind !== "object") return null;
+      out.push({ filter: f, ...(other || another ? { other: true as const } : {}) });
+    }
+    return out;
+  };
+  let m = /^If (?:an? )?(.+?) (entering|dying|attacking|dealing combat damage to a player)(?: the battlefield)? causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time\.$/.exec(line);
+  if (m) {
+    const event = ({ entering: "enters", dying: "dies", attacking: "attacks" } as Record<string, "enters" | "dies" | "attacks">)[m[2]!] ?? "combatDamage";
+    // Dying and attacking are things only creatures do here (CR 700.4, 508.1a).
+    if ((event === "dies" || event === "attacks" || event === "combatDamage") && !/^creature( you control)?$/.test(m[1]!)) return null;
+    const filter = kinds(m[1]!, false);
+    return filter ? { by: { event, filter: filter.map((x) => x.filter) } } : null;
+  }
+  m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
+  if (m) {
+    const all = /^another (.+ or .+ you control)$/.exec(m[1]!);
+    const of = kinds(all ? all[1]! : m[1]!, !!all);
+    // Only permanents you control (a spell's triggered abilities aren't covered: Echoes of Eternity).
+    return of && of.every((x) => x.filter.controller === "you") ? { of } : null;
+  }
+  return null;
 }

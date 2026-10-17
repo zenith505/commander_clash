@@ -1,4 +1,4 @@
-import type { AbilityBody, BatchTrigger, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
+import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
@@ -27,6 +27,45 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
   main1: ["yourFirstMain", "eachFirstMain"], // CR 505.1a
   main2: ["yourPostcombatMain", "eachPostcombatMain"],
 };
+
+/** See `causedBy` in fireEvent. */
+type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] };
+
+/**
+ * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
+ * of a permanent `controller` controls that applies, the ones leaving the battlefield at the same time included (rulings
+ * on Teysa Karlov). Only abilities of permanents, as they are or as they were leaving (CR 603.10a).
+ */
+function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, cause: Cause | null): number {
+  const leaving = cause?.event === "dies" ? cause.objs.find((x) => x.o.id === src.id) : undefined;
+  const permanent = src.zone === "battlefield" || !!leaving || (s.leftTogether ?? []).some((l) => l.id === src.id && src.zone !== "battlefield");
+  if (!permanent) return 0;
+  const statics: { id: ObjectId; again: NonNullable<CompiledCard["triggersAgain"]> }[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const again = compileCard(defOf(s, o)).triggersAgain;
+    if (!again) continue;
+    const c = characteristics(s, o);
+    if (c.hasPrintedAbilities && c.controller === controller) statics.push({ id, again });
+  }
+  for (const l of s.leftTogether ?? []) {
+    const o = s.objects[l.id];
+    const again = o && l.hadAbilities && o.zone !== "battlefield" ? compileCard(defOf(s, o)).triggersAgain : undefined;
+    if (again && l.controller === controller && !statics.some((x) => x.id === l.id)) statics.push({ id: l.id, again });
+  }
+  if (!statics.length) return 0;
+  // Whose ability it is: as it is, or as it last existed.
+  const view = leaving ? { o: leaving.o, c: leaving.c } : { o: src, c: src.zone === "battlefield" ? undefined : characteristics(s, src) };
+  const ofMatches = (f: TargetSpec) => objectMatches(s, { ...f, controller: undefined }, view.o, controller, false, undefined, view.c);
+  let n = 0;
+  for (const { id, again } of statics)
+    for (const a of again) {
+      if (a.by && !(cause?.event === a.by.event && cause.objs.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
+      if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ofMatches(k.filter))) continue;
+      n++;
+    }
+  return n;
+}
 
 /** Who controls the permanent `o` is attached to, if it's attached to one on the battlefield. */
 function hostController(s: GameState, o: GameObject): PlayerId | undefined {
@@ -224,6 +263,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   let fromYard = false;
   // Torpor Orb: while set, the controllers whose abilities the event can't trigger.
   let locked: ((controller: PlayerId) => boolean) | null = null;
+  // While set, what the event is for "triggers an additional time" (Panharmonicon, Teysa Karlov, Isshin; CR 603.2d) and
+  // the objects doing it, as they were then.
+  let causedBy: Cause | null = null;
   // Abilities that trigger on the battlefield use the permanent's abilities right now;
   // leaves-the-battlefield triggers look back in time (CR 603.10a), so "dies" passes them in.
   const add = (
@@ -253,7 +295,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
-        s.triggerQueue.push({
+        const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
           // An ability an effect gave it isn't on its card, so the trigger carries what it does.
           ...(printed[index] !== t ? { body: t.body } : {}),
@@ -269,7 +311,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ...(kicked ? { kicked } : {}),
           ...(colorsSpent ? { colorsSpent } : {}),
           ...(event ? { event } : {}),
-        });
+        };
+        s.triggerQueue.push(queued);
+        // "That ability triggers an additional time" (CR 603.2d): only a permanent's (or one leaving's) own abilities.
+        if (!fromYard) for (let n = triggersAgain(s, o, controller, causedBy); n > 0; n--) s.triggerQueue.push({ ...queued });
       }
     });
   };
@@ -325,6 +370,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       return lock && c!.hasPrintedAbilities && (!lock.types || lock.types.some((t) => types.includes(t))) ? [{ lock, by: c!.controller }] : [];
     });
     if (locks.length) locked = (ctrl) => locks.some((l) => !l.lock.opponents || l.by !== ctrl);
+    causedBy = { event: "enters", objs: [{ o: entering, controller: you }] };
     (s.zoneBatch ??= []).push({
       id: entering.id,
       zc: entering.zoneChanges ?? 0,
@@ -377,6 +423,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
     locked = null;
+    causedBy = null;
   } else if (ev.type === "controlChanged") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield") add(o, ev.from, (e) => e === "selfLostControl");
@@ -386,6 +433,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield" && host) add(o, controllerOf(s, o), (e) => e === "selfBecomesUnattached", undefined, undefined, host);
   } else if (ev.type === "dies") {
     const o = obj(s, ev.id);
+    // A creature dying (CR 700.4): put into a graveyard from the battlefield.
+    if (ev.to === "graveyard" && ev.wasCreature && ev.snapshot && ev.chars) causedBy = { event: "dies", objs: [{ o: ev.snapshot, c: ev.chars, controller: ev.controller }] };
     // Earthbend's "when that land dies or is put into exile" (CR 701.66a): it triggers once, for that object only; gone
     // anywhere else, it never will.
     const was = ev.snapshot?.zoneChanges ?? 0;
@@ -447,6 +496,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
     }
+    // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
+    causedBy = null;
     // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
     // the same time (CR 603.10a), whatever zone it went to.
     if (ev.sacrificed && ev.snapshot && ev.chars) {
@@ -617,6 +668,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
+    causedBy = { event: "attacks", objs: [{ o, controller: controllerOf(s, o) }] };
     // Is it attacking `pid` ("attacks you"), or them or a planeswalker they control (CR 506.2: `attacking` is then the
     // planeswalker's controller)?
     const attackingYou = (a: GameObject, pid: PlayerId) => ({ player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid });
@@ -640,8 +692,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const aura = obj(s, id);
         if (aura.attachedToPlayer === o.attacking) add(aura, controllerOf(s, aura), (e) => e === "creatureAttacksEnchantedPlayer", undefined, undefined, o);
       }
+    causedBy = null;
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
+    causedBy = { event: ev.type === "groupAttack" ? "attacks" : "combatDamage", objs: ev.ids.filter((x) => s.objects[x]).map((x) => ({ o: obj(s, x), controller: ev.controller })) };
     const groupWatch = (o: GameObject) => {
       // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
       const fits = (t: TriggeredAbility) => ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)));
@@ -665,6 +719,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           add(aura, controllerOf(s, aura), (e) => e === "enchantedPlayerAttacked", undefined, undefined, undefined, undefined, undefined, undefined, { player: aura.attachedToPlayer });
       }
     }
+    causedBy = null;
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
@@ -687,10 +742,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const attacker = obj(s, ev.id);
     const you = controllerOf(s, attacker);
     const that = attacker.attacking !== undefined ? { player: attacker.attacking } : undefined;
+    causedBy = { event: "attacks", objs: [{ o: attacker, controller: you }] };
     add(attacker, you, (e) => e === "selfAttacksAlone", undefined, undefined, undefined, undefined, undefined, undefined, that);
     addHosted(attacker, (e) => e === "selfAttacksAlone", undefined, attacker, that);
     for (const id of s.battlefield)
       if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e, t) => e === "creatureYouControlAttacksAlone" && (!t.subjectFilter || objectMatches(s, t.subjectFilter, attacker, you, false)), undefined, undefined, attacker, undefined, undefined, undefined, that);
+    causedBy = null;
   } else if (ev.type === "dealtDamage") {
     // Its abilities work only on the battlefield; a spell or a card that left isn't "~" any more.
     const o = s.objects[ev.id];
@@ -743,6 +800,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };
+    causedBy = { event: "combatDamage", objs: [{ o, controller: controllerOf(s, o) }] };
     add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.ifNotRenowned && o.renowned) && !(t.toOpponent && ev.player === controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, info);
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
@@ -752,6 +810,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, w) !== dealerBy) continue;
       add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
     }
+    causedBy = null;
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);
     // "Whenever one or more creatures a player controls deal combat damage to the player who has the initiative, the
@@ -930,7 +989,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
         if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
+        // "Whenever one or more creatures enter / die": caused by each of them entering or dying (CR 603.2d).
+        const died = matched.filter((m) => m.from === "battlefield" && m.to === "graveyard" && m.snapshot && m.chars?.types.includes("Creature"));
+        causedBy =
+          b.what === "enters"
+            ? { event: "enters", objs: matched.filter((m) => s.objects[m.id]).map((m) => ({ o: obj(s, m.id), controller: m.controller ?? you })) }
+            : (b.what === "leaves" || b.what === "toGraveyard") && died.length
+              ? { event: "dies", objs: died.map((m) => ({ o: m.snapshot!, c: m.chars!, controller: m.controller ?? m.owner })) }
+              : null;
         add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: n, ...(b.whose === "you" ? { player: you } : {}) });
+        causedBy = null;
       }
     };
     for (const id of s.battlefield) {
@@ -1173,6 +1241,8 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.x ? { x: t.x } : {}),
     ...(t.rolled !== undefined ? { rolled: t.rolled } : {}),
     ...(t.sacrificed ? { sacrificed: t.sacrificed } : {}),
+    ...(t.amassed ? { amassed: t.amassed } : {}),
+    ...(t.fromSpell ? { fromSpell: true as const } : {}),
     ...(t.kicked ? { kicked: t.kicked } : {}),
     ...(t.colorsSpent ? { colorsSpent: t.colorsSpent } : {}),
     ...(t.event ? { event: t.event } : {}),

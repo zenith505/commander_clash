@@ -1597,6 +1597,8 @@ function reflexiveWorth(s: GameState, pid: PlayerId, body: AbilityBody, sourceId
   if (body.modal) return chooseModes(s, pid, body, false, sourceId) ? 1 : -2;
   const t = body.targets.length ? chooseTargets(s, pid, body, false, sourceId) : [];
   if (!t || (body.targets.length && !t.some((x) => x.kind !== "none"))) return -2;
+  // "When you do, ~ deals 2 damage to each creature" (Lithobraking): not when it hurts us more than the opponents.
+  if (!body.targets.length && (groupValue(s, pid, body) ?? 1) <= 0) return -2;
   // Removal is worth a spare creature: on the same scale as what "you may sacrifice" costs (see wantsMay).
   return Math.max(1, modeValue(s, pid, body, t) / 3);
 }

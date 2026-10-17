@@ -107,6 +107,8 @@ export type Count =
   | { kind: "party" }
   /** "The total amount of life your opponents have lost this turn", "for each 1 life your opponents have lost this turn" (CR 119.3). */
   | { kind: "opponentsLifeLost" }
+  /** "For each unspent green mana you have" (Omnath, Locus of Mana), "six or more unspent mana" (Ozai): what's in your mana pool (CR 106.4). */
+  | { kind: "unspentMana"; color?: Color }
   /** "The amount of life you gained this turn", "for each 1 life you gained this turn" (CR 119.3, 119.9): its total, whatever was lost. */
   | { kind: "lifeGainedThisTurn" }
   /** Devotion to a color, or to several (CR 700.5). */

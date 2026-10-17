@@ -281,6 +281,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     if (!amount) return null;
     return m[2] ? { kind: "amount", amount, max: num(m[2]) - 1 } : { kind: "amount", amount, min: num(m[3]!) };
   }
+  // "As long as you have six or more unspent mana" (Ozai, the Phoenix King): in your mana pool (CR 106.4).
+  if ((m = new RegExp(`^you have ${NUM} or more unspent mana$`).exec(text))) return { kind: "amount", amount: { count: { kind: "unspentMana" } }, min: num(m[1]!) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"

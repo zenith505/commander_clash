@@ -165,6 +165,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
   if ((m = /^(Aura|Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
     return count({ kind: "attachedToSelf", subtypes: [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
+  if ((m = /^differently named (.+?) you control$/i.exec(p))) {
+    const c = parseCount(`${m[1]} you control`, ctx, each);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other ? { count: { ...c.count, differentNames: true, filter: { ...c.count.filter, text: `differently named ${c.count.filter.text}` } } } : null;
+  }
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
   // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
   if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't) .+))?$/i.exec(p))) {

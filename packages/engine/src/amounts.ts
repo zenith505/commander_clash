@@ -94,15 +94,18 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.event?.amount ?? 0;
     case "permanents": {
       let n = 0;
+      const names = new Set<string>();
       const filter = bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         const ch = view(o);
-        if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) n++;
+        if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
+        if (!c.differentNames) n++;
+        else if (ch.name && !o.faceDown) names.add(ch.name);
       }
-      return n;
+      return c.differentNames ? names.size : n;
     }
     case "greatestControlled": {
       // Each player's own count, the most of them (0 with none); players who have left the game control nothing.
@@ -379,7 +382,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
+      return `#${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
     case "cardsInHand":
       return "#cards in hand";
     case "cardsInLibrary":

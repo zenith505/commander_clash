@@ -9,6 +9,9 @@ import type { CopyExcept } from "./copies";
  * A number an effect uses: fixed, or worked out from the game. A spell or ability works out
  * the number once, as it resolves (CR 608.2h); a static ability keeps it up to date (CR 611.3a).
  */
+/** TargetSpec.counter for "with a counter on it": a counter of any kind. */
+export const ANY_COUNTER = "any";
+
 export type Amount = number | AmountExpr;
 
 /** Counter kinds effects can put on permanents. Stun and shield are keyword counters (CR 122.1c-d). */
@@ -168,6 +171,8 @@ export type Count =
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
+  /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
+  | { kind: "mutations" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
   | { kind: "diedThisTurn"; yours?: true }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
@@ -202,6 +207,8 @@ export interface TargetSpec {
   kind: "object" | "player" | "any" | "spell" | "card";
   /** For "card": whose graveyard ("your graveyard", "an opponent's graveyard"); unset = any graveyard. */
   owner?: "you" | "opponent";
+  /** For objects: owned by this player, a mutating creature spell's owner (CR 702.140a). */
+  ownerIs?: PlayerId;
   /** For objects/spells: at least one of these card types (empty = any permanent). */
   types?: string[];
   /** All of these card types: "artifact creature" (as opposed to "artifact or creature"). */
@@ -317,7 +324,7 @@ export interface TargetSpec {
   named?: string;
   /** None of these subtypes. */
   notSubtypes?: string[];
-  /** "creature with a +1/+1 counter on it", "permanents with ice counters on them" */
+  /** "creature with a +1/+1 counter on it", "permanents with ice counters on them"; ANY_COUNTER: "with a counter on it". */
   counter?: CounterKind;
   /**
    * "of the chosen type", "that aren't of the chosen type", "of the chosen color": the creature type
@@ -1892,6 +1899,7 @@ export type TriggerEvent =
   | "selfCountersPut"
   /** "When ~ becomes monstrous" (CR 701.37b). */
   | "selfBecomesMonstrous"
+  | "selfMutates"
   /** "When this Class becomes level 2" (CR 716.2a): TriggeredAbility.level. */
   | "selfBecomesLevel"
   /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
@@ -2303,8 +2311,11 @@ export interface ActivatedAbility {
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */
   onceEver?: true;
-  /** The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). */
-  keyword?: "Exhaust" | "Boast";
+  /**
+   * The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). A power-up
+   * ability costs less by the permanent's mana cost if it entered this turn (CR 702.193a): see game.ts activationCost.
+   */
+  keyword?: "Exhaust" | "Boast" | "Power-up";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
@@ -2561,7 +2572,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission";
@@ -2827,6 +2838,10 @@ export interface CompiledCard {
    * "Equip abilities you activate cost {1} less to activate" (CR 602.2b, 601.2f); `targetSelf`: "that target ~";
    * `otherEquipment`: "of other Equipment".
    */
+  /** "Power-up abilities of other creatures you control cost {3} less to activate." (Hulk, Gamma Goliath; CR 702.193) */
+  powerUpLess?: number;
+  /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */
+  powerUpAgain?: true;
   equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
   /**
    * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the

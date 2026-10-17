@@ -4,7 +4,7 @@ import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripRem
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
-import type { CardDef } from "../types";
+import type { CardDef, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
@@ -166,16 +166,22 @@ export function isFullySupported(d: CardDef): boolean {
  */
 /** `how`: the optional costs announced for it, which decide whether it has the targets of parts that need them (gateTargets). */
 export function spellTargetSpecs(d: CardDef, modes?: number[], how?: CastHow): TargetSpec[] {
+  // A mutating creature spell targets "a non-Human creature with the same owner as this spell" (CR 702.140a).
+  if (d.mutateOwner !== undefined) return [mutateTarget(d.mutateOwner)];
   const c = compileCard(d);
   if (c.spell) return gateTargets(withModes(c.spell, modes).targets, how);
   return c.enchant ? [c.enchant] : [];
 }
+
+/** What a mutating creature spell targets (CR 702.140a): a non-Human creature with the same owner as the spell. */
+export const mutateTarget = (owner: PlayerId): TargetSpec => ({ kind: "object", types: ["Creature"], notSubtypes: ["Human"], ownerIs: owner, text: "target non-Human creature with the same owner" });
 
 /**
  * The spell's effect as a body, for deciding what to target: a spell's text, or for an
  * Aura, what it will do to the enchanted permanent.
  */
 export function castingBody(d: CardDef): AbilityBody | undefined {
+  if (d.mutateOwner !== undefined) return { targets: [mutateTarget(d.mutateOwner)], effects: [], text: "Mutate" };
   const c = compileCard(d);
   if (c.spell) return c.spell;
   if (!c.enchant) return undefined;
@@ -188,6 +194,18 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
 // ---------------------------------------------------------------------------
 
 export const QUOTED_SOURCE_NAME = "\u27easource\u27eb";
+
+/** "He", "she", "him", "his" and "her" of a legendary card that names itself: "~" or "~'s". */
+function selfPronouns(t: string): string {
+  const kept: string[] = [];
+  return t
+    // Left as they are: "his or her" (their), a copy's exceptions ("except his name is ~ and he's a 4/4", read by
+    // parseCopyExcept) and "if his sneak cost was paid" (read with the trigger).
+    .replace(/\b(?:his or her|he or she|him or her)\b|\bexcept [^."]*|\b(?:his|her) \w+ cost was paid\b/gi, (m) => `\u0001${kept.push(m) - 1}\u0001`)
+    .replace(/\b(?:[Hh]is|[Hh]er(?= (?:power|toughness|owner's|owner|controller|name|loyalty|additional|sneak|other|text|mana)\b))\b/g, "~'s")
+    .replace(/\b(?:[Hh]e|[Ss]he|him|her)\b(?!')/g, "~")
+    .replace(/\u0001(\d+)\u0001/g, (_, n: string) => kept[Number(n)]!);
+}
 
 /** Replace every way a card refers to itself with "~". */
 export function normalizeSelf(d: CardDef): string {
@@ -211,6 +229,10 @@ export function normalizeSelf(d: CardDef): string {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
+  // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
+  // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in
+  // a quoted ability, where it would mean the object given the ability, and not "his or her" (an old way to say "their").
+  if (d.supertypes?.includes("Legendary")) t = t.split(/("[^"]*")/).map((part, i) => (i % 2 ? part : selfPronouns(part))).join("");
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
   t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case)\b/g, "~");
@@ -527,7 +549,7 @@ export function compile(d: CardDef): CompiledCard {
     // Exert (CR 701.43d): "You may exert ~ as it attacks. When you do, it gets +2/+2 until end of turn." The "when you
     // do" ability triggers when it's exerted (linked, CR 607.2h); "it" is the exerted creature itself.
     // Combat Celebrant: "If ~ hasn't been exerted this turn, you may exert it as it attacks" (with additional combats).
-    const exert = /^(?:You may exert ~|(If ~ hasn't been exerted this turn), you may exert it) as (?:it|he|she|they) attacks?\.(?: When you do, (.+))?$/.exec(line);
+    const exert = /^(?:You may exert ~|(If ~ hasn't been exerted this turn), you may exert it) as (?:it|he|she|they|~) attacks?\.(?: When you do, (.+))?$/.exec(line);
     if (exert) {
       const body = exert[2] ? parseBody(exert[2].replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|can't)\b)/, "~ ").replace(/^(?:he|she) /, "it "), { selfIt: true }) : undefined;
       if (out.exert || body === null) out.unsupported.push(raw);
@@ -1018,6 +1040,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
       out.payWUBRG = true;
+      continue;
+    }
+    if (line === "Each power-up ability of permanents you control can be activated an additional time.") {
+      out.powerUpAgain = true;
+      continue;
+    }
+    const powerUpLess = /^Power-up abilities of other creatures you control cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (powerUpLess && !out.powerUpLess) {
+      out.powerUpLess = Number(powerUpLess[1]);
       continue;
     }
     const equipLess = /^Equip abilities you activate( of other Equipment| that target ~)? cost \{(\d+)\} less to activate\.$/.exec(line);

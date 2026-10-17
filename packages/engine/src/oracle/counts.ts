@@ -146,6 +146,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^colou?rs among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
+  if (/^times ~ has mutated$/i.test(p)) return count({ kind: "mutations" });
   // Converge: "the number of colors of mana spent to cast this spell", "for each color of mana spent to cast it".
   // "It" is the object itself only where nothing else can be "it" (not "whenever you cast a spell").
   if ((m = /^colou?rs? of mana spent to cast (~|it)$/i.exec(p)) && (m[1] === "~" || ctx === null || ctx.selfIt || ctx.spell)) return count({ kind: "colorsSpent" });

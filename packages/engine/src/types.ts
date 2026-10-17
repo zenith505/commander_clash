@@ -83,6 +83,11 @@ export interface CardDef {
   producedMana?: ManaType[];
   /** A double-faced token's back face (CR 111.10i, 712): what it becomes as it transforms (CR 701.27a). */
   tokenBack?: CardDef;
+  /**
+   * A mutating creature spell (CR 702.140a): it targets a non-Human creature with this owner, the spell's (see
+   * mutatingDef). Set only on the definition a mutating spell uses on the stack.
+   */
+  mutateOwner?: PlayerId;
   imageUrl?: string;
   artUrl?: string;
 }
@@ -91,7 +96,11 @@ export interface CardDef {
 /** How it became face down: cast with morph, megamorph or disguise, or put onto the battlefield manifested or cloaked (CR 701.40, 701.58). */
 export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak";
 
-export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command" | "phasedOut";
+/**
+ * "merged": a card or token that's a component of a merged permanent other than the permanent's own object (CR 730.2):
+ * it's part of that permanent (GameObject.mergedInto), in no zone list of its own.
+ */
+export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "stack" | "command" | "phasedOut" | "merged";
 
 /** A game object (card or token) in some zone. CR 109 */
 export interface GameObject {
@@ -137,6 +146,23 @@ export interface GameObject {
   counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
+  /** A spell cast for its mutate cost: a mutating creature spell (CR 702.140a). */
+  mutating?: true;
+  /**
+   * A merged permanent (CR 730.2): its components top first, this object's own card or token among them. Its own
+   * card's token and commander status, which the merged permanent's may not be (730.2d, 903.3c), are `ownToken` and
+   * `ownCommander`. Its characteristics are a copy effect (GameObject.copyEffects, 730.2a).
+   */
+  merged?: { parts: ObjectId[]; ownToken: boolean; ownCommander: boolean };
+  /** A component of a merged permanent (zone "merged"): the permanent's object. */
+  mergedInto?: ObjectId;
+  /** How many times it has mutated (CR 702.140d): "where X is the number of times ~ has mutated". */
+  mutations?: number;
+  /**
+   * The other components of the merged permanent this object was, as they left the battlefield with it (CR 730.3c):
+   * an effect that finds this new object finds them too.
+   */
+  movedWith?: { id: ObjectId; zc: number }[];
   /** A copy of a spell (CR 707.10): not a card; it ceases to exist off the stack (707.10a), or becomes a token (608.3f). */
   spellCopy?: boolean;
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
@@ -792,7 +818,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1059,6 +1085,11 @@ export interface GameState {
   openingActions?: PlayerId[];
   /** A spell or ability partway through resolving, waiting on `pending` (see continueResolution). */
   resolving: Resolving | null;
+  /**
+   * A mutating creature spell resolving onto `host` (CR 702.140c), while its controller chooses whether it goes on top
+   * or underneath (the pending "mutate" choice).
+   */
+  mutatingSpell?: { id: ObjectId; host: ObjectId; controller: PlayerId };
   /** Permanents that just entered and still have an "as ~ enters, choose ..." choice to make (CR 614.12). */
   /**
    * Choices made as permanents enter (CR 614.12), still to ask. `enters`: its enters event waits for

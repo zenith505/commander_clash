@@ -1,6 +1,6 @@
 # Roadmap
 
-19,695 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,778 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -20,6 +20,26 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    second half of split cards and adventures aren't in `cards.json`. Rebuilding it with every face needs the Scryfall
    bulk file on Ken's PC (Scryfall is blocked from the cloud), then the shared `cards.json.gz` replaced.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
+   Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:
+   Gemrazer, Huntmaster Liger, Snapdax, Nethroi, Mindleecher):
+   - Power-up still out: Kang (extra turn), Loki (short name), Quicksilver ("in your opening hand"), Stature and Viv
+     ("if its power is ..."), Thanos (odd or even), Nick Fury (double-faced). Wonder Man's extra activation is added
+     once per Wonder Man you control (no rulings yet). "Put a +1/+1 counter and an indestructible counter on it" is
+     two counter events one after the other, not one.
+   - Iron Fist's "divided among up to five targets" needs at least one target.
+   - Mutate still out: Archipelagore ("up to X target creatures"), Auspicious Starrix and Illuna (exile until X
+     permanent cards / a nonland permanent card), Brokkos (cast from your graveyard using its mutate ability, also
+     Nethroi-style permissions "using its mutate ability"), Everquill Phoenix (a Feather token whose quoted ability says
+     "~"), Otrimi ("creature card with mutate"), Parcelbeast (look at the top card, a land onto the battlefield),
+     Vadrok ("you may cast target noncreature card ... without paying").
+   - Merged permanents: turning one face down or face up (CR 730.2f-g), a merged permanent with an instant or sorcery
+     card, flip and double-faced components (730.2h-j) and stickers aren't handled. An owner doesn't choose the order of
+     the cards going to a graveyard or library together (730.3a) or their exile timestamps (730.3b). Only flicker and
+     "exile until" effects find all the cards a merged permanent became (730.3c); "return it to its owner's hand" from a
+     dies trigger finds only the one card. A merged token with card components under a "card" replacement (730.3e) is
+     treated like any other merged permanent.
+   - Bots put the bigger body on top and cast a mutate creature for its mutate cost only when its mana cost is out of
+     reach.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):
@@ -232,7 +252,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Abilities that work only from your graveyard work (Loathsome Troll); bots don't use them.
    - Face-down exile you may play works (Three Wishes, Outrageous Robbery, Intet, Gonti, Rev and 3 more); "mana of any
      type" doesn't cover Phyrexian symbols' life option (they still need their color or 2 life). Three Wishes' upkeep
-     cleanup is one delayed trigger per card. Still out: Klaw ("whenever you play a card from exile"), Mindleecher (mutate),
+     cleanup is one delayed trigger per card. Still out: Klaw ("whenever you play a card from exile"),
      Blightwing Bandit, Edward Kenway, Apple of Eden, Predators' Hour, Bloodsoaked Insight.
    - Main phase triggers work for "your first / precombat main phase", "each player's first main phase", "each of your
      postcombat main phases", "your second main phase" and "each of your main phases" (505.1), with mana for other
@@ -291,7 +311,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      after making tokens (Martial Coup), Banefire, Finale of Eternity and Finale of Promise.
    - "You may cast target ... card from your graveyard without paying its mana cost" works (Torrential Gearhulk,
      Dreadhorde Arcanist, Goblin Dark-Dwellers and 6 more); still out: "Until end of turn, you may cast" (Sins of the
-     Past), Vadrok (mutate). "Cast an instant or sorcery spell from among them" with where the rest go works (Muse
+     Past), Vadrok. "Cast an instant or sorcery spell from among them" with where the rest go works (Muse
      Vortex, Epic Experiment, Collected Conjuring).
    - Half an amount: "they lose half their life", "pay half your life" (rulings: 0 with 0 or less life), "Round up each
      time", each player's own half work; still out: Temporal Extortion ("any player may pay"), Heartless Hidetsugu

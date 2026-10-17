@@ -170,6 +170,9 @@ export function parseCostKeyword(
     const text = m[2]!.replace(/^pay (?:\{[^}]+\})+(?: and )?/, "");
     return { alt: { kind: "alternative", mana, ...(costs.length ? { costs } : {}), ...(cond ? { if: cond } : {}), ...(text ? { text } : {}) } };
   }
+  // Mutate (CR 702.140a): cast for it, it's a mutating creature spell targeting a non-Human creature with the same owner
+  // (see mutatingDef).
+  if ((m = /^Mutate ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && d.types.includes("Creature") ? { alt: { kind: "mutate", mana: m[1]! } } : "fail";
   // Bestow (CR 702.103a); "Bestow—{R}, Collect evidence 6" isn't modeled. (Cast bestowed, the card is an Aura: see bestowedDef.)
   if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
   // Madness (CR 702.35a): "Madness—{1}{B}, Pay 1 life" and X madness costs aren't modeled.

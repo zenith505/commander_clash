@@ -1512,7 +1512,7 @@ function canPlayLand(s: GameState, id: string) {
   return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle" };
+const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1533,6 +1533,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   overload: "\"target\" in its text becomes \"each\": no targets, it affects all of them",
   awaken: "also put +1/+1 counters on target land you control: it becomes a 0/0 Elemental creature with haste",
   miracle: "",
+  mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard" };
@@ -2166,6 +2167,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {(o.preventNext ?? 0) > 0 && (
           <span className="chip shield" title={`The next ${o.preventNext} damage that would be dealt to it this turn is prevented.`}>
             Prevent {o.preventNext}
+          </span>
+        )}
+        {o.merged && (
+          <span className="chip other" title={`Mutated ${o.mutations ?? 1} time${(o.mutations ?? 1) === 1 ? "" : "s"}: ${o.merged.parts.map((id) => s.cards[s.objects[id]!.cardId]!.name).join(", ")}, top to bottom. It has the top card's characteristics and every card's abilities.`}>
+            Mutated
           </span>
         )}
         {paired && (
@@ -3564,7 +3570,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

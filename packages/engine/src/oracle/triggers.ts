@@ -78,6 +78,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
+  [/^Whenever ~ mutates, (.+)$/, "selfMutates"],
   [/^Whenever you exert a creature, (.+)$/, "youExert"],
   [/^When(?:ever)? ~ exploits a creature, (.+)$/, "selfExploits"],
   // Heroic (an ability word): "Whenever you cast a spell that targets ~".
@@ -88,7 +89,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
-  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous",
+  "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous", "selfMutates",
 ];
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */

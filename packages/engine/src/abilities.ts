@@ -60,6 +60,10 @@ export interface UnlessPays {
   life?: number;
   /** "Ward—Discard a card": discard this many cards (of their choice) as the payment. */
   discard?: number;
+  /** "Ward—Pay life equal to this creature's power" (Phyrexian Fleshgorger): life counted as the choice is offered. */
+  lifeAmount?: Amount;
+  /** "Ward—Sacrifice a creature" (Vein Ripper): `n` permanents of their choice they control that match `filter`. */
+  sacrifice?: { n: number; filter: TargetSpec };
 }
 
 /**
@@ -105,6 +109,13 @@ export type Count =
   | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
+  /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
+  | { kind: "lifeLostThisWay" }
+  /**
+   * "Where X is the difference between those players' life totals" after "two target players exchange life totals"
+   * (Profane Transfusion): their totals now, after the exchange (rulings), even if one is no longer a legal target (CR 608.2b).
+   */
+  | { kind: "exchangedLifeDifference" }
   /** "For each death vote", "the number of profit votes" (CR 701.38): the votes for that choice in this ability's vote. */
   | { kind: "votes"; option: string }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
@@ -807,7 +818,8 @@ export type StaticCondition =
   /** A Class's level (CR 716.2a): at least `min`, at most `max`; a permanent without a level is level 1 (716.2d). */
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" }
+  /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `not`: "~ didn't attack this turn" (Air Nomad Student). */
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1025,7 +1037,13 @@ export type Effect =
    * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
    * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
    */
-  | { type: "exchangeLife"; a: PlayerRef; b: PlayerRef }
+  | {
+      type: "exchangeLife";
+      a: PlayerRef;
+      b: PlayerRef;
+      /** "If the difference between your life total and target player's life total is 5 or less" (Psychic Transfer), as it resolves. */
+      maxDiff?: number;
+    }
   | { type: "destroy"; what: ObjRef; noRegen?: boolean } // "It can't be regenerated."
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | { type: "regenerate"; what: ObjRef }

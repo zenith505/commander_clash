@@ -358,6 +358,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
+  // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
+  // under your control this turn" (Mad Dog: neither happened), "unless it came under your control this turn" (Erg Raiders).
+  if (/^~ didn't attack this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn", not: true };
+  if (/^~ didn't attack or come under your control this turn$/.test(text))
+    return { kind: "allOf", conds: [{ kind: "self", is: "attackedThisTurn", not: true }, { kind: "self", is: "controlledThisTurn", not: true }] };
+  if (/^(?:~|it) came under your control this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "controlledThisTurn" };
   if (/^(?:it's|~ is) attacking the player with the most life or tied for most life$/.test(text) && st.affects.kind === "self") return { kind: "attackingMostLife" };
   // "If it's your main phase", "if it's the first combat phase of the turn" (CR 505.1, 506.1).
   if ((m = /^it's your (main|combat) phase$/.exec(text))) return { kind: "phase", phase: m[1] as "main" | "combat", yours: true };

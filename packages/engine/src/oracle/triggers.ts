@@ -960,7 +960,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     }
     // "At the beginning of your upkeep, if ~ is tapped, put a storage counter on it" (Bottomless Vault): "it" is ~, the
     // only thing named.
-    if (/^~ /.test(intervening[2]!) && /^At /.test(intervening[1]!)) rest = rest.replace(/( counters? on) it\.$/, "$1 ~.");
+    // So is every "it" of "sacrifice it" (Mad Dog) and "it deals 2 damage to you unless it came under your control this
+    // turn" (Erg Raiders), with no target or other object in the text.
+    if (/^~ /.test(intervening[2]!) && /^At /.test(intervening[1]!))
+      rest = /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.") : rest.replace(/\bit\b/g, "~");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
   }

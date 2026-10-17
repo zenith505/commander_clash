@@ -569,7 +569,8 @@ export function firebending(n: Amount, text: string): TriggeredAbility {
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
   const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0, entersOptions: [], statics: [] };
   const plus = (n: number, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
-  for (const raw of line.split(/[,;]\s*/)) {
+  // "Ward—{2}, Pay 2 life" is one keyword.
+  for (const raw of line.split(/(?<!ward—(?:\{[^}]+\})+)[,;]\s*/i)) {
     const p = raw.trim();
     let m: RegExpExecArray | null;
     if (keywordOf(p)) continue;
@@ -889,6 +890,33 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", life }, ward: true }], text: `Ward—Pay ${life} life: counter that spell or ability unless its controller pays ${life} life.` },
       });
+    } else if ((m = /^ward—((?:\{(?:\d+|[WUBRGC])\})+), pay (\d+) life\.?$/i.exec(p))) {
+      // "Ward—{2}, Pay 2 life" (Gisa, the Hellraiser): both (CR 702.21a).
+      const life = Number(m[2]);
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: m[1]!, life }, ward: true }], text: `Ward—${m[1]}, Pay ${life} life: counter that spell or ability unless its controller pays ${m[1]} and ${life} life.` },
+      });
+    } else if ((m = /^ward—pay life equal to (?:~|this creature)'s power\.?$/i.exec(p))) {
+      // Phyrexian Fleshgorger, Raubahn: its power as the ward trigger resolves, or as it last existed (CR 608.2h).
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", lifeAmount: { count: { kind: "power", of: { ref: "self" } } } }, ward: true }], text: "Ward—Pay life equal to ~'s power: counter that spell or ability unless its controller pays that much life." },
+      });
+    } else if ((m = /^ward—sacrifice (a|an|two|three) ([a-z][a-z0-9 ,]*?)\.?$/i.exec(p))) {
+      // "Ward—Sacrifice a creature" (Vein Ripper), "a legendary artifact or legendary creature" (Sauron), "two
+      // permanents" (Ulamog): permanents of that player's choice they control (CR 702.21a, 701.21a).
+      const n = num(m[1]!);
+      const words = n === 1 ? m[2]! : m[2]!.replace(/s$/, "");
+      const filter = /\bor\b(?! (?:greater|less)\b)|,/.test(words) && !/^legendary artifact or legendary creature$/i.test(words) ? null : parseTargetPhrase(words);
+      if (filter?.kind !== "object" || filter.controller || n < 1) return null;
+      {
+        const text = words;
+        out.triggers.push({
+          event: "becomesTargetOfOpponent",
+          body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", sacrifice: { n, filter: { ...filter, text } } }, ward: true }], text: `Ward—Sacrifice ${m[1]} ${m[2]}: counter that spell or ability unless its controller sacrifices ${m[1]} ${m[2]}.` },
+        });
+      }
     } else if ((m = /^ward—discard (a|two) cards?\.?$/i.exec(p))) {
       // CR 702.21a with a discard cost: "counter that spell or ability unless that player discards a card".
       const n = m[1] === "a" ? 1 : 2;

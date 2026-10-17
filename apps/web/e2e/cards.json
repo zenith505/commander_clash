@@ -2409,6 +2409,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "696363c9-e8a7-4c65-b65c-4a94891ec43d",
+  "name": "Gisa, the Hellraiser",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Ward—{2}, Pay 2 life.\nSkeletons and Zombies you control get +1/+1 and have menace.\nWhenever you commit a crime, create two tapped 2/2 blue and black Zombie Rogue creature tokens. This ability triggers only once each turn. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e65a8ab8-84a7-4fe2-b009-ceb87bec6b4e",
   "name": "Glacial Ray",
   "manaCost": "{1}{R}",
@@ -4044,6 +4079,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "938b4e2c-88d9-4637-bc00-e228920c9a78",
+  "name": "Murder",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "933afaa3-3b23-454c-9465-8f2ba9652b4f",
   "name": "Myrkul's Edict",
   "manaCost": "{1}{B}",
@@ -4345,6 +4406,41 @@
   "releasedAt": "2018-12-07",
   "rarity": "rare",
   "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d3a5a830-cd14-49da-9412-c50049c74c92",
+  "name": "Phyrexian Fleshgorger",
+  "manaCost": "{7}",
+  "cmc": 7,
+  "typeLine": "Artifact Creature — Phyrexian Wurm",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Wurm"
+  ],
+  "oracleText": "Prototype {1}{B}{B} — 3/3 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\nMenace, lifelink\nWard—Pay life equal to this creature's power.",
+  "power": "7",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Menace",
+   "Ward",
+   "Prototype"
+  ],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "prototype",
   "gameChanger": false
  },
  {
@@ -6155,6 +6251,40 @@
   "set": "tdm",
   "releasedAt": "2025-04-11",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f83a768c-162d-46f0-8ebd-d9c6b2c69322",
+  "name": "Vein Ripper",
+  "manaCost": "{3}{B}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Vampire Assassin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Assassin"
+  ],
+  "oracleText": "Flying\nWard—Sacrifice a creature.\nWhenever a creature dies, target opponent loses 2 life and you gain 2 life.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

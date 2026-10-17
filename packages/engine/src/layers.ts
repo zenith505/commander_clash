@@ -402,7 +402,7 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
   }
 }
 
-function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number): boolean {
+function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
@@ -425,8 +425,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return n >= cond.min && (cond.max === undefined || n <= cond.max);
     }
     case "selfPT": {
-      // Only in a trigger's intervening if, so the layers are all applied by now; gone from the battlefield, it's false.
-      const c = chars.get(sourceId);
+      // A trigger's intervening if (CR 603.4) or "if ~'s power is 7 or greater" as it resolves, so the layers are all
+      // applied by now. Given the zone change the ability is about (`sourceZc`), once that object has left the
+      // battlefield it's its power as it last existed there (CR 608.2h; rulings on Vincent, Vengeful Atoner).
+      const here = chars.has(sourceId) && (sourceZc === undefined || (src.zoneChanges ?? 0) === sourceZc);
+      const lk = !here && sourceZc !== undefined ? s.lastKnown?.[sourceId] : undefined;
+      const c = here ? chars.get(sourceId) : lk?.zc === sourceZc ? lk : undefined;
       if (!c) return false;
       const n = cond.stat === "power" ? c.power : c.toughness;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
@@ -434,7 +438,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "yourTurn":
       return (s.activePlayer === you) !== !!cond.not;
     case "anyOf":
-      return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount));
+      return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc));
     case "beforeAttackers":
       return s.activePlayer === you && ["untap", "upkeep", "draw", "main1", "beginCombat"].includes(s.step);
     case "during": // CR 506.8, 601.3, 602.5b
@@ -628,6 +632,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {
+      if (cond.not) return !conditionMet(s, { kind: "self", is: cond.is }, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
       if (cond.is === "attacking") return src.attacking !== undefined;
       // CR 506.5: "attacking alone" means it's attacking and no other creature is.
       if (cond.is === "attackingAlone") return src.attacking !== undefined && !s.battlefield.some((id) => id !== src.id && s.objects[id]!.attacking !== undefined);
@@ -638,6 +643,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
+      // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
+      if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
       if (cond.is === "saddled") return !!src.saddled; // CR 702.171b
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
@@ -664,14 +671,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       });
     }
     case "allOf":
-      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount));
+      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc));
   }
 }
 
 /** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
-export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number): boolean {
+export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number): boolean {
   const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
-  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount);
+  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {

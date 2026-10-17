@@ -126,6 +126,7 @@ import {
   type TargetChoice,
   type TargetSpec,
   COLOR_NAMES,
+  pickOptions,
 } from "@cc/engine";
 import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -3993,19 +3994,26 @@ function Controls({
     // You can tap mana by hand first (CR 605.3a); Pay taps whatever else is needed.
     const life = pending.life ?? 0;
     const discard = pending.discard ?? 0;
-    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    // "Ward—Sacrifice a creature": you pick which after choosing to pay.
+    const sac = pending.sacrifice;
+    const canSacrifice = !sac || pickOptions(s, sac, HUMAN).length >= sac.n;
+    const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong>{" "}
-          {discard ? (
+          {sac ? (
+            `sacrifice ${sac.n === 1 ? (/^[aeiou]/i.test(sac.filter.text) ? "an" : "a") : sac.n === 2 ? "two" : sac.n === 3 ? "three" : sac.n} ${sac.filter.text}${sac.n === 1 ? "" : "s"}`
+          ) : discard ? (
             `discard ${discard === 1 ? "a card" : `${discard} cards`}`
+          ) : pending.cost === "{0}" && life ? (
+            `pay ${life} life`
           ) : (
             <>
               pay <ManaCost cost={pending.cost} size="sm" />
             </>
           )}
-          {life ? ` and ${life} life` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
+          {life && !(pending.cost === "{0}" && !discard && !sac) ? ` and ${life} life` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
         </span>
         <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>
           Pay

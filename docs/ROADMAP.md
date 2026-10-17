@@ -16,9 +16,10 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 0. Double-faced, split, adventure, prepare and flip cards (846 legal cards, the largest group left) can't be supported
-   from the current card data: `tools/build-cards.ts` keeps only the first face (`card_faces[0]`), so back faces, the
-   second half of split cards and adventures aren't in `cards.json`. Rebuilding it with every face needs the Scryfall
-   bulk file on Ken's PC (Scryfall is blocked from the cloud), then the shared `cards.json.gz` replaced.
+   from the current card data, which has only the first face. `tools/build-cards.ts` now keeps every face
+   (`CardDef.faces`, and `CardDef.meld` for the seven meld pairs, CR 712.5), but the shared `cards.json.gz` has to be
+   rebuilt from the Scryfall bulk file on Ken's PC first (Scryfall is blocked from the cloud): there,
+   `node tools/scryfall-extract.mjs --push <branch>` pushes a ~20 MB extract that the cloud builds from.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands

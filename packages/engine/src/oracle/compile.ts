@@ -143,6 +143,8 @@ export function isFullySupported(d: CardDef): boolean {
   // Split, adventure, flip and double-faced cards (CR 709-712) need their faces modeled: today
   // only the first face's text is compiled and the mana costs of both halves run together.
   if (d.name.includes(" // ")) return false;
+  // A melded permanent isn't a card: it exists only as the back faces of its meld pair (CR 712.4b).
+  if (d.meld?.result === d.name) return false;
   const cost = parseManaCost(d.manaCost);
   if (!cost.supported) return false;
   if (d.types.some((t) => UNSUPPORTED_TYPES.includes(t)) || d.subtypes.some((t) => UNSUPPORTED_SUBTYPES.includes(t))) return false;

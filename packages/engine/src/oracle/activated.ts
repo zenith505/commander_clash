@@ -145,7 +145,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const tap = symbols.includes("T");
   // "{3}, Exile this card from your graveyard: ...", "{2}{B}: Return this card from your graveyard to your hand":
   // it works only from your graveyard (CR 113.6j), where "~" is the card.
-  const returnsSelf = /^Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)\./.test(effectText);
+  const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   if (fromYard && (tap || /Sacrifice ~|Remove /.test(costs))) return "fail";
   if (returnsSelf && /Exile ~ from your graveyard/.test(costs)) return "fail";

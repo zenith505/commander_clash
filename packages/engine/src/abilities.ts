@@ -350,6 +350,8 @@ export interface TargetSpec {
 export interface SearchDest {
   zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile";
   tapped?: boolean;
+  /** "Put that card third from the top" (Long-Term Plans), for "libraryTop". */
+  third?: true;
   /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
   counters?: { counter: CounterKind; n: Amount };
 }
@@ -1111,7 +1113,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
@@ -1349,7 +1351,7 @@ export type Effect =
    * CR 610.3: it returns to its owner's hand). `linked`: Tidehollow Sculler's "When ~ leaves the battlefield, return the
    * exiled card to its owner's hand" returns it (CR 607.2a).
    */
-  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile"; until?: "sourceLeaves"; linked?: boolean }
+  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile" | /** Lost Hours */ "libraryThird"; until?: "sourceLeaves"; linked?: boolean }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true } // CR 701.9
@@ -1741,6 +1743,7 @@ export type TriggerEvent =
   | "chapter"
   | "selfEnters" // When this enters
   | "selfDies" // When this dies
+  | "selfDiesOrExiled" // "When this dies or is put into exile from the battlefield" (the God-Eternals)
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
   /**
@@ -1981,6 +1984,8 @@ export interface TriggeredAbility {
   sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
+  /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
+  ownGraveyard?: true;
   /**
    * Evolve (CR 702.100a): "if that creature's power is greater than this creature's power and/or
    * that creature's toughness is greater than this creature's toughness", checked as it triggers and

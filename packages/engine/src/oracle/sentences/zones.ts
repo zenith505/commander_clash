@@ -60,6 +60,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if (ctx.selfCard && /^[Ss]huffle (?:it|~) into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
   // "When ~ dies, put it on top of its owner's library" (Dark Revenant): the card in the graveyard, if it's still there.
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
+  // The God-Eternals: "you may put it into its owner's library third from the top"; Enigma Sphinx's "into your library"
+  // (it triggers only from its owner's graveyard); Bookwurm's "Put ~ from your graveyard into your library ...".
+  if (ctx.selfCard && /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|your) library third from the top$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "third" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
   // "The owner of target nonland permanent shuffles it into their library."
   if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {
@@ -262,10 +265,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
     return [{ type: "putInLibrary", what, position: "ownersChoice" }];
   }
-  // "Put target creature into its owner's library second from the top" (Bury in Books).
-  if ((m = /^Put (target .+?|~) into its owner's library second from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
+  // "Put target creature into its owner's library second from the top" (Bury in Books), "third from the top" (Teferi,
+  // Hero of Dominaria; Shattered Ego's "enchanted creature").
+  if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
-    return what && (what.ref === "target" || what.ref === "self") ? [{ type: "putInLibrary", what, position: "second" }] : null;
+    return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" }] : null;
   }
   // "Put target creature on top of its owner's library", "on the bottom of its owner's library" (Excommunicate).
   if ((m = /^Put (target .+?|~) on (top|the bottom) of its owner's library$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {

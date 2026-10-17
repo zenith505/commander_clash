@@ -687,14 +687,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (choose) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
-      const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      // Lost Hours: "That player puts that card into their library third from the top."
+      const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?|That player puts that card into their library third from the top)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       if (!then) return null;
       // "Exile that card until ~ leaves the battlefield" (Kitesail Freebooter, CR 610.3): only an ability of a permanent.
       const until = typeof then !== "string" && !!then[1];
       if (until && opts.spell) return null;
       const filter = parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`);
       if (filter === null) return null;
-      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}) });
+      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : typeof then !== "string" && /third from the top/.test(then[0]) ? "libraryThird" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}) });
       if (!choose[3]) si++;
       continue;
     }

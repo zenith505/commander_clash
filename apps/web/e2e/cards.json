@@ -1674,6 +1674,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b5d64271-4478-4c55-8c71-ba8f02b47fac",
+  "name": "Fiendish Panda",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Creature — Bear Demon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bear",
+   "Demon"
+  ],
+  "oracleText": "Whenever you gain life, put a +1/+1 counter on this creature.\nWhen this creature dies, return another target non-Bear creature card with mana value less than or equal to this creature's power from your graveyard to the battlefield.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fdn",
+  "releasedAt": "2024-11-15",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d09c9cba-fdd2-479b-ad5d-d05181c3e3f9",
   "name": "Fierce Guardianship",
   "manaCost": "{2}{U}",

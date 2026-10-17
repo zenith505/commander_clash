@@ -1170,6 +1170,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               s={s}
               label={targeting.label}
               spec={nextSpec}
+              sourceId={targetSource}
               allowed={(id) => canTarget({ kind: "object", id })}
               onSkip={nextSpec.optional ? skipTargets : undefined}
               onHover={setHover}
@@ -2602,6 +2603,7 @@ function GraveyardPicker({
   s,
   label,
   spec,
+  sourceId,
   allowed,
   onSkip,
   onHover,
@@ -2611,6 +2613,8 @@ function GraveyardPicker({
   s: GameState;
   label: string;
   spec: TargetSpec;
+  /** The ability's source: "with mana value less than or equal to this creature's power" is counted from it. */
+  sourceId?: string;
   /** Also left out: one already chosen for another of the same targets. */
   allowed: (id: string) => boolean;
   /** For an "up to" target: choose no more. */
@@ -2619,7 +2623,7 @@ function GraveyardPicker({
   onPick: (id: string) => void;
   onCancel?: () => void;
 }) {
-  const legal = legalTargets(s, spec, HUMAN)
+  const legal = legalTargets(s, spec, HUMAN, undefined, undefined, sourceId)
     .map((t) => t.id as string)
     .filter(allowed);
   const owners = [...new Set(legal.map((id) => s.objects[id]!.owner))];

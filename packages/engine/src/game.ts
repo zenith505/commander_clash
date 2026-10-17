@@ -674,7 +674,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)) };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, keywords: last.keywords } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -2063,10 +2063,13 @@ function sagaSBAs(s: GameState): boolean {
   return changed;
 }
 
-/** "You have no maximum hand size" on a permanent the player controls (CR 402.2, 514.1). */
+/** "You have no maximum hand size" on a permanent the player controls, or "Players have ..." on any (CR 402.2, 514.1). */
 export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
   !!player(s, pid).noMaxHandSize ||
-  s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).noMaxHandSize);
+  s.battlefield.some((id) => {
+    const a = abilitiesOf(s, obj(s, id)).noMaxHandSize;
+    return a === "all" || (!!a && controllerOf(s, obj(s, id)) === pid);
+  });
 
 function finishCleanup(s: GameState) {
   closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
@@ -2458,8 +2461,9 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
   if (s.activePlayer === pid && extra?.turn === s.turn) n += extra.n;
   if (s.activePlayer === pid)
     for (const id of s.battlefield) {
-      if (controllerOf(s, obj(s, id)) !== pid) continue;
       const a = abilitiesOf(s, obj(s, id));
+      n += a.extraLandsEach ?? 0; // Rites of Flourishing: whoever controls it
+      if (controllerOf(s, obj(s, id)) !== pid) continue;
       n += (a.extraLands ?? 0) + (a.extraLandsIf ?? []).filter((c) => staticConditionNow(s, c, id, pid)).length;
     }
   return n;
@@ -3338,6 +3342,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | nul
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
+    for (const f of abilitiesOf(s, o).youCantCast ?? [])
+      if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
       if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;

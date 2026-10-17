@@ -79,6 +79,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
+  // "Whenever ~ deals combat damage to an opponent, it deals that much damage to each other opponent" (Hydra Omnivore).
+  // The trigger parsers write "each other opponent" this way only when the event's player is an opponent.
+  if (x === "each opponent other than that player" && ctx.eventPlayer) return { ref: "otherOpponents" };
   // "Whenever ~ deals combat damage to a player, they lose half their life" (Unstoppable Slasher): that player, while no
   // other player has been named.
   if (x === "they" && ctx.eventPlayer && ctx.lastPlayerTarget === undefined && !ctx.chosenOpponent) return { ref: "eventPlayer" };

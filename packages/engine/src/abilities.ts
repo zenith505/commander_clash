@@ -500,6 +500,8 @@ export type PlayerRef =
   | { ref: "targetOwner"; index: number } // "its owner": a targeted card's owner (Pharika's "Its owner creates ...")
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
   | { ref: "eventPlayer" }
+  /** "Each other opponent" after "Whenever ~ deals combat damage to an opponent": this ability's controller's opponents but that one. */
+  | { ref: "otherOpponents" }
   /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
   | { ref: "enchantedPlayer" }
   /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
@@ -1004,7 +1006,17 @@ export type Effect =
    * `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). `evenly`: "divided evenly,
    * rounded down, among any number of targets" (Fireball): among the targets still legal as it resolves, nothing chosen.
    */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true; /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true }
+  | {
+      type: "damage";
+      amount: Amount;
+      to: DamageRecipient;
+      also?: DamageRecipient[];
+      divided?: true;
+      evenly?: true;
+      /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
+      /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
+      by?: "subject";
+    }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
@@ -2799,6 +2811,8 @@ export interface CompiledCard {
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   opponentsCantCastYourTurn?: true;
+  /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
+  youCantCast?: TargetSpec[];
   /**
    * "During your turn, your opponents can't ... activate abilities of artifacts, creatures, or enchantments" (Grand
    * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
@@ -2895,8 +2909,8 @@ export interface CompiledCard {
    * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).
    */
   creatureAbilitiesHaste?: true;
-  /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
-  noMaxHandSize?: boolean;
+  /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
+  noMaxHandSize?: boolean | "all";
   /**
    * Unspent mana not lost as steps and phases end (CR 500.4): kept by `who` (only mana of `color`, if given: Leyline
    * Tyrant's red), or with `becomes`, a replacement effect: it becomes that type of mana instead and is kept (Kruphix's
@@ -2974,6 +2988,8 @@ export interface CompiledCard {
   countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;
+  /** "Each player may play an additional land on each of their turns." (Rites of Flourishing): the same for every player. */
+  extraLandsEach?: number;
   /** The same, only while each condition holds (a Class level's, CR 716.2a). */
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */

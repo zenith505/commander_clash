@@ -343,6 +343,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "eventPlayer":
       return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
+    case "otherOpponents":
+      return opponents(s, ctx.controller).filter((p) => p !== ctx.event?.player);
     case "enchantedPlayer": {
       // The player this Aura is attached to, or was as it last existed (CR 608.2h).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

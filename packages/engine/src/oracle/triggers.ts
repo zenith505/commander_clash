@@ -1,4 +1,4 @@
-import { allEffects, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
+import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
 import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
@@ -94,6 +94,16 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfBecomesUntapped",
 ];
 
+/** "Each other opponent" after "deals combat damage to an opponent": each opponent but that player (see parsePlayer). */
+function otherOpponents(text: string): string {
+  return text.replace(/\beach other opponent\b/g, "each opponent other than that player");
+}
+
+/** The ability's text as printed again, after otherOpponents. */
+function withOtherOpponents(body: AbilityBody): AbilityBody {
+  return body.text.includes("each opponent other than that player") ? { ...body, text: body.text.replaceAll("each opponent other than that player", "each other opponent") } : body;
+}
+
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
 const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: true; defending?: true; toOpponent?: true; creature?: true }][] = [
   [/^attacks or blocks, (.+)$/, "selfAttacksOrBlocks", {}],
@@ -134,7 +144,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     const h = re.exec(m[3]!);
     if (!h) continue;
     if (m[2] !== "creature" && event !== "selfBecomesTapped" && event !== "selfBecomesUntapped") return "fail";
-    let text = h[1]!;
+    let text = o.toOpponent ? otherOpponents(h[1]!) : h[1]!;
     // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm).
     if (m[1] && /\b(it|its|that creature)\b/i.test(text)) return "fail";
     if (o.creature) {
@@ -150,7 +160,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     let body = parseBody(text, { ...(o.creature ? { subject: true } : { subjectIt: true }), ...(o.eventPlayer ? { eventPlayer: true } : {}), ...(o.defending ? { defending: true } : {}) });
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
-    return { event, body, host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}) };
+    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}) };
   }
   return null; // "whenever equipped creature dies" is parseDiesTrigger's
 }
@@ -454,7 +464,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);
   if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
-  let text = m[4]!;
+  let text = m[3] === "an opponent" ? otherOpponents(m[4]!) : m[4]!;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
     if (/\bX\b/.test(text)) return "fail";
@@ -466,7 +476,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   return {
     event: "creatureYouControlDealsCombatDamageToPlayer",
     dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}) },
-    body,
+    body: withOtherOpponents(body),
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
   };
 }
@@ -927,7 +937,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "If it's attacking" is about the source only in an ability about the source itself.
   const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) )/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
-  const thatHand = intervening && /^At the beginning of each opponent's (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
+  const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
   // "Whenever ~ attacks, if its toughness is 3 or less" (Young Hero Role): its own power or toughness as it triggers and resolves.
   const ptIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? new RegExp(`^(?:its|~'s) (power|toughness) is ${NUM} or (less|greater)$`).exec(intervening[2]!) : null;
@@ -980,11 +990,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const hosted = parseHostTrigger(line);
   if (hosted) return hosted;
-  // "Whenever ~ deals damage to an opponent": an opponent of its controller.
-  const toOpp = /^Whenever ~ deals damage to an opponent, (.+)$/.exec(line);
+  // "Whenever ~ deals damage to an opponent": an opponent of its controller. "Whenever ~ deals combat damage to an
+  // opponent, it deals that much damage to each other opponent" (Hydra Omnivore): each opponent but the one it hit.
+  const toOpp = /^Whenever ~ deals (combat )?damage to an opponent, (.+)$/.exec(line);
   if (toOpp) {
-    const t = parseTrigger(`Whenever ~ deals damage to a player, ${toOpp[1]}`);
-    return t && t !== "fail" ? { ...t, toOpponent: true } : "fail";
+    const t = parseTrigger(`Whenever ~ deals ${toOpp[1] ?? ""}damage to a player, ${otherOpponents(toOpp[2]!)}`);
+    return t && t !== "fail" ? { ...t, body: withOtherOpponents(t.body), toOpponent: true } : "fail";
   }
   // "Whenever this Equipment becomes unattached from a permanent, sacrifice that permanent" (Grafted Wargear).
   const unattached = /^Whenever ~ becomes unattached from a permanent, (.+)$/.exec(line);

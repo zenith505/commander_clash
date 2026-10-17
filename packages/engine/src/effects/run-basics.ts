@@ -3,7 +3,7 @@ import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
 import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, invalidateCharacteristics } from "../layers";
-import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
+import { cardSource, dealDamage, dealDamageBatch, objectSource, type DamageEvent, type DamageSource } from "../damage";
 import type { GameObject, GameState, ManaOrigin, ManaType, PlayerId, RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
@@ -90,7 +90,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             })
           : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
-      const from = { ...ctxSource(s, ctx), ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
+      const by = e.by === "subject" ? subjectSource(s, ctx) : ctxSource(s, ctx);
+      if (!by) return;
+      const from = { ...by, ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
       const events: DamageEvent[] = [
@@ -406,4 +408,20 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
   s.monarch = pid;
   invalidateCharacteristics(s); // "as long as you're the monarch"
   log(s, `${p.name} becomes the monarch.`);
+}
+
+/**
+ * The trigger's creature as a damage source ("it deals that much damage", Kediss): as it is on the battlefield, or as
+ * it last existed there once it has left (CR 608.2h), with the lifelink or deathtouch it had then (rulings on Warstorm
+ * Surge, Fiendlash).
+ */
+function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {
+  const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+  if (!o) return undefined;
+  if (o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc) return objectSource(s, o);
+  // A "dies" trigger's subject is the card in the graveyard, one zone change after the creature (see subjectEvenIfGone).
+  const lk = s.lastKnown?.[o.id];
+  if (!lk || (lk.zc !== ctx.subject!.zc && lk.zc !== ctx.subject!.zc - 1)) return undefined;
+  const ref = { object: o.id, zc: lk.zc };
+  return lk.source ? { ...lk.source, controller: lk.controller, ref } : cardSource((lk.copyKey && s.cards[lk.copyKey]) || defOf(s, o), lk.controller, ref);
 }

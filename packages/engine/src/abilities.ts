@@ -1304,9 +1304,10 @@ export type Effect =
   | { type: "evolve" }
   /**
    * `notSource`: backup's "If that's another creature, it gains ..." (CR 702.165a). "whileTapped": "for as long as ~
-   * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped".
+   * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped". Duration
+   * "whileControlled": "for as long as you control ~" alone (CR 611.2b).
    */
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped"; notSource?: boolean; whileControlled?: true }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).

@@ -750,7 +750,7 @@ export function moveObject(
     // are no longer attached (Auras then go to the graveyard and Equipment stays, CR 704.5m-n).
     for (const e of s.effects) e.affected = e.affected.filter((x) => x !== id);
     // "For as long as ~ remains tapped": it isn't tapped anymore (rulings on Vedalken Shackles).
-    s.effects = s.effects.filter((e) => e.affected.length && e.whileTapped?.id !== id);
+    s.effects = s.effects.filter((e) => e.affected.length && e.whileTapped?.id !== id && e.whileControlled?.id !== id);
     for (const other of s.battlefield)
       if (s.objects[other]!.attachedTo === id) {
         s.objects[other]!.attachedTo = undefined;
@@ -1279,14 +1279,20 @@ export function untapPermanent(s: GameState, o: GameObject) {
 
 /**
  * End "for as long as ~ remains tapped" effects (CR 611.2b) whose permanent untapped, left the battlefield (it's no
- * longer tapped, rulings), phased out (CR 702.26f), or, with "for as long as you control ~", changed control.
+ * longer tapped, rulings), phased out (CR 702.26f), or, with "for as long as you control ~", changed control; and "for
+ * as long as you control ~" effects whose permanent left, phased out or changed control.
  */
 export function endWhileTapped(s: GameState): boolean {
-  const ended = s.effects.filter((e) => e.whileTapped && !whileTappedHolds(s, e.whileTapped));
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)));
   if (!ended.length) return false;
   s.effects = s.effects.filter((e) => !ended.includes(e));
   invalidateCharacteristics(s);
   return true;
+}
+
+export function whileControlledHolds(s: GameState, w: NonNullable<ContinuousEffect["whileControlled"]>): boolean {
+  const o = s.objects[w.id];
+  return !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === w.zc && controllerOf(s, o) === w.controller;
 }
 
 export function whileTappedHolds(s: GameState, w: NonNullable<ContinuousEffect["whileTapped"]>): boolean {

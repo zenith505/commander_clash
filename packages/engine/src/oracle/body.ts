@@ -95,6 +95,9 @@ function thenSubject(first: string, next: string): string {
   return next.charAt(0).toUpperCase() + next.slice(1);
 }
 
+/** A card type a player can be told to choose among (CR 205.2a). */
+const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|planeswalker|sorcery)";
+
 /**
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
@@ -1351,6 +1354,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ctx.chosenOpponent = true;
       continue;
     }
+    // "Choose artifact or enchantment. Destroy all permanents of the chosen type" (Season of Gathering): a card type,
+    // chosen as it resolves (CR 608.2d); "the chosen type" in the next instruction is that one.
+    const typeChoice = new RegExp(`^Choose (${CARD_TYPE_WORD}(?:, ${CARD_TYPE_WORD})*,? or ${CARD_TYPE_WORD})$`).exec(s);
+    if (typeChoice && sentences[si + 1]) {
+      const options = typeChoice[1]!.split(/,? or |, /).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+      const next = attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx));
+      const asCardType = (v: unknown): unknown => (Array.isArray(v) ? v.map(asCardType) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "chosen" && x === "type" ? "cardType" : asCardType(x)])) : v);
+      if (!next || !JSON.stringify(next).includes('"chosen":"type"')) return null;
+      effects.push({ type: "choose", choice: "cardType", options }, ...(asCardType(next) as Effect[]));
+      si++;
+      continue;
+    }
     // "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed
     // triggered ability that triggers each time until then (CR 603.7b), the rest of the paragraph its instructions.
     const floatingFor = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
@@ -1750,7 +1765,10 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
       (put?.type === "putFromHand" && !put.any) ||
       // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
-    ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut;
+    // "Put a +1/+1 counter on a creature you control. It gains vigilance and trample until end of turn" (Season of
+    // Gathering): the one creature picked (kept in `created` too).
+    const picked = last?.type === "pick" && (last.action === "counters" || last.action === "choose") && last.n === 1 && last.who.ref === "you" && !last.among;
+    ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
     if (last?.type === "amass") ctx.amassed = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).

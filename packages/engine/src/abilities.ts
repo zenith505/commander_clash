@@ -31,7 +31,8 @@ export interface FaceDownPlay {
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap";
+/** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "choose";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -309,7 +310,7 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType";
   /**
    * "Target spell with a single target": a spell that targets exactly one thing once, whether or not that target is
    * still legal (rulings on Deflection).
@@ -1659,7 +1660,8 @@ export type Effect =
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
-export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent";
+/** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
+export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent" | "cardType";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor";

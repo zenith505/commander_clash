@@ -118,10 +118,16 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     sc.chosen![pid] = options;
     sc.queue.shift();
   }
+  // "Put a +1/+1 counter on a creature you control. It gains ...": "it" is the one picked, while it's that object (CR 400.7).
+  if ((e.action === "counters" || e.action === "choose") && s.resolving) s.resolving.created = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
   for (const pid of apnap(s, who))
     for (const id of sc.chosen?.[pid] ?? []) {
       const o = s.objects[id];
       if (o?.zone !== "battlefield") continue;
+      if (e.action === "choose") {
+        log(s, `${player(s, pid).name} chooses ${defOf(s, o).name}.`);
+        continue;
+      }
       if (e.action === "populate") {
         if (s.resolving) s.resolving.created ??= [];
         tokenCopies(s, pid, defOf(s, o), 1, ctx);

@@ -1096,6 +1096,8 @@ export interface Chosen {
   landType?: string;
   /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
   keyword?: string;
+  /** "Choose artifact or enchantment" (Season of Gathering): a card type. */
+  cardType?: string;
   /** "As ~ enters, choose a player" (True-Name Nemesis). */
   player?: PlayerId;
   /** "Secretly choose an opponent" (Guardian Archon): only its controller knows who, until it's revealed. */
@@ -1274,6 +1276,8 @@ export interface Resolving {
     auraHosts?: Record<ObjectId, string>;
     /** The Aura whose host is being chosen. */
     auraAsking?: ObjectId;
+    /** "Choose artifact or enchantment": this instruction has asked its question. */
+    asked?: true;
   };
 }
 

@@ -131,6 +131,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   const { chosen: kind, ...rest } = spec;
   if ((kind === "type" || kind === "notType") && chosen?.type)
     return kind === "type" ? { ...rest, subtypes: [...(rest.subtypes ?? []), chosen.type] } : { ...rest, notSubtypes: [...(rest.notSubtypes ?? []), chosen.type] };
+  if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
   return kind === "notType" || kind === "notColor" ? rest : spec;
@@ -152,6 +153,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "creatureType") return { ...chosen, type: choice };
   if (what === "basicLandType") return { ...chosen, landType: choice };
   if (what === "keyword") return { ...chosen, keyword: choice };
+  if (what === "cardType") return { ...chosen, cardType: choice };
   if (what === "opponent") return { ...chosen, player: Number(choice) };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };

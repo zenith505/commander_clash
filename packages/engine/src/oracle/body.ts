@@ -687,14 +687,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (choose) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "lookAtHand" || !prev.reveal) return null;
-      const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      // Lost Hours: "That player puts that card into their library third from the top."
+      const then = choose[3] ? "exile" : /^(?:That player discards that card|(?:That player exiles|Exile) that card( until ~ leaves the battlefield)?|That player puts that card into their library third from the top)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
       if (!then) return null;
       // "Exile that card until ~ leaves the battlefield" (Kitesail Freebooter, CR 610.3): only an ability of a permanent.
       const until = typeof then !== "string" && !!then[1];
       if (until && opts.spell) return null;
       const filter = parseSearchFilter(`${choose[1]}${choose[2] ?? ""}`);
       if (filter === null) return null;
-      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}) });
+      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: typeof then !== "string" && /discards/.test(then[0]) ? "discard" : typeof then !== "string" && /third from the top/.test(then[0]) ? "libraryThird" : "exile", ...(until ? { until: "sourceLeaves" as const } : {}) });
       if (!choose[3]) si++;
       continue;
     }
@@ -910,9 +911,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         // announced but an amount compared as the target is chosen and again as it resolves (TargetSpec.bound; CR 601.2c,
         // 608.2b; rulings on Spellstutter Sprite). Only an amount that can be worked out then.
         if (t.xRange) {
-          if (t.xRange.at === "exact" || !boundAtTargeting(def)) return false;
+          if (!boundAtTargeting(def)) return false;
           const { xRange, ...rest } = t;
-          ctx.targets[k] = { ...rest, bound: { key: xRange.key, at: xRange.at === "least" ? "least" : "most", amount: def } };
+          ctx.targets[k] = { ...rest, bound: { key: xRange.key, at: xRange.at, amount: def } };
           continue;
         }
         if (t.divided?.amount) ctx.targets[k] = { ...t, divided: { ...t.divided, amount: replaceX(t.divided.amount, def) } };
@@ -984,6 +985,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       copy.newTargets = true;
       continue;
     }
+    // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
+    // wasn't flipped ("you may flip a coin").
+    const ifFlip = /^If you (win|lose) the flip, (.+)$/.exec(s);
+    if (ifFlip) {
+      const flipped = (es: Effect[]): boolean => es.some((e) => (e.type === "flipCoin" && !e.untilLose) || (e.type === "may" && flipped(e.effects)));
+      const inner = flipped(effects) && parseOne(ifFlip[2]!.charAt(0).toUpperCase() + ifFlip[2]!.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "wonFlip", ...(ifFlip[1] === "lose" ? { lost: true as const } : {}) }, effects: inner });
+      continue;
+    }
     // "Clash with an opponent. If you win, ... Otherwise, ...": decided by that clash (CR 701.30d).
     const ifWin = /^If you win, (.+)$/.exec(s);
     if (ifWin) {
@@ -1030,9 +1041,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // "Roll a d20. When you do, put X +1/+1 counters on each of up to two target creatures, where X is the result"
       // (Ancient Bronze Dragon): the roll always happens; the result goes with the reflexive trigger.
       const rolled = prev?.type === "roll" && !prev.chooseOne && effects.length === 1;
-      if ((!rolled && (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence"))) || si !== sentences.length - 1) return null;
+      // Wishing Well: "Put a coin counter on ~. When you do, ...": it's put if ~ is still on the battlefield. The rest of
+      // the ability is the reflexive trigger's.
+      const counted = prev?.type === "counters" && prev.what.ref === "self" && effects.length === 1 && !ctx.selfCard;
+      if ((!rolled && !counted && (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence"))) || (si !== sentences.length - 1 && !counted)) return null;
       // Its own "where X is ..." goes with it.
-      const whenText = where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!;
+      const whenText = [where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
+      if (counted) si = sentences.length;
       const reflexive = parseBody(`${whenText.charAt(0).toUpperCase()}${whenText.slice(1)}.`, {
         ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
         ...(ctx.selfIt ? { selfIt: true } : {}),
@@ -1042,7 +1057,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         ...(ctx.defending ? { defending: true } : {}),
       });
       if (!reflexive || reflexive.modal) return null;
-      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "state", cond: { kind: "self", is: "onBattlefield" } } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
     // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."
@@ -1262,6 +1277,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       last.loseAtEnd = true;
       continue;
     }
+    // "~ deals 4 damage to target creature. The damage can't be prevented." (CR 615.12)
+    if (/^The damage can't be prevented$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "damage") return null;
+      last.unpreventable = true;
+      continue;
+    }
     // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c), "That creature", "Those
     // creatures", "Creatures destroyed this way", "A creature destroyed this way".
     if (/^(?:It|They|The creature|That (?:creature|artifact|permanent|Wall)|Those (?:creatures|permanents)|(?:Creatures|A creature) destroyed this way) can't be regenerated$/i.test(s)) {
@@ -1445,6 +1467,12 @@ function mentionsTarget(v: unknown, i: number): boolean {
  * add targets of its own (see gateNewTargets).
  */
 function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = false): { effects: Effect[]; instead: boolean } | null {
+  // "instead ~ deals 6 damage to that permanent or player and the damage can't be prevented" (Lightning Surge, CR 615.12).
+  if (/^instead,? .+ and the damage can't be prevented$/i.test(text)) {
+    const r = parseKicked(text.replace(/ and the damage can't be prevented$/i, ""), previous, ctx, newTargets);
+    if (!r?.instead || r.effects.length !== 1 || r.effects[0]!.type !== "damage") return null;
+    return { effects: [{ ...r.effects[0]!, unpreventable: true }], instead: true };
+  }
   let t = text;
   const instead = /^instead,? /i.test(t) || / instead$/i.test(t);
   t = t.replace(/^instead,? /i, "").replace(/ instead$/i, "");
@@ -1463,7 +1491,7 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     return { effects: [...first, ...second], instead };
   }
   // "~ deals 2 damage to any target. If ~ was kicked, it deals 5 damage instead": the same damage, more of it.
-  const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|it))?$/.exec(t);
+  const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|that permanent or player|it))?$/.exec(t);
   if (more && instead) {
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "damage") return null;

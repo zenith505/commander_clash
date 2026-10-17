@@ -1933,6 +1933,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
+      // A coin flip that costs something if it's lost (Frenetic Efreet's "sacrifice ~", Goblin Bangchuckers): not a gamble
+      // bots take.
+      if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "wonFlip" && e.cond.lost)) continue;
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step
       // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
       const hand = player(s, pid).hand.length;

@@ -10,6 +10,7 @@ import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
+import { chooseDamageSource } from "./run-prevention";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 /**
@@ -89,7 +90,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             })
           : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
-      const from = ctxSource(s, ctx);
+      const from = { ...ctxSource(s, ctx), ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
       const events: DamageEvent[] = [
@@ -169,6 +170,36 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       s.noPreventionTurn = s.turn;
       log(s, `${src}: damage can't be prevented this turn.`);
       return;
+    case "damageMod": {
+      const mod = { ...e.mod, ...(e.mod.amount !== undefined ? { amount: amountNow(s, e.mod.amount, ctx) } : {}) };
+      if (e.byTarget !== undefined) {
+        const t = ctx.targets[e.byTarget];
+        const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+        if (!o || o.zone !== "battlefield") return;
+        mod.by = { ...mod.by, chosen: { id: o.id, zc: o.zoneChanges ?? 0 } };
+      }
+      if (e.choose) {
+        const chosen = chooseDamageSource(s, ctx, e.choose, src);
+        if (chosen === "paused") return "paused";
+        if (!chosen) return;
+        mod.by = { ...mod.by, chosen };
+      }
+      if (e.bySubject) {
+        // "The next time that creature would deal combat damage": the trigger's creature, as the object it is.
+        const o = ctx.subject && s.objects[ctx.subject.id];
+        if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
+        mod.by = { ...mod.by, chosen: { id: o.id, zc: ctx.subject!.zc } };
+      }
+      if (e.toPlayer) {
+        const [p] = players(s, e.toPlayer, ctx);
+        if (p === undefined) return;
+        mod.to = { player: p, permanentsOf: p };
+      }
+      const live = (s.damageMods ?? []).filter((r) => r.turn === s.turn || (r.until === "yourNextTurn" && !(s.activePlayer === r.you && s.turn > r.turn)));
+      s.damageMods = [...live, { id: `dm${s.nextId++}`, mod, you: ctx.controller, name: ctx.sourceDef.name, turn: s.turn, ...(e.until ? { until: e.until } : {}) }];
+      log(s, `${src}: ${e.mod.text.replace(/\.$/, "")}.`);
+      return;
+    }
     case "pumpPerBlocker":
       for (const o of objects(s, e.what, ctx)) {
         // Counted as it resolves (CR 702.23b).

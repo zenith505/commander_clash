@@ -1,6 +1,6 @@
 # Roadmap
 
-18,949 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,064 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -225,14 +225,14 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      trigger shapes (Broodcaller Scourge, Glamdring), Old Man of the Sea, Sphere of Annihilation, Quag Feast
      ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester ("their total power"), Sundering
      Archaic (colors spent).
-   - "Your team" is "you" (CR 102.4) and "Partner with" works (27 cards); still out: "each player on your team" (Azra
-     Bladeseeker), "each of your teammates" (Imperial Mask), Combo Attack, surge (Fall of the Titans). Pir and other
+   - "Your team" is "you" (CR 102.4), as is Azra Bladeseeker's "each player on your team", and "Partner with" works (27
+     cards); still out: "each of your teammates" (Imperial Mask), Combo Attack, surge (Fall of the Titans). Pir and other
      "Partner with" cards are out on their other lines.
    - "Target ... with mana value X or less, where X is ..." works for the life you gained this turn (Celestine, Moseo);
      still out: Rodolf (reflexive "when you do"), damage dealt (Venerable Warsinger), players attacked (Custodi
      Soulcaller), Go-Shintai of Hidden Cruelty, Ancient Brass Dragon (a die roll's X with "total mana value X or less"),
      casting from revealed library cards (Sunbird's Invocation), Kamahl's Druidic Vow, Eldritch Evolution, Rally the
-     Ancestors, Wishing Well (a reflexive "when you do" with "equal to the number of coin counters").
+     Ancestors. Wishing Well and "with mana value equal to" an amount work.
    - "Total mana value / power N or X or less" for a group of targets works (Rampaging Yao Guai, Orcus, Patch Up,
      Reunion of the House), only one such group per ability. An enters trigger's own X works (Dune Drifter, Kinetic
      Ooze). "Double the number of each kind of counter you have" (on players) is out.
@@ -243,13 +243,13 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      and lost").
    - "Put a creature card from your hand onto the battlefield tapped and attacking" works, with a choice of what it
      attacks (CR 508.4), as do Kaalia, Shadowfax ("lesser power") and Sneak Attack (haste, sacrificed at the end step);
-     still out: Minion of the Mighty (pack tactics), Ilharg ("third from the top"), Arni Metalbrow, Ultra Magnus,
+     still out: Minion of the Mighty (pack tactics), Arni Metalbrow, Ultra Magnus,
      Strefan. Tokens created attacking still attack what the source attacks, without the choice.
    - "Search your library and/or graveyard" works (the planeswalker deck cards, Finale of Devastation); the player is
      asked "library too, or only the graveyard?" only when the graveyard has a card that fits, so searching nothing just
      to skip the shuffle isn't offered. "A card named A or B" works (Bogbrew Witch, Dragonstorm Forecaster): it splits
-     only between names of two or more words, since a name may hold "or" (Fight or Flight). "... and/or a card named
-     ..." (Alpine Houndmaster, Agency Outfitter) is out.
+     only between names of two or more words, since a name may hold "or" (Fight or Flight). "A card named A and/or a card
+     named B" works for a library search (Alpine Houndmaster); Agency Outfitter ("graveyard, hand and/or library") is out.
    - "If X is N or more" works in a spell; still out: "instead" (Finale of Revelation), "destroy all other creatures"
      after making tokens (Martial Coup), Banefire, Finale of Eternity and Finale of Promise.
    - "You may cast target ... card from your graveyard without paying its mana cost" works (Torrential Gearhulk,
@@ -259,11 +259,23 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Half an amount: "they lose half their life", "pay half your life" (rulings: 0 with 0 or less life), "Round up each
      time", each player's own half work; still out: Temporal Extortion ("any player may pay"), Heartless Hidetsugu
      (per-recipient damage), Saw in Half, Aspect of Wolf, The Goose Mother, Banshee, Chainer's Torment, Doomsday, Death
-     Wish, Tectonic Split ("sacrifice half the lands you control" as an additional cost), Contaminated Drink (rad
+     Wish, Contaminated Drink (rad
      counters), Contested Game Ball and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
-   - Damage replacements that change the amount (double, +N, half: Ghosts of the Innocent, Furnace of Rath, Torbran,
-     Dictate of the Twin Gods, Dark Sphere, Backdraft; about 40 cards) need the affected player to order them with
-     prevention shields (CR 616.1), so they're still out.
+   - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
+     "all but N", "can't be prevented"; the affected player orders them with shields, CR 616.1); still out: Neriv and
+     Obosh (mana value of the source), Bitter Feud, Desperate Gambit and Forcefield (next-time doubling on a chosen or
+     unblocked source), Quest for Pure Flame, Taii Wakeen, Goblin Goliath and Jeska (other lines), Rankle and Torbran
+     (a "player or battle" trigger), the Ajani emblem, Lightning Surge, Arrow Storm, Banefire and Demonfire
+     (conditional "can't be prevented"), Flames of the Blood Hand, Volcano Hellion, and prevention with extra effects
+     (Nine Lives, Swans of Bryn Argoll, Mindskinner, Hostility, Weeping Angel, Ironscale Hydra). A replacement applies
+     to all of one source's damage to one recipient at once, so one order per recipient. Bots' combat choices don't
+     count doublers.
+   - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
+     flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends, Mana
+     Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast, Fighting
+     Chance), Fiery Gambit, Game of Chaos, Squee's Revenge, Crooked Scales, Krark the Thumbless, Planar Chaos, and lines
+     that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots don't activate a flip
+     whose loss costs them something.
    - "Each other creature you control enters with an additional +1/+1 counter on it" works from permanents already on
      the battlefield (Renata, Grumgully, Dragonstorm Globe, Oath of Gideon, Arlinn); still out: "for each" (Giada,
      Bioengineered Future), "of the chosen type" (Metallic Mimic), conditions (Vampire Socialite, Dearly Departed),
@@ -318,7 +330,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (Fertile Ground on it): it's refused rather than asked. No supported card hits this yet.
    Left from the for-each-opponent/commander/mana value X round:
    - Reflexive "When you do" outside collect evidence (Lich's Relic, Balrog); "choose up to one target" (Luminate
-     Primordial, Shellshock, Mega Flare); "third from the top" (Riptide Gearhulk); exchanges of control (Twist
+     Primordial, Shellshock, Mega Flare); exchanges of control (Twist
      Allegiance, Reins of Power); "creatures and lands target opponent controls don't untap during their next
      untap step" (Exhaustion).
    - Bots choose X for "with mana value X" counterspells (Spell Blast) but cast Killing Glare-style "power X or less"
@@ -524,7 +536,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   battlefield and the stack only (not a commander in the command zone, which can't deal damage there anyway).
   Prevention still out: "that damage is dealt to that source's controller instead" (Reflect Damage), Eye for an Eye's
   "instead that source deals that much damage to you and ~ deals that much damage to that source's controller",
-  Dark Sphere's "prevent half that damage, rounded down", Nova Pentacle's "target creature of an opponent's choice",
+  Nova Pentacle's "target creature of an opponent's choice",
   "if damage is prevented this way, you may have ~ deal that much damage to target creature" (Channel Harm) and
   "to that creature" (Comeuppance), "sources of the color of your choice" (Prismatic Strands), Rhystic Circle's "any
   player may pay {1}", Heavy Fog's cast restriction; about 95 cards that mention prevention are still out (search

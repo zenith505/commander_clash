@@ -148,6 +148,8 @@ export type Count =
   | { kind: "rollResult" }
   /** "The other result" after "roll two dX and choose one result": the one not chosen. */
   | { kind: "rollOther" }
+  /** "For each flip you won" after "flip a coin until you lose a flip". */
+  | { kind: "flipsWon" }
   /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
@@ -223,7 +225,7 @@ export interface TargetSpec {
    * it resolves (CR 601.2c, 608.2b; rulings on Beguiler of Wills and Earthshaker Khenra), for a group or a search as it
    * resolves (`bindBound`). Until then, any value.
    */
-  bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least"; amount: AmountExpr };
+  bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
   /** `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1). */
   combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
@@ -350,6 +352,8 @@ export interface TargetSpec {
 export interface SearchDest {
   zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile";
   tapped?: boolean;
+  /** "Put that card third from the top" (Long-Term Plans), for "libraryTop". */
+  third?: true;
   /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
   counters?: { counter: CounterKind; n: Amount };
 }
@@ -546,6 +550,50 @@ export interface Untargetable {
   subtype?: string;
 }
 
+/**
+ * A replacement effect that changes how much damage is dealt (CR 614.1a): "If a source you control would deal damage to a
+ * permanent or player, it deals double that damage instead" (Angrath's Marauders), "... that much damage plus 2" (Torbran),
+ * "... half that damage, rounded down" (Ghosts of the Innocent), "... minus 1" (Benevolent Unicorn). It applies to the
+ * damage after it's divided or assigned (rulings), once per damage event (CR 614.5), and the player or controller of the
+ * permanent being dealt it orders it with the other replacement and prevention effects (CR 616.1). It isn't prevention:
+ * "damage can't be prevented" doesn't stop it (rulings on Ghosts of the Innocent).
+ */
+export interface DamageMod {
+  /**
+   * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
+   * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
+   */
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent";
+  n?: number;
+  amount?: Amount;
+  up?: true;
+  /**
+   * A prevention effect (CR 615.1a), not a replacement: Gisela's "prevent half that damage, rounded up", Rem Karolus's
+   * "prevent that damage". "Damage can't be prevented" stops it (CR 615.12).
+   */
+  prevent?: true;
+  /** Callous Giant: "If a source would deal 3 or less damage to ~": only to damage of at most this much. */
+  atMost?: number;
+  /**
+   * What would deal the damage: any of `filters` (as it deals it, CR 609.7b); `self`: the permanent with the ability (for
+   * an Aura or Equipment, the permanent it's attached to); `other`: not that permanent; `spell`: a spell, not a permanent.
+   * Missing: any source.
+   */
+  by?: { self?: true; other?: true; filters?: { spec: TargetSpec; spell?: true }[]; /** A resolved effect's target or chosen source, as the object it was; `spell`: a spell, and the permanent it becomes (CR 609.7a). */ chosen?: { id: ObjectId; zc: number; spell?: true } };
+  /**
+   * What it would be dealt to: `players` ("enchanted": the player enchanted by the permanent with the ability; "chosen":
+   * its chosen player), `objects` (a permanent matching it, "you" being the ability's controller), `self` (the permanent
+   * with the ability), `chosenPermanents` (a permanent the chosen player controls). Missing: any permanent or player.
+   */
+  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true; /** A resolved effect's "that player" and the permanents they control. */ player?: PlayerId; permanentsOf?: PlayerId };
+  combat?: "only" | "non";
+  /** The Rollercrusher Ride: "while there are four or more card types among cards in your graveyard". */
+  while?: StaticCondition;
+  /** "The next time ... would deal damage": the next damage event only (Dark Sphere, Impulsive Maneuvers). */
+  nextTime?: true;
+  text: string;
+}
+
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
   /** Layer 4, "in addition to its other types"; `allCreatureTypes`: "with all creature types" (Mutavault). */
@@ -614,6 +662,10 @@ export type Modification =
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
   | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }
+  /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
+  | { kind: "damageMod"; mod: DamageMod }
+  /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
+  | { kind: "unpreventable"; combat?: true }
   /** "Can't block creatures with power 2 or greater" (a blocking restriction on the blocker, CR 509.1b). */
   | { kind: "cantBlockCreatures"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
@@ -899,7 +951,7 @@ export type Effect =
    * `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). `evenly`: "divided evenly,
    * rounded down, among any number of targets" (Fireball): among the targets still legal as it resolves, nothing chosen.
    */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true }
+  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true; /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
@@ -1065,7 +1117,7 @@ export type Effect =
    * "Put target card from your graveyard on top of / on the bottom of its owner's library"; "ownersChoice": "Target
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
-  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" }
+  | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
   | { type: "tap"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
@@ -1303,7 +1355,7 @@ export type Effect =
    * CR 610.3: it returns to its owner's hand). `linked`: Tidehollow Sculler's "When ~ leaves the battlefield, return the
    * exiled card to its owner's hand" returns it (CR 607.2a).
    */
-  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile"; until?: "sourceLeaves"; linked?: boolean }
+  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile" | /** Lost Hours */ "libraryThird"; until?: "sourceLeaves"; linked?: boolean }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true } // CR 701.9
@@ -1312,6 +1364,11 @@ export type Effect =
   | { type: "endure"; what: ObjRef; n: Amount }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
+  /**
+   * "Flip a coin" (CR 705): its controller calls it and wins or loses the flip, for a following "If you win the flip, ..."
+   * (SpellCondition "wonFlip"); `untilLose`: "flip a coin until you lose a flip", counting the wins (Count "flipsWon").
+   */
+  | { type: "flipCoin"; untilLose?: true }
   /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
    * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
@@ -1505,6 +1562,13 @@ export type Effect =
   | { type: "cantPlayLands"; who: PlayerRef }
   /** "Damage can't be prevented this turn" (CR 615.12). */
   | { type: "noPrevention" }
+  /**
+   * A damage amount replacement for the rest of the turn, or `until` its controller's next turn (CR 611.2a): "If a source
+   * you control would deal damage this turn, it deals double that damage instead" (Insult), "Each time target permanent
+   * would deal damage ... this turn" (Overblaze: `byTarget`), "until your next turn, if a source would deal damage to that
+   * player or a permanent that player controls" (Lightning, Army of One: `toPlayer`). Its amounts are counted as it resolves.
+   */
+  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** "That creature": the trigger's subject. */ bySubject?: true }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**
@@ -1512,7 +1576,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster): at most one card of each name. */ oneEach?: true }
   /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
@@ -1598,6 +1662,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
+  | { kind: "wonFlip"; lost?: true }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
   | { kind: "destroyedThisWay" }
   /**
@@ -1688,6 +1754,7 @@ export type TriggerEvent =
   | "chapter"
   | "selfEnters" // When this enters
   | "selfDies" // When this dies
+  | "selfDiesOrExiled" // "When this dies or is put into exile from the battlefield" (the God-Eternals)
   | "selfToGraveyard" // "When this is put into a graveyard from the battlefield" (any permanent, not just a creature)
   | "selfLeaves" // "When this leaves the battlefield", wherever it goes (CR 603.6c, 603.10a)
   /**
@@ -1784,6 +1851,11 @@ export type TriggerEvent =
   | "selfDealsDamageToCreature"
   | "selfDealsCombatDamageToCreature"
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
+  /** "Whenever you win a coin flip", "whenever you lose a coin flip" (CR 705.2): once per flip. */
+  | "youWinFlip"
+  | "youLoseFlip"
+  /** "Whenever a player wins a coin flip" (Okaun, Zndrsplt). */
+  | "playerWinsFlip"
   /** "Whenever you roll one or more dice": once per instruction to roll (CR 706); the event amount is the result. */
   | "youRollDice"
   /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
@@ -1901,7 +1973,7 @@ export interface TriggeredAbility {
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
-  attacker?: { filter: TargetSpec; other?: boolean };
+  attacker?: { filter: TargetSpec; other?: boolean; /** "Whenever a creature attacks": anyone's (Caltrops, Righteous Cause). */ anyone?: true };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
@@ -1928,6 +2000,8 @@ export interface TriggeredAbility {
   sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
+  /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
+  ownGraveyard?: true;
   /**
    * Evolve (CR 702.100a): "if that creature's power is greater than this creature's power and/or
    * that creature's toughness is greater than this creature's toughness", checked as it triggers and
@@ -2256,7 +2330,7 @@ export interface CostMod {
  */
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up" }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }

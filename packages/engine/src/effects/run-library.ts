@@ -130,12 +130,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (!cards.length) return;
         const kind = e.filter?.text ?? "card";
         const what = `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
-        const to = e.action === "discard" ? `for ${p.name} to discard` : "to exile";
+        const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : "to exile";
         s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: 1, max: 1, dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
         return "paused";
       }
       const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
       if (e.action === "discard") discardCards(s, pid, ids, "", false, false, ctx.controller);
+      else if (e.action === "libraryThird")
+        for (const id of ids) {
+          log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their library third from the top.`);
+          moveObject(s, id, "library", { top: true });
+          // On the bottom of a library with fewer than 3 cards (rulings on Lost Hours).
+          if (p.library[0] === id) p.library.splice(Math.min(2, p.library.length - 1), 0, p.library.shift()!);
+        }
       else
         for (const id of ids) {
           log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, obj(s, id)).name} from ${p.name}'s hand${me ? ` until ${src} leaves the battlefield` : ""}.`);
@@ -381,7 +388,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // They've searched, found something or not (Archive Trap rulings).
         const searched = ((s.turnLog ??= {}).searched ??= []);
         if (!yardOnly && !searched.includes(p.id)) searched.push(p.id);
-        const cards = [...(yardOnly ? [] : libOf(p.id).library), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
+        let cards = [...(yardOnly ? [] : libOf(p.id).library), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
+        // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
+        if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => defOf(s, obj(s, x)).name === defOf(s, obj(s, id)).name) === i);
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
@@ -430,7 +439,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const to = dest(pid, id);
           if (to.zone === "libraryTop") {
             obj(s, id).zone = "library";
-            p.library.unshift(id);
+            // Third from the top, or on the bottom of a library with fewer than 3 other cards (rulings on Long-Term Plans).
+            p.library.splice(to.third ? Math.min(2, p.library.length) : 0, 0, id);
           } else if (to.zone === "battlefield") {
             // "With X additional +1/+1 counters on it" (CR 614.1c).
             const extra = to.counters ? Math.max(0, amountNow(s, to.counters.n, ctx)) : 0;

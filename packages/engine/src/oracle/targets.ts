@@ -456,12 +456,13 @@ export function parseTargetPhrase(
   const extra: Partial<TargetSpec> = {};
   // "Card with mana value less than or equal to ~'s power from your graveyard", "creature with power less than or equal to the
   // number of Islands you control": the amount as written, read first since it may hold words of its own (TargetSpec.bound).
-  const bound = / with (power|toughness|mana value) (less|greater) than or equal to (.+)$/i.exec(phrase.trim());
+  // Wishing Well: "with mana value equal to the number of coin counters on ~".
+  const bound = / with (power|toughness|mana value) (?:(less|greater) than or )?equal to (.+)$/i.exec(phrase.trim());
   if (bound) {
     const from = / from (?:your|a|an opponent's) graveyard$/i.exec(bound[3]!);
     const amount = opts.count?.(from ? bound[3]!.slice(0, from.index) : bound[3]!);
     if (!amount) return null;
-    extra.bound = { key: bound[1]!.toLowerCase() === "mana value" ? "manaValue" : (bound[1]!.toLowerCase() as "power" | "toughness"), at: bound[2]!.toLowerCase() === "less" ? "most" : "least", amount };
+    extra.bound = { key: bound[1]!.toLowerCase() === "mana value" ? "manaValue" : (bound[1]!.toLowerCase() as "power" | "toughness"), at: !bound[2] ? "exact" : bound[2].toLowerCase() === "less" ? "most" : "least", amount };
     p = `${phrase.trim().slice(0, bound.index)}${from ? from[0] : ""}`.toLowerCase();
   }
   p = p.replace(/\btime lords?\b/g, "time-lord");

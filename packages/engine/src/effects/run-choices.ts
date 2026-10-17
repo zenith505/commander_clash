@@ -152,6 +152,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? !!s.resolving!.did
           : e.cond.kind === "wonClash"
             ? !!s.resolving!.wonClash
+            : e.cond.kind === "wonFlip"
+            ? !!s.resolving!.flipped && s.resolving!.flipped.won !== !!e.cond.lost
             : e.cond.kind === "destroyedThisWay"
             ? !!s.resolving!.destroyed?.length
             : e.cond.kind === "rollIn"

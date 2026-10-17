@@ -23,9 +23,17 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   const upTo = !!m[1] || m[2] === "any number of";
   const n = m[2] === "any number of" ? 99 : NUMBER_WORDS[m[2]!.toLowerCase()]!;
   const reveal = /, reveal /.test(s);
+  const rest = m[4]!;
+  // Alpine Houndmaster: "a card named A and/or a card named B": up to one of each (one search, CR 701.23).
+  const both = /^card named ([A-Z][^~]*?) and\/or a card named ([A-Z][^~]*)$/.exec(m[3]!);
+  if (both && n === 1 && !m[1]) {
+    const r = new RegExp(`^put them ${SEARCH_DEST}, then shuffle$`, "i").exec(rest);
+    if (!r || / or |\band\/or\b/.test(`${both[1]} ${both[2]}`)) return null;
+    const filter: TargetSpec = { kind: "card", anyOf: [both[1]!, both[2]!].map((name) => ({ kind: "card" as const, named: name, text: `card named ${name}` })), text: m[3]! };
+    return [{ type: "search", filter, n: 2, upTo: true, oneEach: true, reveal, dest: searchDest(r[1]!) }];
+  }
   const filter = parseSearchFilter(m[3]!, count);
   if (filter === null) return null;
-  const rest = m[4]!;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
   const base = { type: "search" as const, ...(filter ? { filter } : {}), n, upTo, reveal };
@@ -34,6 +42,7 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
     return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!) }];
   // The shuffle and putting the card on top are one action (rulings).
   if (/^then shuffle and put (?:that card|the card|it) on top(?: of your library)?$/i.test(rest) && n === 1) return [{ ...base, dest: { zone: "libraryTop" } }];
+  if (/^then shuffle and put that card third from the top$/i.test(rest) && n === 1) return [{ ...base, dest: { zone: "libraryTop", third: true } }];
   if (/^put (?:it|that card) on top of your library, then shuffle$/i.test(rest)) return null; // shuffled away again: not a real template
   return null;
 }

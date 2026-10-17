@@ -17,7 +17,7 @@
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
 import { creatureCardAbove } from "./graveyard";
-import type { Affects, Amount, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
+import type { Affects, Amount, DamageMod, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
@@ -123,6 +123,10 @@ export interface Characteristics {
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
   preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }[];
+  /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
+  damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
+  /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */
+  unpreventable?: "all" | "combat";
   /** "Can't be blocked except by ...": each entry is a group a blocker has to belong to (CR 509.1b). */
   blockableOnlyBy?: { filters: TargetSpec[]; text: string }[];
   /** Attackers it can't block. */
@@ -850,6 +854,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.preventDamage = [...(c.preventDamage ?? []), p];
       return;
     }
+    case "unpreventable":
+      if (c.unpreventable !== "all") c.unpreventable = m.combat ? "combat" : "all";
+      return;
+    case "damageMod":
+      c.damageMods = [...(c.damageMods ?? []), { ...m.mod, you: controllerOfInst(e, chars), from: e.sourceId ?? "" }];
+      return;
     case "blockableOnlyBy":
       c.blockableOnlyBy = [...(c.blockableOnlyBy ?? []), { filters: m.filters, text: m.text }];
       return;

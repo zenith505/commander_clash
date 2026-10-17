@@ -77,6 +77,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Roll two d4 and choose one result. Create a number of ... equal to that result. Then ... equal to the other result."
   if (!each && ctx?.chooseResult && /^that result$/i.test(p)) return count({ kind: "rollResult" });
   if (!each && ctx?.chooseResult && /^the other result$/i.test(p)) return count({ kind: "rollOther" });
+  // "Put a +1/+1 counter on ~ for each flip you won" (Crazed Firecat).
+  if (each && /^flip you won$/i.test(p)) return count({ kind: "flipsWon" });
   // Life and hands.
   if ((m = /^(your|their|that player's|target player's|target opponent's|enchanted player's) life total$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);

@@ -56,3 +56,23 @@ export function runDiceEffect(s: GameState, e: Extract<Effect, { type: "roll" }>
     return "paused";
   }
 }
+
+/**
+ * "Flip a coin" (CR 705.2): its controller calls heads or tails and wins the flip if the coin matches, an even chance
+ * either way, so only whether they won is kept. "Flip a coin until you lose a flip": as many as it takes. Each flip won
+ * or lost is an event of its own ("whenever you win a coin flip").
+ */
+export function runCoinEffect(s: GameState, e: Extract<Effect, { type: "flipCoin" }>, ctx: ResolveCtx, src: string): void {
+  const who = ctx.controller;
+  let wins = 0;
+  let won = false;
+  // Even "until you lose a flip" ends some time; a long run of wins is cut short where paper Magic would be (CR 732).
+  for (let i = 0; i < 100; i++) {
+    won = nextRandom(s) < 0.5;
+    fireEvent(s, { type: "coinFlipped", player: who, won });
+    if (won) wins++;
+    if (!won || !e.untilLose) break;
+  }
+  s.resolving!.flipped = { won, wins };
+  log(s, e.untilLose ? `${player(s, who).name} flips coins for ${src} until losing a flip: ${wins} won.` : `${player(s, who).name} flips a coin for ${src} and ${won ? "wins" : "loses"} the flip.`);
+}

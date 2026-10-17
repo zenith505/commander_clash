@@ -117,6 +117,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;
   }
+  // Flipping a coin (CR 705): see "If you win the flip, ..." in body.ts.
+  if (/^[Ff]lip a coin$/.test(s)) return [{ type: "flipCoin" }];
+  if (/^[Ff]lip a coin until you lose a flip$/.test(s)) return [{ type: "flipCoin", untilLose: true }];
   // Clash (CR 701.30b): see "If you win, ..." in body.ts.
   if (/^Clash with an opponent$/i.test(s)) return [{ type: "clash" }];
   // Rolling dice (CR 706.1a: "a d20", "N-sided dice"). A modifier in the same instruction ("and add the number of cards

@@ -13,7 +13,7 @@ import type { ManaSpent } from "../mana";
 import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
-import { runDiceEffect } from "./run-dice";
+import { runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
@@ -493,6 +493,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":
+    case "damageMod":
     case "pumpPerBlocker":
     case "draw":
     case "getEnergy":
@@ -656,6 +657,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDungeonsEffect(s, e, ctx, src);
     case "roll":
       return runDiceEffect(s, e, ctx, src);
+    case "flipCoin":
+      return runCoinEffect(s, e, ctx, src);
     case "may":
     case "eachMay":
     case "punisher":
@@ -742,5 +745,5 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const item = s.resolving?.item;
   const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
   const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;
-  return cardSource(ctx.sourceDef, ctx.controller, ref);
+  return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell ? { spell: true as const } : {}) };
 }

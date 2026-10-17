@@ -55,6 +55,37 @@ export function damageSourceOptions(s: GameState, filter: TargetSpec | undefined
   return out;
 }
 
+/**
+ * Asks the ability's controller for a source of damage (CR 609.7a) as it resolves, then gives the one chosen, as the
+ * object it is; null when there's none to choose.
+ */
+export function chooseDamageSource(s: GameState, ctx: ResolveCtx, filter: TargetSpec, src: string): "paused" | { id: ObjectId; zc: number; spell?: true } | null {
+  const sc = (s.resolving!.scratch ??= {});
+  if (sc.damageSource === undefined) {
+    const options = damageSourceOptions(s, filter, ctx.controller);
+    if (!options.length) {
+      log(s, `${src}: there's no ${filter.text ? `${filter.text.replace(/^target /, "")} ` : ""}source to choose.`);
+      return null;
+    }
+    s.pending = {
+      kind: "chooseOption",
+      player: ctx.controller,
+      source: src,
+      what: "damageSource",
+      prompt: `choose a source of damage${filter.text ? ` (${filter.text.replace(/^target /, "")})` : ""}`,
+      options: options.map((o) => o.key),
+      labels: options.map((o) => `${o.name}${o.spell ? " (spell)" : ""}, ${player(s, o.controller).name}'s`),
+    };
+    return "paused";
+  }
+  const [id, zc] = sc.damageSource.split("@");
+  const o = s.objects[id!];
+  if (!o) return null;
+  const spell = o.zone === "stack" && s.stack.some((x) => x.kind === "spell" && x.objectId === o.id);
+  log(s, `${player(s, ctx.controller).name} chooses ${spell ? defOf(s, o).name : o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name} as the source for ${src}.`);
+  return { id: o.id, zc: Number(zc), ...(spell ? { spell: true as const } : {}) };
+}
+
 /** The permanent or player a reference means now, as the object it is (CR 400.7), or null if it's gone or illegal. */
 function fixedRecipient(s: GameState, to: DamageRecipient, ctx: ResolveCtx): { object: ObjectId; zc: number } | { player: PlayerId } | null {
   const r = to.ref === "attached" ? { objs: objects(s, to, ctx), pids: [] } : damageRecipients(s, to, ctx);
@@ -80,31 +111,11 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   };
   // The source of your choice, chosen as it resolves (CR 609.7a): asked first, then the rest is worked out.
   if (spec.by?.choose) {
-    const sc = (s.resolving!.scratch ??= {});
     const filter = bindChosen(spec.by.choose, ctx.chosen);
-    if (sc.damageSource === undefined) {
-      const options = damageSourceOptions(s, filter, ctx.controller);
-      if (!options.length) {
-        log(s, `${src}: there's no ${filter.text ? `${filter.text.replace(/^target /, "")} ` : ""}source to choose.`);
-        return;
-      }
-      s.pending = {
-        kind: "chooseOption",
-        player: ctx.controller,
-        source: src,
-        what: "damageSource",
-        prompt: `choose a source of damage${filter.text ? ` (${filter.text.replace(/^target /, "")})` : ""}`,
-        options: options.map((o) => o.key),
-        labels: options.map((o) => `${o.name}${o.spell ? " (spell)" : ""}, ${player(s, o.controller).name}'s`),
-      };
-      return "paused";
-    }
-    const [id, zc] = sc.damageSource.split("@");
-    const o = s.objects[id!];
-    if (!o) return;
-    const spell = o.zone === "stack" && s.stack.some((x) => x.kind === "spell" && x.objectId === o.id);
-    rule.by = { chosen: { id: o.id, zc: Number(zc), ...(spell ? { spell: true as const } : {}) }, filter };
-    log(s, `${player(s, ctx.controller).name} chooses ${spell ? defOf(s, o).name : o.zone === "battlefield" ? characteristics(s, o).name : defOf(s, o).name} as the source for ${src}.`);
+    const chosen = chooseDamageSource(s, ctx, filter, src);
+    if (chosen === "paused") return "paused";
+    if (!chosen) return;
+    rule.by = { chosen, filter };
   }
   if (spec.by?.filter) rule.by = { ...rule.by, filter: bindChosen(spec.by.filter, ctx.chosen) };
   if (spec.by?.target) {

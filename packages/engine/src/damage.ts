@@ -12,9 +12,9 @@ import { fireEvent } from "./effects";
 import { objectMatches, playerProtectedFrom } from "./effects/targeting";
 import { canPreventDamage, gainLife, log, loseLife, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
-import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
+import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
-import type { TargetSpec } from "./abilities";
+import type { DamageMod, TargetSpec } from "./abilities";
 
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
@@ -34,6 +34,10 @@ export interface DamageSource {
    * it, as it last existed. For a source chosen earlier (CR 609.7a).
    */
   ref?: { object: ObjectId; zc: number };
+  /** It's a spell (CR 112.1), for "if a spell would deal damage" (Benevolent Unicorn, Fire Servant). */
+  spell?: true;
+  /** The damage it deals can't be prevented (CR 615.12): all of it, or its combat damage. */
+  unpreventable?: "all" | "combat";
 }
 
 /**
@@ -43,11 +47,14 @@ export interface DamageSource {
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
   const zc = o.zone === "battlefield" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, id: o.id, ref: { object: o.id, zc }, ...(o.isCommander ? { commanderId: o.id } : {}) };
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, id: o.id, ref: { object: o.id, zc }, ...(o.isCommander ? { commanderId: o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */
 export const cardSource = (d: CardDef, controller: PlayerId, ref?: DamageSource["ref"]): DamageSource => ({ name: d.name, controller, colors: d.colors, types: d.types, subtypes: d.subtypes, keywords: d.keywords, ...(ref ? { ref } : {}) });
+
+/** Can't this source's damage be prevented (CR 615.12)? */
+export const unpreventable = (src: DamageSource, combat: boolean) => src.unpreventable === "all" || (src.unpreventable === "combat" && combat);
 
 const has = (src: DamageSource, k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 
@@ -75,7 +82,7 @@ export function dealDamage(
   opts: { combat?: boolean; lifelink?: { n: number }; shielded?: boolean; witherCounters?: Map<ObjectId, number> } = {},
 ): number {
   if (n <= 0) return 0;
-  if (opts.combat && s.preventCombatDamage && canPreventDamage(s)) return 0;
+  if (opts.combat && s.preventCombatDamage && canPreventDamage(s) && !unpreventable(src, true)) return 0;
   if (!opts.shielded) {
     const ev: DamageEvent = { src, to: "object" in to ? { object: to.object.id } : { player: to.player }, n, ...(opts.combat ? { combat: true } : {}) };
     return dealDamageBatch(s, [ev], { lifelink: opts.lifelink }).reduce((a, e) => a + e.dealt, 0);
@@ -83,7 +90,7 @@ export function dealDamage(
   const targetName = "object" in to ? characteristics(s, to.object).name : player(s, to.player).name;
   // The Phantom creatures: prevent it all and remove a +1/+1 counter (CR 615). Damage dealt at the same time by
   // several sources (combat) removes only one counter; with none on it, the damage is still prevented (rulings).
-  if ("object" in to && abilitiesOf(s, to.object).phantom && canPreventDamage(s)) {
+  if ("object" in to && abilitiesOf(s, to.object).phantom && canPreventDamage(s) && !unpreventable(src, !!opts.combat)) {
     const o = to.object;
     const event = opts.combat ? `${s.turn}:${s.step}` : undefined;
     log(s, `Damage from ${src.name} to ${targetName} is prevented.`);
@@ -208,6 +215,8 @@ type ShieldOp =
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
+  /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** A "next time" one, used up now. */ once?: string }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
   | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string };
 
@@ -325,6 +334,103 @@ function redirectDestination(s: GameState, r: RedirectShield): Rec | null {
   return c.types.includes("Creature") || c.types.includes("Planeswalker") ? { object: o.id } : null;
 }
 
+// Damage amount replacements (DamageMod): permanents' static abilities that change how much damage is dealt.
+
+/** One permanent's damage amount replacement, as the planner sees it. `holder` has the ability (for an Equipment's, the creature it's attached to). */
+interface LiveMod {
+  key: string;
+  mod: DamageMod & { you: PlayerId; from?: ObjectId };
+  /** None for a resolved spell's or ability's (GameState.damageMods). */
+  holder?: GameObject;
+  card: string;
+  /** GameState.damageMods's id of a "next time" one. */
+  once?: string;
+}
+
+function liveMods(s: GameState): LiveMod[] {
+  const out: LiveMod[] = [];
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    for (const [i, mod] of (characteristics(s, o).damageMods ?? []).entries()) {
+      const from = s.objects[mod.from];
+      out.push({ key: `mod:${id}:${i}`, mod, holder: o, card: from ? characteristics(s, from).name : characteristics(s, o).name });
+    }
+  }
+  // A resolved one lasts the turn, or until its controller's next turn begins (CR 611.2a).
+  for (const r of s.damageMods ?? [])
+    if (r.turn === s.turn || (r.until === "yourNextTurn" && !(s.activePlayer === r.you && s.turn > r.turn))) out.push({ key: `mod:${r.id}`, mod: { ...r.mod, you: r.you }, card: r.name, ...(r.mod.nextTime ? { once: r.id } : {}) });
+  return out;
+}
+
+/** Does the replacement apply to this damage: its source and what it would be dealt to, combat or not (CR 609.7b)? */
+function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolean): boolean {
+  const d = m.mod;
+  const h = m.holder;
+  if (d.prevent && !preventing) return false;
+  if (d.combat && (d.combat === "only") !== !!e.combat) return false;
+  if (d.atMost !== undefined && e.n > d.atMost) return false;
+  const ref = e.src.ref;
+  const isHolder = !!ref && !!h && ref.object === h.id && ref.zc === (h.zoneChanges ?? 0);
+  if (d.by?.self && !isHolder) return false;
+  // A permanent spell chosen as the source: the permanent it becomes is that source too (CR 609.7a).
+  const c = d.by?.chosen;
+  if (c && !(ref && ref.object === c.id && (ref.zc === c.zc || (c.spell && ref.zc === c.zc + 1)))) return false;
+  if (d.by?.other && isHolder) return false;
+  if (d.by?.filters && !d.by.filters.some((f) => (!f.spell || e.src.spell) && sourceMatches(s, f.spec, e.src, d.you))) return false;
+  const t = d.to;
+  if (t) {
+    let ok = false;
+    if ("player" in e.to) {
+      const p = e.to.player;
+      ok = t.players === "all" || (t.players === "you" && p === d.you) || (t.players === "opponents" && p !== d.you) || (t.players === "enchanted" && h?.attachedToPlayer === p) || (t.players === "chosen" && h?.chosen?.player === p) || t.player === p;
+    } else {
+      const o = s.objects[e.to.object];
+      if (o && o.zone === "battlefield" && !(t.other && o.id === h?.id))
+        ok =
+          (!!t.self && o.id === h?.id) ||
+          (!!t.objects && objectMatches(s, t.objects, o, d.you, false)) ||
+          (!!t.chosenPermanents && h?.chosen?.player !== undefined && controllerOf(s, o) === h.chosen.player) ||
+          (t.permanentsOf !== undefined && controllerOf(s, o) === t.permanentsOf);
+    }
+    if (!ok) return false;
+  }
+  return !d.while || (!!d.from && staticConditionNow(s, d.while, d.from, d.you));
+}
+
+const modExtra = (s: GameState, m: LiveMod) => (m.mod.amount === undefined ? 0 : Math.max(0, evalAmount(s, m.mod.amount, { controller: m.mod.you, ...(m.mod.from ? { sourceId: m.mod.from } : {}) })));
+
+/** The damage after the replacement: double, triple, half, plus or minus (not below 0), or prevented. */
+function modAmount(s: GameState, m: LiveMod, n: number): number {
+  const d = m.mod;
+  if (d.op === "times") return n * (d.n ?? 1);
+  if (d.op === "half") return d.up ? Math.ceil(n / 2) : Math.floor(n / 2);
+  if (d.op === "plus") return n + modExtra(s, m);
+  if (d.op === "minus") return Math.max(0, n - modExtra(s, m));
+  if (d.op === "allBut") return Math.min(n, d.n ?? 0);
+  return 0;
+}
+
+function modLabel(s: GameState, m: LiveMod): string {
+  const d = m.mod;
+  const what =
+    d.op === "times" ? (d.n === 3 ? "Triple it" : "Double it")
+    : d.op === "half" ? (d.prevent ? `Prevent half of it, rounded ${d.up ? "down" : "up"}` : `Halve it, rounded ${d.up ? "up" : "down"}`)
+    : d.op === "plus" ? `Add ${modExtra(s, m)}`
+    : d.op === "minus" ? (d.prevent ? `Prevent ${modExtra(s, m)} of it` : `Take ${modExtra(s, m)} away`)
+    : d.op === "allBut" ? `Prevent all but ${d.n} of it`
+    : "Prevent it";
+  return `${what} (${m.card})`;
+}
+
+/** Every order of a few things. */
+function* permutations<T>(xs: T[]): Generator<T[]> {
+  if (xs.length <= 1) {
+    yield [...xs];
+    return;
+  }
+  for (const [i, x] of xs.entries()) for (const rest of permutations([...xs.slice(0, i), ...xs.slice(i + 1)])) yield [x, ...rest];
+}
+
 /**
  * Work out what the damage shields do to damage dealt at the same time (CR 510.2), without changing anything yet:
  * protection prevents damage first (it uses up no shield), then each shield counter prevents one source's damage
@@ -347,11 +453,14 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
   const ops: ShieldOp[] = [];
   const final: DamageEvent[] = [];
   const allRules = [...live(s), ...staticRules(s, events)];
+  const allMods = liveMods(s);
   const preventCap = new Map<string, number>();
   const redirectCap = new Map<string, number>();
   const counters = new Map<ObjectId, number>();
-  // "Damage can't be prevented" (CR 615.12): protection, shield counters and prevention shields don't stop it.
+  // "Damage can't be prevented" (CR 615.12): protection, shield counters and prevention shields don't stop it, nor
+  // damage from a source whose damage can't be prevented.
   const preventing = canPreventDamage(s);
+  const prev = (e: DamageEvent) => preventing && !unpreventable(e.src, !!e.combat);
   // Damage rules' shields: what's left of each, shared by all it protects, and how much of it each may take.
   const ruleCap = new Map<string, number>();
   const alloc = new Map<string, Map<string, number>>();
@@ -380,7 +489,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     }
     return out;
   };
-  const takes = (sh: PlanShield, e: DamageEvent) => !(e.applied ?? []).includes(sh.key) && (!sh.rule || ruleTakes(s, sh.rule, e));
+  const takes = (sh: PlanShield, e: DamageEvent) => (sh.kind !== "prevent" || prev(e)) && !(e.applied ?? []).includes(sh.key) && (!sh.rule || ruleTakes(s, sh.rule, e));
   let queue = events.filter((e) => e.n > 0).map((e) => ({ ...e, applied: e.applied ?? [] }));
   const order = turnOrderFrom(s, s.activePlayer);
   // A rule's "next N damage" shield protecting several permanents and players (Harm's Way's "you and/or permanents you
@@ -389,7 +498,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     if (rule.left === undefined || rule.left <= 0 || (!rule.redirect && !preventing)) continue;
     const per = new Map<string, { to: Rec; n: number }>();
     for (const e of queue) {
-      if (!ruleCovers(s, rule, e.to) || !ruleTakes(s, rule, e)) continue;
+      if (!ruleCovers(s, rule, e.to) || !ruleTakes(s, rule, e) || (!rule.redirect && !prev(e))) continue;
       const k = recKey(e.to);
       per.set(k, { to: e.to, n: (per.get(k)?.n ?? 0) + e.n });
     }
@@ -434,25 +543,31 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     for (const e of here) {
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
-      const rules = preventing ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
+      const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
       const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src))) ?? (preventedAll(s, e) ? undefined : rules[0]);
       if (rule) {
-        ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n: e.n, src: e.src });
+        // The player being dealt it may apply amount replacements first (CR 616.1): when the prevention gains its
+        // controller life or deals that much back, they're applied first when that's who chooses, as the most it can be.
+        let n = e.n;
+        const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
+        if ((rule.gainLife || rule.dealBack) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
+          for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
+        ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src });
         continue;
       }
-      if (preventing && preventedAll(s, e)) {
+      if (prev(e) && preventedAll(s, e)) {
         ops.push({ kind: "preventAll", srcName: e.src.name, toName });
         continue;
       }
-      if (preventing && "player" in to && playerProtectedFrom(s, to.player, e.src.controller, e.src)) {
+      if (prev(e) && "player" in to && playerProtectedFrom(s, to.player, e.src.controller, e.src)) {
         ops.push({ kind: "protection", srcName: e.src.name, toName });
         continue;
       }
-      if (preventing && "object" in to && protectedFrom(characteristics(s, obj(s, to.object)).keywords, e.src, protectionHolder(s, obj(s, to.object)))) {
+      if (prev(e) && "object" in to && protectedFrom(characteristics(s, obj(s, to.object)).keywords, e.src, protectionHolder(s, obj(s, to.object)))) {
         ops.push({ kind: "protection", srcName: e.src.name, toName });
         continue;
       }
-      if (preventing && "object" in to) {
+      if (prev(e) && "object" in to) {
         const left = counters.get(to.object) ?? obj(s, to.object).counters.shield ?? 0;
         if (left > 0) {
           counters.set(to.object, left - 1);
@@ -474,11 +589,9 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const ranked = [...opps].sort((a, b) => player(s, b).life - player(s, a).life);
         const i = choose({ player: me, prompt: `${toName}: which opponent gains control of it?`, labels: ranked.map((p) => player(s, p).name) });
         if (i === null) return { ask, ops, final };
-        ops.push({ kind: "betrayer", id: betrayer.id, to: ranked[i]!, prevented: preventing, toName });
-        if (preventing) {
-          for (const e of incoming) ops.push({ kind: "preventAll", srcName: e.src.name, toName });
-          incoming = [];
-        }
+        ops.push({ kind: "betrayer", id: betrayer.id, to: ranked[i]!, prevented: incoming.some(prev), toName });
+        for (const e of incoming) if (prev(e)) ops.push({ kind: "preventAll", srcName: e.src.name, toName });
+        incoming = incoming.filter((e) => !prev(e));
       }
     }
     // The same source's damage arriving by two routes is one amount to choose from.
@@ -494,62 +607,62 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     const who = chooserOf(to);
     const left = incoming.map((e) => e.n);
     const total = () => left.reduce((a, b) => a + b, 0);
-    let paused = false;
-    while (shields.length && total() > 0 && !paused) {
-      // Which shield applies next: it matters only when they can't all be used up and they do different things.
-      const capSum = shields.reduce((a, x) => a + x.cap, 0);
-      const same = (a: PlanShield, b: PlanShield) => a.kind === b.kind && (a.to ? recKey(a.to) : "") === (b.to ? recKey(b.to) : "");
-      let sh = shields[0]!;
-      if (capSum > total() && shields.some((x) => !same(x, sh))) {
-        const opts = [...shields].sort((a, b) => (a.kind === "prevent" ? 0 : 1) - (b.kind === "prevent" ? 0 : 1));
-        const part = (x: PlanShield) => (x.cap === Infinity ? "it" : `${x.cap} of it`);
-        const label = (x: PlanShield) => (x.kind === "prevent" ? `Prevent ${part(x)}${x.rule ? ` (${x.card})` : ""}` : `Deal ${part(x)} to ${nameOf(x.to!)} instead (${x.card})`);
-        const i = choose({ player: who, prompt: `Damage to ${toName}: which shield applies first?`, labels: opts.map(label) });
-        if (i === null) {
-          paused = true;
-          break;
-        }
-        sh = opts[i]!;
+    // The damage amount replacements and prevention effects that change some of it (CR 614.1a, 615.1a), each applying
+    // once to each source's damage (CR 614.5): `done` is what has already applied to it.
+    const done = incoming.map((e) => new Set(e.applied ?? []));
+    const modLive = (m: LiveMod, at: number[], seen: Set<string>[]) => incoming.some((e, i) => at[i]! > 0 && !seen[i]!.has(m.key) && modApplies(s, m, e, prev(e)));
+    const applyMod = (m: LiveMod, at: number[], seen: Set<string>[], record = false) => {
+      for (const [i, e] of incoming.entries()) {
+        if (at[i]! <= 0 || seen[i]!.has(m.key) || !modApplies(s, m, e, prev(e))) continue;
+        const before = at[i]!;
+        at[i] = modAmount(s, m, before);
+        seen[i]!.add(m.key);
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}) });
       }
-      // Which damage it takes: asked one at a time while two or more sources' damage is left and it can't take it all.
-      const usable = (i: number) => left[i]! > 0 && takes(sh, incoming[i]!);
+    };
+    // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
+    // chooser's order of preference, while two or more sources' damage is left and it can't take it all.
+    const allocate = (sh: PlanShield, at: number[], pick: (ranked: number[], room: number) => number | null): number[] | null => {
+      const usable = (i: number) => at[i]! > 0 && takes(sh, incoming[i]!);
       const take = new Array<number>(incoming.length).fill(0);
-      let room = Math.min(sh.cap, incoming.reduce((a, _, i) => a + (usable(i) ? left[i]! : 0), 0));
+      let room = Math.min(sh.cap, incoming.reduce((a, _, i) => a + (usable(i) ? at[i]! : 0), 0));
       while (room > 0) {
         const open = incoming.map((_, i) => i).filter(usable);
-        const openTotal = open.reduce((a, i) => a + left[i]!, 0);
-        let pick = open[0]!;
+        const openTotal = open.reduce((a, i) => a + at[i]!, 0);
         if (room < openTotal && new Set(open.map((i) => srcKey(incoming[i]!.src))).size > 1) {
           const ranked = [...open].sort((a, b) => shieldPreference(s, sh, who, to, incoming[b]!) - shieldPreference(s, sh, who, to, incoming[a]!));
-          const counts = new Map<string, number>();
-          const labels = ranked.map((i) => {
-            const nm = incoming[i]!.src.name;
-            const dup = open.filter((j) => incoming[j]!.src.name === nm).length > 1;
-            const k = (counts.get(nm) ?? 0) + 1;
-            counts.set(nm, k);
-            return `${nm}${dup ? ` #${k}` : ""} (${left[i]} damage)`;
-          });
-          const prompt =
-            sh.kind === "prevent"
-              ? `Prevent 1 damage to ${toName} (${room} of the shield left): from which source?`
-              : `${sh.card}: deal 1 damage to ${nameOf(sh.to!)} instead of ${toName} (${room} left): from which source?`;
-          const i = choose({ player: who, prompt, labels });
-          if (i === null) {
-            paused = true;
-            break;
-          }
-          pick = ranked[i]!;
-          left[pick]! -= 1;
-          take[pick]! += 1;
+          const j = pick(ranked, room);
+          if (j === null) return null;
+          const i = ranked[j]!;
+          at[i]! -= 1;
+          take[i]! += 1;
           room -= 1;
           continue;
         }
-        const n = Math.min(room, left[pick]!);
-        left[pick]! -= n;
-        take[pick]! += n;
+        const i = open[0]!;
+        const n = Math.min(room, at[i]!);
+        at[i]! -= n;
+        take[i]! += n;
         room -= n;
       }
-      if (paused) break;
+      return take;
+    };
+    const askSource = (sh: PlanShield) => (ranked: number[], room: number): number | null => {
+      const counts = new Map<string, number>();
+      const labels = ranked.map((i) => {
+        const nm = incoming[i]!.src.name;
+        const dup = ranked.filter((j) => incoming[j]!.src.name === nm).length > 1;
+        const k = (counts.get(nm) ?? 0) + 1;
+        counts.set(nm, k);
+        return `${nm}${dup ? ` #${k}` : ""} (${left[i]} damage)`;
+      });
+      const prompt =
+        sh.kind === "prevent"
+          ? `Prevent 1 damage to ${toName} (${room} of the shield left): from which source?`
+          : `${sh.card}: deal 1 damage to ${nameOf(sh.to!)} instead of ${toName} (${room} left): from which source?`;
+      return choose({ player: who, prompt, labels });
+    };
+    const commit = (sh: PlanShield, take: number[]) => {
       let used = 0;
       for (const [i, n] of take.entries()) {
         if (!n) continue;
@@ -558,7 +671,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if (sh.kind === "prevent") ops.push({ kind: "prevent", to, n, srcName: e.src.name, toName, ...(sh.rule ? { rule: sh.key, src: e.src, card: sh.card! } : {}) });
         else {
           ops.push({ kind: "redirect", to, shield: sh.key, n, srcName: e.src.name, fromName: toName, toName: nameOf(sh.to!), card: sh.card!, ...(sh.rule ? { rule: true } : {}) });
-          queue.push({ ...e, to: sh.to!, n, applied: [...(e.applied ?? []), sh.key] });
+          queue.push({ ...e, to: sh.to!, n, applied: [...done[i]!, sh.key] });
         }
       }
       if (sh.rule) {
@@ -568,7 +681,92 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         if (a?.has(key)) a.set(key, a.get(key)! - used);
       } else if (sh.kind === "prevent") preventCap.set(sh.key, sh.cap - used);
       else redirectCap.set(sh.key, sh.cap - used);
-      shields = shields.filter((x) => x !== sh);
+    };
+    const part = (x: PlanShield) => (x.cap === Infinity ? "it" : `${x.cap} of it`);
+    const label = (x: PlanShield) => (x.kind === "prevent" ? `Prevent ${part(x)}${x.rule ? ` (${x.card})` : ""}` : `Deal ${part(x)} to ${nameOf(x.to!)} instead (${x.card})`);
+    let paused = false;
+    const mods = allMods.filter((m) => modLive(m, left, done));
+    if (!mods.length) {
+      while (shields.length && total() > 0 && !paused) {
+        // Which shield applies next: it matters only when they can't all be used up and they do different things.
+        const capSum = shields.reduce((a, x) => a + x.cap, 0);
+        const same = (a: PlanShield, b: PlanShield) => a.kind === b.kind && (a.to ? recKey(a.to) : "") === (b.to ? recKey(b.to) : "");
+        let sh = shields[0]!;
+        if (capSum > total() && shields.some((x) => !same(x, sh))) {
+          const opts = [...shields].sort((a, b) => (a.kind === "prevent" ? 0 : 1) - (b.kind === "prevent" ? 0 : 1));
+          const i = choose({ player: who, prompt: `Damage to ${toName}: which shield applies first?`, labels: opts.map(label) });
+          if (i === null) {
+            paused = true;
+            break;
+          }
+          sh = opts[i]!;
+        }
+        const take = allocate(sh, left, askSource(sh));
+        if (!take) {
+          paused = true;
+          break;
+        }
+        commit(sh, take);
+        shields = shields.filter((x) => x !== sh);
+      }
+    } else {
+      // With amount replacements among them, the order matters in more ways (doubling before or after preventing some of
+      // it, adding 2 before or after doubling, rulings on Furnace of Rath, Torbran and Ghosts of the Innocent), so every
+      // order of what's left is worked out: the player is asked which applies next only when the orders don't all come
+      // to the same thing (CR 616.1, 616.1f), and a bot takes the one that leaves it the least damage.
+      type Opt = { shield: PlanShield } | { mod: LiveMod };
+      let opts: Opt[] = [...shields.map((sh) => ({ shield: sh })), ...mods.map((m) => ({ mod: m }))];
+      const live = (o: Opt, at: number[], seen: Set<string>[]) => ("mod" in o ? modLive(o.mod, at, seen) : incoming.some((e, i) => at[i]! > 0 && takes(o.shield, e)));
+      const outcome = (order: Opt[]) => {
+        const at = [...left];
+        const seen = done.map((x) => new Set(x));
+        const taken: number[][] = [];
+        for (const o of order) {
+          if ("mod" in o) applyMod(o.mod, at, seen);
+          else taken.push(allocate(o.shield, at, () => 0)!);
+        }
+        const used = taken.reduce((a, t) => a + t.reduce((x, y) => x + y, 0), 0);
+        return { key: JSON.stringify([at, taken]), score: at.reduce((a, n, i) => a + n * (1 + harm(incoming[i]!, to, who) / 100), 0) + used / 1000 };
+      };
+      while (total() > 0 && !paused) {
+        opts = opts.filter((o) => live(o, left, done));
+        if (!opts.length) break;
+        let pick = opts[0]!;
+        if (opts.length > 1) {
+          let ranked = opts;
+          let differ = true;
+          if (opts.length <= 6) {
+            const best = new Map<Opt, number>();
+            const keys = new Set<string>();
+            for (const order of permutations(opts)) {
+              const r = outcome(order);
+              keys.add(r.key);
+              best.set(order[0]!, Math.min(best.get(order[0]!) ?? Infinity, r.score));
+            }
+            differ = keys.size > 1;
+            ranked = [...opts].sort((a, b) => best.get(a)! - best.get(b)!);
+          }
+          if (differ) {
+            const i = choose({ player: who, prompt: `Damage to ${toName}: which applies first?`, labels: ranked.map((o) => ("mod" in o ? modLabel(s, o.mod) : label(o.shield))) });
+            if (i === null) {
+              paused = true;
+              break;
+            }
+            pick = ranked[i]!;
+          }
+        }
+        if ("mod" in pick) applyMod(pick.mod, left, done, true);
+        else {
+          const take = allocate(pick.shield, left, askSource(pick.shield));
+          if (!take) {
+            paused = true;
+            break;
+          }
+          commit(pick.shield, take);
+        }
+        const used = pick;
+        opts = opts.filter((o) => o !== used);
+      }
     }
     if (paused) return { ask, ops, final };
     for (const [i, e] of incoming.entries()) if (left[i]! > 0) final.push({ ...e, n: left[i]! });
@@ -612,11 +810,14 @@ function allocPreference(s: GameState, to: Rec, n: number): number {
  * combat damage); a redirection is best spent on plain damage when it lands on our own creature, and on the worst
  * damage when it lands on someone else's.
  */
-function shieldPreference(s: GameState, sh: PlanShield, who: PlayerId, to: Rec, e: DamageEvent): number {
+/** How much worse than plain damage this damage is where it lands: deathtouch, infect, wither, a commander's combat damage, an opponent's lifelink. */
+function harm(e: DamageEvent, r: Rec, who: PlayerId): number {
   const kw = (k: string) => e.src.keywords.some((x) => x.toLowerCase() === k);
-  const nasty = (r: Rec) =>
-    ("object" in r ? (kw("deathtouch") ? 100 : 0) + (kw("infect") || kw("wither") ? 50 : 0) : (kw("infect") ? 50 : 0) + (e.combat && e.src.commanderId ? 20 : 0)) +
-    (kw("lifelink") && e.src.controller !== who ? 10 : 0);
+  return ("object" in r ? (kw("deathtouch") ? 100 : 0) + (kw("infect") || kw("wither") ? 50 : 0) : (kw("infect") ? 50 : 0) + (e.combat && e.src.commanderId ? 20 : 0)) + (kw("lifelink") && e.src.controller !== who ? 10 : 0);
+}
+
+function shieldPreference(s: GameState, sh: PlanShield, who: PlayerId, to: Rec, e: DamageEvent): number {
+  const nasty = (r: Rec) => harm(e, r, who);
   if (sh.kind === "prevent") return nasty(to) * 10 + e.n;
   const dest = sh.to!;
   const ours = "object" in dest ? controllerOf(s, obj(s, dest.object)) === who : dest.player === who;
@@ -638,6 +839,7 @@ interface DealBack {
 function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const back: DealBack[] = [];
   const used = new Set<string>();
+  const usedMods = new Set<string>();
   // Life gained from each rule's prevention of damage dealt at the same time is one life-gain event (CR 119.10).
   const gains = new Map<string, { pid: PlayerId; n: number }>();
   const gainLater = (r: DamageRule, n: number) => gains.set(r.id, { pid: r.controller, n: (gains.get(r.id)?.n ?? 0) + n });
@@ -660,7 +862,11 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         if (colorsOk(r.dealBack, op.src)) back.push({ cardId: r.cardId, controller: r.controller, to: op.src.controller, n: op.n });
       }
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
-    else if (op.kind === "betrayer") {
+    else if (op.kind === "modify") {
+      if (op.once) usedMods.add(op.once);
+      if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
+      else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
+    } else if (op.kind === "betrayer") {
       // A new controller each time it applies, each one noticed (rulings: the ability triggers once each time).
       const o = obj(s, op.id);
       if (o.zone !== "battlefield") continue;
@@ -691,6 +897,10 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     }
   }
   for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n);
+  if (usedMods.size && s.damageMods) {
+    s.damageMods = s.damageMods.filter((r) => !usedMods.has(r.id));
+    if (!s.damageMods.length) s.damageMods = undefined;
+  }
   // Used up: "the next time" once it has applied, "the next N" at 0 (CR 615.7-8).
   if (s.damageRules) {
     s.damageRules = s.damageRules.filter((r) => !used.has(r.id) && (r.left === undefined || r.left > 0));

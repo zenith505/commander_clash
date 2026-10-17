@@ -26,20 +26,25 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      ("if its power is ..."), Thanos (odd or even), Nick Fury (double-faced). Wonder Man's extra activation is added
      once per Wonder Man you control (no rulings yet). "Put a +1/+1 counter and an indestructible counter on it" is
      two counter events one after the other, not one.
-   - Iron Fist's "divided among up to five targets" needs at least one target.
    - Mutate still out: Archipelagore ("up to X target creatures"), Auspicious Starrix and Illuna (exile until X
      permanent cards / a nonland permanent card), Brokkos (cast from your graveyard using its mutate ability, also
      Nethroi-style permissions "using its mutate ability"), Everquill Phoenix (a Feather token whose quoted ability says
      "~"), Otrimi ("creature card with mutate"), Parcelbeast (look at the top card, a land onto the battlefield),
      Vadrok ("you may cast target noncreature card ... without paying").
-   - Merged permanents: turning one face down or face up (CR 730.2f-g), a merged permanent with an instant or sorcery
-     card, flip and double-faced components (730.2h-j) and stickers aren't handled. An owner doesn't choose the order of
-     the cards going to a graveyard or library together (730.3a) or their exile timestamps (730.3b). Only flicker and
-     "exile until" effects find all the cards a merged permanent became (730.3c); "return it to its owner's hand" from a
-     dies trigger finds only the one card. A merged token with card components under a "card" replacement (730.3e) is
-     treated like any other merged permanent.
+   - Merged permanents: no effect in the engine turns a merged permanent face down (CR 730.2f; mutating onto or under
+     a face-down creature and turning it face up work); a merged permanent with an instant or sorcery card, flip and
+     double-faced components (730.2h-j) and stickers aren't handled. The owner doesn't choose the exile timestamps of
+     its cards (730.3b). "The second card from the top" of a library a merged permanent went to isn't asked for. A
+     merged token with card components under a "card" replacement (730.3e) is treated like any other merged permanent.
+     Oblation ("The owner of target nonland permanent shuffles it into their library") is unsupported.
    - Bots put the bigger body on top and cast a mutate creature for its mutate cost only when its mana cost is out of
      reach.
+   Left from the round after mutate ("up to N" divided targets, merged cards leaving together, "becomes untapped"):
+   - "Becomes untapped" still out on other lines: Arbiter of the Ideal (manifestation counters), Daring Thief and
+     Disciple of Deceit, King Macar, Fishing Pole, Ghostly Pilferer; "become untapped" for two (Tui and La); "during
+     your untap step" (The Ninth Doctor).
+   - "Commander creatures you own have ..." (the Baldur's Gate backgrounds: Acolyte of Bahamut, Candlekeep Sage, Folk
+     Hero, Noble Heritage, Raised by Giants and more) fails on the granted abilities, which vary card by card.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):
@@ -485,8 +490,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "For as long as ~ remains tapped" (27 of 40 legal supported): dynamic target filters (Vedalken Shackles' "power less
      than or equal to the number of Islands", Old Man of the Sea, Entrancing Lyre's X, Seasinger), "a creature of an
      opponent's choice" (Preacher), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
-     attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "becomes untapped"
-     triggers (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
+     attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "when ~ becomes untapped
+     or ..." delayed triggers from an activated ability (Coffin Queen, Tawnos's Coffin, The Pandorica), Giant Oyster's counters, Hivis's Dragon filter, Hedge
      Whisperer and The Blackstaff of Waterdeep's animation.
    - Entwine with a non-mana cost (Betrayal of Flesh, Solar Tide); the other unsupported entwine cards fail on a mode.
    - Job select (11 of 19): granted quoted abilities that don't compile (Ninja's Blades, Blue Mage's Cane, Summoner's
@@ -601,8 +606,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   combat's beginning of combat step but not in an added main phase; check the rulings before relying on it. Random
   discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with something else ("create a
   2/2 black Zombie", Kalitas).
-- "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat; Pain Seer's "becomes
-  untapped"; Ivory Gargoyle.
+- "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat.
 - Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed"); reinforce X;
   Dodecapod's "with two +1/+1 counters". Prototype can't be chosen for free casts ("without paying its mana
   cost") yet.

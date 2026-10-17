@@ -458,7 +458,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setDiscards([]);
     setTapPick(null);
     if (pending?.kind === "chooseTargets") {
-      const specs = offerTargets(s!, pending.specs, HUMAN, 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
+      const specs = offerTargets(s!, pending.specs, HUMAN, pending.x ?? 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
       setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: pending.description });
     } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });

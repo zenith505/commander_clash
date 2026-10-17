@@ -270,6 +270,13 @@ export interface TargetSpec {
   sameGraveyardAs?: number[];
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
+  /**
+   * "Any number of target artifacts with total mana value 6 or less", "up to two target creature cards with total power
+   * 10 or less": with the other targets that have it, the targets chosen add up to no more than `max` (CR 601.2c), or
+   * the X announced (`x`, made into `max` as targets are chosen, see settleDivided). Checked again as it resolves: over
+   * it then, every one of them is illegal (CR 608.2b; rulings on Nethroi, Reunion of the House).
+   */
+  total?: { key: "manaValue" | "power"; max?: number; x?: true };
   /** true: tapped; false: untapped. */
   tapped?: boolean;
   /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
@@ -1099,7 +1106,11 @@ export type Effect =
   | { type: "enterTappedUntil"; filter: TargetSpec }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true }
+  /**
+   * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
+   * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
+   */
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each

@@ -69,6 +69,11 @@ export interface Ctx {
   defending?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
   subjectLeft?: boolean;
+  /**
+   * An enters trigger of a card with {X} in its cost (or a "when you cast this spell" one): X is the X its spell was cast
+   * with (CR 107.3m, 107.3a), known as the trigger's targets are chosen, like a spell's.
+   */
+  ownX?: boolean;
   /** This sentence defines its own X ("..., where X is ..."): "up to X target ..." isn't the spell's X then. */
   whereX?: boolean;
   /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
@@ -293,7 +298,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -318,6 +323,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
+    ...(opts.ownX ? { ownX: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -1077,7 +1083,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // what came before ("also"). Only a spell's own X.
     const xAtLeast = /^If X is (\d+|one|two|three|four|five|six|seven|eight|nine|ten) or (?:more|greater), (?:also )?(.+)$/.exec(s);
     if (xAtLeast && !/\binstead\b/.test(xAtLeast[2]!)) {
-      if (!ctx.spell || ctx.whereX) return null;
+      if (!(ctx.spell || ctx.ownX) || ctx.whereX) return null;
       const inner = parseOne(xAtLeast[2]!.charAt(0).toUpperCase() + xAtLeast[2]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });
@@ -1587,6 +1593,7 @@ export function usesX(v: unknown): boolean {
     const o = v as Record<string, unknown>;
     if (o.count && (o.count as Count).kind === "x") return true;
     if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
+    if (o.xRange || (o.total as TargetSpec["total"])?.x || o.kind === "xAtLeast") return true; // "with mana value X or less", "if X is 5 or more"
     return Object.values(o).some(usesX);
   }
   return false;
@@ -1660,7 +1667,7 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
     case "scry":
     case "surveil":
     case "preventNext": {
-      if (e.type === "counters" && e.perLastKnownCounter) return null;
+      if (e.type === "counters" && (e.perLastKnownCounter || e.double)) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
     }

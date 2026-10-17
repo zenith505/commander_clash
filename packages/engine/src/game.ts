@@ -3869,7 +3869,7 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
   const t = s.triggerQueue[0]!;
   // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
-  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets);
+  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, t.x ?? 0);
   if (typeof fit === "string") throw new RulesError(fit);
   const problem = targetProblem(s, fit.body.targets, fit.targets, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);

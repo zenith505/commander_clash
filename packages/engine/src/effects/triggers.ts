@@ -1010,13 +1010,13 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         continue;
       }
       // "Any number of target creatures" with none to choose and nothing else to target: zero targets (CR 115.6).
-      const offered = offerTargets(s, body.targets, t.controller, 0, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
+      const offered = offerTargets(s, body.targets, t.controller, t.x ?? 0, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
       if (offered.every((x) => x.skip)) {
         pushTrigger(s, t, offered.map(() => ({ kind: "none" as const })));
         added = true;
         continue;
       }
-      s.pending = { kind: "chooseTargets", player: t.controller, sourceId: t.sourceId, specs: body.targets, description: describeAbility(def, body.text) };
+      s.pending = { kind: "chooseTargets", player: t.controller, sourceId: t.sourceId, specs: body.targets, description: describeAbility(def, body.text), ...(t.x ? { x: t.x } : {}) };
       return added;
     }
     pushTrigger(s, t, []);
@@ -1105,7 +1105,7 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
 export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoice[]) {
   const def = s.cards[t.sourceCardId]!;
   // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
-  const fit = fitMany(withModes(triggerBody(s, t), t.modes), chosen);
+  const fit = fitMany(withModes(triggerBody(s, t), t.modes), chosen, t.x ?? 0);
   if (typeof fit === "string") throw new RulesError(fit);
   const { body, targets } = fit;
   s.triggerQueue = s.triggerQueue.filter((x) => x !== t);

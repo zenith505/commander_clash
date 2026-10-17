@@ -266,6 +266,21 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         }
         return;
       }
+      // Doubling: as many more as it has now, of that kind or of each kind (CR 701.10e). Putting them can be modified (CR
+      // 122.6; rulings on Kalonian Hydra and doublers).
+      if (e.double) {
+        for (const o of objects(s, e.what, ctx)) {
+          const kinds = e.everyKind ? Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0) : [e.counter];
+          for (const kind of kinds) {
+            const have = o.counters[kind] ?? 0;
+            if (have <= 0) continue;
+            invalidateCharacteristics(s);
+            const put = putCounters(s, o, kind, have);
+            log(s, `${defOf(s, o).name} gets ${put} ${kind} counter${put > 1 ? "s" : ""}.`);
+          }
+        }
+        return;
+      }
       const base = amountNow(s, e.n, ctx);
       const n = e.perLastKnownCounter ? base * (ctx.lki?.counters?.[e.perLastKnownCounter] ?? 0) : base;
       if (n <= 0) return;

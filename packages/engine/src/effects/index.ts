@@ -8,7 +8,7 @@
 //   describe.ts      text for costs, destinations and changes
 //   heuristics.ts    estimates the bots use (is this harmful, how much damage)
 
-export { objectMatches, bindChosen, ENTERS_COUNTER, choiceOptions, withChoice, sourceQuality, spellQuality, printedMatches, isLegalTarget, legalTargets, offerMany, offerTargets, settleDivided, bindBound, targetingCtx, spellManaValue, sameTarget, canChooseTarget, targetProblem, divisionProblem, stampTargets, hasLegalTargets, legalModes, modesUsed, noteModesChosen, canChooseModes, modesProblem, pickOptions, sameNamed } from "./targeting";
+export { objectMatches, bindChosen, ENTERS_COUNTER, choiceOptions, withChoice, sourceQuality, spellQuality, printedMatches, isLegalTarget, legalTargets, offerMany, offerTargets, settleDivided, bindBound, targetingCtx, spellManaValue, sameTarget, canChooseTarget, totalOk, targetProblem, divisionProblem, stampTargets, hasLegalTargets, legalModes, modesUsed, noteModesChosen, canChooseModes, modesProblem, pickOptions, sameNamed } from "./targeting";
 export { beginResolution, continueResolution, resolveManaAbility, type Resolution } from "./resolve";
 export { becomeMonarch } from "./run-basics";
 export { takeInitiative, dungeonSBAs } from "./run-dungeons";

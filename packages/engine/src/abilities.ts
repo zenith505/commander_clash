@@ -1839,6 +1839,17 @@ export type TriggerEvent =
   // forms trigger once for each creature it blocks or is blocked by, which is their subject.
   | "selfBlocks"
   | "selfBecomesBlocked"
+  /**
+   * "Whenever a creature blocks" (Battle Strain: anyone's) and "Whenever a creature you control becomes blocked" (Somberwald
+   * Alpha): once for each such creature, its subject, which `subjectFilter` describes relative to this permanent's controller.
+   */
+  | "creatureBlocks"
+  | "creatureBecomesBlocked"
+  /**
+   * "Whenever a creature deals damage to you" (Dread), "Whenever a source an opponent controls deals damage to you" (Michiko
+   * Konda): once for each source dealing damage to this permanent's controller (CR 603.2c), see `damagesYou`.
+   */
+  | "dealsDamageToYou"
   /** "Whenever ~ attacks and isn't blocked": after blockers are declared, if no creature blocks it (rulings). */
   | "selfAttacksUnblocked"
   /** "Whenever ~ attacks alone" (CR 506.5): it's the only creature declared as an attacker. */
@@ -1973,9 +1984,22 @@ export interface TriggeredAbility {
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
-  attacker?: { filter: TargetSpec; other?: boolean; /** "Whenever a creature attacks": anyone's (Caltrops, Righteous Cause). */ anyone?: true };
+  attacker?: {
+    filter: TargetSpec;
+    other?: boolean;
+    /** "Whenever a creature attacks": anyone's (Caltrops, Righteous Cause). */
+    anyone?: true;
+    /** "Whenever a creature attacks you" (Briar Patch): this permanent's controller; "or a planeswalker you control" (Isperia) too. */
+    attacksYou?: "player" | "orPlaneswalker";
+  };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
+  /**
+   * For "dealsDamageToYou": a source that's a permanent fitting `subjectFilter` (the subject, "it", "that creature"), or
+   * any source with `by` saying whose ("a source an opponent controls": the event player, "that player", is its
+   * controller); `combat`: only combat damage.
+   */
+  damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
   /**

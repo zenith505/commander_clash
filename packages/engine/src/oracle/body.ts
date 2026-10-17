@@ -264,7 +264,7 @@ function revealedAction(text: string, ctx: Ctx): Effect[] | null {
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
     // Not about the card: "draw a card" (Track Down, Thrasios).
-    if (/(?:it|its|that card|that card's)/.test(text)) return null;
+    if (/\b(?:it|its|that card|that card's)\b/.test(text)) return null;
     const before = ctx.targets.length;
     const fx = parseSentence(text.charAt(0).toUpperCase() + text.slice(1), ctx);
     return fx && ctx.targets.length === before && !allEffects(fx).some((e) => PAUSING.has(e.type)) ? fx : null;

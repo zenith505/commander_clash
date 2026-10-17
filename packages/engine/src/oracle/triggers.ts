@@ -179,7 +179,51 @@ function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | 
   return { event: m[1] ? "selfDealsCombatDamageToCreature" : "selfDealsDamageToCreature", body };
 }
 
+/**
+ * "Whenever a creature deals damage to you, destroy it" (Dread), "Whenever a creature deals combat damage to you" (Teysa),
+ * "Whenever a source an opponent controls deals damage to you, that player sacrifices a permanent of their choice"
+ * (Michiko Konda): once for each source (CR 603.2c). A creature or permanent is "it" and "that creature"; for a source of
+ * any kind, "that player" is its controller and "that many" the damage.
+ */
+function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (an?) (.+?) deals (combat )?damage to you, (.+)$/.exec(line);
+  if (!m) return null;
+  const who = /^source(?: (an opponent|you) controls?)?$/.exec(m[2]!);
+  let text = m[4]!;
+  const thatMuch = /\bthat (?:much|many)\b/.test(text);
+  if (thatMuch) {
+    if (/\bX\b/.test(text)) return "fail";
+    text = text.replace(/\bthat (?:much|many)\b/g, "X");
+  }
+  const damagesYou = { by: who ? (who[1] === "an opponent" ? ("opponent" as const) : who[1] === "you" ? ("you" as const) : ("any" as const)) : undefined, ...(m[3] ? { combat: true as const } : {}) };
+  if (who) {
+    // "That player" is the source's controller only when it's an opponent's.
+    if (/\b(it|its|that source|that creature)\b/.test(text) || (damagesYou.by !== "opponent" && /\bthat player\b/.test(text))) return "fail";
+    let body = parseBody(text, { eventPlayer: true });
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
+    return { event: "dealsDamageToYou", body, damagesYou: { by: damagesYou.by!, ...(m[3] ? { combat: true as const } : {}) } };
+  }
+  const filter = parseTargetPhrase(m[2]!);
+  if (!filter || filter.kind !== "object" || filter.controller) return "fail";
+  let body = parseBody(text.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[4]!) };
+  return { event: "dealsDamageToYou", body, subjectFilter: { ...filter, text: m[2]! }, damagesYou: m[3] ? { combat: true } : {} };
+}
+
 function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever a creature blocks" (anyone's), "Whenever a Rat you control becomes blocked": "it" and "that creature" are
+  // that creature, once for each (CR 509.3a, 509.3c).
+  const other = /^Whenever (an?) ((?:[a-z]+ )?creature) blocks, (.+)$/.exec(line) ?? /^Whenever (an?) (.+?) you control becomes blocked, (.+)$/.exec(line);
+  if (other) {
+    const blocks = / blocks, /.test(line);
+    const filter = parseTargetPhrase(other[2]!);
+    if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
+    const body = parseBody(other[3]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
+    if (!body) return "fail";
+    return { event: blocks ? "creatureBlocks" : "creatureBecomesBlocked", body, subjectFilter: { ...filter, ...(blocks ? {} : { controller: "you" as const }), text: blocks ? other[2]! : `${other[2]} you control` } };
+  }
   for (const [re, event] of BLOCK_TRIGGERS) {
     const m = re.exec(line);
     if (!m) continue;
@@ -400,6 +444,16 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (another|an?) (.+?) you control attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature) attacks, (.+)$/.exec(line);
+  // "Whenever a creature attacks you or a planeswalker you control" (Blood Reckoning, Isperia): one attacking this
+  // permanent's controller, or a planeswalker they control (CR 506.2, 508.3a); "attacks you" alone, not a planeswalker.
+  const you = m || any ? null : /^Whenever (an?) ((?:[a-z]+ )?creature(?: with(?:out)? [a-z]+| with power \d+ or (?:greater|less))?) attacks you( or a planeswalker you control)?, (.+)$/.exec(line);
+  if (you) {
+    const filter = parseTargetPhrase(you[2]!);
+    if (!filter || filter.kind !== "object" || filter.controller || !filter.types?.includes("Creature")) return "fail";
+    const body = parseBody(you[4]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: you[2]! }, anyone: true, attacksYou: you[3] ? "orPlaneswalker" : "player" }, body };
+  }
   const w = m ?? any;
   if (!w) return null;
   const filter = parseTargetPhrase(w[2]!);
@@ -909,6 +963,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const block = parseBlockTrigger(line);
   if (block) return block;
+  const damagesYou = parseDamagesYouTrigger(line);
+  if (damagesYou) return damagesYou;
   const damages = parseDamagesCreatureTrigger(line);
   if (damages) return damages;
   const enters = parseEntersTrigger(line);

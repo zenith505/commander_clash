@@ -165,7 +165,7 @@ export function dealDamage(
     if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
-    if (src.id) fireEvent(s, { type: "damagedPlayer", source: src.id, player: p.id, amount: n, combat: !!opts.combat });
+    fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
     if (opts.combat) {
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its

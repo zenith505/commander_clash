@@ -83,11 +83,40 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const theirs = mine && parseSentence(`${both[1]!.replace(/^./, (c) => c.toUpperCase())} ${both[2]}s ${both[3]}`, ctx);
     return mine && theirs ? [...mine, ...theirs] : null;
   }
+  const list = parseTargetList(s, ctx);
+  if (list !== undefined) return list;
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;
   }
   return null;
+}
+
+/**
+ * "Destroy up to one target artifact, up to one target creature, and up to one target land" (Boom Box), "Return up to
+ * one target instant card and up to one target sorcery card from your graveyard to your hand" (Pull from the Deep): the
+ * same instruction for each target, in order. Each "target" is its own instance of the word, so one object may be chosen
+ * for several of them if it fits each (CR 115.3), and any "up to one" may be left unchosen (CR 115.6). Afterwards "it"
+ * can't mean one of them. Undefined when the sentence isn't such a list.
+ */
+function parseTargetList(s: string, ctx: Ctx): Effect[] | null | undefined {
+  const m = /^(Destroy|Exile|Tap|Untap|Return) ((?:up to one )?target .+?)( from your graveyard to your hand| to (?:its|their) owners?'s? hands?)?$/.exec(s);
+  if (!m) return undefined;
+  const parts = m[2]!.split(/,? (?:and\/or|and|or) (?=(?:up to one )?target )|, (?=(?:up to one )?target )/);
+  if (parts.length < 2 || parts.some((p) => !/^(?:up to one )?target [^,]+$/.test(p) || / and /.test(p))) return undefined;
+  if (m[1] === "Return" && !m[3]) return undefined;
+  // Two required targets of a removal spell are already a sentence of their own (Plague Spores).
+  if (parts.length === 2 && parts.every((p) => /^target /.test(p)) && /^(Destroy|Exile)$/.test(m[1]!)) return undefined;
+  const to = m[3]?.replace(/ to (?:its|their) owners?'s? hands?$/, " to its owner's hand") ?? "";
+  const out: Effect[] = [];
+  for (const p of parts) {
+    const one = parseSentence(`${m[1]} ${p}${to}`, ctx);
+    if (!one) return null;
+    out.push(...one);
+  }
+  ctx.lastObjectTarget = undefined;
+  ctx.lastTargets = undefined;
+  return out;
 }
 
 /** "3/3", or "X/X" with the X of the spell or ability (or its "where X is ..."), worked out as it resolves (CR 608.2h). */

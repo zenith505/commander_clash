@@ -95,7 +95,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
-  if (each && /^opponent(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
+  // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
+  if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });

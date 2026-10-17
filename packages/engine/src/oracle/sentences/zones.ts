@@ -434,10 +434,15 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return [{ type: "keepRest", who, keep, among }];
   }
   // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
-  // control with the greatest power" (Szat's Will).
+  // control with the greatest power" (Szat's Will), "a creature or planeswalker with the greatest mana value among
+  // creatures and planeswalkers they control" (Soul Shatter).
   if ((m = /^(.+?) sacrifices? a creature (?:with the greatest power among creatures (?:they control|that player controls)|they control with the greatest power)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
+  }
+  if ((m = /^(.+?) sacrifices? a creature or planeswalker (?:they control )?with the greatest mana value among creatures and planeswalkers (?:they control|that player controls)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature", "Planeswalker"], text: "creature or planeswalker" }, n: 1, action: "sacrifice", greatest: "manaValue" }] : null;
   }
   // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
   // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before

@@ -1,122 +1,42 @@
 // Builds the game's card database from Scryfall bulk data.
 //
 //   npm run build:cards                    (uses the newest files in data/raw/)
-//   npm run build:cards -- <cards.jsonl> <rulings.jsonl>
+//   npm run build:cards -- <cards.jsonl> <rulings.jsonl> [--cards-only]
 //
-// Accepts either "unique-artwork" or "all-cards" bulk files. all-cards is ~3 GB and
-// includes every language, so it is streamed and filtered to English.
+// Accepts "unique-artwork", "all-cards" or "default-cards" bulk files, or the much smaller extract that
+// tools/scryfall-extract.mjs makes from one (scryfall-oracle-cards.jsonl.gz; .gz files are read as they are).
+// all-cards is ~3 GB and includes every language, so it is streamed and filtered to English.
 //
 // Outputs (data/generated/):
-//   cards.json         one entry per English oracle card: CardDef + legality + printing info
+//   cards.json         one entry per English oracle card: CardDef + legality + printing info, with every face
 //   rulings.json       oracle_id -> rulings
 //   sample-decks.json  four 100-card decks built only from cards the engine fully supports
-// and copies the deck bundle to apps/web/public/data/ for the UI.
+// and copies the deck bundle to apps/web/public/data/ for the UI. --cards-only leaves the decks as they are.
 
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { createInterface } from "node:readline";
 import {
   canBeCommander,
   allEffects,
+  cardFromScryfall,
   castingBody,
   compileCard,
   modsAreHarmful,
   isFullySupported,
-  parseTypeLine,
   validateCommanderDeck,
-  type CardDef,
+  type CardRecord,
   type Color,
-  type ManaType,
 } from "../packages/engine/src";
+import { bestPrintings, lines, newest } from "./scryfall-extract.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const RAW = join(ROOT, "data", "raw");
 const OUT = join(ROOT, "data", "generated");
 const WEB = join(ROOT, "apps", "web", "public", "data");
 
-// Layouts that aren't playable cards in a Commander game.
-const SKIP_LAYOUTS = new Set(["art_series", "token", "double_faced_token", "emblem", "planar", "scheme", "vanguard", "augment", "host"]);
-
-export interface CardRecord extends CardDef {
-  commanderLegal: "legal" | "banned" | "not_legal" | "restricted";
-  set: string;
-  releasedAt: string;
-  rarity: string;
-  layout: string;
-  gameChanger: boolean;
-}
-
-function newest(prefix: string): string | undefined {
-  if (!existsSync(RAW)) return undefined;
-  const f = readdirSync(RAW)
-    .filter((n) => n.startsWith(prefix) && n.endsWith(".jsonl"))
-    .sort()
-    .pop();
-  return f && join(RAW, f);
-}
-
-async function* lines(path: string) {
-  const rl = createInterface({ input: createReadStream(path, { encoding: "utf8" }), crlfDelay: Infinity });
-  for await (const line of rl) if (line.trim()) yield line;
-}
-
-/** Higher is a better printing to show: regular, recent, high-res, non-promo frames. */
-function printingScore(c: any): number {
-  let n = 0;
-  if (c.highres_image) n += 4;
-  if (!c.promo) n += 4;
-  if (!c.full_art && !c.textless) n += 2;
-  if (c.frame === "2015") n += 2;
-  if (c.border_color === "black") n += 1;
-  if (!c.digital) n += 3;
-  return n * 1e9 + Date.parse(c.released_at ?? "2000-01-01") / 1000;
-}
-
-function toRecord(c: any): CardRecord {
-  const face = c.card_faces?.[0] ?? {};
-  const pick = (k: string) => c[k] ?? face[k];
-  const images = c.image_uris ?? face.image_uris ?? {};
-  const typeLine: string = pick("type_line") ?? "";
-  return {
-    oracleId: c.oracle_id,
-    name: c.name,
-    manaCost: pick("mana_cost") ?? "",
-    cmc: c.cmc ?? 0,
-    typeLine,
-    ...parseTypeLine(typeLine),
-    oracleText: pick("oracle_text") ?? "",
-    power: pick("power"),
-    toughness: pick("toughness"),
-    loyalty: pick("loyalty"),
-    colors: (pick("colors") ?? []) as Color[],
-    colorIdentity: (c.color_identity ?? []) as Color[],
-    keywords: c.keywords ?? [],
-    producedMana: c.produced_mana as ManaType[] | undefined,
-    imageUrl: images.normal,
-    artUrl: images.art_crop,
-    commanderLegal: c.legalities?.commander ?? "not_legal",
-    set: c.set,
-    releasedAt: c.released_at,
-    rarity: c.rarity,
-    layout: c.layout,
-    gameChanger: !!c.game_changer,
-  };
-}
-
 async function buildCards(path: string) {
-  const best = new Map<string, { score: number; card: any }>();
-  let seen = 0;
-  for await (const line of lines(path)) {
-    seen++;
-    if (seen % 100_000 === 0) console.log(`  ...${seen.toLocaleString()} lines`);
-    const c = JSON.parse(line);
-    if (c.lang !== "en" || !c.oracle_id || SKIP_LAYOUTS.has(c.layout)) continue;
-    if (c.set_type === "memorabilia" || c.set_type === "funny") continue;
-    const score = printingScore(c);
-    const prev = best.get(c.oracle_id);
-    if (!prev || score > prev.score) best.set(c.oracle_id, { score, card: c });
-  }
-  const cards = [...best.values()].map((b) => toRecord(b.card)).sort((a, b) => a.name.localeCompare(b.name));
+  const { seen, cards: printings } = await bestPrintings(path, (n: number) => console.log(`  ...${n.toLocaleString()} lines`));
+  const cards = printings.map(cardFromScryfall).sort((a, b) => a.name.localeCompare(b.name));
   console.log(`Read ${seen.toLocaleString()} printings -> ${cards.length.toLocaleString()} English oracle cards`);
   return cards;
 }
@@ -273,9 +193,11 @@ function buildSampleDecks(cards: CardRecord[]) {
 }
 
 async function main() {
-  const [cardsArg, rulingsArg] = process.argv.slice(2);
-  const cardsPath = cardsArg ?? newest("unique-artwork") ?? newest("default-cards") ?? newest("all-cards");
-  const rulingsPath = rulingsArg ?? newest("rulings");
+  const args = process.argv.slice(2);
+  const cardsOnly = args.includes("--cards-only");
+  const [cardsArg, rulingsArg] = args.filter((a) => !a.startsWith("--"));
+  const cardsPath = cardsArg ?? newest(RAW, "unique-artwork") ?? newest(RAW, "default-cards") ?? newest(RAW, "all-cards") ?? newest(RAW, "scryfall-oracle-cards");
+  const rulingsPath = rulingsArg ?? newest(RAW, "rulings") ?? newest(RAW, "scryfall-rulings");
   if (!cardsPath && existsSync(join(OUT, "cards.json"))) {
     // No raw Scryfall files: rebuild the decks from the card database built last time.
     console.log("No Scryfall files in data/raw; rebuilding sample decks from data/generated/cards.json");
@@ -285,9 +207,9 @@ async function main() {
   console.log(`Cards:   ${cardsPath}\nRulings: ${rulingsPath ?? "(none)"}`);
 
   mkdirSync(OUT, { recursive: true });
-  mkdirSync(WEB, { recursive: true });
   const cards = await buildCards(cardsPath);
   writeFileSync(join(OUT, "cards.json"), JSON.stringify(cards));
+  console.log(`Cards with more than one face: ${cards.filter((c) => c.faces).length.toLocaleString()}`);
 
   if (rulingsPath) {
     const rulings = await buildRulings(rulingsPath);
@@ -295,7 +217,8 @@ async function main() {
     console.log(`Rulings for ${Object.keys(rulings).length.toLocaleString()} cards`);
   }
 
-  writeDecks(cards);
+  if (cardsOnly) console.log(`Fully supported by the engine today: ${cards.filter((c) => c.commanderLegal === "legal" && isFullySupported(c)).length.toLocaleString()} of ${cards.length.toLocaleString()}`);
+  else writeDecks(cards);
 }
 
 function writeDecks(cards: CardRecord[]) {

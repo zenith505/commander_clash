@@ -90,6 +90,44 @@ export interface CardDef {
   mutateOwner?: PlayerId;
   imageUrl?: string;
   artUrl?: string;
+  /** Scryfall's layout: "normal", "split", "flip", "transform", "modal_dfc", "meld", "adventure", "prepare", ... */
+  layout?: string;
+  /**
+   * Every face of a card with more than one, in printed order: the halves of a split card (CR 709), a flip card's two
+   * halves (710), the front and back of a double-faced card (712), an adventurer card's creature and Adventure (715),
+   * a preparation card's creature and prepare spell (722). The card's own fields above are its first face's, except
+   * `name` ("A // B"), `cmc`, `colorIdentity`, `keywords` and `producedMana`, which are the whole card's. Nothing in
+   * the engine reads the other faces yet, and `isFullySupported` turns such cards away.
+   */
+  faces?: CardFace[];
+  /**
+   * A meld pair (CR 712.4, 712.5): the two cards that meld and the melded permanent they become. A melded permanent's
+   * card exists only as the back faces of the pair (712.4b), so the card named `result` can't be in a deck.
+   */
+  meld?: { parts: string[]; result: string };
+}
+
+/** One face of a card with several (CardDef.faces). Each face has its own characteristics (CR 709.1, 712.8a). */
+export interface CardFace {
+  name: string;
+  manaCost: string; // "" for a face with none, such as a transforming card's back face (CR 202.1b)
+  typeLine: string;
+  supertypes: string[];
+  types: string[];
+  subtypes: string[];
+  oracleText: string;
+  power?: string;
+  toughness?: string;
+  loyalty?: string;
+  /** A battle's defense (CR 310.4). */
+  defense?: string;
+  /** From its mana cost and color indicator (CR 105.2, 202.2); a flip card's bottom half has the card's (CR 710.1c). */
+  colors: Color[];
+  /** A color indicator: the colors of a face with no mana cost, usually a back face (CR 204). */
+  colorIndicator?: Color[];
+  /** Only a face printed on its own side has its own image (a double-faced card's back); the others share the card's. */
+  imageUrl?: string;
+  artUrl?: string;
 }
 
 /** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */

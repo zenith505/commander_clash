@@ -63,6 +63,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of each player's (?:first|precombat) main phase, (.+)$/, "eachFirstMain"],
   [/^At the beginning of (?:your postcombat main phase|each of your postcombat main phases), (.+)$/, "yourPostcombatMain"],
   [/^At the beginning of each postcombat main phase, (.+)$/, "eachPostcombatMain"],
+  [/^At the beginning of each of your main phases, (.+)$/, "yourMain"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
@@ -291,7 +292,7 @@ function enchantedControls(phrase: string): TargetSpec | null {
 }
 
 // "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (?:dies|is put into a graveyard from the battlefield), (.+)$/;
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -304,7 +305,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
   // "That player" in a trigger about what enchanted player controls is that player.
-  let bodyText = (attached ? attached[2]! : m![3]!).replace(ench ? /\bthat player\b/g : /$^/, "enchanted player");
+  let bodyText = (attached ? attached[2]! : m![4]!).replace(ench ? /\bthat player\b/g : /$^/, "enchanted player");
   // "That land's controller", and "that player" after "an artifact an opponent controls": who controlled it as it last
   // existed (CR 603.10a).
   if (!attached) {
@@ -313,6 +314,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever another Zombie you control dies, if it didn't have decayed, ..." (Wilhelt): an intervening if (CR 603.4) on
   // the creature as it last existed (CR 603.10a), which can't change, so part of what dies.
+  const leaves = !attached && m![3]!.startsWith("leaves");
+  // "Whenever another creature you control leaves the battlefield, if it didn't die, ..." (Taeko): where it went can't
+  // change, so it's part of the event, like "without dying".
+  const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
+  if (didntDie) bodyText = bodyText.slice(didntDie[0].length);
+  const notDies = !!didntDie || (!attached && m![3]! === "leaves the battlefield without dying");
+  // "If it had a counter on it", "if it had one or more counters on it": as it last existed, so it can't change.
+  const hadCounter = !attached && /^if it had (?:a counter|one or more counters|counters) on it, /.exec(bodyText);
+  if (hadCounter) bodyText = bodyText.slice(hadCounter[0].length);
   const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
@@ -334,6 +344,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? { damagedBySelf: true } : {}),
+      ...(leaves ? { leaves: true as const } : {}),
+      ...(notDies ? { notDies: true as const } : {}),
+      ...(hadCounter ? { hadCounter: true as const } : {}),
     },
     body,
   };
@@ -816,9 +829,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // "At the beginning of each opponent's upkeep, ~ deals 1 damage to that player": an "each upkeep" trigger that
   // triggers only on its controller's opponents' turns; "that player" is the active player.
-  const oppStep = /^At the beginning of each opponent's (upkeep|draw step|end step), (.+)$/.exec(line);
+  // "At the beginning of combat on each opponent's turn, tap target creature that player controls" (Citadel Siege, CR 507.1).
+  const oppStep = /^At the beginning of each opponent's (upkeep|draw step|end step), (.+)$/.exec(line) ?? /^At the beginning of (combat) on each opponent's turn, (.+)$/.exec(line);
   if (oppStep) {
-    const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : "eachEndStep";
+    const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : oppStep[1] === "combat" ? "eachBeginCombat" : "eachEndStep";
     // "They lose 2 life", "~ deals 2 damage to them": that player.
     const body = parseBody(oppStep[2]!.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
     return body ? { event, body, opponentsTurn: true } : "fail";
@@ -1041,6 +1055,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       const left = event === "selfDies" || event === "selfToGraveyard" || event === "selfLeaves";
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
+      // "At the beginning of each postcombat main phase, the active player adds ..." (Belbe): that player is the active one.
+      if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);

@@ -170,10 +170,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
     case "rollResult":
-      return s.resolving?.rolled?.result ?? ctx.event?.amount ?? 0;
+      return s.resolving?.rolled?.result ?? s.resolving?.item.rolled ?? ctx.event?.amount ?? 0;
+    case "rollOther":
+      return s.resolving?.rolled?.other ?? 0;
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
+      if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
     case "opponentsAttacked": {
       const a = s.players[ctx.controller]?.attackedPlayers;
@@ -371,7 +374,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return c.opponents ? "#opponents" : "#players";
+      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}`;
     case "diedThisTurn":
       return "#creatures that died this turn";
     case "tokensCreatedThisTurn":
@@ -418,6 +421,8 @@ function describeCount(c: Count): string {
       return "{S} spent";
     case "rollResult":
       return "the result";
+    case "rollOther":
+      return "the other result";
     default:
       return c.kind;
   }

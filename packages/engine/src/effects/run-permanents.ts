@@ -245,6 +245,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Its controller's next untap step skips it, then it untaps as usual (CR 502.3).
       for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
       return;
+    case "noMaxHandSize":
+      player(s, ctx.controller).noMaxHandSize = true;
+      log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
+      return;
+    case "enterTappedUntil":
+      (s.entersTappedUntil ??= []).push({ controller: ctx.controller, filter: e.filter, source: src });
+      return;
     case "counters": {
       // Distributed (CR 601.2d): each target gets its part; a part for an illegal target isn't put anywhere (CR 608.2b).
       if (e.divided && e.what.ref === "target") {

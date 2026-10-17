@@ -378,6 +378,8 @@ export interface ManaLot {
 }
 
 export interface Player {
+  /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
+  noMaxHandSize?: true;
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
   /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */
@@ -502,6 +504,8 @@ export interface StackItem {
   sourceUntaps?: number;
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
   x?: number;
+  /** See PendingTrigger.rolled. */
+  rolled?: number;
   /**
    * In `castItems` only: the spell's mana value as it was put on the stack, X included (CR 202.3e), for when it has left
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
@@ -515,6 +519,8 @@ export interface StackItem {
   event?: TriggerEventInfo;
   /** What was sacrificed to cast it, as it last existed ("the sacrificed creature's power", CR 608.2h). */
   sacrificed?: LastKnown[];
+  /** The names of cards moved to pay its cost beyond mana: Jester's Scepter's "that card" (CR 608.2h). */
+  costCardNames?: string[];
   /**
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
@@ -586,6 +592,8 @@ export interface PendingTrigger {
   lki?: LastKnown;
   /** For an enters trigger of a permanent that was a spell with X: that X (CR 107.3m). */
   x?: number;
+  /** A reflexive trigger after a roll ("roll a d20. When you do, ... where X is the result"): that result. */
+  rolled?: number;
   kicked?: number[];
   colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
@@ -759,7 +767,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -945,6 +953,12 @@ export interface GameState {
   noLifeGain?: { turn: number; controller: PlayerId; who: "all" | "opponents" }[];
   /** Rules for one player this turn: "you can't lose life this turn" (CR 119.8), "you can't lose the game this turn", "your opponents can't win the game this turn". */
   turnRules?: TurnRule[];
+  /**
+   * "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect from a
+   * resolved spell (CR 614.1c), with `filter` from `controller`'s view, ending as `controller`'s next turn begins
+   * (CR 611.2b, 800.4m).
+   */
+  entersTappedUntil?: { controller: PlayerId; filter: TargetSpec; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
@@ -1057,6 +1071,8 @@ export interface Chosen {
   player?: PlayerId;
   /** "Secretly choose an opponent" (Guardian Archon): only its controller knows who, until it's revealed. */
   secret?: true;
+  /** "As ~ enters, choose Khans or Dragons": the anchor word chosen (CR 614.12b). */
+  anchor?: string;
 }
 
 export interface TurnRule {
@@ -1131,7 +1147,7 @@ export interface Resolving {
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   wonClash?: boolean;
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
-  rolled?: { sides: number; naturals: number[]; result: number };
+  rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
@@ -1208,6 +1224,8 @@ export interface Resolving {
     castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
+    /** "Roll two d8 and choose one result": the index of the die chosen (see runDiceEffect). */
+    rollChoice?: string;
     evidence?: ObjectId[]; // the cards picked to collect evidence with as it resolves (CR 701.59a)
     clash?: { opp?: PlayerId; revealed?: Record<string, ObjectId | null>; queue?: PlayerId[]; bottom?: PlayerId[]; answer?: boolean };
     /** Auras entering without being cast: what each enchants (an auraHostKey), "none" if nothing (CR 303.4f-g). */

@@ -184,15 +184,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
-      (s.nextCast ??= []).push({
-        controller: ctx.controller,
-        filter: e.filter,
-        sourceId: id ?? "",
-        sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
-        body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
-        turn: s.turn,
-        ...(e.cascade ? { cascade: true as const } : {}),
-      });
+      for (const caster of e.who ? players(s, e.who, ctx) : [ctx.controller])
+        (s.nextCast ??= []).push({
+          controller: caster,
+          filter: e.filter,
+          sourceId: id ?? "",
+          sourceCardId: o ? cardIdOf(o) : ctx.sourceDef.oracleId,
+          body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
+          turn: s.turn,
+          ...(e.cascade ? { cascade: true as const } : {}),
+        });
       return;
     }
     case "cascade": {
@@ -380,6 +381,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const mv = cost ? manaValue(cost) + (item!.x ?? 0) * xCount(cost) : 0;
         if (!item || item.kind !== "spell" || mv !== (ctx.x ?? 0)) {
           log(s, `${src} doesn't counter ${item?.description ?? "it"}: its mana value isn't ${ctx.x ?? 0}.`);
+          return;
+        }
+      }
+      // Jester's Scepter: only a spell with the name of the card put into a graveyard for the cost; a split card's either
+      // half (rulings).
+      if (e.ifCostCardName) {
+        const item = s.stack.find((x) => x.id === t.id);
+        const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+        const names = (s.resolving?.item.costCardNames ?? []).flatMap((n) => [n, ...n.split(" // ")]);
+        if (!o || !names.includes(defOf(s, o).name)) {
+          log(s, `${src} doesn't counter ${item?.description ?? "it"}: it doesn't have the same name as that card.`);
           return;
         }
       }

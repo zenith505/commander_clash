@@ -104,6 +104,7 @@ import {
   potentialAttackers,
   attackedName,
   returnCandidates,
+  linkedExileCards,
   tapCostCandidates,
   ringBearer,
   power,
@@ -634,6 +635,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
         if (d.exileFromHand !== undefined) continue;
         return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `put ${c.n === 1 ? "a card" : `${c.n} cards`} from your hand on top of your library`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId), chosen: [] });
+      }
+      if (c.kind === "exileFromGraveyard" && c.linked) {
+        // Jester's Scepter: pick one of the cards exiled with it (you may look at them) to put into its owner's graveyard.
+        if (d.exileCards !== undefined) continue;
+        const label = cardOf(s, d.objectId).name;
+        return setCostPick({ activate: d, kind: "exileCards", label, what: `put a card exiled with ${label} into its owner's graveyard`, n: 1, candidates: linkedExileCards(s, s.objects[d.objectId]!), chosen: [] });
       }
       if (c.kind === "exileFromGraveyard" && !c.top) {
         // "Exile a card from your graveyard" (Stonerise Spirit): click the cards in your graveyard.
@@ -3448,7 +3455,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -3608,7 +3615,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && pending.what === "color")
+  if (pending?.kind === "chooseOption" && pending.what === "color" && pending.player === HUMAN)
     return (
       <div className="controls color-pick">
         <span>

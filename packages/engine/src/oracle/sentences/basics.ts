@@ -16,6 +16,24 @@ import { parsePreventAll } from "../statics";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
+  // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search
+  // their library (CR 701.23a); a permanent found comes under your control.
+  const theirs = /^Search (target opponent's|target player's) library for (an? (?:.+? )?card) and (put that card onto the battlefield under your control|exile it)$/.exec(s);
+  if (theirs) {
+    const filter = parseSearchFilter(theirs[2]!.replace(/^an? /, ""));
+    if (filter === null) return null;
+    const library = parsePlayer(theirs[1]!.replace(/'s$/, ""), ctx);
+    return library ? [{ type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: false, dest: { zone: theirs[3] === "exile it" ? "exile" : "battlefield" }, library }] : null;
+  }
+  // "Search your library for a number of basic land cards equal to the other result, put them onto the battlefield
+  // tapped, then shuffle" (Wild Endeavor): that many, counted as it resolves.
+  const howMany = /^Search your library for a number of (.+? cards) equal to (.+?)((?:,| and) (?:put|then) .+)$/i.exec(s);
+  if (howMany) {
+    const n = parseCount(howMany[2]!, ctx);
+    const fx = n && parseSearch(`Search your library for two ${howMany[1]}${howMany[3]}`);
+    return n && fx?.length === 1 && fx[0]!.type === "search" && !fx[0]!.others ? [{ ...fx[0]!, n }] : null;
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s);
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
@@ -190,6 +208,22 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Adding mana from a spell or a non-mana triggered ability (CR 605.5a: it uses the stack): "Add {B}{B}{B}" (Dark
   // Ritual), "add one mana of any color", "add three mana of any one color" (the color is chosen as it resolves).
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+)$/.exec(s))) return [{ type: "addMana", mana: m[1]! }];
+  // Another player adds the mana (CR 106.4): "target player adds two mana of any one color" (Bigger on the Inside), "that
+  // player adds {G}{G}" (Eladamri's Vineyard), "the active player adds {C}{C} for each ..." (Belbe). The player who adds
+  // it chooses its color (608.2d: the player doing the instruction).
+  if ((m = /^([Tt]arget player|[Tt]hat player|[Tt]he active player) adds (.+)$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    // "That player adds {C} for each artifact they control" (Blinkmoth Urn): that player counts their own.
+    const theirs = /^((?:\{[WUBRGC]\})+) for each (.+) they control$/.exec(m[2]!);
+    if (theirs) {
+      const count = who && who.ref !== "target" ? parseCount(`${theirs[2]} on the battlefield`, ctx, true) : null;
+      if (!who || !count || count.count.kind !== "permanents" || count.times || count.plus) return null;
+      return [{ type: "addMana", mana: theirs[1]!, times: { count: { ...count.count, whose: who } }, who }];
+    }
+    const inner = who && parseSentence(`Add ${m[2]!}`, ctx);
+    if (!who || !inner?.length || !inner.every((e) => e.type === "addMana" || (e.type === "choose" && e.choice === "color"))) return null;
+    return inner.map((e) => ({ ...e, who }));
+  }
   // "Add {R} for each card in target opponent's hand" (Jeska's Will): counted as it resolves.
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+) for each (.+)$/.exec(s))) {
     const times = parseCount(m[2]!, ctx, true);

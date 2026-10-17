@@ -60,6 +60,9 @@ import {
   auraHostFor,
   auraHostKey,
   payableLife,
+  linkedExileCards,
+  MAX_HAND_SIZE,
+  hasNoMaxHandSize,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -183,7 +186,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
     // "As ~ enters, choose a player" (True-Name Nemesis's protection): the opponent with the most power on the battlefield.
-    if (pend.kind === "chooseOption" && pend.what === "player") {
+    // "Choose an opponent. That player sacrifices a creature" (Myrkul's Edict): the same one.
+    if (pend.kind === "chooseOption" && (pend.what === "player" || pend.what === "opponent")) {
       const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       const opps = pend.options.filter((x) => Number(x) !== pid);
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
@@ -208,6 +212,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Its own card back on top, to draw it again; someone else's card can't be on our library.
     // Read ahead (CR 702.155): start on chapter I, so every chapter happens.
     if (pend.kind === "chooseOption" && pend.what === "readAhead") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    // The Sieges' Khans or Dragons (CR 614.12b): Khans, the long-term value (a card, counters, mana, a returned creature).
+    // "Roll two d8 and choose one result" (the Endeavors): the higher one for the first instruction.
+    if (pend.kind === "chooseOption" && pend.what === "rollResult") return [{ type: "chooseOption", player: pid, choice: Number(pend.labels?.[1]) > Number(pend.labels?.[0]) ? "1" : "0" }];
+    if (pend.kind === "chooseOption" && pend.what === "anchor") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
     // Tap or untap: tap an opponent's untapped permanent, untap our own tapped one; otherwise leave it if we may.
     // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": the biggest one.
@@ -1915,8 +1923,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
-      // Gustha's Scepter: bots don't hide cards from their hand, so there's nothing to take back either.
-      if (ab.body.effects.some((e) => e.type === "exileFaceDown" || (e.type === "moveLinked" && !linkedOwned(s, id, pid)))) continue;
+      // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step
+      // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
+      const hand = player(s, pid).hand.length;
+      const handRoom = hasNoMaxHandSize(s, pid) ? Infinity : MAX_HAND_SIZE - hand;
+      if (ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
+      if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;
       if (regenerates(s, o, ab.body) !== undefined) continue; // only when something threatens it (chooseRegeneration)
@@ -2102,6 +2114,13 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       const picks = chooseDiscards(s, pid, player(s, pid).hand.length).filter((x) => hand.includes(x)).slice(0, c.n);
       if (picks.length < c.n) return null;
       out.discard = picks;
+    } else if (c.kind === "exileFromGraveyard" && c.linked) {
+      // Jester's Scepter: the exiled card with the name of the spell we target, or not at all.
+      const spell = targets.map((t) => (t.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined)).find((x) => x?.objectId);
+      const name = spell?.objectId ? defOf(s, obj(s, spell.objectId)).name : undefined;
+      const card = linkedExileCards(s, o).find((x) => name !== undefined && defOf(s, obj(s, x)).name.split(" // ").concat(defOf(s, obj(s, x)).name).includes(name));
+      if (!card) return null;
+      out.exileCards = [card];
     } else if (c.kind === "exileFromGraveyard" && c.top) {
       if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
     } else if (c.kind === "exileFromGraveyard" && !c.x) {

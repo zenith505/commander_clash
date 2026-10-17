@@ -35,7 +35,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!;
@@ -75,6 +75,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const top = parseAdditionalCost(part);
       if (top?.kind !== "exileFromGraveyard" || !top.top) return "fail";
       extra.push(top);
+    } else if (/^Put a card exiled with ~ into its owner's graveyard$/.test(part)) {
+      // Jester's Scepter: one of the cards its linked exile took (CR 607.2a).
+      extra.push({ kind: "exileFromGraveyard", n: 1, linked: true });
     } else if ((c = new RegExp(`^Put ${NUM} cards? from your hand on top of your library$`).exec(part))) {
       // Several cards go on top in the order their owner chooses (CR 401.4): the first one picked ends up on top.
       extra.push({ kind: "exileFromHand", n: num(c[1]!), toLibrary: true });
@@ -89,8 +92,15 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let activateIf: ActivatedAbility["activateIf"] = keyword === "Boast" ? { kind: "self", is: "attackedThisTurn" } : undefined;
   // "This ability costs {1} less to activate for each legendary creature you control." (CR 602.2b applies 601.2f)
   let costLess: ActivatedAbility["costLess"];
+  // "Activate only if this card is in your graveyard" (Loathsome Troll): it works only from there (CR 113.6j).
+  let inYard = false;
   for (let found = true; found; ) {
     found = false;
+    if (/ Activate only if ~ is in your graveyard\.$/.test(effectText) && !inYard && !keyword) {
+      inYard = true;
+      effectText = effectText.slice(0, effectText.length - " Activate only if ~ is in your graveyard.".length);
+      found = true;
+    }
     const less = / This ability costs \{(\d+)\} less to activate for each ([^.]+)\.$/.exec(effectText);
     if (less && !costLess) {
       const c = parseCount(less[2]!, null, true);
@@ -134,7 +144,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "{3}, Exile this card from your graveyard: ...", "{2}{B}: Return this card from your graveyard to your hand":
   // it works only from your graveyard (CR 113.6j), where "~" is the card.
   const returnsSelf = /^Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)\./.test(effectText);
-  const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf;
+  const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
   if (fromYard && (tap || /Sacrifice ~|Remove /.test(costs))) return "fail";
   if (returnsSelf && /Exile ~ from your graveyard/.test(costs)) return "fail";
   // "{1}{G}, Discard this card: ..." (channel and the like): it works only while the card is in your hand, and
@@ -150,7 +160,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     .map((x) => `{${x}}`)
     .join("");
   // "Sacrifice ~: It deals damage equal to its power to ...": "it" is the source.
-  const body = parseBody(effectText.replace(/^It (?=deals\b)/, "~ "), { activated: true, ...(returnsSelf ? { selfCard: true } : {}) });
+  const body = parseBody(effectText.replace(/^It (?=deals\b)/, "~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
@@ -168,7 +178,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     sorcerySpeed,
     body,
     text: raw,
-    ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf ? {} : { exileSelf: true }) } : {}),
+    ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf || (inYard && !/Exile ~ from your graveyard/.test(costs)) ? {} : { exileSelf: true }) } : {}),
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
@@ -189,7 +199,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
 /** Instructions that move a card to or from a library (CR 605.1a): an ability with one isn't a mana ability. */
 const LIBRARY_EFFECTS = new Set<Effect["type"]>(["draw", "mill", "putInLibrary", "exileTop", "revealTopToHand", "surveil", "handToTop", "shuffleIntoLibrary", "shuffleSpell", "shuffleZones", "search", "dig", "impulse", "cascade", "discover", "ripple", "explore", "hideaway", "recruit", "connive", "orderTop", "scry", "clash", "revealTop", "putInGraveyard", "castFromAmong"]);
 /** Instructions that don't: what mana abilities do besides adding mana (Pristine Talisman's life, Glittering Stockpile's counter). */
-const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
+const MANA_RIDERS = new Set<Effect["type"]>(["addMana", "choose", "roll", "if", "may", "gainLife", "loseLife", "damage", "counters", "removeCounters", "removeSelfCounter", "delayed", "tap", "untap", "getEnergy", "poison", "skipUntap", "continuous", "sacrifice"]);
 
 /**
  * Whether an activated ability's effect makes it a mana ability (CR 605.1a): no target, it could add mana, and it

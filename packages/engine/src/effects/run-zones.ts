@@ -1004,7 +1004,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (hosts === "paused") return "paused";
         const ids = found.filter((id) => !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
         if (ids.length) log(s, `${p.name} returns ${ids.map((id) => defOf(s, obj(s, id)).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} from their graveyard to the battlefield${e.tapped ? ", tapped" : ""}.`);
-        enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: { ...e.counters } } : {}), ...hosts.get(id) })));
+        enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: e.countersN === undefined ? { ...e.counters } : Object.fromEntries(Object.keys(e.counters).map((k) => [k, Math.max(0, amountNow(s, e.countersN!, ctx))])) } : {}), ...hosts.get(id) })));
         return;
       }
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
@@ -1026,6 +1026,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return askWholeGraveyardOrder(s, p.id, src) ? "paused" : undefined;
     }
     case "returnAllFromGraveyard": {
+      if (e.toHand) {
+        // All at once (CR 608.2c), whatever they are.
+        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id)))));
+        if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${player(s, ctx.controller).name}'s hand.`);
+        for (const id of ids) moveObject(s, id, "hand");
+        return;
+      }
       // All at once, as one move: under your control (CR 110.2a) or, with "under their owners' control", each owner's.
       // Only permanent cards can be put onto the battlefield (CR 110.4b). Which cards is fixed as it starts (Replenish
       // rulings), before any Aura's host is chosen; an Aura with nothing to enchant stays in the graveyard (CR 303.4g).

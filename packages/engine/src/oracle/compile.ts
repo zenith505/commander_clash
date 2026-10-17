@@ -629,6 +629,18 @@ export function compile(d: CardDef): CompiledCard {
       if (choosePlayer[1]) out.entersChooseSecret = true;
       continue;
     }
+    // The Sieges: "As ~ enters, choose Khans or Dragons." then "• Khans — [ability]" and "• Dragons — [ability]", each meaning
+    // "as long as [anchor word] was chosen as this permanent entered, it has [ability]" (CR 614.12b, 607.2m).
+    const anchors = /^As ~ enters, choose ([A-Z]\w+) or ([A-Z]\w+)\.$/.exec(line);
+    if (anchors && !out.entersAnchor && lines.slice(li + 1).filter((l) => /^• [A-Z]\w+ — /.test(l)).length === 2) {
+      out.entersAnchor = [anchors[1]!, anchors[2]!];
+      continue;
+    }
+    const anchored = out.entersAnchor && /^• ([A-Z]\w+) — (.+)$/.exec(line);
+    if (anchored) {
+      if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
+      continue;
+    }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
     const asEnters = /^(~ enters tapped\. )?As (?:~|it) enters, choose (an? (?:creature type|color)(?: other than \w+)?(?: and an? (?:creature type|color))?)\.$/.exec(line);
     if (asEnters) {
@@ -799,6 +811,11 @@ export function compile(d: CardDef): CompiledCard {
     // Information that's public while the permanent is on the battlefield (CR 401.5; hands, CR 402.3).
     if (line === "Play with the top card of your library revealed." || line === "Players play with the top card of their libraries revealed.") {
       out.revealTop = /^Players/.test(line) ? "players" : "you";
+      continue;
+    }
+    if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
+      if (out.playLinked) out.unsupported.push(raw);
+      else out.playLinked = true;
       continue;
     }
     if (line === "Players play with their hands revealed." || line === "Your opponents play with their hands revealed.") {

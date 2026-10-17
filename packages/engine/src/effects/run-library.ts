@@ -352,6 +352,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const who = e.who ? (e.who.ref === "eachPlayer" ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);
+      // "Search target opponent's library" (Bribery): you search it (CR 701.23a), and it's theirs that's shuffled.
+      const theirs = e.library ? players(s, e.library, ctx)[0] : undefined;
+      if (e.library && theirs === undefined) return;
+      const libOf = (pid: PlayerId) => player(s, theirs ?? pid);
       if (sc.found && queue.length) {
         searchedBy.push({ pid: queue.shift()!, found: sc.found });
         sc.found = undefined;
@@ -362,7 +366,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // They've searched, found something or not (Archive Trap rulings).
         const searched = ((s.turnLog ??= {}).searched ??= []);
         if (!searched.includes(p.id)) searched.push(p.id);
-        const cards = p.library.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        const cards = libOf(p.id).library.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
@@ -390,14 +394,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const moves: { pid: PlayerId; id: ObjectId }[] = [];
       for (const pid of searchers) {
         const p = player(s, pid);
+        const lib = libOf(pid);
         const found = foundBy(pid).filter((id) => dest(pid, id).zone !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
-        p.library = p.library.filter((id) => !found.includes(id));
+        lib.library = lib.library.filter((id) => !found.includes(id));
         const names = found.map((id) => defOf(s, obj(s, id)).name);
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
-        const shown = e.reveal || e.dest.zone === "battlefield" ? ` (${names.join(", ")})` : "";
-        log(s, `${p.name} searches their library${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 ? "" : ", and shuffles"}.`);
+        const shown = e.reveal || e.dest.zone === "battlefield" || e.dest.zone === "exile" ? ` (${names.join(", ")})` : "";
+        const whose = lib === p ? "their" : `${lib.name}'s`;
+        log(s, `${p.name} searches ${whose} library${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
-        if (searchers.length === 1) shuffle(s, p.library);
+        if (searchers.length === 1) shuffle(s, lib.library);
       }
       enterTogether(s, () => {
         for (const { pid, id } of moves) {

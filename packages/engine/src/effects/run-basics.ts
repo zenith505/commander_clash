@@ -231,7 +231,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "addMana": {
-      // The mana empties from the pool as the step or phase ends (CR 106.4).
+      // The mana empties from the pool as the step or phase ends (CR 106.4). "Target player adds ...": that player.
+      if (e.who) {
+        const color = s.resolving?.chosen?.color;
+        for (const pid of players(s, e.who, ctx)) {
+          const added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
+          const from = manaSourceOrigins(s, ctx);
+          for (const m of added.matchAll(/\{([WUBRGC])\}/g)) addMana(s, pid, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: "turn" as const } : {}) });
+          if (added) log(s, `${player(s, pid).name} adds ${added}.`);
+        }
+        return;
+      }
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
       let added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
@@ -243,7 +253,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);
       for (const m of added.matchAll(/\{([WUBRGC])\}/g)) {
         // "Until end of turn, you don't lose this mana as steps and phases end."
-        addMana(s, p.id, [m[1] as ManaType], { from, ...(e.keep ? { keep: "turn" as const } : {}) });
+        addMana(s, p.id, [m[1] as ManaType], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: "turn" as const } : {}) });
         if (s.resolving?.item.manaAbility) (s.resolving.made ??= []).push(m[1] as ManaType);
       }
       if (added) log(s, `${p.name} adds ${added}.`);

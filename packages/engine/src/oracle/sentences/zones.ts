@@ -3,6 +3,7 @@
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
 import { NUM, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
+import { parseCount } from "../counts";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
 import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
@@ -81,6 +82,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
+  // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
+  if (ctx.selfCard && ctx.activated && (m = /^(?:Return ~ to (your hand|the battlefield)( tapped)?|Put ~ on top of your library)$/.exec(s)))
+    return !m[1] ? [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "top" }] : m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
   if (ctx.selfCard && ctx.subject && /^Return ~ from your graveyard to the battlefield attached to that creature$/.test(s))
     return [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }];
   // The order of a graveyard (CR 404.1; see graveyard.ts): "Return the top creature card of your graveyard to the
@@ -117,6 +121,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = parseSearchFilter(m[1]!);
     if (!filter || !filter.types?.includes("Creature")) return null;
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" } }];
+  }
+  // "... with a number of +1/+1 counters on it equal to that result" (Grave Endeavor): counted as it resolves.
+  const counted = new RegExp(`^([Rr]eturn an? .+? from your graveyard to the battlefield(?: tapped)?) with a number of (${COUNTER}) counters on it equal to (.+)$`).exec(s);
+  if (counted) {
+    const n = parseCount(counted[4]!, ctx); // COUNTER has a group of its own
+    const fx = n && parseZonesSentence(`${counted[1]} with a ${counted[2]} counter on it`, ctx);
+    return n && fx?.length === 1 && fx[0]!.type === "chooseFromGraveyard" && fx[0]!.counters ? [{ ...fx[0]!, countersN: n }] : null;
   }
   if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
     // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
@@ -156,6 +167,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
+  }
+  // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
+  // graveyard to your hand" (Praetor's Counsel).
+  if ((m = /^[Rr]eturn all (?:(.+?) )?cards from your graveyard to your hand$/.exec(s))) {
+    const kinds = (m[1] ?? "").replace(/,? and /g, " or ").replace(/, /g, " or ");
+    const spec = parseTargetPhrase(`${kinds ? `${kinds.split(/\s+/).map(singularWord).join(" ")} ` : ""}card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1] ? `${m[1]} ` : ""}card` }, toHand: true }];
   }
   // "You may put a land card from your hand onto the battlefield (tapped)".
   // Brainstorm: "put two cards from your hand on top of your library in any order", "put a card from your hand on top

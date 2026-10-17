@@ -67,11 +67,15 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   const count = (c: Count): AmountExpr => ({ count: c });
   // "Draw cards equal to the result", "where X is the result" (CR 706.2), "the total of those results" (Neverwinter Hydra).
   if (!each && /^(?:the result|the total of those results)$/i.test(p)) return count({ kind: "rollResult" });
+  // "Roll two d4 and choose one result. Create a number of ... equal to that result. Then ... equal to the other result."
+  if (!each && ctx?.chooseResult && /^that result$/i.test(p)) return count({ kind: "rollResult" });
+  if (!each && ctx?.chooseResult && /^the other result$/i.test(p)) return count({ kind: "rollOther" });
   // Life and hands.
   if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
   if (each && /^opponent(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
+  if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
@@ -169,6 +173,7 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   // "Any number of target players' graveyards" (Stonespeaker Crystal), "their" after them: all of them.
   if (/^any number of target (?:players|opponents)'$/.test(x)) return parsePlayer(x.slice(0, -1), ctx);
   if (ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers) return x === "their" || x === "those players'" || x === "those opponents'" ? { ref: "target", index: ctx.manyPlayers, n: 2 } : null;
+  if (x === "that player's" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   if ((x === "that player's" || x === "their") && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
   // "At the beginning of each opponent's upkeep, ~ deals X damage to that player, where X is the number of cards in their hand".
   if ((x === "that player's" || x === "their") && ctx.eventPlayer) return { ref: "eventPlayer" };

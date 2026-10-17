@@ -9,6 +9,7 @@ import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
 import { parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseSearchFilter } from "./search";
+import { parseManaSpend } from "./mana-abilities";
 
 export interface Ctx {
   targets: TargetSpec[];
@@ -41,6 +42,8 @@ export interface Ctx {
   manyPlayers?: number;
   /** In an activated ability: "its power" with no target before it is the source's. */
   activated?: boolean;
+  /** Its cost puts a card exiled with ~ into a graveyard: "that card" is that one (Jester's Scepter). */
+  costLinked?: boolean;
   /** The last sentence created one token: "put a +1/+1 counter on it" means that token. */
   lastCreated?: boolean;
   /**
@@ -58,6 +61,10 @@ export interface Ctx {
   selfCastSpell?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
+  /** "Choose an opponent." came before: "that player" is the one chosen. */
+  chosenOpponent?: boolean;
+  /** "Roll two d8 and choose one result" came before: "that result" and "the other result" mean something. */
+  chooseResult?: boolean;
   /** In "whenever ~ attacks" and "becomes blocked" triggers: "defending player" is the event player. */
   defending?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
@@ -66,13 +73,23 @@ export interface Ctx {
   whereX?: boolean;
 }
 
+/**
+ * The instruction after ", then": "Target player draws a card, then discards a card" (Cephalid Looter) is the same player
+ * discarding, "that player"; "each player draws ..., then discards ..." each of them.
+ */
+function thenSubject(first: string, next: string): string {
+  const who = /^(Target player|Target opponent|That player|Each player|Each opponent) /.exec(first);
+  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : who[1]} ${next}`;
+  return next.charAt(0).toUpperCase() + next.slice(1);
+}
+
 /** Starts a results table row's marker sentence (see parseBody). */
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
 const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
-const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice");
+const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
 /** "You may [this]. If you do, ...": whether it was done is known (see canDoNow in effects.ts). */
 const checkableMay = (e: Effect) =>
@@ -272,7 +289,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -291,6 +308,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.selfIt ? { selfIt: true } : {}),
     ...(opts.selfCard ? { selfCard: true } : {}),
     ...(opts.activated ? { activated: true } : {}),
+    ...(opts.costLinked ? { costLinked: true } : {}),
     ...(opts.spell ? { spell: true } : {}),
     ...(opts.castSpell ? { castSpell: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
@@ -324,7 +342,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i, all) => (i ? thenSubject(all[0]!, p) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -399,6 +417,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       if (!added.length || si === 0 || /[Ss]pend this mana only|can't be spent/.test(sentences[si - 1]!)) return null;
       for (const e of added) e.keep = "turn";
+      continue;
+    }
+    // "Add {U}{R}. Spend this mana only to cast instant and sorcery spells" (Abstract Paintmage, CR 106.6): the mana the
+    // sentence before added.
+    if (/^Spend this mana only /.test(s)) {
+      const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
+      const only = parseManaSpend(`${s}.`);
+      if (!added.length || !only || added.some((e) => e.only)) return null;
+      for (const e of added) e.only = only;
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3).
@@ -865,8 +892,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const whenDo = /^When you do, (.+)$/.exec(s);
     if (whenDo) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence") || si !== sentences.length - 1) return null;
-      const reflexive = parseBody(whenDo[1]!.charAt(0).toUpperCase() + whenDo[1]!.slice(1), {
+      // "Roll a d20. When you do, put X +1/+1 counters on each of up to two target creatures, where X is the result"
+      // (Ancient Bronze Dragon): the roll always happens; the result goes with the reflexive trigger.
+      const rolled = prev?.type === "roll" && !prev.chooseOne && effects.length === 1;
+      if ((!rolled && (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence"))) || si !== sentences.length - 1) return null;
+      // Its own "where X is ..." goes with it.
+      const whenText = where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!;
+      const reflexive = parseBody(`${whenText.charAt(0).toUpperCase()}${whenText.slice(1)}.`, {
         ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
         ...(ctx.selfIt ? { selfIt: true } : {}),
         ...(ctx.selfCard ? { selfCard: true } : {}),
@@ -875,7 +907,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         ...(ctx.defending ? { defending: true } : {}),
       });
       if (!reflexive || reflexive.modal) return null;
-      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
     // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."
@@ -1015,6 +1047,20 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       }
       effects.push({ type: "may", effects: inner, text: may[1]! });
       if (!defineX()) return null;
+      continue;
+    }
+    // "Search target opponent's library for ... Then that player shuffles" (Bribery): the search shuffles it.
+    if (/^That player shuffles$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type === "search" && prev.library) continue;
+      return null;
+    }
+    // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not
+    // targeted. One per ability.
+    if (/^Choose an opponent$/.test(s)) {
+      if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
+      effects.push({ type: "choose", choice: "opponent" });
+      ctx.chosenOpponent = true;
       continue;
     }
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".

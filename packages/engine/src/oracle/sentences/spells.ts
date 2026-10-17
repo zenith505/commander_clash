@@ -106,11 +106,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Rolling dice (CR 706.1a: "a d20", "N-sided dice"). A modifier in the same instruction ("and add the number of cards
   // in your hand", 706.2); "plus an additional six-sided die for each mana from Treasures spent to activate this
   // ability" (Mr. House).
-  if ((m = new RegExp(`^[Rr]oll ${NUMX} (?:d(\\d+)|(\\w+)-sided (?:die|dice))( and ignore the lower roll)?(?: plus an additional (?:d\\d+|\\w+-sided die) for each (.+)| and (add|subtract) (.+))?$`).exec(s))) {
+  if ((m = new RegExp(`^[Rr]oll ${NUMX} (?:d(\\d+)|(\\w+)-sided (?:die|dice))( and ignore the lower roll| and choose one result)?(?: plus an additional (?:d\\d+|\\w+-sided die) for each (.+)| and (add|subtract) (.+))?$`).exec(s))) {
     const sides = m[2] ? Number(m[2]) : num(m[3]!);
     const n = amt(m[1]!);
     if (!sides || (m[4] && n !== 2)) return null;
-    const roll: Extract<Effect, { type: "roll" }> = { type: "roll", sides, ...(n !== 1 ? { n } : {}), ...(m[4] ? { keepHighest: true as const } : {}) };
+    const choose = m[4] === " and choose one result";
+    if (choose && (ctx.chooseResult || m[5] || m[6])) return null;
+    if (choose) ctx.chooseResult = true;
+    const roll: Extract<Effect, { type: "roll" }> = { type: "roll", sides, ...(n !== 1 ? { n } : {}), ...(m[4] ? (choose ? { chooseOne: true as const } : { keepHighest: true as const }) : {}) };
     if (m[5]) {
       const per = n === 1 ? parseCount(m[5], ctx, true) : null;
       if (!per) return null;
@@ -194,12 +197,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // spell you cast this turn each have cascade" (Smoldering Stagecoach): the spell gains cascade as it's cast and it
   // triggers then; each such effect is an instance of its own (rulings, CR 702.85c).
   // TARDIS's "and you may planeswalk": only in a Planechase game; in any other, nothing happens (CR 701.31a, rulings).
-  if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? you cast this turn (?:has|each have) cascade(?: and you may planeswalk)?$/.exec(s)) && !!m[2] === /each have/.test(s)) {
+  // "Target player adds two mana of any one color. The next spell they cast this turn has cascade" (Bigger on the Inside):
+  // the targeted player's next spell (rulings: the effect applies to it as they start casting it).
+  if ((m = /^[Tt]he next ((?:[a-z]+ )?spell)(?: and the next ([a-z]+ spell))? (you|they) cast this turn (?:has|each have) cascade(?: and you may planeswalk)?$/.exec(s)) && !!m[2] === /each have/.test(s)) {
+    const who: PlayerRef | null = m[3] === "you" ? null : ctx.lastPlayerTarget !== undefined && !ctx.targets[ctx.lastPlayerTarget]?.many ? { ref: "target", index: ctx.lastPlayerTarget } : null;
+    if (m[3] === "they" && !who) return null;
     const out: Effect[] = [];
     for (const w of [m[1]!, m[2]].filter((x): x is string => !!x)) {
       const filter = parseTargetPhrase(w);
       if (filter?.kind !== "spell") return null;
-      out.push({ type: "nextCast", filter, effects: [], text: `the next ${w} you cast this turn has cascade`, cascade: true });
+      out.push({ type: "nextCast", filter, effects: [], text: `the next ${w} ${m[3]} cast this turn has cascade`, cascade: true, ...(who ? { who } : {}) });
     }
     return out;
   }
@@ -238,6 +245,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana
   // value, as it resolves, is countered (rulings).
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
+  // Jester's Scepter: "Counter target spell if it has the same name as that card", the card put into a graveyard for the
+  // cost; any spell can be targeted (rulings).
+  if (/^Counter target spell if it has the same name as that card$/i.test(s) && ctx.activated && ctx.costLinked) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifCostCardName: true }];
   // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
   // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
   if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {

@@ -100,9 +100,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         body: e.body,
         ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}),
         ...(item.subject ? { subject: item.subject } : {}),
+        // "When ~ dies, you may pay {E}{E}{E}. When you do, ~ deals damage equal to its power" (Cyclops Superconductor):
+        // ~ as it last existed on the battlefield, like the ability that created it (CR 608.2h, 113.7a).
+        ...(item.lki ? { lki: item.lki } : {}),
         ...(item.event ? { event: item.event } : {}),
         ...(item.x ? { x: item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
+        ...(e.sacrificed && s.resolving!.sacrificedThisWay ? { sacrificed: s.resolving!.sacrificedThisWay } : {}),
       });
       return;
     }
@@ -150,6 +154,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const holds = held ? held.holds :
         e.cond.kind === "youDid"
           ? !!s.resolving!.did
+          : e.cond.kind === "selfHere"
+          ? objects(s, { ref: "self" }, ctx).some((o) => !(e.cond as { yours?: true }).yours || controllerOf(s, o) === ctx.controller)
+          : e.cond.kind === "libraryHas"
+          ? player(s, ctx.controller).library.length >= e.cond.n
           : e.cond.kind === "wonClash"
             ? !!s.resolving!.wonClash
             : e.cond.kind === "wonFlip"
@@ -323,7 +331,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
   for (const e of effects) {
     if (e.type === "discard" && e.who.ref === "you" && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
-    if (e.type === "sacrifice" && !objects(s, e.what, ctx).length) return false;
+    if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
+    if (e.type === "exile" && e.what.ref === "selfCard" && !objects(s, e.what, ctx).length) return false;
+    if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
     // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.

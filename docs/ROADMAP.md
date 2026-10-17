@@ -1,6 +1,6 @@
 # Roadmap
 
-19,201 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,349 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -17,8 +17,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the Roles/modified/can't be regenerated/equip round:
-   - Role cards still out on other lines: reflexive "When you do, create a ... Role" (Curse of the Werefox, Merry
-     Bards, Spellbook Vendor), Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
+   - Role cards still out on other lines: Curse of the Werefox ("fights up to one target creature"), Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
      enchanted creature or enchantment creature"), Seeds of Innocence-style "the controller of each of those".
    - "Can't be regenerated" still out: Purge ("artifact
      creature or black creature"), Mageta ("except for ~"), The Abyss ("of their choice"), Scorching Lava (kicked
@@ -229,7 +228,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      cards); still out: "each of your teammates" (Imperial Mask), Combo Attack, surge (Fall of the Titans). Pir and other
      "Partner with" cards are out on their other lines.
    - "Target ... with mana value X or less, where X is ..." works for the life you gained this turn (Celestine, Moseo);
-     still out: Rodolf (reflexive "when you do"), damage dealt (Venerable Warsinger), players attacked (Custodi
+     still out: damage dealt (Venerable Warsinger), players attacked (Custodi
      Soulcaller), Go-Shintai of Hidden Cruelty, Ancient Brass Dragon (a die roll's X with "total mana value X or less"),
      casting from revealed library cards (Sunbird's Invocation), Kamahl's Druidic Vow, Eldritch Evolution, Rally the
      Ancestors. Wishing Well and "with mana value equal to" an amount work.
@@ -290,9 +289,9 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      Bypass, Crowd of True Believers, Viper), and "choose target face-up exiled card" (Riftsweeper, Blink).
    Left from the delayed end step round ("sacrifice / exile / return it at the beginning of the next end step" about
    objects named earlier, exile now and return later, "until your next end step", "if you controlled that permanent"):
-   - Still out: "That Dragon gains haste until end of turn" after a search (Arms Race, Meek Attack, Treacherous Urge,
-     Swift Warkite, Greasefang, Zirilan); "gets ... and gains" with no duration (Goblin Ski Patrol); named tokens
-     (Hornet Cannon, Giant Caterpillar); Manaform Hellkite, Urabrask's Forge, Fire Navy Trebuchet; "investigate X times"
+   - Still out: haste for a card put from the hand with a filter or from the graveyard (Meek Attack, Treacherous Urge,
+     Swift Warkite, Greasefang); "gets ... and gains" with no duration (Goblin Ski Patrol); Manaform Hellkite and
+     Urabrask's Forge (X/X tokens); "investigate X times"
      (Disorder in the Court); "any number of target ... return each of them" (Semester's End, Brago); Flickerform
      ("and all Auras attached to it"); Memory Jar (exile hands face down); Teferi's Time Twist, Phelia, Koya, Norin,
      Conciliator's Duelist, Mistmeadow Vanisher, Vizier of Deferment, Charming Prince; Avacyn and Resurrection Orb,
@@ -301,6 +300,16 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      Slaughter; "If you controlled it, ... Otherwise, its controller" (Unyielding Gatekeeper) and Azog's amass.
    - Simplifications: "sacrifice those creatures / them at the next end step" makes one delayed trigger per object
      (CR 603.7 has one for all; no supported card can tell); a flicker's return is one trigger for all the cards.
+   Left from the reflexive triggers round ("When you do" after a payment, a sacrifice, a may, a mill, a roll, a count
+   or a token, CR 603.12; named tokens; "that artifact gains haste" after putting it onto the battlefield):
+   - Reflexive triggers still out: on instants and sorceries (Hypothesizzle, Faebloom Trick, Earth Rumble,
+     Lithobraking, Tip the Scales; the spell is gone by the time the ability resolves); "pay {X}. When you do" (Electro,
+     Isareth, Halo Forager, Numa, Wildborn Preserver, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
+     Walker); "exile N cards from your graveyard. When you do" (Kroxa, Young Necromancer, Kishla Trawlers); Wick's
+     Patrol ("the greatest mana value among cards in your graveyard"); Curse of the Werefox (fight "up to one target");
+     Red Hulk, Hylda, Ziatora, Tiger-Tribe Hunter, Surtland Flinger, Bolg, Edgar's Awakening, Leyline Tyrant ("any
+     amount"), Rubble Rouser, Novel Nunchaku, Old Man Willow ("or a token"), Greasefang, Kher Keep ("~" in a token's
+     name), Murmuration, Mordor Trebuchet, The Great Unclean One. The Balrog is out on its cost reduction.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
@@ -313,8 +322,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Left from the haunt/Aura-host rounds:
    - Auras put onto the battlefield without being cast ask what they enchant (CR 303.4f), returns from exile and
      "until ~ leaves" included. An "until ~ leaves" Aura is placed after the instruction or state-based-action pass
-     that made the source leave, not mid-instruction. Still out: Calix, Estrid, Push the Limit, Academy Rector's "you
-     may exile it. If you do", Mount/Vehicle groups.
+     that made the source leave, not mid-instruction. Still out: Calix, Estrid, Push the Limit, Mount/Vehicle groups.
    - Auras that transform: Lignify (the Kindred type), Witness Protection and Honest Work (a new name), Frozen in Ice
      ("can't become untapped"), Withercrown (granted upkeep trigger with "unless you sacrifice"), Swift
      Reconfiguration (Vehicle with crew), enchant unions with a subtype (In Too Deep, Sugar Coat, Puppet Crafting).
@@ -347,7 +355,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      activated while a "whenever ~ is tapped for mana, add one mana of any color" trigger would need a color choice
      (Fertile Ground on it): it's refused rather than asked. No supported card hits this yet.
    Left from the for-each-opponent/commander/mana value X round:
-   - Reflexive "When you do" outside collect evidence (Lich's Relic, Balrog); "choose up to one target" (Luminate
+   - "Choose up to one target" (Luminate
      Primordial, Shellshock, Mega Flare); exchanges of control (Twist
      Allegiance, Reins of Power); "creatures and lands target opponent controls don't untap during their next
      untap step" (Exhaustion).

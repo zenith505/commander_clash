@@ -1631,6 +1631,14 @@ function checkCastingLinks(out: CompiledCard) {
         delete o.cost;
       }
     }
+    // A reflexive trigger's "that creature" after "you may sacrifice another creature" (Heart-Piercer Manticore).
+    if (o.type === "reflexive" && o.sacrificed) {
+      const was = canSac;
+      canSac = true;
+      visit(o.body);
+      canSac = was;
+      return;
+    }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : needs.add("creatureType"));

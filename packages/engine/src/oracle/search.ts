@@ -74,6 +74,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return { kind: "card", anyOf: [{ kind: "card", named: or[1]!, text: `card named ${or[1]}` }, other], text: p };
   }
   if (named) return { kind: "card", named: named[1]!, text: `card named ${named[1]}` };
+  // "A basic Forest, Plains, or Island card" (Brokers Hideout): a basic land card with any one of those types.
+  const basics = /^basic ([A-Z][a-z]+(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+) card$/.exec(p);
+  if (basics) {
+    const subs = basics[1]!.split(/,? or |, /).map((t) => parseSearchFilter(`basic ${t} card`));
+    if (subs.some((x) => !x)) return null;
+    return { kind: "card", anyOf: subs as TargetSpec[], text: p };
+  }
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);
   if (parts.length > 1 && parts.every((x) => / card$/.test(x))) {

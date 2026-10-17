@@ -23,6 +23,8 @@ export interface Ctx {
   selfIt?: boolean;
   /** After it left the battlefield ("When ~ dies, return it to its owner's hand"), "it" is the card in its new zone. */
   selfCard?: boolean;
+  /** A reflexive trigger after "you may sacrifice another creature": "that creature's power" is the sacrificed one's. */
+  sacrificedIt?: boolean;
   /** Index of the most recent object target, for "it" / "its controller". */
   lastObjectTarget?: number;
   /** An earlier sentence acted on "enchanted creature" (or equipped): a later "it" means that creature. */
@@ -107,6 +109,12 @@ const checkableMay = (e: Effect) =>
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
+  // "Whenever a Goblin or Orc you control deals combat damage to a player, you may sacrifice it." (Gorbag): the subject.
+  (e.type === "sacrifice" && e.what.ref === "subject") ||
+  // "When ~ dies, you may exile it. When you do, ..." (Undead Butler): only while it's still that card in the graveyard.
+  (e.type === "exile" && e.what.ref === "selfCard") ||
+  // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
+  (e.type === "tap" && e.what.ref === "self") ||
   // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
   (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "number") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
@@ -301,7 +309,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -311,7 +319,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     if (modal[1] !== "one" || opts.spell) return null;
     return { ...body, modal: { ...body.modal!, ...(how === "at random" ? { random: true as const } : { unchosen: how.endsWith("this turn") ? ("turn" as const) : ("ever" as const) }) } };
   }
-  if (text.includes("•")) return null; // modes with text before them, or a kind of choice we don't support
+  // Modes with text before them, or a kind of choice we don't support; but "You may pay {1}. When you do, choose one —
+  // • ..." (Hylda of the Icy Crown) is a modal reflexive trigger, its modes chosen as it's put on the stack (CR 603.12).
+  const reflexiveModes = /\bWhen you do, choose [^•.]*—\s*•/.exec(text);
+  if (text.includes("•") && (!reflexiveModes || text.indexOf("•") < reflexiveModes.index)) return null;
   const ctx: Ctx = {
     targets: [],
     ...(opts.subject ? { subject: true } : {}),
@@ -327,6 +338,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
     ...(opts.ownX ? { ownX: true } : {}),
+    ...(opts.sacrificedIt ? { sacrificedIt: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -343,6 +355,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
+  text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   let rowToken: string | undefined;
@@ -737,6 +751,17 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     if (payFirst) {
+      // "You may pay {2}{W}. When you do, tap target creature." (Thousand Moons Crackshot): paying triggers a reflexive
+      // ability with targets of its own, chosen as it's put on the stack (CR 603.12; rulings). The rest of the ability is its.
+      const whenPaid = /^When you do, (.+)$/.exec(s);
+      if (whenPaid) {
+        const reflexive = reflexiveBody([whenPaid[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
+        if (!reflexive) return null;
+        effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
+        payFirst = null;
+        si = sentences.length;
+        continue;
+      }
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
       // "You may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the
@@ -1086,20 +1111,46 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // Wishing Well: "Put a coin counter on ~. When you do, ...": it's put if ~ is still on the battlefield. The rest of
       // the ability is the reflexive trigger's.
       const counted = prev?.type === "counters" && prev.what.ref === "self" && effects.length === 1 && !ctx.selfCard;
-      if ((!rolled && !counted && (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence"))) || (si !== sentences.length - 1 && !counted)) return null;
+      // "You may sacrifice another creature. When you do, destroy target creature an opponent controls." (Cavalier of
+      // Night), "you may discard a card. When you do, ..." : doing it triggers the reflexive ability (CR 603.12), so it's a
+      // "you may" whose doing the engine can tell (see checkableMay).
+      const mayDo = prev?.type === "may" && !prev.pay && !prev.otherwise && prev.effects.every(checkableMay) && effects.length >= 1;
+      // "When ~ enters, sacrifice it. When you do, search ..." (Brokers Hideout), "At the beginning of your upkeep,
+      // sacrifice ~. When you do, ..." (Smoke Bomb): done if ~ is still there as that object to be sacrificed (CR 400.7).
+      const sacSelf = prev?.type === "sacrifice" && prev.what.ref === "self" && !prev.byController && !ctx.selfCard;
+      // "Mill three cards. When you do, ..." (Wick's Patrol): only if all of them were milled; with fewer in the library,
+      // you mill as many as you can but it doesn't trigger (rulings on Wick's Patrol; CR 701.17b).
+      const milled = prev?.type === "mill" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0;
+      // "Create a Food token. When you do, ..." (Eastfarthing Farmer): the token is created, so it triggers.
+      const created = prev?.type === "createToken" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0 && !prev.attachTo;
+      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !created) return null;
       // Its own "where X is ..." goes with it.
       const whenText = [where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
-      if (counted) si = sentences.length;
-      const reflexive = parseBody(`${whenText.charAt(0).toUpperCase()}${whenText.slice(1)}.`, {
-        ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
-        ...(ctx.selfIt ? { selfIt: true } : {}),
-        ...(ctx.selfCard ? { selfCard: true } : {}),
-        ...(ctx.activated ? { activated: true } : {}),
-        ...(ctx.eventPlayer ? { eventPlayer: true } : {}),
-        ...(ctx.defending ? { defending: true } : {}),
-      });
-      if (!reflexive || reflexive.modal) return null;
-      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "state", cond: { kind: "self", is: "onBattlefield" } } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      si = sentences.length;
+      // What the "you may" sacrificed, if the reflexive trigger is about it.
+      const sacPick = mayDo && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice";
+      const reflexive = reflexiveBody(whenText, ctx, sacPick);
+      if (!reflexive) return null;
+      const aboutSacrificed = sacPick && JSON.stringify(reflexive).includes('"ref":"sacrificed"');
+      if (aboutSacrificed) {
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive, sacrificed: true }] });
+        continue;
+      }
+      if (sacSelf) {
+        effects.pop();
+        effects.push({ type: "if", cond: { kind: "selfHere", yours: true }, effects: [prev, { type: "reflexive", body: reflexive }] });
+        continue;
+      }
+      if (milled) {
+        effects.pop();
+        effects.push({ type: "if", cond: { kind: "libraryHas", n: prev.n as number }, effects: [prev, { type: "reflexive", body: reflexive }], otherwise: [prev] });
+        continue;
+      }
+      if (created) {
+        effects.push({ type: "reflexive", body: reflexive });
+        continue;
+      }
+      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "selfHere" } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
     // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."
@@ -1611,6 +1662,32 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
   const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx));
   if (fx) noteLast(ctx, fx);
   return fx;
+}
+
+/**
+ * The body of a reflexive trigger, "When you do, [text]" (CR 603.12): its own targets, chosen as it's put on the stack,
+ * and the same meaning of ~, "it" and the trigger's subject as the ability that creates it.
+ */
+function reflexiveBody(text: string, ctx: Ctx, sacrificed = false): AbilityBody | null {
+  // A spell's reflexive trigger has the spell as its source, gone from the stack by then (not modeled).
+  if (ctx.spell) return null;
+  // After "you may sacrifice another creature", "that creature" is only ever its power or toughness (Heart-Piercer
+  // Manticore, Ziatora): the sacrificed creature as it last existed (CR 608.2h; rulings).
+  const sac = sacrificed && /\b(?:that|the sacrificed) creature's (?:power|toughness)\b/.test(text);
+  if (sac && /\bthat creature(?!'s (?:power|toughness)\b)/.test(text)) return null;
+  // "When ~ enters, you may pay {2}{R}. When you do, it deals 3 damage to any target." (Sparktongue Dragon): "it" is ~,
+  // the source of both abilities (CR 603.12, 113.7a).
+  if (ctx.selfIt && !ctx.subjectIt) text = text.replace(/^(?:it|he|she) deals /, "~ deals ");
+  const body = parseBody(`${text.charAt(0).toUpperCase()}${text.slice(1)}.`, {
+    ...(sac ? { sacrificedIt: true } : {}),
+    ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
+    ...(ctx.selfIt ? { selfIt: true } : {}),
+    ...(ctx.selfCard ? { selfCard: true } : {}),
+    ...(ctx.activated ? { activated: true } : {}),
+    ...(ctx.eventPlayer ? { eventPlayer: true } : {}),
+    ...(ctx.defending ? { defending: true } : {}),
+  });
+  return body;
 }
 
 /** What "it", "they" and "those creatures" can mean after these effects (the token just created, the group changed). */

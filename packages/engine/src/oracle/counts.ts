@@ -221,6 +221,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (x === "~'s") return { ref: "self" };
   // What was sacrificed to cast the spell, as it last existed (CR 608.2h); compile() checks there's such a cost.
   if (/^the sacrificed (creature|artifact|permanent)'s$/.test(x)) return ctx ? { ref: "sacrificed" } : null;
+  // A reflexive trigger after "you may sacrifice another creature": that creature, as it last existed (CR 608.2h).
+  if (x === "that creature's" && ctx?.sacrificedIt) return { ref: "sacrificed" };
   if (!ctx) return x === "its" ? { ref: "self" } : null;
   // "That spell's mana value": the targeted spell (Imp's Mischief).
   if ((x === "that spell's" || x === "the spell's") && ctx.lastObjectTarget !== undefined) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;

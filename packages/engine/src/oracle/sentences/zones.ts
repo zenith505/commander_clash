@@ -458,6 +458,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (among?.ref !== "target" || !filter || filter.kind !== "object" || !half) return null;
     return [{ type: "pick", who: { ref: "you" }, among, filter, n: { count: { kind: "permanents", filter, whose: among }, half }, action: "bounce" }];
   }
+  // "You may sacrifice another creature" (Cavalier of Night): one other than the source (a permanent's ability).
+  if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {
+    const filter = pickFilter(m[1]!);
+    return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
+  }
   if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const filter = pickFilter(m[3]!);

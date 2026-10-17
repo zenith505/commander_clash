@@ -13,7 +13,7 @@ import { parseOnlyClauses, parseStaticCondition } from "./statics";
  * we can run (mana that can only be spent on some spells, "in any combination", ...).
  */
 export function parseManaAbility(line: string): ManaAbility | null {
-  const part = String.raw`\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
@@ -24,10 +24,13 @@ export function parseManaAbility(line: string): ManaAbility | null {
   let energyCost: number | undefined;
   let removeCounters: ManaAbility["removeCounters"];
   let tapCost: ManaAbility["tapCost"];
+  let removeX: { counter: CounterKind; any: boolean } | undefined;
   for (const c of costs) {
     const rc = removeCounterCost(c);
     const tc = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(c);
+    const rx = new RegExp(`^Remove (any number of|X) ${COUNTER} counters from ~$`).exec(c);
     if (rc) removeCounters = rc;
+    else if (rx && !removeX && !removeCounters) removeX = { counter: counterKind(rx[2]!), any: rx[1] === "any number of" };
     else if (tc) {
       const filter = pickFilter(tc[2]!);
       if (!filter || tapCost) return null;
@@ -41,14 +44,17 @@ export function parseManaAbility(line: string): ManaAbility | null {
     else if (/^(\{(\d+|[WUBRGC]|[WUBRG]\/[WUBRG])\})+$/.test(c)) manaCost += c;
     else return null;
   }
-  const produces = parseManaProduced(m[2]!);
-  if (!produces) return null;
+  const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
+  if (!produces || (removeCounters && removeX)) return null;
   const out: ManaAbility = { text: line, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}) };
   let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
+    // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
+    else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);
+    else if ((m2 = new RegExp(`^If there are no ${COUNTER} counters on ~, sacrifice it\\.$`).exec(extra)) && !out.sacrificeIfNo && removeCounters?.counter === counterKind(m2[1]!)) out.sacrificeIfNo = counterKind(m2[1]!);
     else if ((m2 = new RegExp(`^If ([^,]+), add ${NUM} \\{([WUBRGC])\\} instead\\.$`).exec(extra)) && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
       // "Add {G}{G}. If you've completed a dungeon, add six {G} instead." (Undermountain Adventurer): as it resolves.
       const p = out.produces;
@@ -115,6 +121,19 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
 export function removeCounterCost(part: string): { counter: CounterKind; n: number } | null {
   const m = new RegExp(`^Remove ${NUM} ${COUNTER} counters? from ~$`).exec(part);
   return m ? { counter: counterKind(m[2]!), n: num(m[1]!) } : null;
+}
+
+/**
+ * What a storage land adds for the counters removed (ManaProduce "removeX"): "{B} for each storage counter removed this
+ * way" after "Remove any number of", "X mana in any combination of {U} and/or {B}" after "Remove X". Null for the rest
+ * ("X mana in any combination of colors": too many ways to pick from).
+ */
+function removedProduced(text: string, counter: CounterKind, any: boolean): ManaProduce | null {
+  const each = new RegExp(`^\\{([WUBRGC])\\} for each ${COUNTER} counter removed this way$`).exec(text);
+  if (any && each && counterKind(each[2]!) === counter) return { kind: "removeX", counter, colors: [each[1] as ManaType], min: 0 };
+  const combo = /^X mana in any combination of \{([WUBRG])\} and\/or \{([WUBRG])\}$/.exec(text);
+  if (!any && combo && combo[1] !== combo[2]) return { kind: "removeX", counter, colors: [combo[1] as ManaType, combo[2] as ManaType], min: 1 };
+  return null;
 }
 
 function parseManaProduced(text: string): ManaProduce | null {

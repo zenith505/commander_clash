@@ -1,7 +1,7 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { playerProtectedFrom, spellManaValue } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, COLOR_NAMES } from "./effects";
@@ -2331,8 +2331,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const problem = manaAbilityProblem(s, p.id, o, i, false, tap ?? (ab?.tapCost ? [] : undefined));
   if (problem) throw new RulesError(problem);
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
-  // "Add {W}{W}, {W}{U}, or {U}{U}": one of the combinations, chosen as it resolves (CR 605.3b).
-  if (ab.produces.kind === "combos" ? combo === undefined || !ab.produces.options[combo] : combo !== undefined) throw new RulesError(ab.produces.kind === "combos" ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
+  // "Add {W}{W}, {W}{U}, or {U}{U}": one of the combinations, chosen as it resolves (CR 605.3b). A storage land's: how
+  // many counters it removes, announced as it's activated (CR 107.3a), and how that mana is split.
+  const combos = manaCombos(o, ab);
+  if (combos ? combo === undefined || !combos[combo] : combo !== undefined) throw new RulesError(combos ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
   const adds = manaProduced(s, o, ab, mana, combo);
   // The triggered mana abilities tapping it triggers (CR 605.1b), with the player's picks for their mana.
@@ -2345,13 +2347,19 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   const manaPaid = ab.manaCost ? spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o }) : null;
   if (ab.tap) tapPermanent(s, o);
-  // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3).
-  if (ab.tap) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+  // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
+  // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
+  if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
+  if (ab.produces.kind === "removeX") {
+    const n = combos![combo!]!.length;
+    removeCountersCost(s, o, { counter: ab.produces.counter, n });
+    log(s, `${p.name} removes ${n} ${ab.produces.counter} counter${n === 1 ? "" : "s"} from ${name}.`);
+  }
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
   if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
   if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
@@ -2363,6 +2371,13 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
+  // Depletion lands, as the ability resolves: "Put a depletion counter on ~", "If there are no depletion counters on ~,
+  // sacrifice it" (checked after the cost removed one).
+  if (ab.putCounter && o.zone === "battlefield") putCounters(s, o, ab.putCounter, 1);
+  if (ab.sacrificeIfNo && o.zone === "battlefield" && !(o.counters[ab.sacrificeIfNo] ?? 0)) {
+    log(s, `${p.name} sacrifices ${name}.`);
+    moveObject(s, id, "graveyard", { sacrificed: true });
+  }
   if (ab.selfDamage && dealDamage(s, src, { player: p.id }, ab.selfDamage) && o.zone === "battlefield") fireEvent(s, { type: "dealtDamage", id: o.id, amount: ab.selfDamage, combat: false });
   // Vazi: "if mana from a Treasure was spent to ... activate it" counts mana abilities too.
   fireEvent(s, { type: "activated", player: p.id, mana: true, ...(manaPaid?.treasure ? { treasure: manaPaid.treasure } : {}) });
@@ -4267,6 +4282,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "vote") {
+    // A vote (CR 701.38a), or "none" to pass on an extra vote that's optional (see runVotesEffect).
+    const v = r.scratch?.vote;
+    if (!v) throw new RulesError("nothing to vote on");
+    v.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});
@@ -5604,7 +5627,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i)) return;
       const tap = ab.tapCost ? tapCostCandidates(s, pid, o, ab.tapCost).slice(0, ab.tapCost.n) : undefined;
-      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}) });
+      for (const x of options) if (x.ability === i) out.push({ type: "activateMana", player: pid, objectId: id, mana: x.mana, ability: i, ...(x.combo !== undefined ? { combo: x.combo } : {}), ...(tap ? { tap } : {}), ...(x.extra ? { extra: x.extra } : {}) });
     });
   }
   return out;
@@ -5833,7 +5856,9 @@ export function availableMana(s: GameState, pid: PlayerId): number {
     let best = 0;
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i, true)) return;
-      const most = ab.produces.kind === "combos" ? Math.max(0, ...ab.produces.options.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
+      // A storage land as autopay uses it: one counter at a time.
+      const combos = manaCombos(o, ab);
+      const most = ab.produces.kind === "removeX" ? Math.min(1, o.counters[ab.produces.counter] ?? 0) : combos ? Math.max(0, ...combos.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
       best = Math.max(best, most - manaValue(parseManaCost(ab.manaCost)));
     });
     for (const { ab, options } of payableActivatedMana(s, pid, o)) best = Math.max(best, Math.max(0, ...options.map((x) => x.adds.length)) - manaValue(parseManaCost(ab.manaCost)));

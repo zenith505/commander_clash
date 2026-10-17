@@ -99,6 +99,8 @@ export type Count =
   | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
+  /** "For each death vote", "the number of profit votes" (CR 701.38): the votes for that choice in this ability's vote. */
+  | { kind: "votes"; option: string }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
@@ -457,7 +459,12 @@ export type ObjRef =
    * Krovikan Vampire's "that card": each creature card that died this turn after the source dealt it damage that turn,
    * while it's still that card in the graveyard (rulings: once it leaves, the game loses track of it).
    */
-  | { ref: "diedDamagedBySelf" };
+  | { ref: "diedDamagedBySelf" }
+  /**
+   * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
+   * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
+   */
+  | { ref: "voted" };
 
 /** Which player(s) an effect touches. */
 export type PlayerRef =
@@ -1689,6 +1696,16 @@ export type Effect =
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
   | { type: "playerGains"; keywords: string[] }
+  /**
+   * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the
+   * controller, votes for one of `options` (words with no rules meaning, 701.38b), or for one of the permanents or cards
+   * `among` matches, as seen by the controller ("a nonland permanent you don't control"). Players vote again for each
+   * extra vote they get, all at the time they'd vote (701.38d). `secret`: "each player secretly votes": nobody sees the
+   * others' votes until all are in. The votes are kept for the rest of the ability (Resolving.votes).
+   */
+  /** Illusion of Choice: "You choose how each player votes this turn" (GameState.votesChosenBy). */
+  | { type: "chooseVotes" }
+  | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; text: string }
   | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
@@ -1795,7 +1812,13 @@ export type SpellCondition =
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
-  | { kind: "milledIs"; filter: TargetSpec };
+  | { kind: "milledIs"; filter: TargetSpec }
+  /**
+   * "If death gets more votes" (CR 701.38): that choice got more votes than each other one in this ability's vote.
+   * `orTie`: "If taxes gets more votes or the vote is tied": also when two or more choices tie for the most (rulings on
+   * Coercive Portal).
+   */
+  | { kind: "voteWins"; option: string; orTie?: true };
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
@@ -2343,7 +2366,14 @@ export type ManaProduce =
    */
   | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean }
   /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
-  | { kind: "combos"; options: ManaType[][] };
+  | { kind: "combos"; options: ManaType[][] }
+  /**
+   * Storage lands: "Remove any number of storage counters from ~: Add {B} for each storage counter removed this way"
+   * (`colors` one color, `min` 0), "Remove X storage counters from ~: Add X mana in any combination of {U} and/or {B}"
+   * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
+   * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
+   */
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).
@@ -2377,6 +2407,10 @@ export interface ManaAbility {
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
   spendOnly?: ManaSpend;
+  /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
+  putCounter?: CounterKind;
+  /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
+  sacrificeIfNo?: CounterKind;
 }
 
 /**
@@ -2738,6 +2772,11 @@ export interface CompiledCard {
    * exhaust abilities as though they haven't been activated" (CR 702.177b): see Player.exhaustTurn.
    */
   exhaustAgain?: true;
+  /**
+   * "While voting, you get an additional vote" (Brago's Representative), "you may vote an additional time" (Ballot
+   * Broker): one more vote each time its controller votes (CR 701.38d); with "may", they can pass on it.
+   */
+  extraVote?: "get" | "may";
   /**
    * Platinum Angel: "You can't lose the game and your opponents can't win the game" (`cantLose` "you", `cantWin`
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).

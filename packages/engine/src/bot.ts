@@ -1,6 +1,7 @@
 import { playerProtectedFrom } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
+import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
@@ -170,7 +171,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Exert (CR 701.43d): for its "when you do" bonus, while there's life to spare for it not untapping.
     if (pend.kind === "pickPermanents" && pend.action === "exert") return [{ type: "pickPermanents", player: pid, ids: chooseExert(s, pid, pend.options) }];
     // "You may choose not to untap ~": keep it tapped while one of its "for as long as ~ remains tapped" effects lasts.
-    if (pend.kind === "pickPermanents" && pend.action === "keepTapped") return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id)) }];
+    // Keep tapped what an effect lasts for while it's tapped, and a storage land saving up (Bottomless Vault gets a counter
+    // at upkeep while tapped) until it has three.
+    if (pend.kind === "pickPermanents" && pend.action === "keepTapped") {
+      const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id)) }];
+    }
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).
@@ -259,6 +265,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
+    if (pend.kind === "chooseOption" && pend.what === "vote") return [{ type: "chooseOption", player: pid, choice: chooseVote(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "punisher") return [{ type: "chooseOption", player: pid, choice: choosePunisher(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
     // What an Aura entering without being cast enchants (CR 303.4f): one of ours if it only helps, an opponent's otherwise.

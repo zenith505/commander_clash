@@ -133,6 +133,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
+    case "votes":
+      return (s.resolving?.votes ?? []).filter((v) => v.choice === c.option).length;
     case "discoveredBelow": {
       const d = s.resolving?.discovered;
       return d && d.mv < c.n ? c.n - d.mv : 0;
@@ -404,6 +406,8 @@ function describeCount(c: Count): string {
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
+    case "votes":
+      return `#${c.option} votes`;
     case "discoveredBelow":
       return `${c.n} minus the discovered card's mana value`;
     case "destroyedThisWay":

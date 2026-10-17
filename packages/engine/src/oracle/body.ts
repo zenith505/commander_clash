@@ -83,6 +83,8 @@ export interface Ctx {
   whereX?: boolean;
   /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
   halfRound?: "up" | "down";
+  /** A vote came before (CR 701.38): its words ("death vote", "if taxes gets more votes"), or that it's for objects. */
+  vote?: { options?: string[]; among?: true };
 }
 
 /**
@@ -109,7 +111,7 @@ const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpp
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
+const PAUSING = new Set<Effect["type"]>(["vote", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
@@ -396,6 +398,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
+  // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
+  text = text.replace(/\ball creatures other than ~/g, "all other creatures");
+  // "Each player secretly votes for truth or consequences, then those votes are revealed" is one instruction (a vote whose
+  // votes nobody sees until all are made), not two.
+  text = text.replace(/\b(secretly votes for [^.]+?), then those votes are revealed\./g, "$1.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   let rowToken: string | undefined;
@@ -1092,6 +1099,36 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       if (copy?.type !== "copySpell") return null;
       copy.newTargets = true;
+      continue;
+    }
+    // "Starting with you, each player votes for death or taxes" (CR 701.38a): the words, or "a nonland permanent you don't
+    // control", "an artifact, creature, or enchantment card in your graveyard" (objects, not targeted). One vote per ability.
+    const vote = /^(?:[Ss]tarting with you, each player votes|Each player (secretly) votes) for (.+)$/.exec(s);
+    if (vote) {
+      if (ctx.vote) return null;
+      const what = vote[2]!;
+      const one = /^an? (.+)$/.exec(what);
+      const secret = vote[1] ? { secret: true as const } : {};
+      if (one) {
+        const spec = parseTargetPhrase(one[1]!);
+        if (!spec || (spec.kind !== "object" && spec.kind !== "card") || spec.chosen || spec.counter || (spec.kind === "card" && spec.owner !== "you")) return null;
+        effects.push({ type: "vote", among: { ...spec, text: one[1]! }, ...secret, text: `vote for ${what}` });
+        ctx.vote = { among: true };
+      } else {
+        const options = what.split(/, or |, | or /);
+        if (options.length < 2 || new Set(options).size !== options.length || options.some((o) => !/^[A-Za-z][A-Za-z' ]*$/.test(o))) return null;
+        effects.push({ type: "vote", options, ...secret, text: `vote for ${what}` });
+        ctx.vote = { options };
+      }
+      continue;
+    }
+    // "If death gets more votes, ...", "If taxes gets more votes or the vote is tied, ...": decided by that vote.
+    const ifVote = /^If (.+?) gets more votes( or the vote is tied)?, (.+)$/.exec(s);
+    if (ifVote) {
+      if (!ctx.vote?.options?.includes(ifVote[1]!)) return null;
+      const inner = parseOne(ifVote[3]!.charAt(0).toUpperCase() + ifVote[3]!.slice(1), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "voteWins", option: ifVote[1]!, ...(ifVote[2] ? { orTie: true as const } : {}) }, effects: inner });
       continue;
     }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
@@ -1978,7 +2015,8 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
     case "discard":
     case "scry":
     case "surveil":
-    case "preventNext": {
+    case "preventNext":
+    case "pick": {
       if (e.type === "counters" && (e.perLastKnownCounter || e.double)) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
@@ -2052,7 +2090,10 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {
-    const fx = parseSentence(p.charAt(0).toUpperCase() + p.slice(1), ctx);
+    const part = p.charAt(0).toUpperCase() + p.slice(1);
+    // "Put a +1/+1 counter on ~ for each strength vote and create a 1/1 white Soldier creature token for each numbers vote"
+    // (Lieutenants of the Guard): either part may count.
+    const fx = attempt(ctx, () => parseSentence(part, ctx)) ?? attempt(ctx, () => parseForEach(part, ctx));
     if (!fx) return null;
     // "Create a 2/1 black Skeleton creature token and suspect it" (Case of the Stashed Skeleton): it's the token.
     noteLast(ctx, fx);
@@ -2066,7 +2107,7 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
  * order. A target is chosen once; the second verb is about the same player ("that player").
  */
 function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
-  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?)`;
+  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?|sacrifices?)`;
   const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+|scry \\d+|surveil \\d+)$`).exec(s);
   if (!m) return null;
   const subject = m[1]!;
@@ -2082,7 +2123,9 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
   if (!again) return null;
   // "Target player draws cards equal to half the number of cards in their library and loses half their life" (Peer into
   // the Abyss): either part may be "... equal to ...".
-  const one = (t: string) => attempt(ctx, () => parseSentence(t, ctx)) ?? attempt(ctx, () => parseEqualTo(t, ctx));
+  // "Each opponent sacrifices a creature of their choice for each death vote and discards a card for each taxes vote"
+  // (Capital Punishment): or "... for each ...".
+  const one = (t: string) => attempt(ctx, () => parseSentence(t, ctx)) ?? attempt(ctx, () => parseEqualTo(t, ctx)) ?? attempt(ctx, () => parseForEach(t, ctx));
   const first = one(`${subject} ${m[2]}`);
   const second = first && one(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`);
   return first && second ? [...first, ...second] : null;

@@ -1519,7 +1519,12 @@ export type Effect =
    * among them without paying their mana costs" (Primeval Spawn): `maxMv` each, `totalMv` all together.
    */
   /** `untilMv`: "exile cards from the top of your library until you exile cards with total mana value 4 or greater" (Improvisation Capstone), instead of `n` cards. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number }
+  /**
+   * `filter`: "instant or sorcery spells"; `max`: "an instant or sorcery spell" (1), "up to two sorcery spells" (2).
+   * `rest`: where the exiled cards not cast go once it's done (they stay exiled without it): `toHand` those of the
+   * filter's types, the others to `dest` (Muse Vortex, Epic Experiment, Collected Conjuring).
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).

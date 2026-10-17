@@ -485,7 +485,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
     const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
-    const castAmong = castAmongHead && /^You may cast any number of spells(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // "You may cast an instant or sorcery spell with mana value X or less from among them ..." (Muse Vortex), "... up to
+    // two sorcery spells ..." (Collected Conjuring): only so many, of those types.
+    const castAmong = castAmongHead && /^You may cast (?:(any number of|up to two|an?) )?(?:(instant or sorcery|instant and sorcery|sorcery|instant) )?spells?(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying (?:their mana costs|its mana cost)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     // Improvisation Capstone: "Exile cards from the top of your library until you exile cards with total mana value 4 or
     // greater."
     const untilMv = /^Exile cards from the top of your library until you exile cards with total mana value (\d+) or greater$/.exec(s);
@@ -499,9 +501,31 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const whose = castAmongHead[2] ? (castAmongHead[2] === "your" ? "you" : castAmongHead[2] === "their" ? "that player" : castAmongHead[2].replace(/'s$/, "")) : castAmongHead[3] ?? "you";
       const who = parsePlayer(whose, ctx);
       if (!who) return null;
-      const limit = castAmong[2] ? amt(castAmong[2]) : undefined;
-      effects.push({ type: "castFromAmong", who, n: amt(n), ...(limit !== undefined ? (castAmong[1] ? { totalMv: limit } : { maxMv: limit }) : {}) });
-      si++;
+      const [, many, kinds, total, mv] = castAmong;
+      const one = many === "a" || many === "an";
+      // Plain "spells" needs "any number of"; "instant and sorcery spells" says it without (Epic Experiment).
+      if (!many && kinds !== "instant and sorcery") return null;
+      // "An instant or sorcery spell ... its mana cost", "spells ... their mana costs": the words agree.
+      if (one !== /its mana cost$/.test(sentences[si + 1]!.replace(/\.$/, "")) || (one && total)) return null;
+      const limit = mv ? amt(mv) : undefined;
+      const types = kinds ? (kinds === "sorcery" ? ["Sorcery"] : kinds === "instant" ? ["Instant"] : ["Instant", "Sorcery"]) : undefined;
+      const filter: TargetSpec | undefined = types ? { kind: "card", types: types as TargetSpec["types"] & string[], notTypes: [], notColors: [], text: `${kinds} card` } : undefined;
+      // What happens to the exiled cards not cast: "Then put the exiled instant and sorcery cards that weren't cast this
+      // way into your hand and the rest on the bottom of your library in a random order" (Muse Vortex), "Then put all
+      // cards exiled this way that weren't cast into your graveyard" (Epic Experiment), "Put the exiled cards not cast
+      // this way on the bottom of your library in a random order" (Collected Conjuring). Your own library only.
+      const restText = sentences[si + 2]?.replace(/\.$/, "").replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase()) ?? "";
+      const rest: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } | undefined =
+        kinds && new RegExp(`^Put the exiled ${kinds.replace(" or ", " and ")} cards that weren't cast this way into your hand and the rest on the bottom of your library in a random order$`).test(restText)
+          ? { dest: "bottomRandom", toHand: true }
+          : /^Put all cards exiled this way that weren't cast into your graveyard$/.test(restText)
+            ? { dest: "graveyard" }
+            : /^Put the exiled cards not cast this way on the bottom of your library in a random order$/.test(restText)
+              ? { dest: "bottomRandom" }
+              : undefined;
+      if (rest?.dest === "bottomRandom" && who.ref !== "you") return null;
+      effects.push({ type: "castFromAmong", who, n: amt(n), ...(limit !== undefined ? (total ? { totalMv: limit } : { maxMv: limit }) : {}), ...(filter ? { filter } : {}), ...(one ? { max: 1 } : many === "up to two" ? { max: 2 } : {}), ...(rest ? { rest } : {}) });
+      si += rest ? 2 : 1;
       continue;
     }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1

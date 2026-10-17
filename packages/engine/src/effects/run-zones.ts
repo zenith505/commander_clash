@@ -12,6 +12,7 @@ import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
 import { addDelayed, paidUnless } from "./run-spells";
+import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -591,19 +592,39 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (st.done) return;
       const mvOf = (id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
       const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
+      // Done: the exiled cards that weren't cast go where `rest` says (rulings on Muse Vortex: all the instants and
+      // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
+      const finish = (): "paused" | undefined => {
+        st.done = true;
+        if (!e.rest) return;
+        const left = st.ids.map((x) => x.id).filter(exiled);
+        const toHand = e.rest.toHand ? left.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) : [];
+        for (const id of toHand) moveObject(s, id, "hand");
+        if (toHand.length) log(s, `${you.name} puts ${toHand.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their hand.`);
+        const others = left.filter((id) => !toHand.includes(id));
+        if (e.rest.dest === "graveyard") {
+          for (const id of others) moveObject(s, id, "graveyard");
+          if (others.length) log(s, `${you.name} puts ${others.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
+          return;
+        }
+        const byOwner = new Map<PlayerId, ObjectId[]>();
+        for (const id of others) byOwner.set(obj(s, id).owner, [...(byOwner.get(obj(s, id).owner) ?? []), id]);
+        for (const [owner, ids] of byOwner) toBottom(s, owner, ids, src, true);
+        return;
+      };
       if (st.casting) {
         // Cast: it's on the stack now (a new object, CR 400.7); declined: it stays in exile.
         if (exiled(st.casting)) st.declined.push(st.casting);
-        else if (st.budget !== undefined) st.budget -= mvOf(st.casting);
+        else {
+          if (st.budget !== undefined) st.budget -= mvOf(st.casting);
+          st.cast = (st.cast ?? 0) + 1;
+        }
         st.casting = undefined;
       }
       if (st.pick !== undefined) {
         const pick = st.pick;
         st.pick = undefined;
-        if (pick === "none" || !exiled(pick)) {
-          st.done = true;
-          return;
-        }
+        if (pick === "none" || !exiled(pick)) return finish();
         st.casting = pick;
         s.pending = { kind: "castFree", player: you.id, objectId: pick, source: src };
         return "paused";
@@ -616,11 +637,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       };
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && castable(id));
-      if (!options.length) {
-        st.done = true;
-        return;
-      }
+        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && castable(id));
+      if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the exiled cards without paying its mana cost${left}?` };
       return "paused";

@@ -402,6 +402,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
     case "counterSpell": {
+      // The spell itself, if it's still on the stack (CR 701.6a).
+      if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src) : undefined;
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       // Disrupting Shoal: its mana value with the X chosen for it (CR 202.3e) against this spell's X.

@@ -48,8 +48,11 @@ export interface PayCost {
   energy?: number;
 }
 
-/** One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this, or pay. */
-export type PunisherOption = { discard: number } | { sacrifice: TargetSpec } | { pay: UnlessPays };
+/**
+ * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
+ * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
+ */
+export type PunisherOption = { discard: number } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { damage: number };
 
 export interface UnlessPays {
   cost: string;
@@ -1534,6 +1537,8 @@ export type Effect =
       ifMvX?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
       ifCostCardName?: true;
+      /** "When you cast this spell, ... counter ~" (Brain Gorgers): the spell that triggered it, not a target (`index` -1). */
+      cause?: true;
     }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
@@ -1574,7 +1579,13 @@ export type Effect =
    * each time all the way through (rulings on Torment of Hailfire).
    */
   /** `picks`: "for each blight counter on it, ... unless" (Rottenmouth Viper): each player chooses that many times first. */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount }
+  /**
+   * `mode`: "Any player may sacrifice a land of their choice. If a player does, ..." (Argothian Wurm, Desecration Demon,
+   * Vexing Devil) runs `effects` once if anyone did one of the options ("ifAny"); "Any player may have Browbeat deal 5
+   * damage to them. If no one does, ..." once if no one did ("ifNone"). Each player still chooses in turn order, knowing
+   * the earlier choices, and the chosen actions happen together (rulings on Clackbridge Troll and Vexing Devil).
+   */
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** What `effects` do, for the prompt. */ thenText?: string }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.

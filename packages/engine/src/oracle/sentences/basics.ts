@@ -523,11 +523,19 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
  * A punisher's ways out: "sacrifices a nonland permanent of their choice or discards a card", "discards two cards or
  * sacrifices a creature or planeswalker of their choice", "pay {2}". Null if one isn't understood.
  */
-function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] | null {
+export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] | null {
   const out: PunisherOption[] = [];
   for (const part of text.split(/,? or (?=(?:discards?|sacrifices?|pays?) )/)) {
     let m: RegExpExecArray | null;
     if ((m = new RegExp(`^discards? ${NUM} cards?$`).exec(part))) out.push({ discard: num(m[1]!) });
+    // "Sacrifice two creatures of their choice" (Prowling Pangolin).
+    else if ((m = /^sacrifices? (two|three) (creatures|lands)(?: of (?:their|his or her) choice)?$/.exec(part))) {
+      const filter = pickFilter(m[2]!.replace(/s$/, ""));
+      if (!filter) return null;
+      out.push({ sacrifice: filter, n: num(m[1]!) });
+    }
+    // "Have it deal 4 damage to them" (Vexing Devil), "have Browbeat deal 5 damage to them": the source deals it.
+    else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
     else if ((m = /^sacrifices? (?:an?|one) (.+?)(?: of (?:their|his or her) choice)?$/.exec(part))) {
       // "An artifact, a creature, or a land": one permanent that's any of them.
       const filter = pickFilter(m[1]!.replace(/, (?:or )?an? /g, (x) => x.replace(/an? $/, "")).replace(/ or an? /, " or "));

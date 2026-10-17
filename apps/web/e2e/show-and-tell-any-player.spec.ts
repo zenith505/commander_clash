@@ -1,6 +1,7 @@
 // Show and Tell: you pick a card from your hand without the others seeing it, then everyone's picks enter together.
 // Jungle Wayfinder: "each player may search" asks you whether to search. Quicksilver Wall: an opponent's ability any
-// player may activate opens a menu when you click it.
+// player may activate opens a menu when you click it. Argothian Wurm: "any player may sacrifice a land. If a player
+// does, ..." asks you, its controller, first.
 import { expect, test } from "@playwright/test";
 import { LANDS, one, open, pageErrors, scene } from "./scene";
 import { card, controls, menu, modal, resolveUntil } from "./ui";
@@ -49,5 +50,21 @@ test("Quicksilver Wall: activate an opponent's ability any player may activate",
   const after = await resolveUntil(page, (st) => st.objects[wall]!.zone !== "battlefield");
   expect(after.objects[wall]!.zone).toBe("hand");
   expect(after.players[1]!.hand).toContain(wall);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Argothian Wurm: any player may sacrifice a land; you decline and it stays", async ({ page }) => {
+  const s = scene({ hand: ["Argothian Wurm"], board: LANDS });
+  const wurm = one(s, "Argothian Wurm");
+  await open(page, s);
+  await card(page, "Argothian Wurm", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "punisher");
+  const bar = controls(page);
+  await expect(bar).toContainText("Sacrifice a land? If anyone does, put Argothian Wurm on top of its owner's library.");
+  await expect(bar.getByRole("button", { name: "Sacrifice a land" })).toHaveCount(1);
+  await bar.getByRole("button", { name: "Don't" }).click();
+  // The bots have no lands: they aren't asked.
+  const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.triggerQueue.length === 0);
+  expect(after.objects[wurm]!.zone).toBe("battlefield");
   expect(pageErrors(page)).toEqual([]);
 });

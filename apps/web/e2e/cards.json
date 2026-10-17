@@ -117,6 +117,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f8aa1893-60e5-439e-9316-872a9f6b6c94",
+  "name": "Argothian Wurm",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wurm"
+  ],
+  "oracleText": "Trample\nWhen this creature enters, any player may sacrifice a land of their choice. If a player does, put this creature on top of its owner's library.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4d18bcba-a346-445e-a182-6cc30b7e066d",
   "name": "Ashnod's Altar",
   "manaCost": "{3}",

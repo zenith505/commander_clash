@@ -1356,6 +1356,8 @@ export interface Resolving {
       /** For the bots: the life the penalty costs, or that it makes a token for its controller. */
       lose?: number;
       tokens?: number;
+      /** "If a player does" / "If no one does" (see the punisher effect). */
+      mode?: "ifAny" | "ifNone";
     };
     punished?: PlayerId[]; // those who did none of its options, this round
     /** "Sacrifice an artifact, a creature, and a land": players still to pick, the slot being picked, the picks so far. */

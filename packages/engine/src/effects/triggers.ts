@@ -126,6 +126,7 @@ export type TriggerSourceEvent =
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
+  | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number }
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
@@ -656,6 +657,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    }
+  } else if (ev.type === "untapped") {
+    // "Whenever ~ becomes untapped" (inspired), "whenever equipped creature becomes untapped", "whenever a permanent
+    // you control becomes untapped" (the untapped permanent is the subject).
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfBecomesUntapped");
+    addHosted(o, (e) => e === "selfBecomesUntapped");
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentBecomesUntapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     }
   } else if (ev.type === "tappedForMana") {
     // "Whenever you tap ~ for mana", "whenever an opponent taps a Mountain for mana" (the land is the subject, "that

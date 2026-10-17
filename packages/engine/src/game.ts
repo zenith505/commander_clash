@@ -1335,6 +1335,8 @@ export function untapPermanent(s: GameState, o: GameObject) {
   o.tapped = false;
   o.untaps = (o.untaps ?? 0) + 1;
   endWhileTapped(s);
+  // It "becomes untapped" (CR 701.26b); during the untap step, what that triggers waits for the upkeep (CR 502.4).
+  if (o.zone === "battlefield") fireEvent(s, { type: "untapped", id: o.id });
 }
 
 /**

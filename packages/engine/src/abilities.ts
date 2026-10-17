@@ -546,6 +546,48 @@ export interface Untargetable {
   subtype?: string;
 }
 
+/**
+ * A replacement effect that changes how much damage is dealt (CR 614.1a): "If a source you control would deal damage to a
+ * permanent or player, it deals double that damage instead" (Angrath's Marauders), "... that much damage plus 2" (Torbran),
+ * "... half that damage, rounded down" (Ghosts of the Innocent), "... minus 1" (Benevolent Unicorn). It applies to the
+ * damage after it's divided or assigned (rulings), once per damage event (CR 614.5), and the player or controller of the
+ * permanent being dealt it orders it with the other replacement and prevention effects (CR 616.1). It isn't prevention:
+ * "damage can't be prevented" doesn't stop it (rulings on Ghosts of the Innocent).
+ */
+export interface DamageMod {
+  /**
+   * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
+   * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
+   */
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent";
+  n?: number;
+  amount?: Amount;
+  up?: true;
+  /**
+   * A prevention effect (CR 615.1a), not a replacement: Gisela's "prevent half that damage, rounded up", Rem Karolus's
+   * "prevent that damage". "Damage can't be prevented" stops it (CR 615.12).
+   */
+  prevent?: true;
+  /** Callous Giant: "If a source would deal 3 or less damage to ~": only to damage of at most this much. */
+  atMost?: number;
+  /**
+   * What would deal the damage: any of `filters` (as it deals it, CR 609.7b); `self`: the permanent with the ability (for
+   * an Aura or Equipment, the permanent it's attached to); `other`: not that permanent; `spell`: a spell, not a permanent.
+   * Missing: any source.
+   */
+  by?: { self?: true; other?: true; filters?: { spec: TargetSpec; spell?: true }[] };
+  /**
+   * What it would be dealt to: `players` ("enchanted": the player enchanted by the permanent with the ability; "chosen":
+   * its chosen player), `objects` (a permanent matching it, "you" being the ability's controller), `self` (the permanent
+   * with the ability), `chosenPermanents` (a permanent the chosen player controls). Missing: any permanent or player.
+   */
+  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true };
+  combat?: "only" | "non";
+  /** The Rollercrusher Ride: "while there are four or more card types among cards in your graveyard". */
+  while?: StaticCondition;
+  text: string;
+}
+
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
   /** Layer 4, "in addition to its other types"; `allCreatureTypes`: "with all creature types" (Mutavault). */
@@ -614,6 +656,8 @@ export type Modification =
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
   | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }
+  /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
+  | { kind: "damageMod"; mod: DamageMod }
   /** "Can't block creatures with power 2 or greater" (a blocking restriction on the blocker, CR 509.1b). */
   | { kind: "cantBlockCreatures"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */

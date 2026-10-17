@@ -7,6 +7,7 @@ import { parseCount } from "./counts";
 import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { parseGrants } from "./grants";
 import { parseSearchFilter } from "./search";
+import { parseDamageMod } from "./damage-mods";
 
 /** What "~ enters tapped unless ..." waits for (CR 614.1d). */
 export function parseEntersCondition(text: string): EntersCondition | null {
@@ -824,6 +825,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // Prevention (CR 615.1): "Prevent all combat damage that would be dealt to ~", "Prevent all damage that would be dealt
   // by enchanted creature", "... to and dealt by enchanted creature", "... to ~ by creatures".
+  const damageMod = parseDamageMod(line);
+  if (damageMod) return damageMod;
   const prevent = parsePreventAll(text);
   if (prevent) {
     const affects = prevent.subject === "~" ? ({ kind: "self" } as const) : parseAffected(prevent.subject.replace(/^./, (c) => c.toUpperCase()));

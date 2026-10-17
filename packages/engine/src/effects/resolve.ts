@@ -742,5 +742,5 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const item = s.resolving?.item;
   const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
   const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;
-  return cardSource(ctx.sourceDef, ctx.controller, ref);
+  return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell ? { spell: true as const } : {}) };
 }

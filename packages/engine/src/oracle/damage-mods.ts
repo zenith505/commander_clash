@@ -1,0 +1,177 @@
+// Damage amount replacements (CR 614.1a): "If a source you control would deal damage to a permanent or player, it deals
+// double that damage to that permanent or player instead", "... that much damage plus 2 instead", "... half that damage,
+// rounded down ...". See DamageMod in abilities.ts; damage.ts applies them.
+
+import type { DamageMod, StaticAbility, TargetSpec } from "../abilities";
+import type { Color } from "../types";
+import { parseCount } from "./counts";
+import { parseStaticCondition } from "./statics";
+import { parseTargetPhrase } from "./targets";
+import { COLOR_WORDS } from "./words";
+
+const COLOR = "(?:white|blue|black|red|green)";
+
+/** One kind of source: "a red source you control", "a creature you control", "a red instant or sorcery spell you control". */
+function sourceKind(t: string): { spec: TargetSpec; spell?: true } | null {
+  const you = / you control$/.test(t);
+  let rest = t.replace(/ you control$/, "");
+  // Leading colors ("red", "red or artifact" is handled by the caller): the target phrases don't take them before
+  // "instant or sorcery spell".
+  const colors: Color[] = [];
+  let m: RegExpExecArray | null;
+  if ((m = new RegExp(`^(${COLOR}) (.+)$`).exec(rest))) {
+    colors.push(COLOR_WORDS[m[1]!]!);
+    rest = m[2]!;
+  }
+  const extra = { ...(colors.length ? { colors } : {}), ...(you ? { controller: "you" as const } : {}) };
+  if (rest === "source") return { spec: { kind: "object", ...extra, text: t } };
+  if (rest === "source an opponent controls" && !colors.length) return { spec: { kind: "object", controller: "opponent", text: t } };
+  const typed = /^(Giant|instant or sorcery|artifact|creature) source$/.exec(rest);
+  if (typed) {
+    const w = typed[1]!;
+    const types = w === "instant or sorcery" ? ["Instant", "Sorcery"] : w === "artifact" ? ["Artifact"] : w === "creature" ? ["Creature"] : [];
+    return { spec: { kind: "object", ...(types.length ? { types } : { subtypes: [w] }), ...extra, text: t } };
+  }
+  if (/\bspell$/.test(rest)) {
+    const p = parseTargetPhrase(rest);
+    if (p?.kind !== "spell" || p.controller) return null;
+    const { kind: _, text: __, ...q } = p;
+    return { spec: { ...q, kind: "object", ...(colors.length ? { colors: [...(q.colors ?? []), ...colors] } : {}), ...(you ? { controller: "you" as const } : {}), text: t }, spell: true };
+  }
+  // A permanent: "creature you control with a +1/+1 counter on it", "Lizard, Mouse, Otter, or Raccoon you control", "red
+  // planeswalker you control".
+  const p = parseTargetPhrase(t);
+  if (p?.kind !== "object" || p.manaValue || p.anyOf || p.chosen) return null;
+  return { spec: { ...p, text: t } };
+}
+
+/** What would deal the damage, as written after "If". Null when it isn't understood. */
+function parseBy(t: string, attached: boolean): { by: DamageMod["by"]; attached: boolean } | null {
+  if (t === "~" || t === "this creature") return { by: { self: true }, attached: false };
+  if (/^(?:equipped|enchanted) creature$/.test(t)) return { by: { self: true }, attached: true };
+  if (t === "another creature" && attached) return { by: { other: true, filters: [{ spec: { kind: "object", types: ["Creature"], text: "creature" } }] }, attached };
+  if (t === "a source" || t === "any source") return { by: undefined, attached };
+  const other = /^another /.test(t);
+  const body = t.replace(/^(?:another|an?|any) /, "");
+  // "a red or artifact source you control" (Mechanized Warfare), "a red instant or sorcery spell you control or a red
+  // planeswalker you control" (Pyromancer's Gauntlet): either one.
+  const parts: string[] = [];
+  const both = new RegExp(`^(${COLOR}) or (artifact) source you control$`).exec(body);
+  if (both) parts.push(`${both[1]} source you control`, `${both[2]} source you control`);
+  else parts.push(...body.split(/ or an? (?=\w+ (?:planeswalker|creature) you control$)/));
+  const filters = parts.map(sourceKind);
+  if (filters.some((f) => !f)) return null;
+  return { by: { ...(other ? { other: true as const } : {}), filters: filters as { spec: TargetSpec; spell?: true }[] }, attached };
+}
+
+/** What it would be dealt to, as written after "deal damage to". Null when it isn't understood. */
+function parseTo(t: string | undefined, attached: boolean): DamageMod["to"] | null {
+  if (t === undefined || t === "a permanent or player" || t === "any target") return undefined;
+  if (t === "an opponent or a permanent an opponent controls") return { players: "opponents", objects: { kind: "object", controller: "opponent", text: "permanent an opponent controls" } };
+  if (t === "the chosen player or a permanent they control") return { players: "chosen", chosenPermanents: true };
+  if (t === "you") return { players: "you" };
+  if (t === "an opponent") return { players: "opponents" };
+  if (t === "a player") return { players: "all" };
+  if (t === "enchanted player") return { players: "enchanted" };
+  if (t === "~" || t === "this creature") return attached ? null : { self: true };
+  if (t === "equipped creature" || t === "enchanted creature") return attached ? { self: true } : null;
+  // "you or a creature you control", "you or another permanent you control" (Rem Karolus).
+  const you = /^you or (.+)$/.exec(t);
+  if (you) {
+    const rest = parseTo(you[1]!, attached);
+    return rest?.objects && !rest.players ? { ...rest, players: "you" } : null;
+  }
+  const other = /^another (.+)$/.exec(t);
+  const phrase = (other ? other[1]! : t).replace(/^an? /, "");
+  const p = parseTargetPhrase(phrase);
+  if (p?.kind !== "object" || p.anyOf || p.chosen) return null;
+  return { objects: { ...p, text: phrase }, ...(other ? { other: true as const } : {}) };
+}
+
+/**
+ * "If a source you control would deal damage to a permanent or player, it deals double that damage to that permanent or
+ * player instead" and the like, as a static ability of `~` (or of what it's attached to, for "If equipped creature would
+ * deal combat damage, it deals double that damage instead"). Null when the line isn't one, or isn't fully understood.
+ */
+export function parseDamageMod(line: string): StaticAbility | null {
+  const text = line.replace(/\.$/, "").replace(/^[A-Z][A-Za-z' -]+ — (?=If )/, "");
+  const OP = "(double that damage|twice that much damage|triple that damage|half that damage, rounded down|that much damage (?:plus|minus) (?:\\d+|X|an amount of damage equal to .+?))";
+  const m = new RegExp(
+    `^[Ii]f (.+?) would deal (combat |noncombat )?damage(?: to (.+?))?(?: while (.+?))?, (?:(?:it|that source) deals ${OP}(?:,? to (?:that (?:permanent or player|player or permanent|player|creature|permanent)|you|~|equipped creature|enchanted creature))? instead|instead it deals ${OP})(?:, where X is (.+))?$`,
+  ).exec(text);
+  if (!m) return parsePreventionMod(text, line);
+  const [, srcText, combatWord, toText, whileText, op1, op2, xText] = m;
+  const opText = (op1 ?? op2)!;
+  // An Aura's or Equipment's: the ability is the permanent it's attached to (Inquisitor's Flail: "If another creature would
+  // deal combat damage to equipped creature").
+  const byP = parseBy(srcText!, !!toText && /^(?:equipped|enchanted) creature$/.test(toText));
+  if (!byP) return null;
+  const to = parseTo(toText, byP.attached);
+  if (to === null) return null;
+  const mod: DamageMod = { op: "times", text: line };
+  if (/^double|^twice/.test(opText)) mod.n = 2;
+  else if (/^triple/.test(opText)) mod.n = 3;
+  else if (/^half/.test(opText)) mod.op = "half";
+  else {
+    const pm = /^that much damage (plus|minus) (.+)$/.exec(opText)!;
+    mod.op = pm[1] as "plus" | "minus";
+    const eq = /^an amount of damage equal to (.+)$/.exec(pm[2]!);
+    if (/^\d+$/.test(pm[2]!)) mod.amount = Number(pm[2]);
+    else {
+      const what = eq ? eq[1]! : pm[2] === "X" && xText ? xText : undefined;
+      const amount = what ? parseCount(what, null) : null;
+      if (!amount) return null;
+      mod.amount = amount;
+    }
+  }
+  if (xText && mod.amount === undefined) return null;
+  if (combatWord) mod.combat = combatWord === "combat " ? "only" : "non";
+  if (byP.by) mod.by = byP.by;
+  if (to) mod.to = to;
+  if (whileText) {
+    const cond = parseStaticCondition(whileText, { affects: { kind: "self" }, mods: [], text: "" });
+    if (!cond) return null;
+    mod.while = cond;
+  }
+  return { affects: { kind: byP.attached ? "attached" : "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+}
+
+/**
+ * Prevention effects of permanents that prevent some of each source's damage each time it would be dealt (CR 615.1a):
+ * "If a source would deal damage to you, prevent 1 of that damage" (Urza's Armor), "... prevent all but 1 of that
+ * damage" (Temple Altisaur), "... prevent half that damage, rounded up" (Gisela), "... prevent that damage" (Rem
+ * Karolus), "If a source would deal 3 or less damage to ~, prevent that damage" (Callous Giant). Each applies to each
+ * source's damage to each permanent or player separately (rulings on Hedron-Field Purists, Guardian Seraph).
+ */
+function parsePreventionMod(text: string, line: string): StaticAbility | null {
+  const m =
+    /^[Ii]f (.+?) would deal (combat |noncombat )?(?:(\d+) or less )?damage to (.+?), prevent (that damage|(\d+|X) of that damage|all but (\d+) of that damage|half that damage, rounded (up|down)|(\d+) damage that spell would deal to that permanent or player)(?:, where X is (.+))?$/.exec(text);
+  if (!m) return null;
+  const [, srcText, combatWord, atMost, toText, what, nOf, allBut, round, spellN, xText] = m;
+  if (spellN && srcText !== "a spell") return null;
+  const attached = /^(?:equipped|enchanted) creature$/.test(toText!);
+  const byP = parseBy(srcText!.replace(/^an artifact$/, "an artifact source").replace(/^a creature$/, "a creature source"), attached);
+  if (!byP) return null;
+  const to = parseTo(toText, attached);
+  if (to === null) return null;
+  const mod: DamageMod = { op: "prevent", prevent: true, text: line };
+  if (nOf || spellN) {
+    mod.op = "minus";
+    if (nOf === "X") {
+      const amount = xText ? parseCount(xText, null) : null;
+      if (!amount) return null;
+      mod.amount = amount;
+    } else mod.amount = Number(nOf ?? spellN);
+  } else if (xText) return null;
+  else if (allBut) [mod.op, mod.n] = ["allBut", Number(allBut)];
+  else if (round) {
+    mod.op = "half";
+    // What's dealt is the rest: half rounded down when half is prevented rounded up.
+    if (round === "down") mod.up = true;
+  } else if (what !== "that damage") return null;
+  if (atMost) mod.atMost = Number(atMost);
+  if (combatWord) mod.combat = combatWord === "combat " ? "only" : "non";
+  if (byP.by) mod.by = byP.by;
+  if (to) mod.to = to;
+  return { affects: { kind: byP.attached ? "attached" : "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+}

@@ -30,6 +30,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const n = num(m[3]!) * (m[2]!.toLowerCase() === "minus" ? -1 : 1);
     return c && { ...c, plus: (c.plus ?? 0) + n };
   }
+  // "Half your life total, rounded up", "half the number of Forests you control, rounded down" (CR 107.1a).
+  if ((m = /^half (.+?),? rounded (up|down)$/i.exec(p))) {
+    const c = m[1] === "X" ? { count: { kind: "x" } as Count } : parseCount(m[1]!, ctx);
+    return c && !c.half && !c.negate ? { ...c, half: m[2]!.toLowerCase() as "up" | "down" } : null;
+  }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control".
   if (!each && (m = /^the greatest power among (other )?(creatures you control|creatures on the battlefield)$/i.exec(p))) {
     const spec = parseTargetPhrase(/you control/i.test(m[2]!) ? "creature you control" : "creature", { chosen: true });
@@ -71,7 +76,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && ctx?.chooseResult && /^that result$/i.test(p)) return count({ kind: "rollResult" });
   if (!each && ctx?.chooseResult && /^the other result$/i.test(p)) return count({ kind: "rollOther" });
   // Life and hands.
-  if (/^your life total$/i.test(p)) return count({ kind: "life", who: { ref: "you" } });
+  if ((m = /^(your|their|that player's|target player's|target opponent's|enchanted player's) life total$/i.exec(p))) {
+    const who = whosePlayer(m[1]!, ctx);
+    return who && count({ kind: "life", who });
+  }
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
   if (each && /^opponent(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
@@ -159,6 +167,15 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return spec?.kind === "object" && (spec.types?.length || spec.subtypes?.length) ? count({ kind: "permanents", filter: { ...spec, text: p }, other: true }) : null;
   }
   return null;
+}
+
+/**
+ * The amount of a filter's "with mana value less than or equal to ..." worked out as it resolves (TargetSpec.bound): a count,
+ * or X, which a trigger's "that damage" has become ("Whenever ~ deals combat damage, you may cast a sorcery spell from your
+ * hand with mana value less than or equal to that damage", see HOST_TRIGGERS).
+ */
+export function parseBoundCount(text: string, ctx: Ctx): AmountExpr | null {
+  return text === "X" ? { count: { kind: "x" } } : parseCount(text, ctx);
 }
 
 function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {

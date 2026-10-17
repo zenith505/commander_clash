@@ -1,6 +1,6 @@
 # Roadmap
 
-18,639 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,721 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -125,9 +125,9 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      graveyard "with flying") don't see them; no supported card puts counters on a card off the battlefield yet.
    Left from the decayed, Theros gods, reveal-top and same-name round:
    - Decayed still out on other lines: Diregraf Horde ("When you do, exile up to two target cards from graveyards"),
-     Ghoulcaller's Harvest ("half ... rounded up"), Ghouls' Night Out, Gisa ("They gain decayed"), Poppet Stitcher,
+     Ghouls' Night Out, Gisa ("They gain decayed"), Poppet Stitcher,
      Tainted Adversary ("pay {2}{B} any number of times").
-   - Gods still out on other lines: Athreos (both), Ephara, Keranos, Klothys, Kruphix, Phenax, Purphoros Bronze-Blooded.
+   - Gods still out on other lines: Athreos (both), Ephara, Keranos, Klothys, Phenax, Purphoros Bronze-Blooded.
    - "Reveal the top card of your library. If it's a X card, A. Otherwise, B" works for a card type filter and moves
      of "it"; still out: "you may reveal ... If a X card is revealed this way" (Elven Farsight, Galadriel, Isolated
      Watchtower, Urza Assembles the Titans, Doors of Durin, Vesuvan Drifter), "with mana value 3 or less" (Kellan),
@@ -189,8 +189,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      a creature you control" is checked only as the trigger resolves.
    - Dice (CR 706) work with results tables, modifiers, "ignore the lower roll", natural results, Pixie Guide-style
      advantage, "roll two and choose one result" (Wild, Reckless and Grave Endeavor; bots take the higher result) and a
-     reflexive trigger using the result (Ancient Bronze Dragon); still out: Valiant and Arcane Endeavor (a filter "with
-     mana value / power less than or equal to" an amount, which blocks 62 cards), "roll again" / "reroll" (Delina,
+     reflexive trigger using the result (Ancient Bronze Dragon) and Valiant and Arcane Endeavor; still out: "roll again" / "reroll" (Delina,
      Pixie Guide's Wyll-style rerolls of others), Iron Mastiff, Chaos Dragon, Neverwinter Hydra, Treasure Chest
      (conditional search), Ancient Brass Dragon, Farideh, Thunderwave ("not chosen"), planar die.
    - Abilities that work only from your graveyard work (Loathsome Troll); bots don't use them.
@@ -215,8 +214,33 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    another player's library):
    - "Choose an opponent" as a spell resolves works (Myrkul's Edict; bots choose the strongest opponent); "You and that
      player each ..." (the Offerings) is out.
-   - Still out from this round's search: Power of Persuasion ("until the end of your next turn" control), Kruphix and
-     Horizon Stone (unspent mana becomes colorless), The Ozolith, Taeko, Nikara, Sandstone Oracle, Wrenn and Seven.
+   - Still out from this round's search: Power of Persuasion ("until the end of your next turn" control), The Ozolith,
+     Taeko, Nikara, Sandstone Oracle, Wrenn and Seven.
+   - Bots take the higher die and the strongest opponent, and still don't use abilities that work from the graveyard.
+   Left from the round after #60 (filters up to an amount, unspent mana, half of an amount, "X or less", dies to the top
+   of the library):
+   - "With power / mana value less than or equal to <amount>" works for targets (an amount the source and its
+     controller alone decide: permanents, cards, life, devotion, party, greatest power or mana value, the source's own
+     power, toughness or counters), groups, searches and free casts; still out: "that damage" in other trigger shapes
+     (Broodcaller Scourge, Glamdring), casting a target card (Dreadhorde Arcanist), "your team" (Winter Soldier, Old Man
+     of the Sea, Sphere of Annihilation, Nimbus Champion), Quag Feast, Titan's Presence, Vulpine Harvester, Sundering
+     Archaic (colors spent), Hammerhead Tyrant.
+   - "Target ... with mana value X or less, where X is ..." works when X can be counted as targets are chosen
+     (Spellstutter Sprite, Unforgiving One); still out: the life you gained this turn (Celestine, Moseo, Rodolf),
+     damage dealt (Venerable Warsinger), players attacked (Custodi Soulcaller), reflexive "when you do" (Go-Shintai of
+     Hidden Cruelty), an ETB trigger's own X for a target (Dune Drifter, Kinetic Ooze), "total mana value X or less"
+     (Rampaging Yao Guai, Orcus, Ancient Brass Dragon), "from among them" (Genesis Hydra, Muse Vortex, Epic Experiment,
+     Sunbird's Invocation, Kamahl's Druidic Vow), "tapped and attacking" from hand (Kinscaer Sentry, Paladin Elizabeth
+     Taggerdy), "your library and/or graveyard" (Finale of Devastation, Vision Quest), Eldritch Evolution ("where X
+     is 2 plus the sacrificed creature's mana value" before the shuffle sentence), Rally the Ancestors.
+   - Unspent mana kept or turned colorless works (Kruphix, Horizon Stone, Upwelling, Leyline Tyrant's red); Omnath,
+     Locus of Mana and Ozai's counts of unspent mana are still out.
+   - Half an amount works for "lose half your life", "mill half their library", "where X is half ..." and "half the
+     sacrificed creature's power"; still out: "they lose half their life" (Grievous Wound), "Pay half your life" as a
+     cost (Lurking Evil, Murderous Betrayal, Temporal Extortion), "half that player's life total" per player (Heartless
+     Hidetsugu), "Round up each time" (Fraying Omnipotence, Pox Plague, Peer into the Abyss, Hydroid Krasis, Saw in
+     Half), half the damage (Ghosts of the Innocent, Dark Sphere, Backdraft), Aspect of Wolf, The Goose Mother, Banshee,
+     Chainer's Torment, Doomsday, Death Wish.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or

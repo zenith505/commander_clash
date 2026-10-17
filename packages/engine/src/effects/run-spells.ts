@@ -519,7 +519,7 @@ export function changeTargetOptions(s: GameState, item: StackItem, spec: TargetS
   // A spell's own characteristics, or an ability's source's (CR 113.7a), for protection and hexproof.
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   const src = o ? spellQuality(s, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
-  const all: TargetChoice[] = legalTargets(s, spec, item.controller, item.id, src);
+  const all: TargetChoice[] = legalTargets(s, spec, item.controller, item.id, src, item.sourceId);
   const self = s.resolving?.item;
   if (spec.kind === "spell" && self && self.id !== item.id && isLegalTarget(s, spec, { kind: "stack", id: self.id }, item.controller, src)) all.push({ kind: "stack", id: self.id });
   return all.filter((t) => !sameTarget(current, t));

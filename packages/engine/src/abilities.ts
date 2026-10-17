@@ -59,12 +59,14 @@ export interface UnlessPays {
  * `count` times `times` (default 1), plus `plus` (default 0): "2 life for each creature", "X is 1 plus
  * ...". A negative result is 0 (CR 107.1b: "If your life total is negative, X is considered to be 0").
  * `negate` then makes it negative, for "-X/-X" and "-1/-1 for each".
+ * `half` halves that first, "half your life, rounded up" (rounded down unless the text says up, CR 107.1a).
  */
 export interface AmountExpr {
   count: Count;
   times?: number;
   plus?: number;
   negate?: boolean;
+  half?: "up" | "down";
 }
 
 /** What an amount counts. */
@@ -211,6 +213,13 @@ export interface TargetSpec {
    * any value.
    */
   xRange?: { key: "power" | "toughness" | "manaValue"; at: "exact" | "most" | "least" };
+  /**
+   * "With mana value less than or equal to the number of Plains you control", "with power less than or equal to ~'s
+   * power": a range of `key` up to (or from) an amount. For a target it's worked out as the target is chosen and again as
+   * it resolves (CR 601.2c, 608.2b; rulings on Beguiler of Wills and Earthshaker Khenra), for a group or a search as it
+   * resolves (`bindBound`). Until then, any value.
+   */
+  bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least"; amount: AmountExpr };
   /** `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1). */
   combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
@@ -2466,6 +2475,12 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
   noMaxHandSize?: boolean;
+  /**
+   * Unspent mana not lost as steps and phases end (CR 500.4): kept by `who` (only mana of `color`, if given: Leyline
+   * Tyrant's red), or with `becomes`, a replacement effect: it becomes that type of mana instead and is kept (Kruphix's
+   * colorless, CR 614.1a), with whatever restrictions it had (rulings on Horizon Stone).
+   */
+  keepMana?: { who: "you" | "all"; color?: Color; becomes?: ManaType };
   /** "If you would roll one or more dice, instead roll that many dice plus one and ignore the lowest roll" (Pixie Guide, CR 706.6). */
   rollAdvantage?: true;
   /**

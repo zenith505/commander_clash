@@ -6,7 +6,7 @@ import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef } from "../types";
 import type { CopyExcept } from "../copies";
-import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW } from "./words";
+import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
@@ -1014,6 +1014,17 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = true;
+      continue;
+    }
+    // Mana that isn't lost as steps and phases end (CR 500.4): "Players don't lose unspent mana" (Upwelling), "You don't lose
+    // unspent red mana" (Leyline Tyrant), "If you would lose unspent mana, that mana becomes colorless instead" (Kruphix, a
+    // replacement effect, CR 614.1a; restrictions on that mana stay with it, rulings).
+    const keep = /^(Players|You) don't lose unspent (?:(white|blue|black|red|green) )?mana as steps and phases end\.$/.exec(line);
+    const becomes = /^If you would lose unspent mana, that mana becomes (colorless|white|blue|black|red|green) instead\.$/.exec(line);
+    if ((keep || becomes) && !out.keepMana) {
+      out.keepMana = keep
+        ? { who: keep[1] === "Players" ? "all" : "you", ...(keep[2] ? { color: COLOR_WORDS[keep[2]]! } : {}) }
+        : { who: "you", becomes: becomes![1] === "colorless" ? "C" : COLOR_WORDS[becomes![1]!]! };
       continue;
     }
     // Pixie Guide, Wyll, Barbarian Class: a replacement effect on your rolls (CR 614.1a); the ignored roll never happened (706.6).

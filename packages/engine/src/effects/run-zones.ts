@@ -5,8 +5,8 @@ import { characteristics, controllerOf, invalidateCharacteristics } from "../lay
 import { putCounters } from "../counters";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
-import { objectMatches, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
+import { bindBound, objectMatches, pickOptions, printedMatches } from "./targeting";
+import { ResolveCtx, apnap, objects, players, amountNow, amountCtx } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
@@ -538,7 +538,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       };
       if (sc.castFromHand === undefined) {
         // "With mana value X or less": this spell's X (TargetSpec.xRange).
-        const { xRange, ...rest } = e.filter;
+        // "With mana value less than or equal to the other result" (TargetSpec.bound): as it resolves.
+        const { xRange, ...rest } = bindBound(s, e.filter, amountCtx(s, ctx));
         const filter: TargetSpec = xRange ? { ...rest, manaValue: { max: ctx.x ?? 0 } } : rest;
         // "Draw three cards and reveal them": the ones still in hand, which everyone sees (CR 701.20a).
         const drawn = e.drawn ? (s.resolving!.drawnThisWay ?? []).filter((id) => p.hand.includes(id)) : undefined;
@@ -876,7 +877,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (s.resolving!.scratch ??= {});
       const p = player(s, ctx.controller);
       if (!sc.found) {
-        const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+        const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         if (!cards.length) return;
         const what = `${e.any ? "any number of " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? cards.length : 1, fromHand: true };

@@ -1,6 +1,6 @@
 // Sentences about sacrificing, milling, discarding, scry/surveil, fighting, counterspells, and copying spells.
 
-import { parseCount } from "../counts";
+import { parseBoundCount, parseCount } from "../counts";
 import type { Effect, PlayerRef, TargetSpec } from "../../abilities";
 import type { SkipWhat } from "../../types";
 import { NUM, NUMX, amt, isGroup, isSeveral, num } from "../words";
@@ -45,6 +45,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^(.+?) mills? ${NUMX} cards?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
+  }
+  // "Target player mills half their library, rounded down" (Traumatize): each of them half their own library (CR 107.1a).
+  if ((m = /^(.+?) mills? half (your|their|that player's|his or her) library, rounded (up|down)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
+    return [{ type: "mill", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, half: m[3]!.toLowerCase() as "up" | "down" } }];
   }
   // "Target player mills twice X cards" (Drown in Dreams).
   if ((m = /^(.+?) mills? twice X cards$/i.exec(s))) {
@@ -253,14 +259,18 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(m[2]!, { x: true });
     const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
-    if (!spec || unless === null || (spec.xRange && (!ctx.spell || ctx.whereX))) return null;
+    if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.whereX)) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (Sram's Expertise),
-  // "... with mana value X or less ..." (Electrodominance: its X), "... an instant or sorcery spell from your hand ...".
-  if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:\d+|X) or less)?) from your hand without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow)) {
+  // "... with mana value X or less ..." (Electrodominance: its X), "... an instant or sorcery spell from your hand ...",
+  // "... with mana value less than or equal to the other result ..." (Arcane Endeavor: counted as it resolves).
+  // "A spell from your hand with mana value less than or equal to that damage" (Glamdring): the same, written the other way.
+  if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:(?:\d+|X) or less|less than or equal to .+?))?) from your hand( with mana value (?:(?:\d+|X) or less|less than or equal to .+?))? without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow) && !(m[3] && / with /.test(m[2]!))) {
     m.splice(1, 1);
-    const filter = parseTargetPhrase(m[1]!, { x: true });
+    m[1] = `${m[1]!}${m[2] ?? ""}`;
+    // With "where X is ...", X is that amount, counted as it resolves (TargetSpec.bound, replaced in body.ts).
+    const filter = parseTargetPhrase(m[1]!, { x: !ctx.whereX, count: (t) => parseBoundCount(t, ctx) });
     if (filter?.kind !== "spell" || filter.controller || filter.targetsWhat || (filter.xRange && (!ctx.spell || ctx.whereX || filter.xRange.at !== "most"))) return null;
     return [{ type: "castFromHand", filter: { ...filter, text: m[1]! } }];
   }

@@ -1,6 +1,7 @@
 import { allEffects, refCovers } from "../abilities";
 import type { AbilityBody, Amount, Modification } from "../abilities";
 import { toughness } from "../cards";
+import { halve } from "../amounts";
 import { compileGranted } from "../oracle";
 import type { GameObject, GameState, ObjectId } from "../types";
 import { harmfulCounter } from "./run-permanents";
@@ -122,6 +123,7 @@ export const lethalDamage = (s: GameState, o: GameObject) => Math.max(0, toughne
  */
 export function estimate(a: Amount, x = 0): number {
   if (typeof a === "number") return a;
-  const n = Math.max(0, (a.count.kind === "x" ? x : 2) * (a.times ?? 1) + (a.plus ?? 0));
+  const v = (a.count.kind === "x" ? x : 2) * (a.times ?? 1) + (a.plus ?? 0);
+  const n = Math.max(0, a.half ? halve(v, a.half) : v);
   return a.negate ? -n : n;
 }

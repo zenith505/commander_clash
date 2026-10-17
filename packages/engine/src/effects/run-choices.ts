@@ -6,8 +6,8 @@ import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, 
 import { cardIdOf, defOf } from "../cards";
 import { staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
-import { choiceOptions, objectMatches, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, runEffect, amountNow, gifteeOf, evidenceCollected } from "./resolve";
+import { bindBound, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
+import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected } from "./resolve";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
 import { describePay } from "./describe";
@@ -169,7 +169,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "revealedIs"
             ? revealedIs(s, e.cond.filter) !== !!e.cond.not
             : e.cond.kind === "targetIs"
-            ? objects(s, { ref: "target", index: e.cond.index }, ctx).some((o) => o.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, o, ctx.controller, false))
+            ? targetIs(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "teamwork"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"
@@ -186,6 +186,26 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return runBranch(s, holds, holds ? e.effects : (e.otherwise ?? []), ctx);
     }
   }
+}
+
+/**
+ * "If it's a creature", "if its mana value is less than or equal to ..." about a target (SpellCondition "targetIs"): that
+ * permanent as it is now, a card in a graveyard or a spell by its printed characteristics (a spell's mana value with its X,
+ * CR 202.3e), still a legal target. An amount is counted now (TargetSpec.bound).
+ */
+function targetIs(s: GameState, ctx: ResolveCtx, index: number, filter0: TargetSpec): boolean {
+  const filter = bindBound(s, filter0, amountCtx(s, ctx));
+  const t = ctx.targets[index];
+  if (!ctx.legal[index] || !t) return false;
+  if (t.kind === "stack") {
+    const item = s.stack.find((x) => x.id === t.id);
+    return !!item && item.kind === "spell" && spellMatches(s, filter, item);
+  }
+  if (t.kind !== "object") return false;
+  const o = objects(s, { ref: "target", index }, ctx)[0];
+  if (o?.zone === "battlefield") return objectMatches(s, filter, o, ctx.controller, false);
+  const card = s.objects[t.id];
+  return !!card && card.zone === "graveyard" && (t.zc === undefined || (card.zoneChanges ?? 0) === t.zc) && printedMatches(filter, defOf(s, card));
 }
 
 /** A results table's row (CR 706.3a): no roll, no row. */

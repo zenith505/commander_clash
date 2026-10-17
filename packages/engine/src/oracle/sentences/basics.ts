@@ -5,7 +5,7 @@ import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
 import { NUM, NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
-import { parseCount } from "../counts";
+import { parseBoundCount, parseCount } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
@@ -34,7 +34,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const fx = n && parseSearch(`Search your library for two ${howMany[1]}${howMany[3]}`);
     return n && fx?.length === 1 && fx[0]!.type === "search" && !fx[0]!.others ? [{ ...fx[0]!, n }] : null;
   }
-  if (/^Search your library /i.test(s)) return parseSearch(s);
+  if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
   // player" after "target ... an opponent controls" (Boseiju) is that permanent's controller. Last known information
@@ -368,6 +368,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Life. "You may gain 1 life" leaves "Gain 1 life": yours.
   if ((m = new RegExp(`^Gain ${NUMX} life$`).exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: amt(m[1]!) }];
+  // "You lose half your life, rounded up", "each opponent loses half their life, rounded up": each of them half their own
+  // life total (CR 107.1a).
+  if ((m = /^(.+?) (?:loses?) half (your|their|that player's|his or her) life, rounded (up|down)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
+    return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half: m[3]!.toLowerCase() as "up" | "down" } }];
+  }
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;

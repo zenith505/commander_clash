@@ -7,7 +7,7 @@ import { parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
-import { parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
+import { boundAtTargeting, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseSearchFilter } from "./search";
 import { parseManaSpend } from "./mana-abilities";
 
@@ -711,6 +711,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push({ type: "if", cond: spent.cond, effects: fx, otherwise: [{ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: structuredClone(fx) }] });
       continue;
     }
+    // "Destroy target nonblack creature if its toughness is less than or equal to the number of cards in your graveyard"
+    // (Ghastly Demise), "Counter target spell if its mana value is less than or equal to ..." (Dispersal Shield): any such
+    // object can be targeted, and the comparison is made as it resolves (rulings on Ghastly Demise, Prismatic Ending,
+    // Agadeem Occultist, Nimbus Champion).
+    const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
+    if (atMost) {
+      const fx = parseOne(atMost[1]!, ctx);
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (!fx || i !== curTargets || !t || t.optional || t.many || t.divided || !fx.every((e) => mentionsTarget(e, i))) return null;
+      const key = atMost[2] === "mana value" ? "manaValue" : (atMost[2] as "power" | "toughness");
+      // Power and toughness only for creatures (CR 208.3); a spell's mana value counts its X (202.3e).
+      if (t.kind === "player" || t.kind === "any" || (key !== "manaValue" && t.kind === "spell")) return null;
+      const amount = parseCount(atMost[3]!, ctx);
+      if (!amount || ctx.targets.length !== i + 1) return null;
+      const filter: TargetSpec = { kind: t.kind, bound: { key, at: "most", amount }, text: `${atMost[2]} less than or equal to ${atMost[3]}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+      continue;
+    }
     const howCast = parseHowCast(s, ctx);
     // Once and Future's adamant, "instead return those cards to your hand and exile ~": done instead of all the spell's
     // instructions before it, so each target card goes to your hand whichever zone it was chosen for (CR 601.2c).
@@ -791,8 +810,15 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.splice(before, effects.length - before, ...replaceX(added, def));
       for (let k = targetsBefore; k < ctx.targets.length; k++) {
         const t = ctx.targets[k]!;
-        // "Target creature with power X or less, where X is ...": not the X announced (TargetSpec.xRange).
-        if (t.xRange) return false;
+        // "Counter target spell with mana value X or less, where X is the number of Faeries you control": not the X
+        // announced but an amount compared as the target is chosen and again as it resolves (TargetSpec.bound; CR 601.2c,
+        // 608.2b; rulings on Spellstutter Sprite). Only an amount that can be worked out then.
+        if (t.xRange) {
+          if (t.xRange.at === "exact" || !boundAtTargeting(def)) return false;
+          const { xRange, ...rest } = t;
+          ctx.targets[k] = { ...rest, bound: { key: xRange.key, at: xRange.at === "least" ? "least" : "most", amount: def } };
+          continue;
+        }
         if (t.divided?.amount) ctx.targets[k] = { ...t, divided: { ...t.divided, amount: replaceX(t.divided.amount, def) } };
       }
       return true;

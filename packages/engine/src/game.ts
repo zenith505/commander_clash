@@ -4,7 +4,7 @@ import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, c
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { playerProtectedFrom, spellManaValue } from "./effects/targeting";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -33,6 +33,7 @@ import {
   type GameState,
   type LastKnown,
   type StackItem,
+  type ManaLot,
   type ManaOrigin,
   type ManaType,
   type SpentMana,
@@ -1483,14 +1484,56 @@ const STEP_ORDER: Step[] = [
 /** Steps that firebending's mana survives the end of: every combat step but the last (CR 702.189a). */
 const KEEPS_COMBAT_MANA = new Set<Step>(["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage"]);
 
+/**
+ * Which of `pid`'s unspent mana isn't lost as a step or phase ends (CR 500.4): `all` of it (Upwelling), mana of `colors`
+ * (Leyline Tyrant's red), and what the rest becomes instead of being lost (Kruphix's colorless, a replacement effect, CR
+ * 614.1a). With two such replacements its controller would choose one (616.1); the first one found is used.
+ */
+function manaKeeping(s: GameState, pid: PlayerId): { all: boolean; colors: Set<ManaType>; becomes?: ManaType } {
+  const out: { all: boolean; colors: Set<ManaType>; becomes?: ManaType } = { all: false, colors: new Set() };
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const k = abilitiesOf(s, o).keepMana;
+    if (!k || (k.who === "you" && controllerOf(s, o) !== pid)) continue;
+    if (k.becomes) out.becomes ??= k.becomes;
+    else if (k.color) out.colors.add(k.color);
+    else out.all = true;
+  }
+  return out;
+}
+
 function advanceStep(s: GameState): void {
   for (const p of s.players) {
-    // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a) and mana kept
-    // "until end of turn", lost as the cleanup step ends (514.2). Kept mana keeps what its source was and how it can
-    // be spent.
-    const kept = (p.manaLots ?? []).filter((l) => (l.keep === "combat" ? KEEPS_COMBAT_MANA.has(s.step) : l.keep === "turn" && s.step !== "cleanup"));
-    p.manaPool = emptyPool();
-    for (const l of kept) p.manaPool[l.mana] += l.n;
+    // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a), mana kept
+    // "until end of turn", lost as the cleanup step ends (514.2), and mana a permanent keeps (manaKeeping). Kept mana keeps
+    // what its source was and how it can be spent, even when it becomes another type (rulings on Horizon Stone).
+    const keeping = manaKeeping(s, p.id);
+    const stays = (m: ManaType) => keeping.all || keeping.colors.has(m);
+    const pool = emptyPool();
+    const inLots = emptyPool();
+    const kept: ManaLot[] = [];
+    let changed = 0;
+    for (const l of p.manaLots ?? []) {
+      inLots[l.mana] += l.n;
+      if ((l.keep === "combat" ? KEEPS_COMBAT_MANA.has(s.step) : l.keep === "turn" && s.step !== "cleanup") || stays(l.mana)) kept.push(l);
+      else if (keeping.becomes) {
+        const { keep: _, ...rest } = l;
+        kept.push({ ...rest, mana: keeping.becomes });
+        if (l.mana !== keeping.becomes) changed += l.n;
+      }
+    }
+    for (const l of kept) pool[l.mana] += l.n;
+    for (const m of Object.keys(pool) as ManaType[]) {
+      const plain = p.manaPool[m] - inLots[m];
+      if (plain <= 0) continue;
+      if (stays(m)) pool[m] += plain;
+      else if (keeping.becomes) {
+        pool[keeping.becomes] += plain;
+        if (m !== keeping.becomes) changed += plain;
+      }
+    }
+    if (changed) log(s, `${p.name}'s unspent mana becomes ${keeping.becomes === "C" ? "colorless" : COLOR_NAMES[keeping.becomes as Color].toLowerCase()} instead of emptying.`);
+    p.manaPool = pool;
     p.manaLots = kept.length ? kept : undefined;
   }
   if (s.step === "cleanup" && s.cleanupAgain) {

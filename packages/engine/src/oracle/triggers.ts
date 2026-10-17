@@ -126,10 +126,11 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
       if (/\b(it|its)\b/i.test(text)) return "fail"; // the creature dealing damage, or the one dealt it?
       text = text.replace(/\bthe other creature\b/g, "that creature");
     }
-    const thatMuch = o.thatMuch && /\bthat (?:much|many)\b/.test(text);
+    // "With mana value less than or equal to that damage" (Glamdring): the damage dealt, like "that much".
+    const thatMuch = o.thatMuch && /\bthat (?:much|many)\b|\bless than or equal to that damage\b/.test(text);
     if (thatMuch) {
       if (/\bX\b/.test(text)) return "fail";
-      text = text.replace(/\bthat (?:much|many)\b/g, "X");
+      text = text.replace(/\bthat (?:much|many)\b/g, "X").replace(/\bless than or equal to that damage\b/g, "less than or equal to X");
     }
     let body = parseBody(text, { ...(o.creature ? { subject: true } : { subjectIt: true }), ...(o.eventPlayer ? { eventPlayer: true } : {}), ...(o.defending ? { defending: true } : {}) });
     if (!body) return "fail";
@@ -1045,10 +1046,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       let text = self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
-      const thatMuch = amount && /\bthat (?:much|many)\b/.test(text);
+      // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
+      const damage = amount && event !== "youGainLife" && event !== "opponentLosesLife";
+      const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;
         text = text.replace(/\bthat (?:much|many)\b/g, "X");
+        if (damage) text = text.replace(/\bless than or equal to that damage\b/g, "less than or equal to X");
       }
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).

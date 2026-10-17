@@ -39,6 +39,8 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
 
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
   if (o.zone !== "battlefield") return false;
+  // An amount bound not worked out yet (TargetSpec.bound): nothing is known to fit it.
+  if (spec.bound) return false;
   const c = chars ?? characteristics(s, o);
   const hasSubtype = (st: string) => c.subtypes.includes(st) || (!!c.allCreatureTypes && CREATURE_TYPES.has(st));
   if (spec.types?.length && !spec.types.some((t) => c.types.includes(t)) && !spec.orSubtypes?.some(hasSubtype)) return false;
@@ -174,6 +176,7 @@ export const spellQuality = (s: GameState, cardId?: string): SourceQuality => ({
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
   const hasSubtype = (st: string) => d.subtypes.includes(st) || (d.keywords.includes("Changeling") && CREATURE_TYPES.has(st));
+  if (spec.bound) return false; // not worked out yet (see objectMatches)
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype)) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;
   if (spec.notTypes?.some((ty) => d.types.includes(ty))) return false;
@@ -332,7 +335,31 @@ function targetsMatch(s: GameState, targets: TargetChoice[], what: TargetSpec | 
   });
 }
 
-export function legalTargets(s: GameState, spec: TargetSpec, controller: PlayerId, excludeStackId?: string, src?: SourceQuality, sourceId?: ObjectId): ChosenTarget[] {
+/**
+ * The filter with its amount bound (TargetSpec.bound) worked out now, as a range of its key; without one, as is. A negative
+ * amount counts as 0 (CR 107.1b).
+ */
+export function bindBound(s: GameState, spec: TargetSpec, ctx: AmountCtx): TargetSpec {
+  if (!spec.bound) return spec;
+  const { bound, ...rest } = spec;
+  const n = Math.max(0, evalAmount(s, bound.amount, ctx));
+  const old = rest[bound.key];
+  const range: Range = bound.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) };
+  return { ...rest, [bound.key]: range };
+}
+
+/**
+ * What an amount bound of a target is worked out with as the target is chosen: who controls the spell or ability and its
+ * source, or the source as it last existed on the battlefield if it has left (CR 608.2h; rulings on Fiendish Panda).
+ */
+export function targetingCtx(s: GameState, controller: PlayerId, sourceId?: ObjectId): AmountCtx {
+  const o = sourceId ? s.objects[sourceId] : undefined;
+  const lki = o && o.zone !== "battlefield" ? s.lastKnown?.[o.id] : undefined;
+  return { controller, ...(sourceId ? { sourceId } : {}), ...(lki ? { lki } : {}) };
+}
+
+export function legalTargets(s: GameState, spec0: TargetSpec, controller: PlayerId, excludeStackId?: string, src?: SourceQuality, sourceId?: ObjectId): ChosenTarget[] {
+  const spec = bindBound(s, spec0, targetingCtx(s, controller, sourceId));
   const out: ChosenTarget[] = [];
   if (spec.kind === "player" || spec.kind === "any")
     for (const pid of livingPlayers(s)) out.push({ kind: "player", id: pid });
@@ -399,7 +426,7 @@ export const sameTarget = (a: TargetChoice | undefined, b: TargetChoice) => !!a 
  * and one "two target creatures" can't pick the same creature twice (CR 115.3).
  */
 export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], i: number, t: TargetChoice, controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
-  const spec = specs[i]!;
+  const spec = bindBound(s, specs[i]!, targetingCtx(s, controller, sourceId));
   // A target the spell is cast as if it didn't have (CR 702.33g): nothing is chosen for it.
   if (spec.skip) return t.kind === "none";
   if (t.kind === "none") return !!spec.optional;
@@ -469,7 +496,7 @@ export const stampTargets = (s: GameState, targets: TargetChoice[] | undefined):
 export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: PlayerId, src?: SourceQuality, sourceId?: ObjectId): boolean {
   // "Any number of target creatures" can be none (CR 115.6), and so can "up to X" (see TargetSpec.many).
   const free = (spec: TargetSpec) => spec.optional || spec.skip || !!spec.many;
-  const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
+  const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
   if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length)) return true;
   // Some targets must differ from each other: look for one way to choose them all.

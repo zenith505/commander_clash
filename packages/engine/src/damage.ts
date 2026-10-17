@@ -784,6 +784,22 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
 }
 
 /**
+ * How much of `n` damage from a permanent to a permanent or player would be dealt if it were dealt now, for bots weighing
+ * attacks and blocks: after the damage amount replacements and prevention it would meet (Furnace of Rath, Torbran, Dark
+ * Sphere, Fog, protection, shields and shield counters, CR 614.1a, 615), each choice made the way a bot makes it.
+ * Nothing changes.
+ */
+export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: number, combat = true): number {
+  if (n <= 0) return 0;
+  const src = objectSource(s, from);
+  const prev = canPreventDamage(s) && !unpreventable(src, combat);
+  if (combat && s.preventCombatDamage && prev) return 0;
+  if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).phantom) return 0;
+  const k = recKey(to);
+  return planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true).final.filter((e) => recKey(e.to) === k).reduce((a, e) => a + e.n, 0);
+}
+
+/**
  * Is this damage stopped by a "prevent all damage that would be dealt to / by" effect (CR 615.1): one on the permanent
  * it would be dealt to, or on the permanent dealing it?
  */

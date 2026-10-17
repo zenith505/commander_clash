@@ -72,6 +72,7 @@ import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState
 import { evalAmount } from "./amounts";
 import { CHOSEN_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
+import { damageEstimate } from "./damage";
 
 /**
  * A simple heuristic opponent. Returns the sequence of actions it wants to take next
@@ -328,7 +329,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -1922,7 +1923,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // A cost of nothing, "{0}" included, could be paid over and over.
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
-      if ((ab.sacrificeSelf && !cashIn) || ab.exileSelf || freeCost || ab.station) continue;
+      // A coin flip's own cost is weighed with what winning and losing do (flipWorth).
+      const flips = flipBranches(ab.body);
+      if ((ab.sacrificeSelf && !cashIn && !flips) || ab.exileSelf || freeCost || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
@@ -1933,9 +1936,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
-      // A coin flip that costs something if it's lost (Frenetic Efreet's "sacrifice ~", Goblin Bangchuckers): not a gamble
-      // bots take.
-      if (ab.body.effects.some((e) => e.type === "if" && e.cond.kind === "wonFlip" && e.cond.lost)) continue;
+      // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
+      if (flips && flipEscape(flips)) continue;
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step
       // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
       const hand = player(s, pid).hand.length;
@@ -1970,6 +1972,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         if (!targets || pointlessAttach(s, body, targets, id)) continue;
         const costs = abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
+        if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
         plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x, costs);
         if (plan) break;
       }
@@ -1979,6 +1982,57 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/** What winning and losing a coin flip do (CR 705.2): "If you win the flip, ..." and "If you lose the flip, ..." Undefined without a loss branch. */
+function flipBranches(body: AbilityBody): { win: Effect[]; lose: Effect[] } | undefined {
+  const ifs = body.effects.filter((e): e is Extract<Effect, { type: "if" }> => e.type === "if" && e.cond.kind === "wonFlip");
+  const lost = (e: Extract<Effect, { type: "if" }>) => e.cond.kind === "wonFlip" && !!e.cond.lost;
+  if (!body.effects.some((e) => e.type === "flipCoin") || !ifs.some(lost)) return undefined;
+  return { win: ifs.filter((e) => !lost(e)).flatMap((e) => e.effects), lose: ifs.filter(lost).flatMap((e) => e.effects) };
+}
+
+/** A flip that only saves its source from what's about to happen to it: phased out or back to hand if won, sacrificed if lost. */
+const flipEscape = (f: { win: Effect[]; lose: Effect[] }) =>
+  f.win.length > 0 && f.win.every((e) => (e.type === "phaseOut" || e.type === "bounce") && e.what.ref === "self") && f.lose.every((e) => e.type === "sacrifice" && e.what.ref === "self");
+
+/**
+ * What an activated ability that flips a coin is worth to a bot: half what winning does and half what losing does (an even
+ * chance, CR 705.1), less sacrificing its source as a cost unless that's all the permanent is for (Bottle of Suleiman).
+ * Losing a creature counts as what it's worth, damage to us as the life it costs (after doublers and prevention), and
+ * never what would kill us.
+ */
+function flipWorth(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, f: { win: Effect[]; lose: Effect[] }, targets: TargetChoice[]): number {
+  const own = abilitiesOf(s, o);
+  const onlyUse = !objIsType(s, o, "Creature") && !objIsType(s, o, "Land") && own.activated.length === 1 && !own.triggers.length && !own.statics.length;
+  const cost = ab.sacrificeSelf && !onlyUse ? worth(s, pid, o) : 0;
+  return (flipBranchWorth(s, pid, o, f.win, targets) + flipBranchWorth(s, pid, o, f.lose, targets)) / 2 - cost;
+}
+
+function flipBranchWorth(s: GameState, pid: PlayerId, o: GameObject, effects: Effect[], targets: TargetChoice[]): number {
+  const target = (r: ObjRef) => {
+    const t = r.ref === "target" ? targets[r.index] : r.ref === "self" ? { kind: "object" as const, id: o.id } : undefined;
+    return t && !Array.isArray(t) && t.kind === "object" && s.objects[t.id]?.zone === "battlefield" ? obj(s, t.id) : undefined;
+  };
+  const loss = (x: GameObject) => (controllerOf(s, x) === pid ? -1 : 1) * worth(s, pid, x);
+  let v = 0;
+  for (const e of effects) {
+    if ((e.type === "sacrifice" || e.type === "destroy" || e.type === "exile") && "what" in e && target(e.what)) v += loss(target(e.what)!);
+    // Back to its owner's hand: casting it again costs its mana. Phased out, it can't block until our next turn (CR 702.26b).
+    else if (e.type === "bounce" && target(e.what)) v += loss(target(e.what)!) / 2;
+    else if (e.type === "phaseOut" && target(e.what)) v += controllerOf(s, target(e.what)!) === pid ? -1 : 1;
+    else if (e.type === "damage" && e.to.ref === "you") {
+      const n = damageEstimate(s, o, { player: pid }, estimate(e.amount), false);
+      v -= n >= player(s, pid).life ? Infinity : n / 2;
+    } else if (e.type === "createToken" && e.who.ref === "you" && "power" in e.token) v += estimate(e.n) * Math.max(2, Number(e.token.power ?? 0) + Number(e.token.toughness ?? 0));
+    else if (e.type === "continuous" && target(e.what)) {
+      // A pump until end of turn after combat does nothing; shrinking one of ours to 0 toughness kills it (CR 704.5f).
+      const t = target(e.what)!;
+      const dt = e.mods.reduce((n, m) => n + (m.kind === "modifyPT" ? estimate(m.toughness) : 0), 0);
+      if (dt < 0 && lethalDamage(s, t) + dt <= 0) v += loss(t);
+    } else v += modeValue(s, pid, { targets: [], effects: [e], text: "" }, targets);
+  }
+  return v;
 }
 
 /** "Attach target Equipment you control to target creature you control" (Brass Squire) where it already is, or with no Equipment chosen. */
@@ -2178,6 +2232,49 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
       const costs = abilityCosts(s, pid, o, ab, [], c.id);
       if (costs === null) continue;
       const plan = planActivate(s, pid, id, i, undefined, undefined, undefined, undefined, costs);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * A coin flip that only saves its source (Frenetic Efreet's "phases out", Viashino Sandswimmer's "return to its owner's
+ * hand"; if lost, sacrificed): when an opponent's spell or ability would destroy, exile or kill it, or it's in a combat it
+ * would die in, there's nothing to lose by flipping.
+ */
+function chooseFlipEscape(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  const hit = combatHits(s);
+  const doomed = (o: GameObject) => {
+    if (top) {
+      if (top.controller === pid) return false;
+      const body = top.body ?? (top.objectId && s.objects[top.objectId] ? compileCard(defOf(s, obj(s, top.objectId))).spell : undefined);
+      if (!body) return false;
+      const at = (top.targets ?? []).flatMap((t, i) => (!Array.isArray(t) && t.kind === "object" && t.id === o.id ? [i] : []));
+      const aimed = (r: { ref: string; index?: number } | undefined) => r?.ref === "target" && at.includes(r.index!);
+      return allEffects(body.effects).some(
+        (e) =>
+          (["destroy", "exile", "putInLibrary", "shuffleIntoLibrary"].includes(e.type) && "what" in e && aimed(e.what)) ||
+          (e.type === "damage" && "index" in e.to && aimed(e.to) && damageEstimate(s, top.sourceId && s.objects[top.sourceId] ? obj(s, top.sourceId) : o, { object: o.id }, estimate(e.amount), false) >= Math.max(1, lethalDamage(s, o))) ||
+          (e.type === "continuous" && aimed(e.what) && e.mods.reduce((n, m) => n + (m.kind === "modifyPT" ? estimate(m.toughness) : 0), 0) + lethalDamage(s, o) <= 0),
+      );
+    }
+    if (s.step !== "declareBlockers") return false;
+    const foes = o.blocking ? o.blocking : o.attacking !== undefined ? (o.blockedBy ?? []) : [];
+    const ids = Array.isArray(foes) ? foes : [foes];
+    return ids.reduce((n, f) => n + (s.objects[f]?.zone === "battlefield" ? hit(obj(s, f), o) : 0), 0) >= Math.max(1, lethalDamage(s, o)) || ids.some((f) => s.objects[f]?.zone === "battlefield" && objHasKeyword(s, obj(s, f), "Deathtouch") && hit(obj(s, f), o) > 0);
+  };
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || objHasKeyword(s, o, "Indestructible")) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const f = flipBranches(abilities[i]!.body);
+      if (!f || !flipEscape(f) || !doomed(o)) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const plan = planActivate(s, pid, id, i);
       if (plan) return plan;
     }
   }
@@ -2598,8 +2695,23 @@ function chooseLoyalty(s: GameState, pid: PlayerId): Action[] | null {
  * can't block (or all of them when they have no untapped creatures) onto it, smallest first, until their power
  * covers its loyalty. Not when the attack on the player would be lethal, and never a goaded creature (CR 701.15b).
  */
-function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
-  const atPlayer = (d: PlayerId) => attacks.filter((a) => a.defender === d && a.planeswalker === undefined).reduce((n, a) => n + Math.max(0, power(s, obj(s, a.attacker))), 0);
+/**
+ * The combat damage one creature would deal another or a player as things stand: its combat damage after the damage
+ * amount replacements and prevention it would meet (doublers like Furnace of Rath and Torbran, halvers, Fog, protection;
+ * damageEstimate). Worked out once per pair for one decision.
+ */
+function combatHits(s: GameState): (from: GameObject, to: GameObject | PlayerId) => number {
+  const memo = new Map<string, number>();
+  return (from, to) => {
+    const k = `${from.id}>${typeof to === "number" ? `p${to}` : to.id}`;
+    let n = memo.get(k);
+    if (n === undefined) memo.set(k, (n = damageEstimate(s, from, typeof to === "number" ? { player: to } : { object: to.id }, Math.max(0, combatDamageOf(s, from)))));
+    return n;
+  };
+}
+
+function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[], hit = combatHits(s)) {
+  const atPlayer = (d: PlayerId) => attacks.filter((a) => a.defender === d && a.planeswalker === undefined).reduce((n, a) => n + hit(obj(s, a.attacker), d), 0);
   const walkers = s.battlefield
     .map((id) => obj(s, id))
     .filter((o) => objIsType(s, o, "Planeswalker") && opponents(s, pid).includes(controllerOf(s, o)))
@@ -2611,13 +2723,14 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
     const free = attacks
       .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), owner))
       .filter((a) => blockers.every((b) => blockProblem(s, b, obj(s, a.attacker), owner)))
-      .sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)));
+      .filter((a) => hit(obj(s, a.attacker), pw) > 0)
+      .sort((a, b) => hit(obj(s, a.attacker), pw) - hit(obj(s, b.attacker), pw));
     let need = pw.counters.loyalty ?? 0;
     const moved: typeof attacks = [];
     for (const a of free) {
       if (need <= 0) break;
       moved.push(a);
-      need -= Math.max(0, power(s, obj(s, a.attacker)));
+      need -= hit(obj(s, a.attacker), pw);
     }
     if (need > 0) continue;
     for (const a of moved) {
@@ -2636,20 +2749,22 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Pressure whoever is lowest on life, but take the crown from an opponent who's the monarch
   // (CR 725.2) unless someone else is low enough to finish.
   const lowest = [...opps].sort((a, b) => player(s, a).life - player(s, b).life)[0]!;
-  const reach = potentialAttackers(s, pid).reduce((n, o) => n + Math.max(0, combatDamageOf(s, o)), 0);
+  // Damage doublers and halvers, prevention and protection count (CR 614.1a, 615).
+  const hit = combatHits(s);
+  const reach = potentialAttackers(s, pid).reduce((n, o) => n + hit(o, lowest), 0);
   const target = s.monarch !== undefined && opps.includes(s.monarch) && player(s, lowest).life > reach ? s.monarch : lowest;
   const theirBlockers = s.battlefield
     .map((id) => obj(s, id))
     .filter((o) => controllerOf(s, o) === target && !o.tapped && objIsType(s, o, "Creature"));
-  const biggestBlocker = Math.max(0, ...theirBlockers.map((o) => combatDamageOf(s, o)));
-  const ready = potentialAttackers(s, pid).filter((o) => combatDamageOf(s, o) > 0 && !attackProblem(s, o, target));
+  const ready = potentialAttackers(s, pid).filter((o) => hit(o, target) > 0 && !attackProblem(s, o, target));
+  const survivesBlocks = (o: GameObject) => theirBlockers.every((b) => blockProblem(s, b, o, target) || hit(b, o) < toughness(s, o));
   // Swing with everything when we outnumber their untapped blockers; otherwise only with creatures that survive a block.
   const allIn = ready.length > theirBlockers.length;
   // Creatures that attack each combat if able have to (CR 508.1d), whatever their power, at whoever they can.
   const must = potentialAttackers(s, pid).filter((o) => characteristics(s, o).attacksIfAble && !ready.includes(o));
   let attacks = [
     ...ready
-      .filter((o) => allIn || characteristics(s, o).attacksIfAble || toughness(s, o) > biggestBlocker || theirBlockers.every((b) => blockProblem(s, b, o, target)))
+      .filter((o) => allIn || characteristics(s, o).attacksIfAble || survivesBlocks(o))
       .map((o) => ({ attacker: o.id, defender: target })),
     ...must.map((o) => ({ attacker: o.id, defender: attackProblem(s, o, target) ? opps.find((d) => !attackProblem(s, o, d))! : target })),
   ];
@@ -2669,7 +2784,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
-  let declared = attackPlaneswalkers(s, pid, attacks);
+  let declared = attackPlaneswalkers(s, pid, attacks, hit);
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
   for (;;) {
@@ -2695,7 +2810,9 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   const used = new Set<string>();
   const blocks: { blocker: string; attacker: string }[] = [];
   // Only damage to us counts toward our life; attackers of our planeswalkers are blocked when that's a good trade.
-  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + combatDamageOf(s, a), 0);
+  // Damage doublers and halvers, prevention and protection count (CR 614.1a, 615).
+  const hit = combatHits(s);
+  const totalIncoming = incoming.filter((a) => !a.attackingPermanent).reduce((n, a) => n + hit(a, pid), 0);
   const desperate = totalIncoming >= me.life;
   // Requirements first (CR 509.1c): every creature able to block a lure blocks one, and a creature that
   // must be blocked if able gets our sturdiest blocker (two against menace).
@@ -2721,7 +2838,7 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   // One that must block this turn blocks the attacker it fares best against (CR 509.1c).
   for (const b of mine.filter((o) => characteristics(s, o).mustBlock && !used.has(o.id))) {
     const able = incoming.filter((at) => !blockProblem(s, b, at) && mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).length >= blockersNeeded(s, at) - 1);
-    const at = able.find((a) => toughness(s, b) > power(s, a)) ?? able.find((a) => power(s, b) >= toughness(s, a)) ?? able[0];
+    const at = able.find((a) => toughness(s, b) > hit(a, b)) ?? able.find((a) => hit(b, a) >= toughness(s, a)) ?? able[0];
     if (!at) continue;
     const helpers = mine.filter((o) => o.id !== b.id && !used.has(o.id) && !blockProblem(s, o, at)).sort((x, y) => toughness(s, y) - toughness(s, x)).slice(0, blockersNeeded(s, at) - 1);
     for (const o of [b, ...helpers]) {
@@ -2742,8 +2859,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     if (blocks.some((b) => b.attacker === at.id)) continue;
     if (blockersNeeded(s, at) > 1 || characteristics(s, at).cantBeBlocked) continue;
     const canBlock = mine.filter((b) => !used.has(b.id) && !blockProblem(s, b, at));
-    const good = canBlock.find((b) => toughness(s, b) > combatDamageOf(s, at) && !objHasKeyword(s, at, "Deathtouch"));
-    const trade = canBlock.find((b) => combatDamageOf(s, b) >= toughness(s, at));
+    const good = canBlock.find((b) => toughness(s, b) > hit(at, b) && !(objHasKeyword(s, at, "Deathtouch") && hit(at, b) > 0));
+    const trade = canBlock.find((b) => hit(b, at) >= toughness(s, at));
     const pick = good ?? trade ?? (desperate ? canBlock[0] : undefined);
     if (pick) {
       used.add(pick.id);
@@ -2752,10 +2869,10 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   }
   // A creature that can block more than one creature (CR 509.1a) also takes on attackers nobody blocks, as long
   // as it survives all of them together.
-  const hurt = (b: GameObject) => blocks.filter((x) => x.blocker === b.id).reduce((n, x) => n + (objHasKeyword(s, obj(s, x.attacker), "Deathtouch") ? Infinity : Math.max(0, power(s, obj(s, x.attacker)))), 0);
+  const hurt = (b: GameObject) => blocks.filter((x) => x.blocker === b.id).reduce((n, x) => n + (objHasKeyword(s, obj(s, x.attacker), "Deathtouch") ? Infinity : hit(obj(s, x.attacker), b)), 0);
   for (const at of [...incoming].sort((a, b) => power(s, b) - power(s, a))) {
     if (blocks.some((b) => b.attacker === at.id) || blockersNeeded(s, at) > 1 || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
-    const extra = mine.find((b) => used.has(b.id) && blocks.filter((x) => x.blocker === b.id).length < maxBlocks(s, b) && !blockProblem(s, b, at) && toughness(s, b) > hurt(b) + power(s, at));
+    const extra = mine.find((b) => used.has(b.id) && blocks.filter((x) => x.blocker === b.id).length < maxBlocks(s, b) && !blockProblem(s, b, at) && toughness(s, b) > hurt(b) + hit(at, b));
     if (extra) blocks.push({ blocker: extra.id, attacker: at.id });
   }
   // One that can't block alone doesn't block by itself (CR 506.5).

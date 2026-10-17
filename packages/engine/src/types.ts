@@ -1418,7 +1418,7 @@ export interface Resolving {
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;
     /** "Tapped and attacking that player or a planeswalker they control": each opponent's pick (an attackChoices key). */
-    attackEach?: Record<number, string>;
+    attackEach?: Record<number, string[]>;
     /** "Search your library and/or graveyard": "both", or "graveyard" alone (no shuffle). */
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */

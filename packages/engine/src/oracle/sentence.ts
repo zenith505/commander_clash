@@ -73,6 +73,14 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
+  // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
+  // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.
+  const both = /^[Yy]ou and (target opponent|target player|that player|that opponent) each (draw|create|gain|lose|mill) (.+)$/.exec(s);
+  if (both) {
+    const mine = parseSentence(`You ${both[2]} ${both[3]}`, ctx);
+    const theirs = mine && parseSentence(`${both[1]!.replace(/^./, (c) => c.toUpperCase())} ${both[2]}s ${both[3]}`, ctx);
+    return mine && theirs ? [...mine, ...theirs] : null;
+  }
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;

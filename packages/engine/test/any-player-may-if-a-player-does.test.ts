@@ -19,6 +19,7 @@ const pangolin = card("Prowling Pangolin", "Creature — Pangolin Beast", "{3}{B
 const troll = card("Clackbridge Troll", "Creature — Troll", "{3}{B}{B}", { power: "8", toughness: "8", keywords: ["Haste", "Trample"], oracleText: "Trample, haste\nWhen this creature enters, target opponent creates three 0/1 white Goat creature tokens.\nAt the beginning of combat on your turn, any opponent may sacrifice a creature of their choice. If a player does, tap this creature, you gain 3 life, and you draw a card." });
 const dashHopes = card("Dash Hopes", "Instant", "{B}{B}", { oracleText: "When you cast this spell, any player may pay 5 life. If a player does, counter Dash Hopes.\nCounter target spell." });
 const breakingPoint = card("Breaking Point", "Sorcery", "{1}{R}{R}", { oracleText: "Any player may have Breaking Point deal 6 damage to them. If no one does, destroy all creatures. Creatures destroyed this way can't be regenerated." });
+const circle = card("Rhystic Circle", "Enchantment", "{2}{W}{W}", { oracleText: "{1}: Any player may pay {1}. If no one does, the next time a source of your choice would deal damage to you this turn, prevent that damage." });
 const firebeast = card("Longhorn Firebeast", "Creature — Elemental Ox Beast", "{2}{R}", { power: "3", toughness: "2", oracleText: "When this creature enters, any opponent may have it deal 5 damage to them. If a player does, sacrifice this creature." });
 
 const settle = (s: GameState) => {
@@ -30,7 +31,7 @@ const choose = (s: GameState, pid: PlayerId, choice: string) => settle(act(s, { 
 const pending = (s: GameState) => s.pending as { kind: string; player: PlayerId; options: string[]; labels: string[]; prompt: string };
 
 describe("any player may ... if a player does / if no one does", () => {
-  it("parses", () => [wurm, demon, devil, browbeat, gorgers, pangolin, troll, dashHopes, breakingPoint, firebeast].forEach((d) => expect(isFullySupported(d), d.name).toBe(true)));
+  it("parses", () => [wurm, demon, devil, browbeat, gorgers, pangolin, troll, dashHopes, breakingPoint, firebeast, circle].forEach((d) => expect(isFullySupported(d), d.name).toBe(true)));
 
   it("Argothian Wurm: each player in turn order, even after one has; then it goes on top of its owner's library once", () => {
     let { s, ap, ids } = setup([wurm]);
@@ -171,5 +172,25 @@ describe("any player may ... if a player does / if no one does", () => {
     expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
     // Browbeat is still there, now resolving: asking its own question.
     expect(s.objects[ids[1]!]!.zone).toBe("stack");
+  });
+  it("Rhystic Circle: a player who chooses to pay {1} then pays it, and there's no shield", () => {
+    for (const someone of [true, false]) {
+      let { s, ap } = setup([]);
+      const [p1, p2, p3] = others(s, ap);
+      const c = putOnBattlefield(s, ap, circle);
+      addMana(s, ap, ["C"] as ManaType[], {});
+      s = settle(act(s, { type: "activateAbility", player: ap, objectId: c, index: 0 }));
+      expect(pending(s)).toMatchObject({ kind: "chooseOption", player: ap, labels: ["Pay {1}", "Don't"] });
+      s = choose(s, ap, "none");
+      if (someone) {
+        addMana(s, p1!, ["C"] as ManaType[], {});
+        s = act(s, { type: "chooseOption", player: p1!, choice: "0" });
+        expect(s.pending).toMatchObject({ kind: "payUnless", player: p1, cost: "{1}", otherwise: "don't pay" });
+        s = settle(act(s, { type: "payUnless", player: p1!, pay: true }));
+      } else s = choose(s, p1!, "none");
+      for (const p of [p2, p3]) if (s.pending?.player === p) s = choose(s, p!, "none");
+      // If no one paid, the controller chooses the source now.
+      expect(s.pending?.player === ap).toBe(!someone);
+    }
   });
 });

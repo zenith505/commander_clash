@@ -1,6 +1,6 @@
 # Roadmap
 
-19,877 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,971 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -45,20 +45,33 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      your untap step" (The Ninth Doctor).
    Left from the round after backgrounds (the last five Backgrounds, kinship with last-known types, Leaf-Crowned Elder,
    Adeline's planeswalker choice, tempting offers, airbend and "its owner may cast it" exiles, Nalfeshnee):
-   - Adeline with a token doubler: one choice per opponent, so all the tokens for one opponent attack the same player
-     or planeswalker. Granted myriad's tokens still attack the player only.
+   - Granted myriad's tokens still attack the player only, not a planeswalker.
    - Tempting offers: each accepting player's part runs one after the other, not at the same time (it matters only
-     with triggers that care about batches). Bots always accept. Still out: Tempt with Discovery ("who searches a
-     library this way"), Tempt with Mayhem (copies), Braids, Fandaniel, Wernog, The Second Doctor ("who doesn't"),
-     Step Between Worlds and Turtles in Time ("each player who does draws seven").
-     "Each player may" without "for each ... who does" stays with the older parsing: Show and Tell and Iwamori (the
-     cards enter at the same time), Eager Construct and Myr Custodian ("each player may scry") are still out.
+     with triggers that care about batches). Their choices stay open and in turn order (CR 101.4b, Tempt rulings), not
+     hidden like Show and Tell's. Bots always accept: accepting never leaves a bot behind the other opponents, and the
+     offerer gets only what the bot also gets. Still out: Tempt with Discovery ("who searches a library this way"),
+     Tempt with Mayhem (copies), Braids, Fandaniel, Wernog, The Second Doctor ("who doesn't"), Step Between Worlds and
+     Turtles in Time ("each player who does draws seven").
    - Granted persist and undying (Haunted One) are abilities, not keywords: "creatures with undying" doesn't see them.
    - Airbend still out: Aang, Airbending Master ("another target creature"), Airbender Ascension and Avatar's Wrath
      (other lines). Suspend Aggression and Elite Spellbinder ("its owner may play it until the end of their next turn",
      "look at target opponent's hand. You may exile a nonland card from it"), Extraordinary Journey.
-   - Scion of Halaster's replacement is applied before Alhammarret's Archive or dredge on the same draw instead of
-     letting the player order them (CR 616.1). Choreographed Sparks ("this spell can't be copied").
+   - Choreographed Sparks ("this spell can't be copied").
+   - Alhammarret's Archive always applies before dredge on the same draw (CR 616.1 lets the player order them;
+     dredging first only means drawing fewer cards).
+   Left from the round after tempting offers (Show and Tell's hidden picks, "each player may search / scry / draw",
+   "any player may activate this ability", "any player may ... If a player does / If no one does", Scion of Halaster's
+   replacement order, Adeline with a token doubler):
+   - Bots never activate another player's "any player may activate" abilities, and the UI's auto-pass doesn't stop for
+     them (click the permanent to open its menu). Those with {T}, mana abilities, graveyard or hand abilities, or costs
+     that sacrifice or exile the permanent stay unsupported, as do Temporal Extortion (half your life), Truce, Shah of
+     Naar Isle, Carrion Rats and Wurm, Mana Cache, Xantcha, Casey Jones, Glittering Lion and Lynx, Volrath's Dungeon,
+     and Kaya's -3.
+   - "Any player may ...": the chosen actions all happen after everyone has chosen. Shivan Wumpus's ruling has each
+     one happen as it's chosen; the outcome is the same for the supported cards.
+   - Kwain's "each player who drew a card this way" counts those who chose to draw, even from an empty library.
+   - Hypergenesis and Eureka (each player in turn puts a card in, again until no one does) are still out: their cards
+     enter one at a time, and as-enters choices wait until the spell finishes resolving.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):

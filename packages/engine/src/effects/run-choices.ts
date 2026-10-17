@@ -485,7 +485,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           loseLife(s, pid, o.pay.life);
           log(s, `${p.name} pays ${o.pay.life} life.`);
         } else if (o && "pay" in o) {
-          const paid = paidUnless(s, ctx, pid, o.pay, src, describePenalty(e).toLowerCase(), describePenalty(e).toLowerCase());
+          const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : paidUnless(s, ctx, pid, o.pay, src, describePenalty(e).toLowerCase(), describePenalty(e).toLowerCase());
           if (paid === "paused") return "paused";
           if (!paid) pu.picked[pid] = "none";
           sc.paid = undefined;

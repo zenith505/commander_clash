@@ -18,7 +18,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "mill":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const n = amountNow(s, e.n, ctx);
+        const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
         for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
       }

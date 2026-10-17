@@ -59,12 +59,14 @@ export interface UnlessPays {
  * `count` times `times` (default 1), plus `plus` (default 0): "2 life for each creature", "X is 1 plus
  * ...". A negative result is 0 (CR 107.1b: "If your life total is negative, X is considered to be 0").
  * `negate` then makes it negative, for "-X/-X" and "-1/-1 for each".
+ * `half` halves that first, "half your life, rounded up" (rounded down unless the text says up, CR 107.1a).
  */
 export interface AmountExpr {
   count: Count;
   times?: number;
   plus?: number;
   negate?: boolean;
+  half?: "up" | "down";
 }
 
 /** What an amount counts. */

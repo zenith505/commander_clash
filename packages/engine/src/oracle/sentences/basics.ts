@@ -368,6 +368,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Life. "You may gain 1 life" leaves "Gain 1 life": yours.
   if ((m = new RegExp(`^Gain ${NUMX} life$`).exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: amt(m[1]!) }];
+  // "You lose half your life, rounded up", "each opponent loses half their life, rounded up": each of them half their own
+  // life total (CR 107.1a).
+  if ((m = /^(.+?) (?:loses?) half (your|their|that player's|his or her) life, rounded (up|down)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
+    return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half: m[3]!.toLowerCase() as "up" | "down" } }];
+  }
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;

@@ -55,8 +55,14 @@ export const isFixed = (a: Amount): a is number => typeof a === "number";
 /** The value of `a` right now. */
 export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
-  const n = Math.max(0, evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0));
+  const v = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
+  const n = Math.max(0, a.half ? halve(v, a.half) : v);
   return a.negate ? -n : n;
+}
+
+/** Half of `n`, rounded as the text says (CR 107.1a: down unless it says up). */
+export function halve(n: number, round: "up" | "down"): number {
+  return round === "up" ? Math.ceil(n / 2) : Math.floor(n / 2);
 }
 
 function selfObject(s: GameState, ctx: AmountCtx): GameObject | undefined {
@@ -337,7 +343,8 @@ export function describeAmount(a: Amount): string {
   const base = describeCount(a.count);
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
-  const v = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
+  const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
+  const v = a.half ? `half ${v0}, rounded ${a.half}` : v0;
   return a.negate ? `-(${v})` : v;
 }
 

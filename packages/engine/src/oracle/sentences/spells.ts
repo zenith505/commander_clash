@@ -46,6 +46,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
   }
+  // "Target player mills half their library, rounded down" (Traumatize): each of them half their own library (CR 107.1a).
+  if ((m = /^(.+?) mills? half (your|their|that player's|his or her) library, rounded (up|down)$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
+    return [{ type: "mill", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, half: m[3]!.toLowerCase() as "up" | "down" } }];
+  }
   // "Target player mills twice X cards" (Drown in Dreams).
   if ((m = /^(.+?) mills? twice X cards$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

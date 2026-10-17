@@ -39,7 +39,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
   // player" after "target ... an opponent controls" (Boseiju) is that permanent's controller. Last known information
   // says who controlled it if it's gone by then (CR 608.2h).
-  if ((m = /^(Its controller|That creature's controller|That permanent's controller|That player) may search their library for (.+)$/.exec(s))) {
+  // "Target player may search their library for a card named [name]" (Partner with, CR 702.124j).
+  if ((m = /^(Its controller|That creature's controller|That permanent's controller|That player|[Tt]arget player) may search their library for (.+)$/.exec(s))) {
     const who = m[1] === "That player" ? (ctx.lastPlayerTarget === undefined && ctx.lastObjectTarget !== undefined ? { ref: "targetController" as const, index: ctx.lastObjectTarget } : null) : parsePlayer(m[1]!.toLowerCase(), ctx);
     if (!who || / your /.test(m[2]!)) return null;
     const fx = parseSearch(`Search your library for ${m[2]!.replace(/ their hand\b/, " your hand")}`);

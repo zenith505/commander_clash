@@ -350,6 +350,8 @@ export interface TargetSpec {
 export interface SearchDest {
   zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile";
   tapped?: boolean;
+  /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
+  counters?: { counter: CounterKind; n: Amount };
 }
 
 /** Inclusive bounds; either end may be open. */
@@ -2370,6 +2372,8 @@ export interface CompiledCard {
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
    */
   othersEnterTapped?: { filter: TargetSpec; text: string }[];
+  /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; text: string }[];
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
@@ -2398,7 +2402,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**

@@ -552,14 +552,26 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "You may search your library and/or graveyard for a card named Ajani, Valiant Protector, reveal it, and put it into
     // your hand. If you search your library this way, shuffle." (CR 701.23): one card, from either zone; whether the
     // library is searched too is the player's choice as it resolves (search.orGraveyard).
-    const orYard = /^(?:([Yy]ou may) )?[Ss]earch your library and\/or graveyard for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?)$/.exec(s);
-    if (orYard && sentences[si + 1]?.replace(/\.$/, "") === "If you search your library this way, shuffle") {
+    // "... and put it onto the battlefield with X additional +1/+1 counters on it. If X is 4 or greater, it gains haste
+    // until end of turn. If you search your library this way, shuffle." (Vision Quest): the shuffle doesn't depend on
+    // what's between, so it goes with the search.
+    const orYard = new RegExp(`^(?:([Yy]ou may) )?[Ss]earch your library and\\/or graveyard for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?)(?: with (X|an|a|one|two|three) additional ${COUNTER} counters? on it)?$`).exec(s);
+    const isShuffle = (i: number) => sentences[i]?.replace(/\.$/, "") === "If you search your library this way, shuffle";
+    const shuffleAt = isShuffle(si + 1) ? si + 1 : orYard && !orYard[1] && isShuffle(si + 2) ? si + 2 : undefined;
+    if (orYard && shuffleAt !== undefined) {
       const filter = parseSearchFilter(orYard[3]!, (t) => parseBoundCount(t, ctx));
       if (filter === null) return null;
-      const dest: SearchDest = orYard[5] === "into your hand" ? { zone: "hand" } : { zone: "battlefield", ...(/tapped$/.test(orYard[5]!) ? { tapped: true } : {}) };
+      const dest: SearchDest =
+        orYard[5] === "into your hand"
+          ? { zone: "hand" }
+          : { zone: "battlefield", ...(/tapped$/.test(orYard[5]!) ? { tapped: true } : {}), ...(orYard[6] ? { counters: { counter: counterKind(orYard[7]!), n: /^an?$/.test(orYard[6]) ? 1 : amt(orYard[6]) } } : {}) };
+      if (orYard[6] === "X" && !ctx.spell && !ctx.ownX) return null;
       const search: Effect = { type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: !!orYard[4], dest, orGraveyard: true };
-      effects.push(orYard[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search);
-      si++;
+      const fx: Effect = orYard[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search;
+      effects.push(fx);
+      noteLast(ctx, [fx]);
+      if (shuffleAt === si + 1) si++;
+      else sentences.splice(shuffleAt, 1);
       continue;
     }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
@@ -1539,7 +1551,11 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
     // One card put onto the battlefield: "Put a +1/+1 counter on it", "It gains haste until your next turn".
     const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
-    ctx.lastPut = (put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject) || (put?.type === "putFromHand" && !put.any);
+    ctx.lastPut =
+      (put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject) ||
+      (put?.type === "putFromHand" && !put.any) ||
+      // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
+      (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).

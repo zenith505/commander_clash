@@ -844,6 +844,7 @@ export function moveObject(
     yards[o.owner] = (yards[o.owner] ?? 0) + 1;
     const types = (s.turnLog.toGraveyardTypes ??= {});
     for (const t of defOf(s, o).types) types[t] = (types[t] ?? 0) + 1;
+    noteOwnGraveyardTypes(s, o);
   }
   if (fromZone === "battlefield")
     fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
@@ -852,6 +853,12 @@ export function moveObject(
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id });
   if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner));
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
+}
+
+/** A card put into its owner's graveyard: its card types there, for "if a creature card was put into your graveyard". */
+function noteOwnGraveyardTypes(s: GameState, o: GameObject) {
+  const mine = ((s.turnLog ??= {}).toOwnGraveyardTypes ??= {})[o.owner] ??= [];
+  for (const t of defOf(s, o).types) if (!mine.includes(t)) mine.push(t);
 }
 
 /**
@@ -880,6 +887,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
       yards[p.owner] = (yards[p.owner] ?? 0) + 1;
       const types = (s.turnLog.toGraveyardTypes ??= {});
       for (const t of defOf(s, p).types) types[t] = (types[t] ?? 0) + 1;
+      noteOwnGraveyardTypes(s, p);
       if (!(s.descendedThisTurn ??= []).includes(p.owner)) s.descendedThisTurn.push(p.owner);
     }
     if (dest === "graveyard") (s.zoneBatch ??= []).push({ id, zc: p.zoneChanges, from: "merged", to: dest, owner: p.owner, ...(p.isToken ? { notCard: true as const } : {}), card: p.cardId });
@@ -915,6 +923,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (withCounters) add(withCounters.counter, withCounters.n);
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   for (const [k, n] of Object.entries(othersAddCounters(s, o))) add(k, n);
+  // Its own "enters with an additional counter", printed or granted as it enters (Master Chef, CR 614.12).
+  for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, e.n);
   for (const [k, n] of Object.entries(entering)) putCounters(s, o, k, n, true);
   // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
   if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
@@ -1135,8 +1145,8 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
   for (const id of s.battlefield) {
     if (id === o.id) continue;
     const src = obj(s, id);
-    const rules = compileCard(defOf(s, src)).othersEnterWithCounters;
-    if (!rules || !characteristics(s, src).hasPrintedAbilities) continue;
+    const rules = abilitiesOf(s, src).othersEnterWithCounters;
+    if (!rules) continue;
     const you = controllerOf(s, src);
     for (const r of rules) if (objectMatches(s, r.filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
   }
@@ -2758,10 +2768,10 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
   const mv = manaValue(parseManaCost(d.manaCost)) + x * xCount(parseManaCost(d.manaCost));
   for (const id of s.battlefield) {
     const src = obj(s, id);
-    const mods = compileCard(defOf(s, src)).costMods;
+    // Its own or granted ones (Acolyte of Bahamut's "The first Dragon spell you cast each turn costs {2} less").
+    const mods = abilitiesOf(s, src).costMods;
     if (!mods) continue;
     const c = characteristics(s, src);
-    if (!c.hasPrintedAbilities) continue;
     for (const m of mods) {
       if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : m.who === "enchanted" ? src.attachedToPlayer !== pid : false) continue;
       if (m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
@@ -3524,7 +3534,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     const pool =
       c.kind === "sacrifice"
-        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id) && objectMatches(s, c.filter, obj(s, id), pid, false))
+        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id && !(c.selfIf && objectMatches(s, c.selfIf, o, pid, false))) && objectMatches(s, c.filter, obj(s, id), pid, false))
         : c.kind === "tap"
           ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"

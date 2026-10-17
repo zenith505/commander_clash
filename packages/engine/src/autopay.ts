@@ -395,7 +395,7 @@ function wantCosts(cost: ParsedCost, extra: number, reqs: SpentReq[]): { cost: P
 /** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */
 function costDependsOnBoard(s: GameState, d: CardDef): boolean {
   const c = compileCard(d);
-  return !!(c.costLess?.length || c.costLessIf?.length) || s.battlefield.some((id) => !!compileCard(defOf(s, obj(s, id))).costMods);
+  return !!(c.costLess?.length || c.costLessIf?.length) || s.battlefield.some((id) => !!abilitiesOf(s, obj(s, id)).costMods);
 }
 
 /**

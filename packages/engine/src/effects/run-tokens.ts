@@ -118,6 +118,17 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
   // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
   const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: xx } } : e0;
+  // One group for each opponent, attacking that opponent if it's this player's combat (CR 508.4), tapped either way.
+  if (e.attackingEach) {
+    const pid = ctx.controller;
+    for (const opp of apnap(s, opponents(s, pid))) {
+      const k = tokensToCreate(s, pid, e.token, n);
+      const defender = inCombat(s) && s.activePlayer === pid ? opp : undefined;
+      for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: true, attacking: defender });
+      if (k) log(s, `${src} creates ${k === 1 ? "a" : k} tapped${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined ? ` (attacking ${player(s, defender).name})` : ""}.`);
+    }
+    return;
+  }
   for (const pid of players(s, e.who, ctx)) {
     const k = tokensToCreate(s, pid, e.token, n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.

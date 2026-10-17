@@ -3,6 +3,7 @@ import type { CardDef } from "../types";
 import { QUOTED_SOURCE_NAME, compile } from "./compile";
 import { textKeywords, isKeywordLine } from "./keyword-abilities";
 import { parseKeywordList } from "./targets";
+import { layerOf } from "../layers";
 
 /** Can we run an ability given in quotes (a token's or one granted to something)? */
 export function compileQuoted(text: string): boolean {
@@ -22,16 +23,26 @@ export function compileGranted(text: string): CompiledCard {
 }
 
 /**
- * Can an effect give this quoted ability to an object? It has to be one triggered, activated or mana
- * ability that we can run. Static abilities given this way aren't modeled: their effects would have to
- * come out of the same layer calculation that grants them.
+ * The kinds of static abilities an effect can give an object and the engine runs (see `grantedStatics` in layers.ts and
+ * `withGranted` in cards.ts): continuous effects in layer 7 or the rules that apply after abilities are settled in layer
+ * 6 (CR 613.1f-g), cost changes, counter and token replacements, and "enters with an additional counter". Ones that
+ * change types, colors or abilities would have to come out of the same layers that grant them, so they stay out.
+ */
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional"]);
+export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => !["2", "4", "5", "6"].includes(layerOf(m)) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
+
+/**
+ * Can an effect give this quoted ability to an object? It's one ability we can run: triggered, activated or mana
+ * ("When this creature enters or leaves the battlefield" compiles to two triggers), or a static ability of the kinds above.
  */
 function grantable(text: string): boolean {
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
-  const n = c.triggers.length + c.activated.length + c.mana.length;
   const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, ...rest } = c;
-  return n === 1 && !statics.length && !entersTapped && !unsupported.length && !textKeywords.length && Object.keys(rest).length === 0;
+  const n = triggers.length + activated.length + mana.length + statics.length + Object.keys(rest).length;
+  if (n === 0 || entersTapped || unsupported.length || textKeywords.length) return false;
+  if (!Object.keys(rest).every((k) => GRANTED_FIELDS.has(k))) return false;
+  return statics.every((st) => grantedStaticOk(st.mods));
 }
 
 /**
@@ -115,6 +126,11 @@ export function parseGrants(text: string): Modification[] | null {
     // Keywords that are triggered abilities: each grant is its own instance, which triggers separately (CR 702.121b).
     if (/^melee$/i.test(w)) {
       out.push({ kind: "addAbility", text: "Melee" });
+      continue;
+    }
+    // Myriad too: several instances each trigger (CR 702.116b).
+    if (/^myriad$/i.test(w)) {
+      out.push({ kind: "addAbility", text: "Myriad" });
       continue;
     }
     // Ward is a triggered ability too (CR 702.21a); several instances each trigger (CR 702.21b).

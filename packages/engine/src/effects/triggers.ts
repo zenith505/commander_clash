@@ -1,6 +1,6 @@
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player } from "../game";
+import { checkAscend, creatureTypesOf, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
@@ -911,6 +911,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
         // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
         if (t.cast.targets && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
+        // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
+        if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
+        if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindChosen(t.cast.spell, o.chosen);
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
@@ -1418,4 +1421,24 @@ export function closeZoneBatch(s: GameState) {
   const moves = s.zoneBatch;
   s.zoneBatch = undefined;
   if (moves?.length) fireEvent(s, { type: "batch", moves });
+}
+
+/** Was this spell cast from the zone a "whenever you cast a spell from ..." trigger asks for? */
+function castFromMatches(from: NonNullable<NonNullable<TriggeredAbility["cast"]>["from"]>, spell: GameObject | undefined, caster: PlayerId): boolean {
+  const z = spell?.castFrom;
+  if (!z) return false;
+  switch (from) {
+    case "hand":
+      return z === "hand";
+    case "notHand":
+      return z !== "hand";
+    case "exile":
+      return z === "exile";
+    case "graveyard":
+      return z === "graveyard";
+    case "ownGraveyard":
+      return z === "graveyard" && spell.owner === caster;
+    case "ownLibrary":
+      return z === "library" && spell.owner === caster;
+  }
 }

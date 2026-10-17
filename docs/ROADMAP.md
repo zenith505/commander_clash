@@ -1,6 +1,6 @@
 # Roadmap
 
-19,778 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,877 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -34,18 +34,27 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      Vadrok ("you may cast target noncreature card ... without paying").
    - Merged permanents: no effect in the engine turns a merged permanent face down (CR 730.2f; mutating onto or under
      a face-down creature and turning it face up work); a merged permanent with an instant or sorcery card, flip and
-     double-faced components (730.2h-j) and stickers aren't handled. The owner doesn't choose the exile timestamps of
-     its cards (730.3b). "The second card from the top" of a library a merged permanent went to isn't asked for. A
+     double-faced components (730.2h-j) and stickers aren't handled. The owner isn't asked for the exile timestamps of
+     its cards (730.3b): nothing in the engine reads an exiled card's timestamp, so the order can't be seen. "The second card from the top" of a library a merged permanent went to isn't asked for. A
      merged token with card components under a "card" replacement (730.3e) is treated like any other merged permanent.
-     Oblation ("The owner of target nonland permanent shuffles it into their library") is unsupported.
    - Bots put the bigger body on top and cast a mutate creature for its mutate cost only when its mana cost is out of
      reach.
    Left from the round after mutate ("up to N" divided targets, merged cards leaving together, "becomes untapped"):
    - "Becomes untapped" still out on other lines: Arbiter of the Ideal (manifestation counters), Daring Thief and
      Disciple of Deceit, King Macar, Fishing Pole, Ghostly Pilferer; "become untapped" for two (Tui and La); "during
      your untap step" (The Ninth Doctor).
-   - "Commander creatures you own have ..." (the Baldur's Gate backgrounds: Acolyte of Bahamut, Candlekeep Sage, Folk
-     Hero, Noble Heritage, Raised by Giants and more) fails on the granted abilities, which vary card by card.
+   Left from the round after inspired (Backgrounds granting abilities to commanders, kinship, granted myriad, "whenever
+   you cast a spell from exile / from anywhere other than your hand", Oblation):
+   - Backgrounds still out: Dungeon Delver (room abilities trigger an additional time), Haunted One ("whenever ~
+     becomes tapped ... share a creature type with it"), Noble Heritage (protection from a player), Scion of Halaster
+     (replacing the first draw each turn), Tavern Brawler ("exile the top card ... you may play that card this turn"
+     as a granted trigger).
+   - Kinship: Leaf-Crowned Elder ("you may play that card without paying its mana cost" from the library). Once the
+     kinship creature has left the battlefield, its printed creature types are compared, not the ones it last had.
+   - "For each opponent, create ... tapped and attacking that player or a planeswalker they control" (Adeline): the
+     planeswalker choice. Granted myriad's tokens attack the player only (no planeswalker choice either).
+   - Cast-from-exile cards still out: Aerial Extortionist ("its owner may cast it" for a linked exile), Nalfeshnee
+     (copy a spell cast from exile, with a granted sacrifice ability).
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):
@@ -617,9 +626,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   attacker's among several blockers.
 - Soulbond: "whenever ~ or a creature it's paired with is dealt damage" (Donna Noble, also Doctor's companion);
   granted trigger Breathkeeper Seraph's "at the beginning of your next upkeep".
-- Backgrounds that grant static abilities (Criminal Past, Inspiring Leader, Master Chef, Raised by Giants), "enters
-  or leaves the battlefield" triggers (Candlekeep Sage, Cryogen Relic), Veteran Soldier's "tapped and attacking that
-  opponent", Faceless One. The sample decks have one commander each; two commanders (partners or a Background) work
+- Faceless One ("choose a color before the game begins"). The sample decks have one commander each; two commanders (partners or a Background) work
   in the engine and `sample-decks.json` (`secondCommander`) but no sample deck uses them yet.
 - Split second conditional on a kicker (Molten Disaster's "if it was kicked"); Shadow the Hedgehog's "if mana from an
   artifact was spent" works.

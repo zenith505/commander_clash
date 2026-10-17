@@ -3764,6 +3764,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b57e13ac-12fc-4b6a-9ca4-3ffb60c6b6ad",
+  "name": "Mudbutton Clanger",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Creature — Goblin Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Warrior"
+  ],
+  "oracleText": "Kinship — At the beginning of your upkeep, you may look at the top card of your library. If it shares a creature type with this creature, you may reveal it. If you do, this creature gets +1/+1 until end of turn.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Kinship"
+  ],
+  "commanderLegal": "legal",
+  "set": "mor",
+  "releasedAt": "2008-02-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "933afaa3-3b23-454c-9465-8f2ba9652b4f",
   "name": "Myrkul's Edict",
   "manaCost": "{1}{B}",

@@ -665,6 +665,21 @@ export function compile(d: CardDef): CompiledCard {
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), text: line });
       continue;
     }
+    // Master Chef's granted "Other creatures you control enter with an additional +1/+1 counter on them": Renata's ability
+    // in the plural. "This creature enters with an additional +1/+1 counter on it": a replacement effect on itself
+    // entering (CR 614.1c), which applies as it would exist on the battlefield (CR 614.12, rulings on Master Chef).
+    const othersPlural = new RegExp(`^Other (.+? you control) enter with (an|a|one|two|three) additional ${COUNTER} counters? on them\\.$`).exec(line);
+    if (othersPlural) {
+      const g = parseGroup(`each ${othersPlural[1]!.replace(/s you control$/, " you control")}`);
+      if (!g || g.other || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersPlural[3]!), n: /^an?$/.test(othersPlural[2]!) ? 1 : num(othersPlural[2]!), text: line });
+      continue;
+    }
+    const selfExtra = new RegExp(`^~ enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
+    if (selfExtra) {
+      (out.entersWithAdditional ??= []).push({ counter: counterKind(selfExtra[2]!), n: /^an?$/.test(selfExtra[1]!) ? 1 : num(selfExtra[1]!) });
+      continue;
+    }
     // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player". "Secretly choose an opponent"
     // (Guardian Archon): the same, but only its controller knows who until it's revealed.
     const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);

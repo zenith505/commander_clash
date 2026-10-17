@@ -654,7 +654,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (d[c.kind] !== undefined) continue;
       const candidates =
         c.kind === "sacrifice"
-          ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !(c.other && id === d.objectId) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
+          ? s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === HUMAN && !(c.other && id === d.objectId && !(c.selfIf && objectMatches(s, c.selfIf, s.objects[id]!, HUMAN, false))) && objectMatches(s, c.filter, s.objects[id]!, HUMAN, false))
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
       const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";

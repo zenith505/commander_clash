@@ -4180,6 +4180,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ec49dfcf-d16d-4621-af4b-4a6f09043221",
+  "name": "Runeclaw Bear",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Bear",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bear"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "068b3692-411b-44d4-a7e9-005262760cfc",
   "name": "Sacrifice",
   "manaCost": "{B}",
@@ -4334,6 +4364,32 @@
   "commanderLegal": "legal",
   "set": "blb",
   "releasedAt": "2024-08-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c46738a4-e0d4-41dc-a20d-4800f00cea62",
+  "name": "Seasons Past",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return any number of cards with different mana values from your graveyard to your hand. Put Seasons Past on the bottom of its owner's library.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soi",
+  "releasedAt": "2016-04-08",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false

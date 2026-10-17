@@ -230,8 +230,12 @@ export interface TargetSpec {
    * resolves (`bindBound`). Until then, any value.
    */
   bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
-  /** `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1). */
-  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn";
+  /**
+   * `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1).
+   * `couldButDidntAttack`: "creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
+   * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
+   */
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
   /**
@@ -1090,7 +1094,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), or put onto the battlefield under your control. */ dest?: "exile" | "battlefield"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), or put onto the battlefield under your control. */ dest?: "exile" | "battlefield"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1441,7 +1445,7 @@ export type Effect =
    * instead of its owner's graveyard (CR 608.2n). The owner's library is shuffled even if the card is gone (CR 701.24c).
    */
   | { type: "shuffleIntoLibrary"; what: ObjRef }
-  | { type: "shuffleSpell" }
+  | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
   | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other

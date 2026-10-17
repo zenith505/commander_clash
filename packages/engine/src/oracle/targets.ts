@@ -3,7 +3,7 @@ import { CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
 import { Ctx, addTarget } from "./body";
-import { parseCount } from "./counts";
+import { parseBoundCount, parseCount } from "./counts";
 
 /** Creature types with a hyphen, by how they read lowercased ("assembly-worker"). */
 const HYPHENATED = new Map([...CREATURE_TYPES].filter((ty) => ty.includes("-")).map((ty) => [ty.toLowerCase(), ty]));
@@ -200,7 +200,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose };
   }
   // "All creatures with toughness less than or equal to the number of Islands you control": counted as it resolves.
-  const group = parseGroup(x, false, (t) => parseCount(t, ctx));
+  const group = parseGroup(x, false, (t) => parseBoundCount(t, ctx));
   if (group && group.other && ctx.spell) {
     // A spell's "other creatures you control": other than the creature it targeted ("Put two +1/+1
     // counters on target creature you control. Other creatures you control get +1/+1"). Other than
@@ -493,8 +493,12 @@ export function parseTargetPhrase(
   if ((m = /(?:^| )with (power|toughness|mana value) (\d+|x)(?: or (greater|less))?$/.exec(p))) {
     const key = m[1] === "mana value" ? "manaValue" : (m[1] as "power" | "toughness");
     // "With mana value 2" (Spell Snare): exactly that. With X, the X it's cast or activated with (TargetSpec.xRange).
-    if (m[2] === "x" && !opts.x) return null;
-    if (m[2] === "x") extra.xRange = { key, at: m[3] === "greater" ? "least" : m[3] === "less" ? "most" : "exact" };
+    // "Destroy all creatures with mana value X or less", "search your library for a creature card with mana value X or
+    // less": compared as it resolves (TargetSpec.bound), where the amount reader takes X.
+    const xBound = m[2] === "x" && !opts.x && m[3] ? opts.count?.("X") : undefined;
+    if (xBound) extra.bound = { key, at: m[3] === "greater" ? "least" : "most", amount: xBound };
+    else if (m[2] === "x" && !opts.x) return null;
+    else if (m[2] === "x") extra.xRange = { key, at: m[3] === "greater" ? "least" : m[3] === "less" ? "most" : "exact" };
     else {
       const n = Number(m[2]);
       extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };

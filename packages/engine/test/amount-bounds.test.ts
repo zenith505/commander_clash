@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, island, passAll, plainsCard, putOnBattlefield, setup, target } from "./helpers";
-import { applyAction, controllerOf, isFullySupported, planCast, waitingOn, type CardDef, type GameState, type TargetChoice } from "../src";
+import { applyAction, controllerOf, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type TargetChoice } from "../src";
 import { moveObject } from "../src/game";
 import { nextRandom } from "../src/rng";
 
@@ -242,5 +242,66 @@ describe("amount bounds", () => {
     s.objects[me]!.tapped = false;
     s = activate(s, ap, me, 0, [target(two)]);
     expect(s.objects[two]!).toMatchObject({ zone: "battlefield", controller: ap });
+  });
+});
+
+// "With mana value X or less" for a group, a search or a card put from your hand: the X announced (CR 107.3a) or the X
+// the text defines (107.3c), compared as it resolves.
+const chord = card("Chord of Calling", "Instant", "{X}{G}{G}{G}", { keywords: ["Convoke"], oracleText: "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nSearch your library for a creature card with mana value X or less, put it onto the battlefield, then shuffle." });
+const deed = card("Pernicious Deed", "Enchantment", "{1}{B}{G}", { oracleText: "{X}, Sacrifice this enchantment: Destroy each artifact, creature, and enchantment with mana value X or less." });
+const blackSun = card("Day of Black Sun", "Sorcery", "{X}{B}{B}", { oracleText: "Each creature with mana value X or less loses all abilities until end of turn. Destroy those creatures." });
+const scourge = card("Scourge of Fleets", "Creature — Kraken", "{5}{U}{U}", { power: "6", toughness: "6", oracleText: "When this creature enters, return each creature your opponents control with toughness X or less to its owner's hand, where X is the number of Islands you control." });
+
+describe("with mana value X or less", () => {
+  it("parse", () => supported(chord, deed, blackSun, scourge));
+
+  it("Chord of Calling: the search offers only creature cards with mana value up to X", () => {
+    const { s: s0, ap, ids } = setup([chord]);
+    const lib = s0.players[ap]!.library;
+    const big = putOnBattlefield(s0, ap, ogre());
+    moveObject(s0, big, "library");
+    lib.unshift(big);
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!, [], undefined, undefined, 2)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    const cards = (s.pending as { cards: string[] }).cards;
+    expect(cards.length).toBeGreaterThan(0); // Grizzly Bears
+    expect(cards).not.toContain(big); // mana value 4
+    expect(cards.every((id) => s.cards[s.objects[id]!.cardId]!.typeLine.includes("Creature"))).toBe(true);
+  });
+
+  it("Pernicious Deed: the X paid to activate it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const d = putOnBattlefield(s0, ap, deed);
+    const two = putOnBattlefield(s0, opp, bear());
+    const four = putOnBattlefield(s0, opp, ogre());
+    let s = s0;
+    for (const a of planActivate(s, ap, d, 0, undefined, undefined, undefined, 3)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[two]!.zone).toBe("graveyard");
+    expect(s.objects[four]!.zone).toBe("battlefield");
+  });
+
+  it("Day of Black Sun: those creatures lose their abilities, then are destroyed", () => {
+    const { s: s0, ap, ids, opp } = setup([blackSun]);
+    const two = putOnBattlefield(s0, opp, bear());
+    const four = putOnBattlefield(s0, opp, ogre());
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!, [], undefined, undefined, 2)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[two]!.zone).toBe("graveyard");
+    expect(s.objects[four]!.zone).toBe("battlefield");
+  });
+
+  it("Scourge of Fleets: X is the number of Islands you control, counted as it resolves", () => {
+    const { s: s0, ap, ids, opp } = setup([scourge]); // three Islands
+    const two = putOnBattlefield(s0, opp, bear());
+    const four = putOnBattlefield(s0, opp, ogre());
+    const mine = putOnBattlefield(s0, ap, bear());
+    const s = cast(s0, ap, ids[0]!);
+    expect(s.objects[two]!.zone).toBe("hand");
+    expect(s.objects[four]!.zone).toBe("battlefield");
+    expect(s.objects[mine]!.zone).toBe("battlefield");
   });
 });

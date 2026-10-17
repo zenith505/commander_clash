@@ -43,7 +43,7 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   const p = phrase.replace(/\bcards\b/g, "card");
   // "A card with mana value less than or equal to the number of lands you control" (Beseech the Queen): counted as the
   // search resolves (TargetSpec.bound).
-  const bound = count && / with (?:mana value|power|toughness) (?:less|greater) than or equal to .+$/i.exec(p);
+  const bound = count && (/ with (?:mana value|power|toughness) (?:less|greater) than or equal to .+$/i.exec(p) ?? / with (?:mana value|power|toughness) X or (?:less|greater)$/.exec(p));
   if (bound) {
     const head = parseSearchFilter(p.slice(0, bound.index));
     const spec = head !== null && parseTargetPhrase(`card${bound[0]} from your graveyard`, { count });

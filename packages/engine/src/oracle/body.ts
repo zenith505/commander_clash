@@ -1262,6 +1262,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       last.loseAtEnd = true;
       continue;
     }
+    // "~ deals 4 damage to target creature. The damage can't be prevented." (CR 615.12)
+    if (/^The damage can't be prevented$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "damage") return null;
+      last.unpreventable = true;
+      continue;
+    }
     // "It can't be regenerated." / "They can't be regenerated." after a destroy (CR 701.19c), "That creature", "Those
     // creatures", "Creatures destroyed this way", "A creature destroyed this way".
     if (/^(?:It|They|The creature|That (?:creature|artifact|permanent|Wall)|Those (?:creatures|permanents)|(?:Creatures|A creature) destroyed this way) can't be regenerated$/i.test(s)) {
@@ -1445,6 +1452,12 @@ function mentionsTarget(v: unknown, i: number): boolean {
  * add targets of its own (see gateNewTargets).
  */
 function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = false): { effects: Effect[]; instead: boolean } | null {
+  // "instead ~ deals 6 damage to that permanent or player and the damage can't be prevented" (Lightning Surge, CR 615.12).
+  if (/^instead,? .+ and the damage can't be prevented$/i.test(text)) {
+    const r = parseKicked(text.replace(/ and the damage can't be prevented$/i, ""), previous, ctx, newTargets);
+    if (!r?.instead || r.effects.length !== 1 || r.effects[0]!.type !== "damage") return null;
+    return { effects: [{ ...r.effects[0]!, unpreventable: true }], instead: true };
+  }
   let t = text;
   const instead = /^instead,? /i.test(t) || / instead$/i.test(t);
   t = t.replace(/^instead,? /i, "").replace(/ instead$/i, "");
@@ -1463,7 +1476,7 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     return { effects: [...first, ...second], instead };
   }
   // "~ deals 2 damage to any target. If ~ was kicked, it deals 5 damage instead": the same damage, more of it.
-  const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|it))?$/.exec(t);
+  const more = /^(?:It|~) deals (\d+|X) damage(?: to (?:that creature|that player|that permanent or player|it))?$/.exec(t);
   if (more && instead) {
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "damage") return null;

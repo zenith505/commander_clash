@@ -658,6 +658,8 @@ export type Modification =
   | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }
   /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
   | { kind: "damageMod"; mod: DamageMod }
+  /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
+  | { kind: "unpreventable"; combat?: true }
   /** "Can't block creatures with power 2 or greater" (a blocking restriction on the blocker, CR 509.1b). */
   | { kind: "cantBlockCreatures"; filter: TargetSpec }
   /** "Can't be blocked by more than one creature" (CR 509.1b). */
@@ -943,7 +945,7 @@ export type Effect =
    * `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). `evenly`: "divided evenly,
    * rounded down, among any number of targets" (Fireball): among the targets still legal as it resolves, nothing chosen.
    */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true }
+  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true; /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */

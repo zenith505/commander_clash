@@ -825,6 +825,14 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // Prevention (CR 615.1): "Prevent all combat damage that would be dealt to ~", "Prevent all damage that would be dealt
   // by enchanted creature", "... to and dealt by enchanted creature", "... to ~ by creatures".
+  // "Damage that would be dealt by ~ can't be prevented" (Excruciator), "Combat damage that would be dealt by creatures
+  // you control can't be prevented" (Questing Beast), "Combat damage can't be prevented" (Frenzied Baloth): only
+  // creatures deal combat damage (CR 510.1), so that's all creatures' (CR 615.12).
+  const unprev = /^(Combat d|D)amage that would be dealt by (.+) can't be prevented$/.exec(text) ?? (/^Combat damage can't be prevented$/.test(text) ? ["", "Combat d", "creatures"] : null);
+  if (unprev) {
+    const affects = unprev[2] === "~" ? ({ kind: "self" } as const) : parseAffected(capital(unprev[2]!));
+    return affects ? { affects, mods: [{ kind: "unpreventable", ...(unprev[1] === "Combat d" ? { combat: true as const } : {}) }], text: line } : null;
+  }
   const damageMod = parseDamageMod(line);
   if (damageMod) return damageMod;
   const prevent = parsePreventAll(text);

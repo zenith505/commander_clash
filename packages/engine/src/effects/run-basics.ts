@@ -89,7 +89,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             })
           : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
-      const from = ctxSource(s, ctx);
+      const from = { ...ctxSource(s, ctx), ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
       const events: DamageEvent[] = [

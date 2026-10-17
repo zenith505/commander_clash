@@ -119,6 +119,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "greatestDrawn":
       // Opponents who have left the game too (rulings).
       return Math.max(0, ...s.players.filter((p) => p.id !== ctx.controller).map((p) => (p.draws?.turn === s.turn ? p.draws.n : 0)));
+    case "playersAttacked":
+      return s.players.filter((p) => !p.lost && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent)).length;
     case "drawnThisTurn":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.draws?.turn === s.turn ? s.players[pid]!.draws!.n : 0), 0);
     case "cardsInHand":
@@ -455,6 +457,8 @@ function describeCount(c: Count): string {
       return "the greatest number of cards an opponent has drawn this turn";
     case "drawnThisTurn":
       return "#cards drawn this turn";
+    case "playersAttacked":
+      return "#players being attacked";
     case "treasureSpent":
       return "mana from Treasures spent";
     case "snowSpent":

@@ -148,6 +148,8 @@ export type Count =
   | { kind: "greatestControlled"; filter: TargetSpec; opponents?: true }
   /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
   | { kind: "greatestDrawn" }
+  /** "For each player being attacked" (Pack Attack): players a creature is attacking, not their planeswalkers (CR 506.2, 508.3b). */
+  | { kind: "playersAttacked" }
   /** "The number of cards you've drawn this turn" (Duelist of the Mind), "they've drawn this turn" (Cerebral Vortex). */
   | { kind: "drawnThisTurn"; who: PlayerRef }
   /** "For each mana from a Treasure spent to cast it/~" (CR 106.3): the spell's, its permanent's, or an ability's. */

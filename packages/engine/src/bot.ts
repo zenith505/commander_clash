@@ -1558,6 +1558,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   const follows = then?.type === "if" && then.cond.kind === "youDid" ? then.effects : [];
   for (const inner of allEffects([...e.effects, ...follows])) {
     if (inner.type === "may") continue;
+    if (inner.type === "reflexive") {
+      v += reflexiveWorth(s, pid, inner.body, r.item.sourceId);
+      continue;
+    }
     if (inner.type === "becomeCopy") {
       v += copyGain(s, pid, inner) >= 0 ? 1 : -2;
       continue;
@@ -1583,6 +1587,18 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     else v += 1;
   }
   return v >= 0;
+}
+
+/**
+ * Whether a reflexive trigger ("When you do, ...", CR 603.12) is worth doing what triggers it: it needs a sensible mode
+ * and sensible targets, chosen as it's put on the stack; with none, it's removed (CR 603.3c-d) and the payment is wasted.
+ */
+function reflexiveWorth(s: GameState, pid: PlayerId, body: AbilityBody, sourceId: ObjectId | undefined): number {
+  if (body.modal) return chooseModes(s, pid, body, false, sourceId) ? 1 : -2;
+  const t = body.targets.length ? chooseTargets(s, pid, body, false, sourceId) : [];
+  if (!t || (body.targets.length && !t.some((x) => x.kind !== "none"))) return -2;
+  // Removal is worth a spare creature: on the same scale as what "you may sacrifice" costs (see wantsMay).
+  return Math.max(1, modeValue(s, pid, body, t) / 3);
 }
 
 /** A permanent's printed worth, to compare what a copy effect would make it: size for creatures, else mana value. */

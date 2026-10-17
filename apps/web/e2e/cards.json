@@ -742,6 +742,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "27c2b8ce-17b9-4f6c-8444-3bdc636dd413",
+  "name": "Cavalier of Night",
+  "manaCost": "{2}{B}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Knight"
+  ],
+  "oracleText": "Lifelink\nWhen this creature enters, you may sacrifice another creature. When you do, destroy target creature an opponent controls.\nWhen this creature dies, return target creature card with mana value 3 or less from your graveyard to the battlefield.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "m20",
+  "releasedAt": "2019-07-12",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df2738fe-9cd1-4347-8808-105fcfde1190",
   "name": "Circle of Protection: Red",
   "manaCost": "{1}{W}",
@@ -4682,6 +4715,38 @@
   "commanderLegal": "legal",
   "set": "war",
   "releasedAt": "2019-05-03",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1817acd5-5ed0-47b8-8e56-4715a488867e",
+  "name": "Sparktongue Dragon",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you may pay {2}{R}. When you do, it deals 3 damage to any target.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "m19",
+  "releasedAt": "2018-07-13",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

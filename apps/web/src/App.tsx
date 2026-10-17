@@ -3491,7 +3491,8 @@ function Controls({
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
     const theirs = pending.of !== undefined && pending.of !== HUMAN ? s.players[pending.of]!.name : undefined;
     const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : theirs ? "return to their owner's hand" : "return to your hand";
-    const an = `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
+    // "other creature" reads "another creature".
+    const an = /^other /.test(pending.what) ? `an${pending.what}` : `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
     // Devour: any number of them; exploit: none or one (pending.min).
     const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
     const n = discards.length;

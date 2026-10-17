@@ -597,6 +597,8 @@ export interface PendingTrigger {
   x?: number;
   /** A reflexive trigger after a roll ("roll a d20. When you do, ... where X is the result"): that result. */
   rolled?: number;
+  /** A reflexive trigger after "you may sacrifice another creature": that creature as it last existed (CR 608.2h). */
+  sacrificed?: LastKnown[];
   kicked?: number[];
   colorsSpent?: number;
   /** What its trigger event was about: the damage dealt ("that much"), the player dealt it ("that player"). */
@@ -1150,6 +1152,8 @@ export interface Resolving {
   next: number;
   /** Whether the last "you may ..." was done, for a following "If you do, ..." (CR 608.2c). */
   did?: boolean;
+  /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
+  sacrificedThisWay?: LastKnown[];
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   wonClash?: boolean;
   /** Its last coin flip (CR 705.2): won or lost, and how many were won ("flip a coin until you lose a flip"). */

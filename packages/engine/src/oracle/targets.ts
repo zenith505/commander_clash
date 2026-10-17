@@ -149,7 +149,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (/^the creature$/i.test(x) && ctx.lastObjectTarget !== undefined && ctx.targets.filter((t) => t.kind === "object").length === 1 && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget };
   // "Create a token that's a copy of target artifact. That token gains haste" (Cogwork Assembler), "put an artifact card
   // from your hand onto the battlefield. That artifact gains haste" (Arms Race): the one just created or put there.
-  if (ctx.lastCreated && (/^(?:that|the) token$/i.test(x) || (ctx.lastPut && /^that (?:artifact|enchantment|land|[A-Z][a-z]+)$/.test(x)))) return { ref: "created" };
+  if (ctx.lastCreated && (/^(?:that|the) token$/i.test(x) || (ctx.lastPut && /^[Tt]hat (?:artifact|enchantment|land|[A-Z][a-z]+)$/.test(x)))) return { ref: "created" };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };

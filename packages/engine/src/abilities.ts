@@ -1499,7 +1499,8 @@ export type Effect =
    * "When you do, ..." (CR 603.12): a reflexive triggered ability, triggered by doing what the "you may" before it said.
    * It's put on the stack the next time a player would receive priority, its targets chosen then (603.3d).
    */
-  | { type: "reflexive"; body: AbilityBody }
+  /** `sacrificed`: "the sacrificed creature" / "that creature" in it is what the ability sacrificed (Heart-Piercer Manticore). */
+  | { type: "reflexive"; body: AbilityBody; sacrificed?: true }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
@@ -1669,6 +1670,13 @@ export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
+  /**
+   * The source is still on the battlefield as the same object (CR 400.7), with `yours` under your control: "Sacrifice ~.
+   * When you do, ..." can be done (CR 701.21a).
+   */
+  | { kind: "selfHere"; yours?: true }
+  /** Your library has at least `n` cards, so "mill n cards" mills them all ("Mill three cards. When you do, ..."). */
+  | { kind: "libraryHas"; n: number }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
   /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */

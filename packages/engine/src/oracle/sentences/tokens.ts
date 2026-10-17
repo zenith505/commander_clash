@@ -18,12 +18,15 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Another player can create them: "Target opponent creates three 2/2 white Knight creature tokens", "each opponent
   // creates ..." (Hunted Dragon, Forbidden Orchard): that player creates and controls them (CR 111.2). "You create" after
   // another player's instruction (No Way Out) is the plain "create".
-  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
+  // "... creature token with flying and haste named Hornet" (Hornet Cannon), "... tokens named Cadet": that name rather than
+  // its subtypes (CR 111.4).
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const token = parseToken(Number(m[4]), Number(m[5]), m[6]!, m[7]);
-    const how = `${m[3] ?? ""} ${m[8] ?? ""}`;
+    const how = `${m[3] ?? ""} ${m[9] ?? ""}`;
     const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}) };
-    return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token, ...state }] : null;
+    const named = m[8] ? { name: m[8], named: true as const } : {};
+    return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token: { ...token, ...named }, ...state }] : null;
   }
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
   // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name

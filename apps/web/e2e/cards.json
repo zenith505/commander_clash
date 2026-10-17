@@ -3304,6 +3304,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "deeb942b-cf50-43f7-90a9-bdce4e42123a",
+  "name": "Memoricide",
+  "manaCost": "{3}{B}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a nonland card name. Search target player's graveyard, hand, and library for any number of cards with that name and exile them. Then that player shuffles.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "10e0ccdf-9a31-402a-9fbf-f501ce63fa52",
   "name": "Merciless Harlequin",
   "manaCost": "{2}{B}",
@@ -3861,6 +3887,28 @@
   "commanderLegal": "legal",
   "set": "uma",
   "releasedAt": "2018-12-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a188fe7e-68de-4c7c-806c-bfe8fc7b44bf",
+  "name": "Pithing Needle",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "As this artifact enters, choose a card name.\nActivated abilities of sources with the chosen name can't be activated unless they're mana abilities.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

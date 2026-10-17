@@ -1,4 +1,4 @@
-import type { CompiledCard, ManaAbility, TriggeredAbility } from "./abilities";
+import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
 import { characteristics, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId } from "./types";
@@ -165,6 +165,8 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   let own = withGranted(c.hasPrintedAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, c.grantedAbilities);
   // Decayed's triggered ability (CR 702.147a), however it got the keyword: printed, granted, or from a decayed counter.
   if (c.keywords.includes("Decayed")) own = withDecayed(own);
+  // "{U}: Counter target spell with the chosen name" (Declaration of Naught): its targets are the name chosen for it.
+  if (o.chosen?.name !== undefined) own = withChosenName(own, o.chosen.name);
   // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
@@ -194,6 +196,20 @@ const cipherTrigger = (name: string, e: { id: ObjectId; zc: number }): Triggered
   event: "selfDealsCombatDamageToPlayer",
   body: { targets: [], effects: [{ type: "castCipher", card: e.id, zc: e.zc }], text: `Whenever ~ deals combat damage to a player, you may copy the encoded card (${name}) and you may cast the copy without paying its mana cost.` },
 });
+
+const named = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+/** Activated abilities whose targets are "with the chosen name", with that name filled in (TargetSpec.chosen "name"). */
+function withChosenName(base: CompiledCard, name: string): CompiledCard {
+  if (!base.activated.some((a) => a.body.targets.some((t) => t.chosen === "name"))) return base;
+  let byName = named.get(base);
+  if (!byName) named.set(base, (byName = new Map()));
+  let hit = byName.get(name);
+  if (!hit) {
+    const bind = (t: TargetSpec): TargetSpec => (t.chosen === "name" ? (({ chosen: _, ...rest }) => ({ ...rest, named: name }))(t) : t);
+    byName.set(name, (hit = { ...base, activated: base.activated.map((a) => ({ ...a, body: { ...a.body, targets: a.body.targets.map(bind) } })) }));
+  }
+  return hit;
+}
 
 const merged = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
 /** A card's abilities plus granted ones (`grantedAbilities` texts), after them in that order. */

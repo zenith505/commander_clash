@@ -26,6 +26,8 @@ function sourceKind(t: string): { spec: TargetSpec; spell?: true } | null {
   }
   const extra = { ...(colors.length ? { colors } : {}), ...(you ? { controller: "you" as const } : {}) };
   if (rest === "source") return { spec: { kind: "object", ...extra, text: t } };
+  // "Sources with the chosen name" (Gideon's Intervention): the name chosen as the permanent entered (CR 201.4).
+  if (rest === "source with the chosen name" && !colors.length) return { spec: { kind: "object", chosen: "name", ...extra, text: t } };
   if (rest === "source an opponent controls" && !colors.length) return { spec: { kind: "object", controller: "opponent", text: t } };
   const typed = /^(Giant|instant or sorcery|artifact|creature) source$/.exec(rest);
   if (typed) {
@@ -96,7 +98,12 @@ function parseTo(t: string | undefined, attached: boolean): DamageMod["to"] | nu
  * deal combat damage, it deals double that damage instead"). Null when the line isn't one, or isn't fully understood.
  */
 export function parseDamageMod(line: string): StaticAbility | null {
-  const text = line.replace(/\.$/, "").replace(/^[A-Z][A-Za-z' -]+ — (?=If )/, "");
+  const text = line
+    .replace(/\.$/, "")
+    .replace(/^[A-Z][A-Za-z' -]+ — (?=If )/, "")
+    // Gideon's Intervention: "Prevent all damage that would be dealt to you and permanents you control by sources with the
+    // chosen name" is the same prevention, for each source (CR 615.1a).
+    .replace(/^Prevent all damage that would be dealt to you and permanents you control by sources with the chosen name$/, "If a source with the chosen name would deal damage to you or a permanent you control, prevent that damage");
   const OP = "(double that damage|twice that much damage|triple that damage|half that damage, rounded down|that much damage (?:plus|minus) (?:\\d+|X|an amount of damage equal to .+?))";
   const m = new RegExp(
     `^[Ii]f (.+?) would deal (combat |noncombat )?damage(?: to (.+?))?(?: while (.+?))?, (?:(?:it|that source) deals ${OP}(?:,? to (?:that (?:permanent or player|player or permanent|player|creature|permanent)|you|~|equipped creature|enchanted creature))? instead|instead it deals ${OP})(?:, where X is (.+))?$`,

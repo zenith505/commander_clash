@@ -97,3 +97,18 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   const { owner: _owner, ...rest } = spec;
   return { ...rest, text: p };
 }
+
+/**
+ * "A card name", "any card name", "a nonland card name", "a card name other than a basic land card name" (CR 201.4):
+ * the cards whose names may be chosen, by their Oracle characteristics (201.4a); `names` undefined for any card.
+ * Null when it isn't understood.
+ */
+export function parseCardNameChoice(phrase: string): { names?: TargetSpec } | null {
+  const m = /^(?:an?|any) ((?:[a-z]+(?:, | ))*?)card name( other than a basic land card name)?$/.exec(phrase);
+  if (!m) return null;
+  const words = m[1]!.trim();
+  const filter = words ? parseSearchFilter(`${words} card`) : undefined;
+  if (filter === null || (words && !filter)) return null;
+  const names: TargetSpec | undefined = m[2] ? { ...(filter ?? { kind: "card" }), notSupertypes: [...(filter?.notSupertypes ?? []), "Basic"], text: `${words ? `${words} ` : ""}card other than a basic land card` } : filter;
+  return names ? { names } : {};
+}

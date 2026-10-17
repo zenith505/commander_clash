@@ -147,6 +147,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const cond = parseStaticCondition(condText, self);
     return cond ? { lessIf: { n: Number(n), cond } } : "fail";
   }
+  // "Spells with the chosen name cost {3} more to cast" (Disruptor Flute), "Spells your opponents cast with the chosen name
+  // ..." (Anointed Peacekeeper), "... you cast cost {2} less" (Council of the Absolute), "Spells with the chosen name
+  // enchanted player casts ..." (Curse of Silence): the name chosen as the permanent entered (CR 201.4).
+  if ((m = /^Spells( your opponents cast)? with the chosen name( you cast| enchanted player casts)? cost \{(\d+)\} (less|more) to cast$/.exec(text)) && !(m[1] && m[2])) {
+    const who = m[1] ? "opponents" : m[2] === " you cast" ? "you" : m[2] ? "enchanted" : "all";
+    return { costMod: { who, filter: { kind: "spell", chosen: "name", text: "spells with the chosen name" }, n: Number(m[3]) * (m[4] === "less" ? -1 : 1), text: line } };
+  }
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with mana value \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();

@@ -142,6 +142,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "handToTop") return [{ type: "handToTop", player: pid, objectIds: chooseDiscards(s, pid, pend.count).reverse() }];
     // Free from the hand: the most expensive card is the best deal.
     // From an opponent's revealed hand: take their most expensive card.
+    // Memoricide's search: every card with the name it can take; from the hand last, which may give that player cards back.
+    if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
+      const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => rank(a) - rank(b)).slice(0, pend.max) }];
+    }
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // Hideaway: the most expensive card, to play for free later.
@@ -264,6 +269,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const key = best && auraHostKey(best);
       return [{ type: "chooseOption", player: pid, choice: key && pend.options.includes(key) ? key : pend.options[0]! }];
     }
+    if (pend.kind === "chooseOption" && pend.what === "cardName") return [{ type: "chooseOption", player: pid, choice: chooseCardName(s, pid, pend) }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
@@ -1772,6 +1778,62 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     }
   }
   return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? options[0]!;
+}
+
+/**
+ * Name a card (CR 201.4), from what it's for (NamePurpose) and only what this player could know: its own cards, and
+ * the cards other players have shown (on the battlefield, in graveyards, face up in exile, commanders, spells).
+ */
+function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "chooseOption" }>): string {
+  const options = new Set(pend.options);
+  const nameOf = (o: GameObject) => defOf(s, o).name;
+  const tally = (ids: readonly ObjectId[]) => {
+    const n = new Map<string, number>();
+    for (const id of ids) {
+      const o = s.objects[id];
+      if (o && !o.isToken && options.has(nameOf(o))) n.set(nameOf(o), (n.get(nameOf(o)) ?? 0) + 1);
+    }
+    return n;
+  };
+  const most = (n: Map<string, number>) => [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+  const me = player(s, pid);
+  const mine = new Set([...me.hand, ...me.library, ...me.graveyard, ...me.command, ...s.battlefield.filter((id) => obj(s, id).owner === pid)].map((id) => nameOf(obj(s, id))));
+  const best = (ids: readonly ObjectId[], score: (o: GameObject) => number) => {
+    let pick: string | undefined;
+    let top = -Infinity;
+    for (const id of ids) {
+      const o = s.objects[id];
+      if (!o || o.isToken || o.faceDown || !options.has(nameOf(o))) continue;
+      const v = score(o);
+      if (v > top) [pick, top] = [nameOf(o), v];
+    }
+    return pick;
+  };
+  const value = (o: GameObject) => manaValue(parseManaCost(defOf(s, o).manaCost)) + (isType(defOf(s, o), "Land") ? -5 : 0);
+  if (pend.purpose === "guess") {
+    // The top card of a library: our own most common card left there; someone else's, what they've shown most of.
+    const who = pend.of ?? pid;
+    const seen = who === pid ? me.library : [...s.battlefield.filter((id) => obj(s, id).owner === who), ...player(s, who).graveyard];
+    return most(tally(seen)) ?? pend.options[0]!;
+  }
+  if (pend.purpose === "guessHand") return most(tally(me.hand)) ?? pend.options[0]!;
+  if (pend.purpose === "find") return best(me.library, value) ?? pend.options[0]!;
+  if (pend.purpose === "own") return best([...me.hand, ...me.library], (o) => value(o) + (o.zone === "hand" ? 10 : 0)) ?? pend.options[0]!;
+  const opps = pend.purpose === "theirs" && pend.of !== undefined && pend.of !== pid ? [pend.of] : opponents(s, pid);
+  const shown = opps.flatMap((x) => [...player(s, x).command, ...player(s, x).graveyard, ...player(s, x).exile.filter((id) => !obj(s, id).faceDown), ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x)]);
+  const card = pend.objectId ? compileCard(defOf(s, obj(s, pend.objectId))) : undefined;
+  const silences = !!card?.nameBans?.some((b) => b.kind === "activate") || !!card?.activationTaxes;
+  const pick = best(shown, (o) => {
+    let v = value(o) - (mine.has(nameOf(o)) ? 20 : 0);
+    // A commander comes back again and again; an activated ability matters most to what stops activations.
+    if (o.zone === "command") v += 8;
+    // A hand, graveyard and library are what "theirs" reaches (Cabal Therapy, Memoricide): a singleton deck's card already
+    // on the battlefield or in the command zone has no other copy there, but one in the graveyard is exiled with them.
+    if (pend.purpose === "theirs") v += o.zone === "graveyard" ? 6 : -14;
+    if (silences) v += o.zone === "battlefield" && abilitiesOf(s, o).activated.some((a) => !a.mana) ? 15 : -10;
+    return v;
+  });
+  return pick ?? pend.options.find((n) => !mine.has(n)) ?? pend.options[0]!;
 }
 
 /** Rough value of one mode for a bot: removal and card advantage first. */

@@ -19,6 +19,7 @@ import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES, type SourceQuality } from "./keywords";
 import { spendPlan } from "./value";
+import { cardNameOptions, currentName, nameActivationBan, nameCastBan, nameLandBan } from "./names";
 import {
   COLORS,
   RulesError,
@@ -1671,6 +1672,8 @@ function startNextTurn(s: GameState) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
+  if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
+  if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
   for (const p of s.players) {
@@ -2279,6 +2282,8 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
   if (!canActAtSorcerySpeed(s, p.id)) throw new RulesError("lands can only be played at sorcery speed");
   if (p.landsPlayedThisTurn >= landsAllowed(s, p.id)) throw new RulesError("already played a land this turn"); // CR 305.2
+  const banned = nameLandBan(s, p.id, d);
+  if (banned) throw new RulesError(banned);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
@@ -2506,8 +2511,8 @@ export function castProblem(
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
-  // A spell's colors are its card's (CR 702.16b), and it's a spell ("can't be the target of spells").
-  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, spell: true };
+  // A spell's colors and name are its card's (CR 702.16b, 201.2), and it's a spell ("can't be the target of spells").
+  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name, spell: true };
   if (spell?.modal) {
     if (modes === undefined) {
       if (!canChooseModes(s, spell, pid, sq)) return `${d.name} has no mode that can be chosen`;
@@ -2652,12 +2657,12 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     const c = characteristics(s, src);
     if (!c.hasPrintedAbilities) continue;
     for (const m of mods) {
-      if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : false) continue;
+      if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : m.who === "enchanted" ? src.attachedToPlayer !== pid : false) continue;
       if (m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
       if (m.notOwned && o.owner === pid) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
-      const { manaValue: range, ...rest } = m.filter;
+      const { manaValue: range, ...rest } = bindChosen(m.filter, src.chosen);
       if (!printedMatches(rest, d)) continue;
       if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
@@ -3094,6 +3099,8 @@ const spliceMana = (s: GameState, ids: ObjectId[] = []) => ids.map((c) => compil
 function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
   const epic = player(s, pid).cantCastSpells;
   if (epic) return `${epic}: you can't cast spells for the rest of the game`;
+  const named = nameCastBan(s, pid, d);
+  if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
     if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
@@ -3585,6 +3592,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
   } else if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
+  const banned = nameActivationBan(s, o, !!ab.mana); // Pithing Needle, in any zone (rulings)
+  if (banned) return banned;
   if (ab.mana) {
     // A mana ability: with priority, or while paying mana for something (CR 605.3a), even under split second (702.61b).
     if (!(s.priority === pid && !s.pending) && !(paysManaNow(s) && waitingOn(s) === pid)) return "you can't activate mana abilities now";
@@ -3660,7 +3669,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
  * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
  */
 export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
-  const cost = parseManaCost(ab.manaCost);
+  const cost0 = parseManaCost(ab.manaCost);
+  // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
+  // (CR 602.2b applies 601.2f).
+  const more = ab.mana ? 0 : activationTax(s, o);
+  const cost = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
   if (!ab.equip && !ab.costLess) return cost;
   let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
@@ -3682,6 +3695,19 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
   const g = splitGeneric(cost, 0);
   const left = Math.max(0, g.extra - less);
   return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...g.cost.symbols] };
+}
+
+/** What permanents' "activated abilities [of sources with the chosen name] cost {2} more to activate" add (CompiledCard.activationTaxes). */
+function activationTax(s: GameState, o: GameObject): number {
+  let n = 0;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    for (const tax of abilitiesOf(s, src).activationTaxes ?? []) {
+      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || currentName(s, o) !== src.chosen.name : !!tax.filter) continue;
+      n += tax.n;
+    }
+  }
+  return n;
 }
 
 /** Creatures that could crew this Vehicle: other untapped creatures you control (CR 702.122a). */
@@ -4412,6 +4438,17 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "chooseOption", player: to, source: defOf(s, o).name, what: "tributePay", options: ["pay", "no"], labels: [`Put ${n} +1/+1 counter${n === 1 ? "" : "s"} on it`, "Don't"], objectId: o.id, prompt: `pay tribute ${n}? If you don't, its "if tribute wasn't paid" ability triggers` };
+      return true;
+    }
+    if (c.what === "cardName") {
+      // "As ~ enters, choose a nonland card name" (CR 614.12, 201.4).
+      const options = cardNameOptions(s, c.names);
+      if (!options.length) {
+        q.shift();
+        if (c.enters) fireEvent(s, { type: "enters", id: o.id, ...c.enters });
+        continue;
+      }
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;
     }
     s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id };
@@ -5550,7 +5587,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   for (const id of [...p.hand, ...exilePlayable(s, pid), ...topPlayable(s, pid)]) {
     const d = defOf(s, obj(s, id));
     if (isType(d, "Land")) {
-      if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid)) out.push({ type: "playLand", player: pid, objectId: id });
+      if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !nameLandBan(s, pid, d)) out.push({ type: "playLand", player: pid, objectId: id });
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
@@ -5558,7 +5595,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   }
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
-    for (const id of p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid)) out.push({ type: "playLand", player: pid, objectId: id });
+    for (const id of p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid) && !nameLandBan(s, pid, defOf(s, obj(s, id)))) out.push({ type: "playLand", player: pid, objectId: id });
   for (const id of p.command) if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
   for (const id of s.battlefield) {
     const o = obj(s, id);

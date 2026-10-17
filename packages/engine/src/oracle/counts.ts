@@ -101,6 +101,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
+  // "For each card exiled from their hand this way" (Lost Legacy), after its exileNamed instruction.
+  if (each && /^card exiled from (?:their|your) hand this way$/i.test(p)) return count({ kind: "exiledFromHandThisWay" });
   // "For each player being attacked", "the number of opponents being attacked" (Pack Attack, Dimir Strandcatcher).
   if (/^(?:players?|opponents?) being attacked$/i.test(p)) return count({ kind: "playersAttacked" });
   // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
@@ -121,6 +123,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Card types among cards in all graveyards" (Tarmogoyf), "in your graveyard", "in your opponents' graveyards" (CR 205.2a).
   if ((m = /^card types? among cards in (your|all|your opponents') graveyards?$/i.exec(p)))
     return count({ kind: "graveyardCardTypes", who: { ref: m[1] === "your" ? "you" : m[1] === "all" ? "eachPlayer" : "eachOpponent" } as PlayerRef });
+  // "Cards named ~ in all graveyards" (Kindle), "for each card named ~ in each graveyard" (Rite of Flame), "in your graveyard".
+  if ((m = /^cards? named ~ in (your|all|each) graveyards?$/i.exec(p)))
+    return count({ kind: "cardsInGraveyard", who: { ref: m[1] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" } });
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
   if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their) graveyards?$/i.exec(p))) {
     const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : whosePlayer(m[2]!, ctx);

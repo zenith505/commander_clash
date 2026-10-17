@@ -99,6 +99,10 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // "Exile target creature card from a graveyard. Its owner creates ..." (Pharika): whose card it is (CR 108.3).
   const lastCard = ctx.targets.length - 1;
   if ((x === "its owner" || x === "that card's owner") && ctx.targets[lastCard]?.kind === "card" && ctx.targets.filter((t) => t.kind === "card").length === 1 && !ctx.targets[lastCard]!.many) return { ref: "targetOwner", index: lastCard };
+  // "Destroy target creature. Its owner gains 4 life" (Path of Peace): whose it is, whoever controls it (rulings, CR 108.3).
+  if (x === "its owner" && ctx.lastObjectTarget === lastCard && ctx.targets[lastCard]?.kind === "object" && !ctx.targets[lastCard]!.many) return { ref: "targetOwner", index: lastCard };
+  // "Destroy target land. ~ deals 2 damage to that land's controller" (Melt Terrain): as it last existed (CR 608.2h).
+  if (x === "that land's controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && isLandSpec(ctx.targets[ctx.lastObjectTarget]!)) return { ref: "targetController", index: ctx.lastObjectTarget };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -706,4 +710,9 @@ export function parseKeywordList(text: string): string[] | null {
     out.push(k);
   }
   return out;
+}
+
+/** A target that can only be a land: "target land", "target Mountain", "target Plains or Island". */
+function isLandSpec(t: TargetSpec): boolean {
+  return t.kind === "object" && (!!t.types?.includes("Land") || (!!t.subtypes?.length && t.subtypes.every((x) => BASIC_TYPES.includes(x))));
 }

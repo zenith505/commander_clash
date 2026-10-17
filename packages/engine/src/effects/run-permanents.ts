@@ -75,6 +75,26 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         else untapPermanent(s, o);
       }
       return;
+    case "untapUpTo": {
+      // Chosen as it resolves among the tapped ones (CR 608.2d), then untapped together.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.chosen?.[ctx.controller]) {
+        const n = amountNow(s, e.n, ctx);
+        const options = s.battlefield.filter((id) => obj(s, id).tapped && objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+        if (n <= 0 || !options.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "untap", what: `tapped ${e.filter.text}`, options, count: Math.min(n, options.length), min: 0 };
+        return "paused";
+      }
+      const ids = sc.chosen[ctx.controller]!;
+      sc.chosen = undefined;
+      sc.queue = undefined;
+      for (const id of ids) if (s.objects[id]?.zone === "battlefield") untapPermanent(s, obj(s, id));
+      if (ids.length) log(s, `${player(s, ctx.controller).name} untaps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      return;
+    }
     case "tapOrUntap": {
       // Its controller chooses as it resolves (CR 608.2d); an illegal target isn't asked about (CR 608.2b).
       const o = objects(s, e.what, ctx).find((x) => x.zone === "battlefield");

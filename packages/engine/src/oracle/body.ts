@@ -94,7 +94,7 @@ function thenSubject(first: string, next: string): string {
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
+const PAUSING = new Set<Effect["type"]>(["discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
@@ -264,7 +264,7 @@ function revealedAction(text: string, ctx: Ctx): Effect[] | null {
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
     // Not about the card: "draw a card" (Track Down, Thrasios).
-    if (/(?:it|its|that card|that card's)/.test(text)) return null;
+    if (/\b(?:it|its|that card|that card's)\b/.test(text)) return null;
     const before = ctx.targets.length;
     const fx = parseSentence(text.charAt(0).toUpperCase() + text.slice(1), ctx);
     return fx && ctx.targets.length === before && !allEffects(fx).some((e) => PAUSING.has(e.type)) ? fx : null;
@@ -334,6 +334,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   }
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
+  // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
+  text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.

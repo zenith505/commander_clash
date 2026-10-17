@@ -31,7 +31,7 @@ export interface FaceDownPlay {
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -756,7 +756,7 @@ export type StaticCondition =
   /** A Class's level (CR 716.2a): at least `min`, at most `max`; a permanent without a level is level 1 (716.2d). */
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
-  | { kind: "self"; is: "attacking" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" }
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1150,6 +1150,11 @@ export type Effect =
   /** "~ assigns no combat damage this turn" (CR 510.1). */
   | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
+  /**
+   * "Untap up to seven lands" (Palinchron, Snap): its controller chooses as it resolves, among any player's tapped lands
+   * (not targeted, rulings), from none up to `n`.
+   */
+  | { type: "untapUpTo"; n: Amount; filter: TargetSpec }
   /**
    * "Tap or untap target permanent": its controller chooses which as it resolves (CR 608.2d); `may`: "you may tap or
    * untap", where doing neither is a choice too (one question).
@@ -1839,6 +1844,17 @@ export type TriggerEvent =
   // forms trigger once for each creature it blocks or is blocked by, which is their subject.
   | "selfBlocks"
   | "selfBecomesBlocked"
+  /**
+   * "Whenever a creature blocks" (Battle Strain: anyone's) and "Whenever a creature you control becomes blocked" (Somberwald
+   * Alpha): once for each such creature, its subject, which `subjectFilter` describes relative to this permanent's controller.
+   */
+  | "creatureBlocks"
+  | "creatureBecomesBlocked"
+  /**
+   * "Whenever a creature deals damage to you" (Dread), "Whenever a source an opponent controls deals damage to you" (Michiko
+   * Konda): once for each source dealing damage to this permanent's controller (CR 603.2c), see `damagesYou`.
+   */
+  | "dealsDamageToYou"
   /** "Whenever ~ attacks and isn't blocked": after blockers are declared, if no creature blocks it (rulings). */
   | "selfAttacksUnblocked"
   /** "Whenever ~ attacks alone" (CR 506.5): it's the only creature declared as an attacker. */
@@ -1973,9 +1989,22 @@ export interface TriggeredAbility {
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
-  attacker?: { filter: TargetSpec; other?: boolean; /** "Whenever a creature attacks": anyone's (Caltrops, Righteous Cause). */ anyone?: true };
+  attacker?: {
+    filter: TargetSpec;
+    other?: boolean;
+    /** "Whenever a creature attacks": anyone's (Caltrops, Righteous Cause). */
+    anyone?: true;
+    /** "Whenever a creature attacks you" (Briar Patch): this permanent's controller; "or a planeswalker you control" (Isperia) too. */
+    attacksYou?: "player" | "orPlaneswalker";
+  };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
+  /**
+   * For "dealsDamageToYou": a source that's a permanent fitting `subjectFilter` (the subject, "it", "that creature"), or
+   * any source with `by` saying whose ("a source an opponent controls": the event player, "that player", is its
+   * controller); `combat`: only combat damage.
+   */
+  damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
   /**
@@ -2022,6 +2051,8 @@ export interface TriggeredAbility {
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
   ifNotRenowned?: boolean;
+  /** "Whenever ~ deals combat damage to a player or planeswalker" (Psychic Frog): also to a planeswalker, once each. */
+  orPlaneswalker?: true;
   /** "When ~ enters, if it was kicked, ..." (an intervening if, CR 603.4). */
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */

@@ -108,11 +108,13 @@ export type TriggerSourceEvent =
   | { type: "attacksAlone"; id: ObjectId }
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
-  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** With `planeswalker`, the damage was dealt to that planeswalker, and `player` controls it. */
+  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; planeswalker?: ObjectId }
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number }
   /** A permanent dealt damage to a player, in combat or not. */
-  | { type: "damagedPlayer"; source: ObjectId; player: PlayerId; amount: number; combat: boolean }
+  /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
+  | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
@@ -463,6 +465,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Blocks" and "becomes blocked" trigger once each; "blocks a creature" / "becomes blocked by a creature"
     // once for each such creature, which is the trigger's subject (CR 509.3c-d).
     const fits = (t: TriggeredAbility, subject: GameObject, you: PlayerId) => !t.subjectFilter || objectMatches(s, t.subjectFilter, subject, you, false);
+    // "Whenever a creature blocks", "whenever a creature you control becomes blocked": every permanent watching for it,
+    // once for each such creature.
+    const watchers = s.battlefield.map((id) => obj(s, id));
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const event = o.blocking ? "creatureBlocks" : o.attacking !== undefined && o.blockedBy?.length ? "creatureBecomesBlocked" : undefined;
+      if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o);
+    }
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
@@ -607,6 +617,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");
   } else if (ev.type === "attacks") {
     const o = obj(s, ev.id);
+    // Is it attacking `pid` ("attacks you"), or them or a planeswalker they control (CR 506.2: `attacking` is then the
+    // planeswalker's controller)?
+    const attackingYou = (a: GameObject, pid: PlayerId) => ({ player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid });
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
     add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
@@ -616,7 +629,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const wc = controllerOf(s, w);
-      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && objectMatches(s, t.attacker.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+      const at = attackingYou(o, wc);
+      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, t.attacker.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     }
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
@@ -693,6 +707,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you), undefined, undefined, undefined, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToPlayer", undefined, o, info);
     }
+    // "Whenever a creature deals damage to you", "Whenever a source an opponent controls deals damage to you": the damaged
+    // player's permanents, once for each source. A permanent source is the subject; whose source it is, the event player.
+    const fromPermanent = o?.zone === "battlefield" ? o : undefined;
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) !== ev.player) continue;
+      const fits = (t: TriggeredAbility) => {
+        const d = t.damagesYou;
+        if (!d || (d.combat && !ev.combat)) return false;
+        if (d.by) return d.by === "any" || (d.by === "you") === (ev.by === ev.player);
+        return !!fromPermanent && (!t.subjectFilter || objectMatches(s, t.subjectFilter, fromPermanent, ev.player, false));
+      };
+      add(w, ev.player, (e, t) => e === "dealsDamageToYou" && fits(t), undefined, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
+    }
   } else if (ev.type === "damagedCreature") {
     const o = s.objects[ev.source];
     const hit = s.objects[ev.id];
@@ -708,6 +736,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
     }
+  } else if (ev.type === "combatDamageToPlayer" && ev.planeswalker) {
+    // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orPlaneswalker, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };

@@ -619,6 +619,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {
       if (cond.is === "attacking") return src.attacking !== undefined;
+      // CR 506.5: "attacking alone" means it's attacking and no other creature is.
+      if (cond.is === "attackingAlone") return src.attacking !== undefined && !s.battlefield.some((id) => id !== src.id && s.objects[id]!.attacking !== undefined);
       // "~ has hexproof as long as it's untapped" (Paradise Druid): tapping it doesn't change the effects' cache key otherwise.
       if (cond.is === "tapped" || cond.is === "untapped") return src.tapped === (cond.is === "tapped");
       if (cond.is === "devoured") return (src.devoured ?? 0) > 0;

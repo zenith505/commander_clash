@@ -165,7 +165,7 @@ export function dealDamage(
     if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
-    if (src.id) fireEvent(s, { type: "damagedPlayer", source: src.id, player: p.id, amount: n, combat: !!opts.combat });
+    fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
     if (opts.combat) {
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its
@@ -781,6 +781,22 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     else out.set(k, { src: e.src, to: e.to, n: e.n, ...(e.combat ? { combat: true } : {}) });
   }
   return { ops, final: [...out.values()] };
+}
+
+/**
+ * How much of `n` damage from a permanent to a permanent or player would be dealt if it were dealt now, for bots weighing
+ * attacks and blocks: after the damage amount replacements and prevention it would meet (Furnace of Rath, Torbran, Dark
+ * Sphere, Fog, protection, shields and shield counters, CR 614.1a, 615), each choice made the way a bot makes it.
+ * Nothing changes.
+ */
+export function damageEstimate(s: GameState, from: GameObject, to: Rec, n: number, combat = true): number {
+  if (n <= 0) return 0;
+  const src = objectSource(s, from);
+  const prev = canPreventDamage(s) && !unpreventable(src, combat);
+  if (combat && s.preventCombatDamage && prev) return 0;
+  if ("object" in to && prev && s.objects[to.object] && abilitiesOf(s, obj(s, to.object)).phantom) return 0;
+  const k = recKey(to);
+  return planShields(s, [{ src, to, n, ...(combat ? { combat: true as const } : {}) }], [], true).final.filter((e) => recKey(e.to) === k).reduce((a, e) => a + e.n, 0);
 }
 
 /**

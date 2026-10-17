@@ -155,6 +155,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!pay || (pay.mana && !plainMana(pay.mana))) return null;
     return [{ type: "may", effects: [], pay, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} to keep ~` }];
   }
+  // "Tap ~ unless you pay 1 life" (Carnophage): chosen as it resolves; paying while it's tapped is allowed and doesn't
+  // untap it (rulings).
+  if ((m = /^[Tt]ap ~ unless you pay (\d+ life)$/.exec(s))) {
+    const pay = parsePayCost(m[1]!);
+    if (!pay) return null;
+    return [{ type: "may", effects: [], pay, otherwise: [{ type: "tap", what: { ref: "self" } }], keep: true, text: `Pay ${m[1]} to keep ~ untapped` }];
+  }
   // "Sacrifice ~ unless you discard a card" (Masticore), "sacrifice it unless you discard a card at random" (Balduvian
   // Horde): the choice is made on resolution; with no card to discard, it's sacrificed (rulings).
   if ((m = /^[Ss]acrifice (~|it) unless you discard a card( at random)?$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {

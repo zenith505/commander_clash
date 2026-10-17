@@ -1,7 +1,7 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
 import type { Effect, ObjRef } from "../../abilities";
-import { NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
+import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
 import { pickFilter, parseGroup, parseObject, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
@@ -35,6 +35,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "tap", what }, { type: "skipUntap", what }] : null;
   }
+  // "Untap up to seven lands" (Palinchron), "You untap up to six lands" (Time Spiral): chosen as it resolves (CR 608.2d),
+  // anyone's (rulings).
+  if ((m = new RegExp(`^(?:You )?[Uu]ntap up to ${NUM} lands?$`).exec(s))) return [{ type: "untapUpTo", n: num(m[1]!), filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" } }];
   // "Tap or untap target permanent" (Twiddle, Pestermite): which is chosen as it resolves (CR 608.2d).
   if ((m = /^Tap or untap ((?:another )?target .+|that creature|it|~|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

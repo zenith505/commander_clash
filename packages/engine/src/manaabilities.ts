@@ -244,13 +244,24 @@ export function mayExhaustAgain(s: GameState, pid: PlayerId): boolean {
   return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && !!abilitiesOf(s, s.objects[id]!).exhaustAgain);
 }
 
+/**
+ * "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments"
+ * (Grand Abolisher, Myrel): why `pid` can't activate an ability of `o`, or null. Only permanents on the battlefield,
+ * mana abilities too; cards in other zones (cycling, unearth) aren't stopped (rulings).
+ */
+export function abolisherBan(s: GameState, pid: PlayerId, o: GameObject): string | null {
+  if (o.zone !== "battlefield" || pid === s.activePlayer || !["Artifact", "Creature", "Enchantment"].some((t) => objIsType(s, o, t))) return null;
+  const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === s.activePlayer && abilitiesOf(s, obj(s, id)).opponentsCantActivateYourTurn);
+  return src ? `${characteristics(s, obj(s, src)).name}: opponents can't activate abilities of artifacts, creatures or enchantments during ${player(s, s.activePlayer).name}'s turn` : null;
+}
+
 export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, index: number, ignorePool = false, tap?: ObjectId[]): string | null {
   const ab = manaAbilitiesOn(s, o)[index];
   const name = characteristics(s, o).name;
   if (!ab) return `${name} has no such mana ability`;
   if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (characteristics(s, o).cantActivate === "all") return `${name}'s activated abilities can't be activated`; // Arrest: mana abilities too (CR 605.1a)
-  const banned = nameActivationBan(s, o, true); // Phyrexian Revoker: mana abilities too
+  const banned = nameActivationBan(s, o, true) ?? abolisherBan(s, pid, o); // Phyrexian Revoker, Grand Abolisher: mana abilities too
   if (banned) return banned;
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6

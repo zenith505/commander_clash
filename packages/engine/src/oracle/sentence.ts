@@ -7,7 +7,7 @@ import { parseSearchFilter } from "./search";
 import { parseKeywordList, parseObject } from "./targets";
 import { parseGrants } from "./grants";
 import { parseBasicsSentence } from "./sentences/basics";
-import { parseZonesSentence } from "./sentences/zones";
+import { parseEveryPlayerZonesSentence, parseZonesSentence } from "./sentences/zones";
 import { parsePermanentsSentence } from "./sentences/permanents";
 import { parseTokensSentence } from "./sentences/tokens";
 import { parseSpellsSentence } from "./sentences/spells";
@@ -95,6 +95,8 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   }
   // "Then each player who drew a card this way gains 1 life" (Kwain): those who chose to.
   if (ctx.eachChose && (m = /^(?:Then )?[Ee]ach player who drew a card this way gains (\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "choseThisWay" }, n: Number(m[1]) }];
+  const whole = parseEveryPlayerZonesSentence(s, ctx);
+  if (whole) return whole;
   const list = parseTargetList(s, ctx);
   if (list !== undefined) return list;
   for (const parse of SENTENCE_PARSERS) {

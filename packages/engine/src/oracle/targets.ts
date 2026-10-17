@@ -20,6 +20,14 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
+  // Bonfire of the Damned: "... to target player or planeswalker and each creature that player or that planeswalker's
+  // controller controls": the creatures of the player it targets, or of the planeswalker's controller.
+  if (/^each creature that player or that planeswalker's controller controls$/i.test(p)) {
+    const i = ctx.targets.length - 1;
+    const t = ctx.targets[i];
+    if (t?.kind !== "any" || !t.types?.includes("Planeswalker")) return null;
+    return { ref: "each", filter: { kind: "object", types: ["Creature"], text: "creature" }, of: { ref: "targetOrController", index: i } };
+  }
   // "any other target", "another target": not one of the targets before it, or with none, not the
   // source (CR 115.4). "Each of two targets", "each of up to two targets" (CR 115.3, 115.6).
   if (/^(any other target|another target)$/i.test(p)) {
@@ -71,6 +79,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
+  // "Whenever ~ deals combat damage to an opponent, it deals that much damage to each other opponent" (Hydra Omnivore).
+  // The trigger parsers write "each other opponent" this way only when the event's player is an opponent.
+  if (x === "each opponent other than that player" && ctx.eventPlayer) return { ref: "otherOpponents" };
   // "Whenever ~ deals combat damage to a player, they lose half their life" (Unstoppable Slasher): that player, while no
   // other player has been named.
   if (x === "they" && ctx.eventPlayer && ctx.lastPlayerTarget === undefined && !ctx.chosenOpponent) return { ref: "eventPlayer" };

@@ -50,6 +50,13 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const text = `${m[3]!} ${who}`;
     return { count: { kind: "greatestPower", filter: { ...spec, text }, ...(m[2] ? { other: true as const } : {}), ...(m[1] === "toughness" ? { toughness: true as const } : {}), ...(whose ? { whose } : {}) } };
   }
+  // "The total power of creatures you control" (Ghalta, Primal Hunger), "... of creatures you control with flying" (The
+  // Lord of the Eagles): a sum, so a negative power takes some off (rulings).
+  if (!each && (m = /^the total (power|toughness) of (creatures you control(?: with [a-z]+)?)$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[2]!.replace(/^creatures/, "creature"), { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return { count: { kind: "greatestPower", total: true, filter: { ...spec, text: m[2]! }, ...(m[1] === "toughness" ? { toughness: true as const } : {}) } };
+  }
   // "For each death vote", "the number of profit votes": the votes for that word in the ability's vote (CR 701.38).
   if ((m = /^(?:the number of )?(.+?) votes?$/i.exec(p)) && ctx?.vote?.options?.includes(m[1]!)) return { count: { kind: "votes", option: m[1]! } };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").

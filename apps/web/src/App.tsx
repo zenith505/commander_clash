@@ -3534,7 +3534,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>Dredge:</strong> draw a card, or mill instead to return a card from your graveyard to your hand?
+          <strong>Dredge:</strong> {pending.archive ? "Alhammarret's Archive would make this draw two cards. Dredge first instead, milling to return a card from your graveyard to your hand?" : "draw a card, or mill instead to return a card from your graveyard to your hand?"}
           {pending.left > 1 ? ` (${pending.left} draws left)` : ""}
         </span>
         {options.map((id) => {
@@ -3546,7 +3546,7 @@ function Controls({
           );
         })}
         <button className="ghost" onClick={() => dispatch([{ type: "dredge", player: HUMAN }])}>
-          Draw
+          {pending.archive ? "Draw two instead (Archive first)" : "Draw"}
         </button>
       </div>
     );

@@ -950,6 +950,10 @@ export function compile(d: CardDef): CompiledCard {
       out.extraLands = (out.extraLands ?? 0) + num(extraLand[1]!);
       continue;
     }
+    if (line === "Each player may play an additional land on each of their turns.") {
+      out.extraLandsEach = (out.extraLandsEach ?? 0) + 1;
+      continue;
+    }
     // Clones: "You may have ~ enter as a copy of any creature on the battlefield[, except ...]." (CR 707.5)
     // Cursed Mirror: "As ~ enters, you may have it become a copy of any creature on the battlefield until end of
     // turn, except it has haste" also becomes the copy as it enters (rulings), for the rest of the turn.
@@ -1135,7 +1139,20 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     if (/^You have no maximum hand size\.$/.test(line)) {
-      out.noMaxHandSize = true;
+      out.noMaxHandSize = out.noMaxHandSize || true;
+      continue;
+    }
+    if (/^Players have no maximum hand size\.$/.test(line)) {
+      out.noMaxHandSize = "all";
+      continue;
+    }
+    // "You can't cast creature spells" (Steel Golem), "noncreature spells" (Nikya of the Old Ways): a "can't" that wins
+    // over any "can" (CR 101.2); putting creatures onto the battlefield isn't casting them (rulings).
+    const cantCast = /^You can't cast (creature|noncreature) spells\.$/.exec(line);
+    if (cantCast) {
+      const filter = parseTargetPhrase(`${cantCast[1]} spell`);
+      if (filter?.kind !== "spell") out.unsupported.push(raw);
+      else (out.youCantCast ??= []).push({ ...filter, text: `${cantCast[1]} spell` });
       continue;
     }
     // Mana that isn't lost as steps and phases end (CR 500.4): "Players don't lose unspent mana" (Upwelling), "You don't lose
@@ -1296,6 +1313,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
+      continue;
+    }
+    if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
+      out.opponentsCantCastYourTurn = true;
+      out.opponentsCantActivateYourTurn = true;
       continue;
     }
     // "~ has flash as long as you've committed a crime this turn" (Take for a Ride), "You may cast ~ as though it had

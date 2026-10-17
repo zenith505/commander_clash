@@ -343,6 +343,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "eventPlayer":
       return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
+    case "otherOpponents":
+      return opponents(s, ctx.controller).filter((p) => p !== ctx.event?.player);
     case "enchantedPlayer": {
       // The player this Aura is attached to, or was as it last existed (CR 608.2h).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -391,6 +393,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const t = ctx.targets[ref.index];
       const o = ctx.legal[ref.index] && t?.kind === "object" ? s.objects[t.id] : undefined;
       return o ? [o.owner] : [];
+    }
+    case "targetOrController": {
+      const t = ctx.targets[ref.index];
+      return players(s, { ref: t?.kind === "player" ? "target" : "targetController", index: ref.index }, ctx);
     }
     case "targetController": {
       const t = ctx.targets[ref.index];
@@ -530,6 +536,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "increaseSpeed":
     case "ascend":
     case "gainLife":
+    case "exchangeLife":
     case "loseLife":
     case "addCombatMana":
     case "addMana":
@@ -573,6 +580,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "putInLibrary":
     case "putInGraveyard":
     case "exileGraveyard":
+    case "livingDeath":
+    case "putAllOnBottom":
+    case "returnFaceDownExiled":
     case "flicker":
     case "returnExiled":
     case "exileIfDies":

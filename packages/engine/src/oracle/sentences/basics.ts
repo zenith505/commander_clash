@@ -16,6 +16,19 @@ import { parsePreventAll } from "../statics";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Exchange life totals with target opponent" (Mirror Universe), "two target players exchange life totals" (Axis of
+  // Mortality): CR 701.12c.
+  if ((m = /^[Ee]xchange life totals with (target opponent|target player)$/.exec(s))) {
+    const b = parsePlayer(m[1]!, ctx);
+    return b ? [{ type: "exchangeLife", a: { ref: "you" }, b }] : null;
+  }
+  if (/^(?:Have t|T)wo target players exchange life totals$/.test(s)) {
+    const first = addTarget(ctx, { kind: "player", text: "target player" });
+    const second = addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first] });
+    ctx.lastPlayerTarget = undefined;
+    return [{ type: "exchangeLife", a: { ref: "target", index: first }, b: { ref: "target", index: second } }];
+  }
+
   // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
   // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search
   // their library (CR 701.23a); a permanent found comes under your control.
@@ -410,8 +423,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const to = addDivided(ctx, m[1]!, m[2]!, m[3]!);
     return to && [{ type: "preventNext", n: to.amount, to: { ref: "anyTarget", index: to.index, n: to.n }, divided: true }];
   }
-  // Damage: "~ deals 3 damage to any target"
-  if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+)$`, "i").exec(s))) {
+  // Damage: "~ deals 3 damage to any target"; "it deals that much damage to each other opponent" after "Whenever a
+  // commander you control deals combat damage to an opponent" (Kediss): that creature deals it.
+  const bySubject = ctx.subjectIt && !ctx.selfIt ? new RegExp(`^(?:it|that creature) deals ${NUMX} damage to (.+)$`, "i").exec(s) : null;
+  if ((m = bySubject ?? new RegExp(`^~ deals ${NUMX} damage to (.+)$`, "i").exec(s))) {
     // "to each creature and each player": dealt to all of them at once (CR 120.3).
     const tos: DamageRecipient[] = [];
     // "To target creature and each other creature with the same name as that creature" is one recipient.
@@ -420,7 +435,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       if (!to) return null;
       tos.push(to);
     }
-    return [{ type: "damage", amount: amt(m[1]!), to: tos[0]!, ...(tos.length > 1 ? { also: tos.slice(1) } : {}) }];
+    return [{ type: "damage", amount: amt(m[1]!), to: tos[0]!, ...(tos.length > 1 ? { also: tos.slice(1) } : {}), ...(bySubject ? { by: "subject" as const } : {}) }];
   }
   // Drawing
   if ((m = new RegExp(`^(?:You )?[Dd]raw ${NUMX} cards?$`).exec(s))) return [{ type: "draw", who: { ref: "you" }, n: amt(m[1]!) }];

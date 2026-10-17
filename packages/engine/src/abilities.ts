@@ -136,7 +136,15 @@ export type Count =
    * "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). `toughness`: "the greatest
    * toughness among". `whose`: "among creatures they control" (Inscription of Abundance), that player's creatures only.
    */
-  | { kind: "greatestPower"; filter: TargetSpec; other?: boolean; toughness?: true; whose?: PlayerRef }
+  | {
+      kind: "greatestPower";
+      filter: TargetSpec;
+      other?: boolean;
+      toughness?: true;
+      whose?: PlayerRef;
+      /** "The total power of creatures you control" (Ghalta): the sum, a negative power taking some off (rulings). */
+      total?: true;
+    }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   | { kind: "greatestManaValue"; filter: TargetSpec }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
@@ -487,9 +495,13 @@ export type PlayerRef =
   | { ref: "eachOpponent" }
   | { ref: "eachPlayer" }
   | { ref: "targetController"; index: number } // "its controller"
+  /** "That player or that planeswalker's controller" (Bonfire of the Damned): the target player, or the target planeswalker's controller. */
+  | { ref: "targetOrController"; index: number }
   | { ref: "targetOwner"; index: number } // "its owner": a targeted card's owner (Pharika's "Its owner creates ...")
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
   | { ref: "eventPlayer" }
+  /** "Each other opponent" after "Whenever ~ deals combat damage to an opponent": this ability's controller's opponents but that one. */
+  | { ref: "otherOpponents" }
   /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
   | { ref: "enchantedPlayer" }
   /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
@@ -916,8 +928,8 @@ export type StaticCondition =
   | { kind: "libraryAtMost"; n: number }
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
   | { kind: "opponentPoison"; n: number }
-  /** Raid: "if you attacked this turn" (with one or more creatures). */
-  | { kind: "attackedThisTurn" }
+  /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
+  | { kind: "attackedThisTurn"; not?: true }
   /** "If you've committed a crime this turn" (CR 700.13). */
   | { kind: "committedCrime" }
   /** A Case's solved designation (CR 719.3b): "Solved — [ability]" (702.169); `not`: a "To solve" trigger's "this Case is not solved" (719.3a). */
@@ -994,11 +1006,26 @@ export type Effect =
    * `divided`: each target of `to` is dealt the part of the amount chosen for it (CR 601.2d). `evenly`: "divided evenly,
    * rounded down, among any number of targets" (Fireball): among the targets still legal as it resolves, nothing chosen.
    */
-  | { type: "damage"; amount: Amount; to: DamageRecipient; also?: DamageRecipient[]; divided?: true; evenly?: true; /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true }
+  | {
+      type: "damage";
+      amount: Amount;
+      to: DamageRecipient;
+      also?: DamageRecipient[];
+      divided?: true;
+      evenly?: true;
+      /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
+      /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
+      by?: "subject";
+    }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
+  /**
+   * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
+   * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
+   */
+  | { type: "exchangeLife"; a: PlayerRef; b: PlayerRef }
   | { type: "destroy"; what: ObjRef; noRegen?: boolean } // "It can't be regenerated."
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | { type: "regenerate"; what: ObjRef }
@@ -1048,6 +1075,12 @@ export type Effect =
    * not those exiled earlier in this resolution).
    */
   | { type: "moveLinked"; dest: "hand" | "graveyard"; one?: true; yours?: true; other?: true }
+  /**
+   * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
+   * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
+   * the same objects in exile (CR 400.7).
+   */
+  | { type: "returnFaceDownExiled"; cards?: { id: ObjectId; zc: number }[] }
   /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
@@ -1176,6 +1209,17 @@ export type Effect =
    */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
+  /**
+   * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
+   * they control, then puts all cards they exiled this way onto the battlefield." Each part for all players at once
+   * (rulings); only the cards the first part exiled come back, under their owners' (the exilers') control.
+   */
+  | { type: "livingDeath" }
+  /**
+   * "Put all creatures on the bottom of their owners' libraries" (Terminus): all at once (rulings); each owner orders
+   * their cards first, without revealing the order (CR 401.4).
+   */
+  | { type: "putAllOnBottom"; filter: TargetSpec }
   | { type: "tap"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
@@ -2767,6 +2811,13 @@ export interface CompiledCard {
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   opponentsCantCastYourTurn?: true;
+  /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
+  youCantCast?: TargetSpec[];
+  /**
+   * "During your turn, your opponents can't ... activate abilities of artifacts, creatures, or enchantments" (Grand
+   * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
+   */
+  opponentsCantActivateYourTurn?: true;
   /**
    * "You may cast ~ as though it had flash if you pay {2} more to cast it.": cast any time a sorcery couldn't have been,
    * its total cost is this much more (CR 601.2f).
@@ -2858,8 +2909,8 @@ export interface CompiledCard {
    * CR 302.6): {T} abilities of creatures that came under your control this turn. They don't gain haste (rulings).
    */
   creatureAbilitiesHaste?: true;
-  /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup. */
-  noMaxHandSize?: boolean;
+  /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
+  noMaxHandSize?: boolean | "all";
   /**
    * Unspent mana not lost as steps and phases end (CR 500.4): kept by `who` (only mana of `color`, if given: Leyline
    * Tyrant's red), or with `becomes`, a replacement effect: it becomes that type of mana instead and is kept (Kruphix's
@@ -2937,6 +2988,8 @@ export interface CompiledCard {
   countMods?: CountMod[];
   /** "You may play an additional land on each of your turns." (CR 305.2a): one more land each turn per such ability. */
   extraLands?: number;
+  /** "Each player may play an additional land on each of their turns." (Rites of Flourishing): the same for every player. */
+  extraLandsEach?: number;
   /** The same, only while each condition holds (a Class level's, CR 716.2a). */
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */

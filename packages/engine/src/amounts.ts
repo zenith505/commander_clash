@@ -316,7 +316,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (c.other && id === ctx.sourceId) continue;
         const ch = view(o);
         if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) {
-          best = Math.max(best, c.toughness ? ch.toughness : ch.power);
+          const n = c.toughness ? ch.toughness : ch.power;
+          best = c.total ? best + n : Math.max(best, n);
         }
       }
       return best;
@@ -458,7 +459,7 @@ function describeCount(c: Count): string {
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":
-      return `the greatest ${c.toughness ? "toughness" : "power"} among ${c.other ? "other " : ""}${c.filter.text}`;
+      return `the ${c.total ? "total" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestManaValue":
       return `the greatest mana value among ${c.filter.text}`;
     case "kicked":

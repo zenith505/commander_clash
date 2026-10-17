@@ -9,6 +9,23 @@ import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPE
 import { parseUnlessPays, type Ctx } from "../body";
 import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
 
+/**
+ * Whole sentences about every player's cards that other templates would take apart (tried before them), or undefined.
+ */
+export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | undefined {
+  if (s === "Put all creatures on the bottom of their owners' libraries") return [{ type: "putAllOnBottom", filter: { kind: "object", types: ["Creature"], text: "creature" } }];
+  // Living Death: each part for all players at once (rulings, Effect livingDeath).
+  if (s === "Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath" }];
+  if (ctx.spell) return undefined;
+  // Memory Jar: each player's hand, face down, then everyone draws seven (CR 608.2c); at the next end step, everyone
+  // discards their hand and gets back the cards they exiled (only the same objects, CR 400.7).
+  if (s === "Each player exiles all cards from their hand face down and draws seven cards")
+    return [{ type: "exileFaceDown", from: "hand", who: { ref: "eachPlayer" } }, { type: "draw", who: { ref: "eachPlayer" }, n: 7 }];
+  if (s === "At the beginning of the next end step, each player discards their hand and returns to their hand each card they exiled this way")
+    return [{ type: "delayed", when: "nextEndStep", effects: [{ type: "discard", who: { ref: "eachPlayer" }, n: 0, hand: true }, { type: "returnFaceDownExiled" }], text: "each player discards their hand and returns to their hand each card they exiled this way" }];
+  return undefined;
+}
+
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
@@ -314,6 +331,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
   if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)
     return [{ type: "returnLinked", dest: /^the battlefield/i.test(m[1]!) ? "battlefield" : "hand" }];
+  // Parallax Wave: "When ~ leaves the battlefield, each player returns to the battlefield all cards they own exiled with
+  // it": the same, the cards its own exile ability took, under their owners' control (CR 607.2a, 610.3).
+  if ((m = /^[Ee]ach player returns to (the battlefield|their hand) all cards they own exiled with (?:it|~)$/.exec(s)) && ctx.selfCard)
+    return [{ type: "returnLinked", dest: m[1] === "the battlefield" ? "battlefield" : "hand" }];
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
   // Hideaway (CR 702.75a): "You may play the exiled card without paying its mana cost", the card its hideaway exiled;

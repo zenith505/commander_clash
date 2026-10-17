@@ -1,6 +1,6 @@
 # Roadmap
 
-19,971 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,029 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -57,8 +57,6 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (other lines). Suspend Aggression and Elite Spellbinder ("its owner may play it until the end of their next turn",
      "look at target opponent's hand. You may exile a nonland card from it"), Extraordinary Journey.
    - Choreographed Sparks ("this spell can't be copied").
-   - Alhammarret's Archive always applies before dredge on the same draw (CR 616.1 lets the player order them;
-     dredging first only means drawing fewer cards).
    Left from the round after tempting offers (Show and Tell's hidden picks, "each player may search / scry / draw",
    "any player may activate this ability", "any player may ... If a player does / If no one does", Scion of Halaster's
    replacement order, Adeline with a token doubler):
@@ -72,6 +70,22 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Kwain's "each player who drew a card this way" counts those who chose to draw, even from an empty library.
    - Hypergenesis and Eureka (each player in turn puts a card in, again until no one does) are still out: their cards
      enter one at a time, and as-enters choices wait until the spell finishes resolving.
+   Left from the round after Show and Tell (Alhammarret's Archive and dredge in either order, Grand Abolisher, Living
+   Death, Parallax Wave, Memory Jar, life swaps, Glacial Chasm, Terminus, Bonfire of the Damned, "each other opponent",
+   a trigger's creature as the damage source, Steel Golem and Nikya, Rites of Flourishing, Curious Obsession):
+   - Life swaps still out: Mister Negative and Profane Transfusion (what the swap's difference does next), Psychic
+     Transfer ("if the difference is 5 or less"). Also out: Personal Sanctuary, Parallax Nexus, Heart of Bogardan,
+     Spirit of Resistance.
+   - "Each other opponent" still out: Vincent ("if Vincent's power is 7 or greater" checked as it resolves, with its
+     last-known power once it's gone), Kosei and Human Torch (the ability inside other text), Parapet Thrasher ("one or
+     more Dragons"), Shredder ("for each other opponent").
+   - "~ didn't attack this turn" (Air Nomad Student, Mad Dog, Erg Raiders) and "you can't cast" variants other than
+     creature or noncreature spells are still out. Ward costs still out: pay life equal to its power, {2} plus 2 life,
+     sacrifice a legendary artifact or creature, discard a card.
+   - A creature that has left the battlefield deals its trigger's damage with its last-known name, colors, types and
+     keywords (lifelink, deathtouch, infect); a "can't be prevented" it had then isn't kept.
+   - Bots cast Living Death, Terminus and Memory Jar by their usual rough value, without weighing whose creatures or
+     hands they help.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):

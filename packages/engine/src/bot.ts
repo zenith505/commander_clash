@@ -116,7 +116,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "drawLook", player: pid, objectId: bin }];
     }
     if (pend.kind === "dredge") {
-      const pick = chooseDredge(s, pid, pend.options);
+      // With an Alhammarret's Archive too, the Archive first: each of the two draws it makes can still be dredged.
+      const pick = pend.archive ? undefined : chooseDredge(s, pid, pend.options);
       return [{ type: "dredge", player: pid, ...(pick ? { objectId: pick } : {}) }];
     }
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
@@ -621,6 +622,23 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
         out.push(pick);
         continue;
       }
+    }
+    // "Exchange life totals with target opponent", "two target players exchange life totals": us and the player with
+    // the most life, when that's more than ours.
+    const exchange = allEffects(body.effects).find((e): e is Extract<Effect, { type: "exchangeLife" }> => e.type === "exchangeLife" && [e.a, e.b].some((r) => r.ref === "target" && r.index === i));
+    if (exchange && spec.kind === "player") {
+      const mine = player(s, pid).life;
+      const richest = all.filter((t) => t.kind === "player" && t.id !== pid).sort((a, b) => player(s, b.id as PlayerId).life - player(s, a.id as PlayerId).life)[0];
+      const ourSlot = exchange.a.ref === "target" && exchange.a.index === i && exchange.b.ref === "target";
+      const me = all.find((t) => t.kind === "player" && t.id === pid);
+      const pick = ourSlot ? me : richest;
+      if (!pick || (!forced && (!richest || player(s, richest.id as PlayerId).life <= mine))) {
+        if (!forced) return null;
+        out.push(all[0] ?? { kind: "none" });
+        continue;
+      }
+      out.push(pick);
+      continue;
     }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
     const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
@@ -1915,6 +1933,17 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "loseLife":
         v += e.who.ref === "you" ? -estimate(e.n) / 2 : estimate(e.n);
         break;
+      case "exchangeLife": {
+        // The life we'd gain (or lose) by taking the other player's total.
+        const who = (r: typeof e.a) => {
+          const t = r.ref === "target" ? targets[r.index] : undefined;
+          return r.ref === "you" ? pid : t?.kind === "player" ? t.id : undefined;
+        };
+        const [a, b] = [who(e.a), who(e.b)];
+        if (a === pid && b !== undefined) v += (player(s, b).life - player(s, pid).life) / 2;
+        else if (b === pid && a !== undefined) v += (player(s, a).life - player(s, pid).life) / 2;
+        break;
+      }
       case "createToken":
         v += e.who.ref === "you" ? 3 * estimate(e.n) : 0;
         break;

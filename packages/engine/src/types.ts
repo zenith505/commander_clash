@@ -874,7 +874,20 @@ export type PendingDecision =
        */
       instead?: { archive?: number; dredge?: ObjectId[] };
     }
-  | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; /** Of those, draws this one already stands for (Alhammarret's Archive). */ ready?: number; after?: "drawStep" }
+  | {
+      kind: "dredge";
+      player: PlayerId;
+      options: ObjectId[];
+      left: number;
+      /** Of those, the draws after this one that a replacement already made (Alhammarret's Archive), each with how many Archives can still replace it. */
+      made?: number[];
+      /**
+       * Alhammarret's Archives that could replace this draw too (CR 616.1): not dredging applies one of them, "draw two
+       * cards instead", rather than drawing.
+       */
+      archive?: number;
+      after?: "drawStep";
+    }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
    * mulligans this player has taken so far; `bottomIfKept` how many cards keeping now costs.
@@ -1152,7 +1165,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all" }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors. */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[] } }>;
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
@@ -1336,6 +1349,7 @@ export interface Resolving {
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
+    bottomOrders?: Record<string, ObjectId[]>; // putAllOnBottom: each owner's order, asked before anything moves
     ordered?: boolean; // "reorder your graveyard as you choose" asked already (graveyard.ts)
     forced?: ObjectId[]; // exileNamed's "all cards with that name" in the public graveyard, found without a choice (CR 701.23b)
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)

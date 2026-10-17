@@ -103,7 +103,9 @@ export function parseDamageMod(line: string): StaticAbility | null {
     .replace(/^[A-Z][A-Za-z' -]+ — (?=If )/, "")
     // Gideon's Intervention: "Prevent all damage that would be dealt to you and permanents you control by sources with the
     // chosen name" is the same prevention, for each source (CR 615.1a).
-    .replace(/^Prevent all damage that would be dealt to you and permanents you control by sources with the chosen name$/, "If a source with the chosen name would deal damage to you or a permanent you control, prevent that damage");
+    .replace(/^Prevent all damage that would be dealt to you and permanents you control by sources with the chosen name$/, "If a source with the chosen name would deal damage to you or a permanent you control, prevent that damage")
+    // Glacial Chasm, Solitary Confinement: "Prevent all damage that would be dealt to you" is the same, from any source.
+    .replace(/^Prevent all (combat )?damage that would be dealt to you$/, "If a source would deal $1damage to you, prevent that damage");
   const OP = "(double that damage|twice that much damage|triple that damage|half that damage, rounded down|that much damage (?:plus|minus) (?:\\d+|X|an amount of damage equal to .+?))";
   const m = new RegExp(
     `^[Ii]f (.+?) would deal (combat |noncombat )?damage(?: to (.+?))?(?: while (.+?))?, (?:(?:it|that source) deals ${OP}(?:,? to (?:that (?:permanent or player|player or permanent|player|creature|permanent)|you|~|equipped creature|enchanted creature))? instead|instead it deals ${OP})(?:, where X is (.+))?$`,

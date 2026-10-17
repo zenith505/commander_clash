@@ -565,11 +565,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Treasure token." (Tempting Contract), "each player may put two +1/+1 counters on a creature they control. For each
     // opponent who does, you gain protection from that player until your next turn" (Noble Heritage). Each decides in
     // turn order, then it happens for each who accepted, then the rest for each opponent who did (rulings).
+    // Only with "For each ... who does": a plain "each player may" (Will of the Jeskai's wheel) is parsed elsewhere.
     const offer = /^(?:Then )?[Ee]ach (opponent|player) may (.+)$/.exec(s);
-    const offerFx = offer && !/\b(?:that player|it|its|them|this way|instead)\b/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
-    if (offer && offerFx) {
-      const does = /^For each (opponent|player) who does, (.+)$/.exec(sentences[si + 1] ?? "");
-      const then = does ? parseOfferRest(does[2]!, ctx) : undefined;
+    const does = offer && /^For each (opponent|player) who does, (.+)$/.exec(sentences[si + 1] ?? "");
+    const offerFx = offer && does && !/\b(?:that player|it|its|them|this way|instead)\b/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    if (offer && does && offerFx) {
+      const then = parseOfferRest(does[2]!, ctx);
       if (then === null) return null;
       const one = offerFx.length === 1 ? offerFx[0]! : undefined;
       const need = one?.type === "pick" ? { zone: "battlefield" as const, filter: one.filter } : one?.type === "chooseFromGraveyard" && one.filter ? { zone: "graveyard" as const, filter: one.filter } : undefined;
@@ -580,9 +581,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         text: offer[2]!.replace(/\btheir\b/g, "your").replace(/\bthey\b/g, "you"),
         each: true,
         ...(need ? { need } : {}),
-        ...(then ? { perAccepted: { effects: then, ...(does![1] === "opponent" ? { opponents: true as const } : {}) } } : {}),
+        perAccepted: { effects: then, ...(does[1] === "opponent" ? { opponents: true as const } : {}) },
       });
-      if (does) si++;
+      si++;
       continue;
     }
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."

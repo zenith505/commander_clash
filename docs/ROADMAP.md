@@ -51,6 +51,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      with triggers that care about batches). Bots always accept. Still out: Tempt with Discovery ("who searches a
      library this way"), Tempt with Mayhem (copies), Braids, Fandaniel, Wernog, The Second Doctor ("who doesn't"),
      Step Between Worlds and Turtles in Time ("each player who does draws seven").
+     "Each player may" without "for each ... who does" stays with the older parsing: Show and Tell and Iwamori (the
+     cards enter at the same time), Eager Construct and Myr Custodian ("each player may scry") are still out.
    - Granted persist and undying (Haunted One) are abilities, not keywords: "creatures with undying" doesn't see them.
    - Airbend still out: Aang, Airbending Master ("another target creature"), Airbender Ascension and Avatar's Wrath
      (other lines). Suspend Aggression and Elite Spellbinder ("its owner may play it until the end of their next turn",

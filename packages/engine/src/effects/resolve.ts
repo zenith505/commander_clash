@@ -10,7 +10,7 @@ import { RulesError, type CardDef, type Chosen, type Color, type GameObject, typ
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
-import { objectMatches, bindChosen, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed } from "./targeting";
+import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runDiceEffect } from "./run-dice";
@@ -88,7 +88,10 @@ export function gifteeOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
 export function beginResolution(s: GameState, item: StackItem, body: AbilityBody): Resolution {
   const targets = item.targets ?? [];
   const src = item.kind === "spell" ? spellQuality(s, s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined) : sourceQuality(s, item.sourceId, item.sourceCardId);
-  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, spec, targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId));
+  // An amount bound ("with power less than or equal to ~'s power") is worked out again now (CR 608.2b), with the source as
+  // it last existed if it has left (608.2h).
+  const now: AmountCtx = { ...targetingCtx(s, item.controller, item.sourceId), ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}), ...(item.lki ? { lki: item.lki } : {}), x: item.x ?? 0 };
+  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId));
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
   const chose = targets.some((t) => t.kind !== "none");
@@ -284,7 +287,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
   }
   if (ref.ref === "each") {
-    const filter = bindChosen(ref.filter, ctx.chosen);
+    const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
@@ -393,7 +396,7 @@ export function amountNow(s: GameState, a: Amount, ctx: ResolveCtx): number {
   return Math.max(0, evalAmount(s, a, amountCtx(s, ctx)));
 }
 
-const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
+export const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   controller: ctx.controller,
   sourceId: ctx.sourceId,
   sourceZc: ctx.sourceZc,

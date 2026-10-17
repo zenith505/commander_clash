@@ -161,6 +161,15 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   return null;
 }
 
+/**
+ * The amount of a filter's "with mana value less than or equal to ..." worked out as it resolves (TargetSpec.bound): a count,
+ * or X, which a trigger's "that damage" has become ("Whenever ~ deals combat damage, you may cast a sorcery spell from your
+ * hand with mana value less than or equal to that damage", see HOST_TRIGGERS).
+ */
+export function parseBoundCount(text: string, ctx: Ctx): AmountExpr | null {
+  return text === "X" ? { count: { kind: "x" } } : parseCount(text, ctx);
+}
+
 function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   const x = w.toLowerCase();
   if (x === "your") return { ref: "you" };

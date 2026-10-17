@@ -5,8 +5,8 @@ import { nextRandom, shuffle } from "../rng";
 import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { printedMatches } from "./targeting";
-import { ResolveCtx, apnap, players, amountNow, objects } from "./resolve";
+import { bindBound, printedMatches } from "./targeting";
+import { ResolveCtx, apnap, players, amountNow, amountCtx, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { chooseAuraHosts } from "./run-zones";
@@ -348,7 +348,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Ruin): each player chooses in APNAP order, then the cards are put where they go at the same time (CR 101.4).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      const filter = e.filter?.named === "~" ? { ...e.filter, named: src } : e.filter;
+      // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
+      const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+      const filter = filter0?.named === "~" ? { ...filter0, named: src } : filter0;
       const who = e.who ? (e.who.ref === "eachPlayer" ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);

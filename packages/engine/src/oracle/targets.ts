@@ -1,8 +1,9 @@
-import type { DamageRecipient, ObjRef, PlayerRef, TargetSpec } from "../abilities";
+import type { AmountExpr, DamageRecipient, ObjRef, PlayerRef, TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, COLOR_WORDS, TYPE_WORDS, keywordOf, BASIC_TYPES, capital, singular } from "./words";
 import { Ctx, addTarget } from "./body";
+import { parseCount } from "./counts";
 
 /** Creature types with a hyphen, by how they read lowercased ("assembly-worker"). */
 const HYPHENATED = new Map([...CREATURE_TYPES].filter((ty) => ty.includes("-")).map((ty) => [ty.toLowerCase(), ty]));
@@ -198,7 +199,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (!whose || (whose.ref === "target" && whose.n)) return null;
     return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose };
   }
-  const group = parseGroup(x);
+  // "All creatures with toughness less than or equal to the number of Islands you control": counted as it resolves.
+  const group = parseGroup(x, false, (t) => parseCount(t, ctx));
   if (group && group.other && ctx.spell) {
     // A spell's "other creatures you control": other than the creature it targeted ("Put two +1/+1
     // counters on target creature you control. Other creatures you control get +1/+1"). Other than
@@ -209,11 +211,50 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const m = /^target (.+)$/i.exec(x);
   if (!m) return null;
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
-  const spec = parseTargetPhrase(phrase, { x: true });
+  const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx) });
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   if (spec.xRange && ((!ctx.spell && !ctx.activated) || ctx.whereX)) return null;
   return { ref: "target", index: addTarget(ctx, theirs ? { ...spec, controller: "eventPlayer", text: `target ${m[1]!}` } : spec) };
+}
+
+/**
+ * Reads the amount of a target's "with mana value less than or equal to ..." (TargetSpec.bound): only one that can be
+ * worked out from the source and its controller alone, both as the target is chosen and as it resolves.
+ */
+function boundCount(ctx: Ctx): (text: string) => AmountExpr | null {
+  return (text) => {
+    const before = ctx.targets.length;
+    const a = parseCount(text, ctx);
+    if (a && ctx.targets.length === before && boundAtTargeting(a)) return a;
+    ctx.targets.length = before;
+    return null;
+  };
+}
+
+function boundAtTargeting(a: AmountExpr): boolean {
+  const c = a.count;
+  const mine = (who: PlayerRef | undefined) => !who || who.ref === "you" || who.ref === "eachPlayer" || who.ref === "eachOpponent";
+  switch (c.kind) {
+    case "permanents":
+      return mine(c.whose);
+    case "cardsInHand":
+    case "cardsInLibrary":
+    case "cardsInGraveyard":
+    case "life":
+      return mine(c.who);
+    case "devotion":
+    case "party":
+    case "greatestPower":
+    case "greatestManaValue":
+      return true;
+    case "power":
+    case "toughness":
+    case "counters":
+      return c.of.ref === "self";
+    default:
+      return false;
+  }
 }
 
 /** "Creature that player controls" in a trigger about a player: the phrase without it, and whether it was there. */
@@ -251,7 +292,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const single = (n > 1 || !!many) && / from a single graveyard$/.test(mine0);
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
   const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "");
-  const parsed = parseTargetPhrase(n > 1 || many ? singularPhrase(mine) : mine);
+  const parsed = n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   const spec: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
   const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "card" ? [i] : []));
@@ -332,7 +373,7 @@ const PLURAL_TYPES: Record<string, string> = {
  * "all" or "each" it has to say whose they are ("creatures you control"), unless `bare` (a static
  * ability's subject, "Creatures of the chosen type get +1/+1").
  */
-export function parseGroup(phrase: string, bare = false): { filter: TargetSpec; other: boolean } | null {
+export function parseGroup(phrase: string, bare = false, count?: (text: string) => AmountExpr | null): { filter: TargetSpec; other: boolean } | null {
   let p = phrase.trim();
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
@@ -355,7 +396,7 @@ export function parseGroup(phrase: string, bare = false): { filter: TargetSpec; 
   head = words
     .map((w) => PLURAL_TYPES[w.toLowerCase()] ?? (/^[A-Z]/.test(w) && w !== "Plains" && CREATURE_TYPES.has(singular(w)) ? singular(w) : w))
     .join(" ");
-  const spec = parseTargetPhrase(`${head} ${tail}`.trim(), { chosen: true });
+  const spec = parseTargetPhrase(`${head} ${tail}`.trim(), { chosen: true, ...(count ? { count } : {}) });
   if (!spec || spec.kind !== "object") return null;
   return { filter: { ...spec, text: phrase.trim().toLowerCase() }, other };
 }
@@ -379,11 +420,30 @@ export function parseCardTarget(p: string, ctx: Ctx, owner?: "you"): ObjRef | nu
 export const OUTLAW_TYPES = ["Assassin", "Mercenary", "Pirate", "Rogue", "Warlock"];
 
 /** Parse the words after "target": "nonblack creature an opponent controls", "artifact or enchantment", "spell", ... */
-export function parseTargetPhrase(phrase: string, opts: { chosen?: boolean; /** "with power X or less" may be the X announced (TargetSpec.xRange). */ x?: boolean } = {}): TargetSpec | null {
+export function parseTargetPhrase(
+  phrase: string,
+  opts: {
+    chosen?: boolean;
+    /** "with power X or less" may be the X announced (TargetSpec.xRange). */
+    x?: boolean;
+    /** Reads the amount of "with mana value less than or equal to <amount>" (TargetSpec.bound); without it, unsupported. */
+    count?: (text: string) => AmountExpr | null;
+  } = {},
+): TargetSpec | null {
   let p = phrase.trim().toLowerCase();
   const text = `target ${p}`;
-  p = p.replace(/\btime lords?\b/g, "time-lord");
   const extra: Partial<TargetSpec> = {};
+  // "Card with mana value less than or equal to ~'s power from your graveyard", "creature with power less than or equal to the
+  // number of Islands you control": the amount as written, read first since it may hold words of its own (TargetSpec.bound).
+  const bound = / with (power|toughness|mana value) (less|greater) than or equal to (.+)$/i.exec(phrase.trim());
+  if (bound) {
+    const from = / from (?:your|a|an opponent's) graveyard$/i.exec(bound[3]!);
+    const amount = opts.count?.(from ? bound[3]!.slice(0, from.index) : bound[3]!);
+    if (!amount) return null;
+    extra.bound = { key: bound[1]!.toLowerCase() === "mana value" ? "manaValue" : (bound[1]!.toLowerCase() as "power" | "toughness"), at: bound[2]!.toLowerCase() === "less" ? "most" : "least", amount };
+    p = `${phrase.trim().slice(0, bound.index)}${from ? from[0] : ""}`.toLowerCase();
+  }
+  p = p.replace(/\btime lords?\b/g, "time-lord");
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
   const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:the chosen|that) (creature type|type|color)/.exec(p);
   if (chosen) {

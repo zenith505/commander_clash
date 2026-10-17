@@ -711,6 +711,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects.push({ type: "if", cond: spent.cond, effects: fx, otherwise: [{ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: structuredClone(fx) }] });
       continue;
     }
+    // "Destroy target nonblack creature if its toughness is less than or equal to the number of cards in your graveyard"
+    // (Ghastly Demise), "Counter target spell if its mana value is less than or equal to ..." (Dispersal Shield): any such
+    // object can be targeted, and the comparison is made as it resolves (rulings on Ghastly Demise, Prismatic Ending,
+    // Agadeem Occultist, Nimbus Champion).
+    const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
+    if (atMost) {
+      const fx = parseOne(atMost[1]!, ctx);
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (!fx || i !== curTargets || !t || t.optional || t.many || t.divided || !fx.every((e) => mentionsTarget(e, i))) return null;
+      const key = atMost[2] === "mana value" ? "manaValue" : (atMost[2] as "power" | "toughness");
+      // Power and toughness only for creatures (CR 208.3); a spell's mana value counts its X (202.3e).
+      if (t.kind === "player" || t.kind === "any" || (key !== "manaValue" && t.kind === "spell")) return null;
+      const amount = parseCount(atMost[3]!, ctx);
+      if (!amount || ctx.targets.length !== i + 1) return null;
+      const filter: TargetSpec = { kind: t.kind, bound: { key, at: "most", amount }, text: `${atMost[2]} less than or equal to ${atMost[3]}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+      continue;
+    }
     const howCast = parseHowCast(s, ctx);
     // Once and Future's adamant, "instead return those cards to your hand and exile ~": done instead of all the spell's
     // instructions before it, so each target card goes to your hand whichever zone it was chosen for (CR 601.2c).

@@ -34,7 +34,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const fx = n && parseSearch(`Search your library for two ${howMany[1]}${howMany[3]}`);
     return n && fx?.length === 1 && fx[0]!.type === "search" && !fx[0]!.others ? [{ ...fx[0]!, n }] : null;
   }
-  if (/^Search your library /i.test(s)) return parseSearch(s);
+  if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseCount(t, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
   // player" after "target ... an opponent controls" (Boseiju) is that permanent's controller. Last known information

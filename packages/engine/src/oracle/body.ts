@@ -911,9 +911,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         // announced but an amount compared as the target is chosen and again as it resolves (TargetSpec.bound; CR 601.2c,
         // 608.2b; rulings on Spellstutter Sprite). Only an amount that can be worked out then.
         if (t.xRange) {
-          if (t.xRange.at === "exact" || !boundAtTargeting(def)) return false;
+          if (!boundAtTargeting(def)) return false;
           const { xRange, ...rest } = t;
-          ctx.targets[k] = { ...rest, bound: { key: xRange.key, at: xRange.at === "least" ? "least" : "most", amount: def } };
+          ctx.targets[k] = { ...rest, bound: { key: xRange.key, at: xRange.at, amount: def } };
           continue;
         }
         if (t.divided?.amount) ctx.targets[k] = { ...t, divided: { ...t.divided, amount: replaceX(t.divided.amount, def) } };
@@ -1031,9 +1031,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       // "Roll a d20. When you do, put X +1/+1 counters on each of up to two target creatures, where X is the result"
       // (Ancient Bronze Dragon): the roll always happens; the result goes with the reflexive trigger.
       const rolled = prev?.type === "roll" && !prev.chooseOne && effects.length === 1;
-      if ((!rolled && (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence"))) || si !== sentences.length - 1) return null;
+      // Wishing Well: "Put a coin counter on ~. When you do, ...": it's put if ~ is still on the battlefield. The rest of
+      // the ability is the reflexive trigger's.
+      const counted = prev?.type === "counters" && prev.what.ref === "self" && effects.length === 1 && !ctx.selfCard;
+      if ((!rolled && !counted && (prev?.type !== "may" || prev.pay || !prev.effects.every((e) => e.type === "collectEvidence"))) || (si !== sentences.length - 1 && !counted)) return null;
       // Its own "where X is ..." goes with it.
-      const whenText = where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!;
+      const whenText = [where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
+      if (counted) si = sentences.length;
       const reflexive = parseBody(`${whenText.charAt(0).toUpperCase()}${whenText.slice(1)}.`, {
         ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
         ...(ctx.selfIt ? { selfIt: true } : {}),
@@ -1043,7 +1047,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         ...(ctx.defending ? { defending: true } : {}),
       });
       if (!reflexive || reflexive.modal) return null;
-      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "state", cond: { kind: "self", is: "onBattlefield" } } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
     // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."

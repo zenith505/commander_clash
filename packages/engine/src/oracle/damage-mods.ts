@@ -191,6 +191,18 @@ export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null 
   let until: "yourNextTurn" | undefined;
   const u = /^[Uu]ntil your next turn, (if .+)$/.exec(t);
   if (u) [until, t] = ["yourNextTurn", u[1]!];
+  // "The next time a source of your choice would deal damage to you this turn, prevent half that damage, rounded down"
+  // (Dark Sphere); "the next time that creature would deal combat damage this turn, it deals double that damage
+  // instead" (Impulsive Maneuvers): the next damage event only.
+  const next = /^The next time (a source of your choice|that creature|it) would deal (combat )?damage( to you)? this turn, (prevent half that damage, rounded (up|down)|prevent that damage|it deals double that damage instead)$/i.exec(t);
+  if (next) {
+    const subject = /^(?:that creature|it)$/i.test(next[1]!);
+    if (until || (subject && !ctx.subjectIt && !(ctx.subject && /^that creature$/i.test(next[1]!)))) return null;
+    const mod: DamageMod = /^it deals/.test(next[4]!) ? { op: "times", n: 2, nextTime: true, text } : next[5] ? { op: "half", prevent: true, ...(next[5] === "down" ? { up: true as const } : {}), nextTime: true, text } : { op: "prevent", prevent: true, nextTime: true, text };
+    if (next[2]) mod.combat = "only";
+    if (next[3]) mod.to = { players: "you" };
+    return [{ type: "damageMod", mod, ...(subject ? { bySubject: true as const } : { choose: { kind: "object" as const, text: "source" } }) }];
+  }
   if (!/would deal (?:combat |noncombat )?damage\b.*, (?:it|that source) deals |would deal .*, instead it deals /.test(t)) return undefined;
   if (!until) {
     if (!/ this turn(?=,| to )/.test(t)) return undefined;

@@ -445,6 +445,12 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     if (spec?.kind !== "object" || spec.controller || spec.combat) return null;
     return { kind: "sacrifice", filter: { ...spec, text: m[2]! }, ...n };
   }
+  // Tectonic Split: "sacrifice half the lands you control, rounded up".
+  if ((m = /^sacrifice half the (.+?) you control, rounded up$/i.exec(text))) {
+    const spec = parseTargetPhrase(m[1]!.split(" ").map(singularWord).join(" "));
+    if (spec?.kind !== "object" || spec.controller || spec.combat) return null;
+    return { kind: "sacrifice", filter: { ...spec, text: m[1]! }, n: 0, half: "up" };
+  }
   // "Discard an Island card and another card" (Foil): two cards, one of them an Island card.
   if ((m = /^discard an? (.+? card) and another card$/i.exec(text))) {
     const oneOf = parseSearchFilter(m[1]!);

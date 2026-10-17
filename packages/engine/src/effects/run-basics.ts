@@ -10,6 +10,7 @@ import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
+import { chooseDamageSource } from "./run-prevention";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 /**
@@ -176,6 +177,18 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const o = t?.kind === "object" ? s.objects[t.id] : undefined;
         if (!o || o.zone !== "battlefield") return;
         mod.by = { ...mod.by, chosen: { id: o.id, zc: o.zoneChanges ?? 0 } };
+      }
+      if (e.choose) {
+        const chosen = chooseDamageSource(s, ctx, e.choose, src);
+        if (chosen === "paused") return "paused";
+        if (!chosen) return;
+        mod.by = { ...mod.by, chosen };
+      }
+      if (e.bySubject) {
+        // "The next time that creature would deal combat damage": the trigger's creature, as the object it is.
+        const o = ctx.subject && s.objects[ctx.subject.id];
+        if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
+        mod.by = { ...mod.by, chosen: { id: o.id, zc: ctx.subject!.zc } };
       }
       if (e.toPlayer) {
         const [p] = players(s, e.toPlayer, ctx);

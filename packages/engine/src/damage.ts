@@ -216,7 +216,7 @@ type ShieldOp =
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** A "next time" one, used up now. */ once?: string }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
   | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string };
 
@@ -343,6 +343,8 @@ interface LiveMod {
   /** None for a resolved spell's or ability's (GameState.damageMods). */
   holder?: GameObject;
   card: string;
+  /** GameState.damageMods's id of a "next time" one. */
+  once?: string;
 }
 
 function liveMods(s: GameState): LiveMod[] {
@@ -356,7 +358,7 @@ function liveMods(s: GameState): LiveMod[] {
   }
   // A resolved one lasts the turn, or until its controller's next turn begins (CR 611.2a).
   for (const r of s.damageMods ?? [])
-    if (r.turn === s.turn || (r.until === "yourNextTurn" && !(s.activePlayer === r.you && s.turn > r.turn))) out.push({ key: `mod:${r.id}`, mod: { ...r.mod, you: r.you }, card: r.name });
+    if (r.turn === s.turn || (r.until === "yourNextTurn" && !(s.activePlayer === r.you && s.turn > r.turn))) out.push({ key: `mod:${r.id}`, mod: { ...r.mod, you: r.you }, card: r.name, ...(r.mod.nextTime ? { once: r.id } : {}) });
   return out;
 }
 
@@ -370,7 +372,9 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
   const ref = e.src.ref;
   const isHolder = !!ref && !!h && ref.object === h.id && ref.zc === (h.zoneChanges ?? 0);
   if (d.by?.self && !isHolder) return false;
-  if (d.by?.chosen && !(ref && ref.object === d.by.chosen.id && ref.zc === d.by.chosen.zc)) return false;
+  // A permanent spell chosen as the source: the permanent it becomes is that source too (CR 609.7a).
+  const c = d.by?.chosen;
+  if (c && !(ref && ref.object === c.id && (ref.zc === c.zc || (c.spell && ref.zc === c.zc + 1)))) return false;
   if (d.by?.other && isHolder) return false;
   if (d.by?.filters && !d.by.filters.some((f) => (!f.spell || e.src.spell) && sourceMatches(s, f.spec, e.src, d.you))) return false;
   const t = d.to;
@@ -613,7 +617,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}) });
       }
     };
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
@@ -835,6 +839,7 @@ interface DealBack {
 function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const back: DealBack[] = [];
   const used = new Set<string>();
+  const usedMods = new Set<string>();
   // Life gained from each rule's prevention of damage dealt at the same time is one life-gain event (CR 119.10).
   const gains = new Map<string, { pid: PlayerId; n: number }>();
   const gainLater = (r: DamageRule, n: number) => gains.set(r.id, { pid: r.controller, n: (gains.get(r.id)?.n ?? 0) + n });
@@ -858,6 +863,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       }
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
     else if (op.kind === "modify") {
+      if (op.once) usedMods.add(op.once);
       if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
       else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
     } else if (op.kind === "betrayer") {
@@ -891,6 +897,10 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     }
   }
   for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n);
+  if (usedMods.size && s.damageMods) {
+    s.damageMods = s.damageMods.filter((r) => !usedMods.has(r.id));
+    if (!s.damageMods.length) s.damageMods = undefined;
+  }
   // Used up: "the next time" once it has applied, "the next N" at 0 (CR 615.7-8).
   if (s.damageRules) {
     s.damageRules = s.damageRules.filter((r) => !used.has(r.id) && (r.left === undefined || r.left > 0));

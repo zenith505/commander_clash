@@ -223,7 +223,7 @@ export interface TargetSpec {
    * it resolves (CR 601.2c, 608.2b; rulings on Beguiler of Wills and Earthshaker Khenra), for a group or a search as it
    * resolves (`bindBound`). Until then, any value.
    */
-  bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least"; amount: AmountExpr };
+  bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
   /** `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1). */
   combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
@@ -577,7 +577,7 @@ export interface DamageMod {
    * an Aura or Equipment, the permanent it's attached to); `other`: not that permanent; `spell`: a spell, not a permanent.
    * Missing: any source.
    */
-  by?: { self?: true; other?: true; filters?: { spec: TargetSpec; spell?: true }[]; /** A resolved effect's target, as the object it was. */ chosen?: { id: ObjectId; zc: number } };
+  by?: { self?: true; other?: true; filters?: { spec: TargetSpec; spell?: true }[]; /** A resolved effect's target or chosen source, as the object it was; `spell`: a spell, and the permanent it becomes (CR 609.7a). */ chosen?: { id: ObjectId; zc: number; spell?: true } };
   /**
    * What it would be dealt to: `players` ("enchanted": the player enchanted by the permanent with the ability; "chosen":
    * its chosen player), `objects` (a permanent matching it, "you" being the ability's controller), `self` (the permanent
@@ -587,6 +587,8 @@ export interface DamageMod {
   combat?: "only" | "non";
   /** The Rollercrusher Ride: "while there are four or more card types among cards in your graveyard". */
   while?: StaticCondition;
+  /** "The next time ... would deal damage": the next damage event only (Dark Sphere, Impulsive Maneuvers). */
+  nextTime?: true;
   text: string;
 }
 
@@ -1559,7 +1561,7 @@ export type Effect =
    * would deal damage ... this turn" (Overblaze: `byTarget`), "until your next turn, if a source would deal damage to that
    * player or a permanent that player controls" (Lightning, Army of One: `toPlayer`). Its amounts are counted as it resolves.
    */
-  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; toPlayer?: PlayerRef }
+  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; toPlayer?: PlayerRef; /** "A source of your choice", chosen as it resolves (CR 609.7a). */ choose?: TargetSpec; /** "That creature": the trigger's subject. */ bySubject?: true }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**
@@ -1957,7 +1959,7 @@ export interface TriggeredAbility {
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
   dealer?: { filter: TargetSpec; other?: boolean };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
-  attacker?: { filter: TargetSpec; other?: boolean };
+  attacker?: { filter: TargetSpec; other?: boolean; /** "Whenever a creature attacks": anyone's (Caltrops, Righteous Cause). */ anyone?: true };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
@@ -2314,7 +2316,7 @@ export interface CostMod {
  */
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up" }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }

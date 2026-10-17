@@ -394,12 +394,16 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
  */
 function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (another|an?) (.+?) you control attacks, (.+)$/.exec(line);
-  if (!m) return null;
-  const filter = parseTargetPhrase(m[2]!);
+  // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
+  const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature) attacks, (.+)$/.exec(line);
+  const w = m ?? any;
+  if (!w) return null;
+  const filter = parseTargetPhrase(w[2]!);
   if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
-  const body = parseBody(m[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
+  const body = parseBody(w[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
   if (!body) return "fail";
-  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}) }, body };
+  if (any) return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: w[2]! }, anyone: true, ...(w[1] === "another" ? { other: true } : {}) }, body };
+  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
 }
 
 /**

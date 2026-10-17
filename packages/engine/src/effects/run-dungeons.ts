@@ -66,7 +66,7 @@ function enterRoom(s: GameState, p: Player, d: Dungeon, room: number) {
   log(s, `${p.name} moves their venture marker into ${d.rooms[room]!.name}.`);
   // Hama Pashar: once more for each permanent of theirs with "room abilities of dungeons you own trigger an additional
   // time" (CR 603.2d; rulings on Dungeon Delver: each one adds one).
-  const more = s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === p.id && abilitiesOf(s, s.objects[id]!).roomsTwice).length;
+  const more = s.battlefield.reduce((n, id) => n + (controllerOf(s, s.objects[id]!) === p.id ? (abilitiesOf(s, s.objects[id]!).roomsTwice ?? 0) : 0), 0);
   for (let i = 0; i <= more; i++) s.triggerQueue.push({ sourceId: "", sourceCardId: def.oracleId, controller: p.id, index: room });
 }
 

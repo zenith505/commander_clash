@@ -43,18 +43,22 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Becomes untapped" still out on other lines: Arbiter of the Ideal (manifestation counters), Daring Thief and
      Disciple of Deceit, King Macar, Fishing Pole, Ghostly Pilferer; "become untapped" for two (Tui and La); "during
      your untap step" (The Ninth Doctor).
-   Left from the round after inspired (Backgrounds granting abilities to commanders, kinship, granted myriad, "whenever
-   you cast a spell from exile / from anywhere other than your hand", Oblation):
-   - Backgrounds still out: Dungeon Delver (room abilities trigger an additional time), Haunted One ("whenever ~
-     becomes tapped ... share a creature type with it"), Noble Heritage (protection from a player), Scion of Halaster
-     (replacing the first draw each turn), Tavern Brawler ("exile the top card ... you may play that card this turn"
-     as a granted trigger).
-   - Kinship: Leaf-Crowned Elder ("you may play that card without paying its mana cost" from the library). Once the
-     kinship creature has left the battlefield, its printed creature types are compared, not the ones it last had.
-   - "For each opponent, create ... tapped and attacking that player or a planeswalker they control" (Adeline): the
-     planeswalker choice. Granted myriad's tokens attack the player only (no planeswalker choice either).
-   - Cast-from-exile cards still out: Aerial Extortionist ("its owner may cast it" for a linked exile), Nalfeshnee
-     (copy a spell cast from exile, with a granted sacrifice ability).
+   Left from the round after backgrounds (the last five Backgrounds, kinship with last-known types, Leaf-Crowned Elder,
+   Adeline's planeswalker choice, tempting offers, airbend and "its owner may cast it" exiles, Nalfeshnee):
+   - Adeline with a token doubler: one choice per opponent, so all the tokens for one opponent attack the same player
+     or planeswalker. Granted myriad's tokens still attack the player only.
+   - Tempting offers: each accepting player's part runs one after the other, not at the same time (it matters only
+     with triggers that care about batches). Bots always accept. Still out: Tempt with Discovery ("who searches a
+     library this way"), Tempt with Mayhem (copies), Braids, Fandaniel, Wernog, The Second Doctor ("who doesn't"),
+     Step Between Worlds and Turtles in Time ("each player who does draws seven").
+     "Each player may" without "for each ... who does" stays with the older parsing: Show and Tell and Iwamori (the
+     cards enter at the same time), Eager Construct and Myr Custodian ("each player may scry") are still out.
+   - Granted persist and undying (Haunted One) are abilities, not keywords: "creatures with undying" doesn't see them.
+   - Airbend still out: Aang, Airbending Master ("another target creature"), Airbender Ascension and Avatar's Wrath
+     (other lines). Suspend Aggression and Elite Spellbinder ("its owner may play it until the end of their next turn",
+     "look at target opponent's hand. You may exile a nonland card from it"), Extraordinary Journey.
+   - Scion of Halaster's replacement is applied before Alhammarret's Archive or dredge on the same draw instead of
+     letting the player order them (CR 616.1). Choreographed Sparks ("this spell can't be copied").
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):
@@ -167,7 +171,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      Stick Together's party, Single Combat's "can't cast creature or planeswalker spells until the end of your next
      turn".
    - "Return a creature card from your graveyard to the battlefield" (chosen, not targeted) works, also for each player
-     (Exhume, Crypt Champion); still out: Infernal Offering and Tempt with Immortality (their other parts), "at random"
+     (Exhume, Crypt Champion); still out: Infernal Offering (its other part), "at random"
      (Moldgraf Monstrosity, Tomb Tyrant), "with total mana value N or less" (Lively Dirge), "where X is ..." outside a
      spell's own count, and cards blocked on other lines (Tayam, Tyvar, Sauron).
    Left from the round after Cataclysm (distribute, step-by-step becomes, Cover of Winter, flavor words, Threaten,

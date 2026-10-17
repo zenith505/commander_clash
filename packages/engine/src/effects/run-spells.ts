@@ -1,4 +1,4 @@
-import type { AbilityBody, Effect, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
+import type { AbilityBody, Effect, Modification, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf } from "../layers";
@@ -15,11 +15,12 @@ import { discardCards, toBottom } from "./run-library";
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
  * it (modes, X, kicker, what was sacrificed), with these targets. It isn't cast.
  */
-function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined) {
+function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }) {
   const card = orig.objectId ? s.objects[orig.objectId] : undefined;
   if (!card) return;
   const o = newObject(s, s.cards[cardIdOf(card)]!, controller, "stack");
   o.spellCopy = true;
+  if (gains) o.copyGains = { mods: gains.mods, timestamp: s.nextTimestamp++, controller, source: gains.source };
   o.kicked = card.kicked;
   o.castAlt = card.castAlt;
   o.bestowed = card.bestowed; // a copy of a bestowed Aura spell is one too (CR 702.103c)
@@ -163,7 +164,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
           return "paused";
         }
-        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
+        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src });
         c.targets = undefined;
         c.left--;
       }

@@ -1,12 +1,12 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital } from "./words";
-import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
+import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
-import { compileQuoted } from "./grants";
+import { compileQuoted, parseGrants } from "./grants";
 import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { parseManaSpend } from "./mana-abilities";
@@ -24,6 +24,8 @@ export interface Ctx {
   selfIt?: boolean;
   /** After it left the battlefield ("When ~ dies, return it to its owner's hand"), "it" is the card in its new zone. */
   selfCard?: boolean;
+  /** "Exile the top card of your library" came before: "that card's mana value" is that card's. */
+  exiledTop?: boolean;
   /** A reflexive trigger after "you may sacrifice another creature": "that creature's power" is the sacrificed one's. */
   sacrificedIt?: boolean;
   /** An amass instruction came before, here or in the ability whose reflexive trigger this is: "the amassed Army" (CR 701.47c). */
@@ -541,6 +543,49 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si = untilNonland.next - 1;
       continue;
     }
+    // "Exile target nonland permanent. For as long as that card remains exiled, its owner may cast it" (Aerial
+    // Extortionist, Release to the Wind's "without paying its mana cost", Soul Partition's "may play it"): a permission for
+    // that card in exile (CR 400.7), its owner's; "A spell cast (by an opponent) this way costs {2} more to cast".
+    const ownerMay =
+      /^For as long as (?:that card|it) remains exiled, its owner may (cast|play) it( without paying its mana cost)?$/.exec(s) ??
+      /^For each of those cards, its owner may (play|cast) it for as long as it remains exiled()$/.exec(s);
+    if (ownerMay) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || prev.until || prev.linked || prev.ownerMay || (prev.what.ref !== "target" && prev.what.ref !== "each")) return null;
+      prev.ownerMay = { ...(ownerMay[1] === "play" ? { play: true as const } : {}), ...(ownerMay[2] ? { free: true as const } : {}) };
+      const tax = /^A spell cast (by an opponent )?this way costs \{(\d+)\} more to cast$/.exec(sentences[si + 1] ?? "");
+      if (tax) {
+        prev.ownerMay.more = Number(tax[2]);
+        if (tax[1]) prev.ownerMay.moreOpponents = true;
+        si++;
+      }
+      continue;
+    }
+    // A tempting offer and the like: "Each opponent may create a Treasure token. For each opponent who does, you create a
+    // Treasure token." (Tempting Contract), "each player may put two +1/+1 counters on a creature they control. For each
+    // opponent who does, you gain protection from that player until your next turn" (Noble Heritage). Each decides in
+    // turn order, then it happens for each who accepted, then the rest for each opponent who did (rulings).
+    // Only with "For each ... who does": a plain "each player may" (Will of the Jeskai's wheel) is parsed elsewhere.
+    const offer = /^(?:Then )?[Ee]ach (opponent|player) may (.+)$/.exec(s);
+    const does = offer && /^For each (opponent|player) who does, (.+)$/.exec(sentences[si + 1] ?? "");
+    const offerFx = offer && does && !/\b(?:that player|it|its|them|this way|instead)\b/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    if (offer && does && offerFx) {
+      const then = parseOfferRest(does[2]!, ctx);
+      if (then === null) return null;
+      const one = offerFx.length === 1 ? offerFx[0]! : undefined;
+      const need = one?.type === "pick" ? { zone: "battlefield" as const, filter: one.filter } : one?.type === "chooseFromGraveyard" && one.filter ? { zone: "graveyard" as const, filter: one.filter } : undefined;
+      effects.push({
+        type: "eachMay",
+        who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" },
+        effects: offerFx,
+        text: offer[2]!.replace(/\btheir\b/g, "your").replace(/\bthey\b/g, "you"),
+        each: true,
+        ...(need ? { need } : {}),
+        perAccepted: { effects: then, ...(does[1] === "opponent" ? { opponents: true as const } : {}) },
+      });
+      si++;
+      continue;
+    }
     // Impulse draw: "Exile the top two cards of your library. Until the end of your next turn, you may play those cards."
     // Under a condition about how it was cast (Elemental Mascot's "If five or more mana was spent to cast that spell, exile
     // the top card of your library. You may play that card until the end of your next turn."), both sentences are.
@@ -548,7 +593,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
     // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
-    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
+    const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)$/;
+    const playIt = exTop && sentences[si + 1] && playRe.exec(sentences[si + 1]!.replace(/\.$/, ""));
+    // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value. You may play
+    // that card this turn." (Tavern Brawler, Daredevil): the permission and the sentence between, about that card.
+    const playAfter = exTop && !exTop[1] && !playIt && sentences[si + 2] && /\b(?:that|the exiled) card's mana value\b/.test(sentences[si + 1] ?? "") ? playRe.exec(sentences[si + 2]!.replace(/\.$/, "")) : null;
+    if (playAfter && !impulseIf) {
+      const when = (playAfter[1] ?? playAfter[2] ?? "").toLowerCase();
+      effects.push({ type: "impulse", n: 1, until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" });
+      ctx.exiledTop = true;
+      sentences.splice(si + 2, 1);
+      continue;
+    }
+    if (exTop && !exTop[1]) ctx.exiledTop = true;
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
       const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
@@ -690,9 +747,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // the card shares a type (rulings on Mudbutton Clanger), and the card stays on top.
     if (/^(?:[Yy]ou may )?look at the top card of your library$/.test(s) && /^If it shares a creature type with ~, you may reveal it$/.test(sentences[si + 1] ?? "")) {
       const ifDo = /^If you do, (.+)$/.exec(sentences[si + 2] ?? "");
-      if (!ifDo || si + 3 !== sentences.length || /(?:it|that card)/.test(ifDo[1]!)) return null;
+      // "If you do, you may play that card without paying its mana cost" (Leaf-Crowned Elder): from the library, as this
+      // resolves (rulings: any X is 0, no alternative costs).
+      const playIt = ifDo && /^you may play that card without paying its mana cost$/.test(ifDo[1]!);
+      if (!ifDo || si + 3 !== sentences.length || (!playIt && /\b(?:it|that card)\b/.test(ifDo[1]!))) return null;
       const before = ctx.targets.length;
-      const then = parseSentence(capital(ifDo[1]!), ctx);
+      const then: Effect[] | null = playIt ? [{ type: "playLinked", revealed: true }] : parseSentence(capital(ifDo[1]!), ctx);
       if (!then || ctx.targets.length !== before) return null;
       effects.push({ type: "revealTop", look: true }, { type: "if", cond: { kind: "revealedSharesCreatureType" }, effects: [{ type: "may", effects: [{ type: "revealRevealed" }, ...then], text: `reveal the revealed card (if you do, ${ifDo[1]!.replace(/\.$/, "")})` }] });
       si += 2;
@@ -1116,6 +1176,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       copy.newTargets = true;
       continue;
     }
+    // "If it's a permanent spell, the copy gains haste and "At the beginning of the end step, sacrifice this permanent.""
+    // (Nalfeshnee): an effect on the copy that goes on applying to the token it becomes (CR 400.7a, 608.3f). A copy of a
+    // spell that isn't a permanent spell never becomes one, so the condition needs no check.
+    const copyGains = /^If it's a permanent spell, the copy gains (.+)$/.exec(s);
+    if (copyGains) {
+      const prev = effects[effects.length - 1];
+      const mods = parseGrants(copyGains[1]!);
+      if (prev?.type !== "copySpell" || prev.spell !== "cause" || prev.gains || !mods?.every((m) => m.kind === "addKeywords" || m.kind === "addAbility")) return null;
+      prev.gains = mods;
+      continue;
+    }
     // "Starting with you, each player votes for death or taxes" (CR 701.38a): the words, or "a nonland permanent you don't
     // control", "an artifact, creature, or enchantment card in your graveyard" (objects, not targeted). One vote per ability.
     const vote = /^(?:[Ss]tarting with you, each player votes|Each player (secretly) votes) for (.+)$/.exec(s);
@@ -1187,14 +1258,21 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Choose a card name, then target player mills a card. If a card with the chosen name was milled this way, you draw two
     // cards. Otherwise, you draw a card." (Predict): about the cards that mill instruction put into the graveyard.
-    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s);
+    // "Mill a card. If a land card was milled this way, ..." (Lorehold Excavation), several of them after one mill (Old
+    // Rutstein): by its printed characteristics in the graveyard.
+    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If an? ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s);
     if (ifMilled) {
-      const prev = effects[effects.length - 1];
+      const then = ifMilled[ifMilled.length - 1]!;
+      const filter: TargetSpec | null = ifMilled.length === 2 ? { kind: "card", chosen: "name", text: "card with the chosen name" } : (parseSearchFilter(ifMilled[1]!.replace(/, (?=non)/, " ")) ?? null);
+      // The mill just before, or another "if ... milled this way" after it.
+      let back = effects.length - 1;
+      while (back >= 0 && effects[back]!.type === "if" && (effects[back] as { cond: SpellCondition }).cond.kind === "milledIs") back--;
+      const prev = effects[back];
       // Not "its mana value" (Lammastide Weave): which card that is isn't kept.
-      if (prev?.type !== "mill" || /\b(?:it|its)\b/.test(ifMilled[1]!)) return null;
-      const inner = parseOne(ifMilled[1]!.charAt(0).toUpperCase() + ifMilled[1]!.slice(1), ctx);
+      if (!filter || prev?.type !== "mill" || /\b(?:it|its)\b|\brepeat\b/.test(then)) return null;
+      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
-      effects.push({ type: "if", cond: { kind: "milledIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: inner });
+      effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: inner });
       continue;
     }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
@@ -2171,4 +2249,32 @@ export function addTarget(ctx: Ctx, spec: TargetSpec): number {
   const i = ctx.targets.length - 1;
   if (spec.kind === "object" || spec.kind === "spell") ctx.lastObjectTarget = i;
   return i;
+}
+
+/**
+ * What each player may do in a tempting offer, as if they were "you" ("put a +1/+1 counter on each creature they
+ * control" is "... each creature you control" for each of them). No targets: they're the spell's or ability's own.
+ */
+function parseOffer(text: string, ctx: Ctx): Effect[] | null {
+  const mine = text.replace(/\bthey control\b/g, "you control").replace(/\btheir\b/g, "your").replace(/\bthey\b/g, "you");
+  const before = ctx.targets.length;
+  const fx = attempt(ctx, () => parseOne(capital(mine), ctx));
+  if (!fx || ctx.targets.length !== before || fx.some((e) => e.type === "eachMay")) {
+    ctx.targets.length = before;
+    return null;
+  }
+  return fx;
+}
+
+/** "For each opponent who does, ...": "you gain protection from that player until your next turn", or what you do. */
+function parseOfferRest(text: string, ctx: Ctx): Effect[] | null {
+  if (/^you gain protection from that player until your next turn$/.test(text)) return [{ type: "playerGains", keywords: [THAT_PLAYER_PROTECTION], untilYourNextTurn: true }];
+  if (/\b(?:that player|they|their|them|it)\b/.test(text)) return null;
+  const before = ctx.targets.length;
+  const fx = attempt(ctx, () => parseOne(capital(text), ctx));
+  if (!fx || ctx.targets.length !== before) {
+    ctx.targets.length = before;
+    return null;
+  }
+  return fx;
 }

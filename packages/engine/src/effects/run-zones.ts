@@ -752,6 +752,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Linked to the source as it was when the ability triggered: if that object has already left, its
           // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
           if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push(l);
+          const card = s.objects[l.id]!;
+          if (e.ownerMay && !card.isToken) {
+            const m = e.ownerMay;
+            const more = m.more && (!m.moreOpponents || card.owner !== ctx.controller) ? m.more : undefined;
+            card.mayPlay = { player: card.owner, zc: card.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(m.play ? {} : { castOnly: true as const }), ...(m.free ? { free: true as const } : {}), ...(m.cost ? { cost: m.cost } : {}), ...(more ? { more } : {}) };
+          }
         }
       }
       return;
@@ -788,8 +794,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // The card this permanent's hideaway exiled, still the same object in exile (CR 400.7, 607.2a), played as this
       // resolves (rulings: it can't wait). Asked once; a land goes through "you may" since it isn't cast.
       const key = `${ctx.sourceId}@${ctx.sourceZc ?? 0}`;
-      const linked = s.linkedExile?.[key] ?? [];
-      const card = linked.map((l) => ({ o: s.objects[l.id], zc: l.zc })).find((x) => x.o && x.o.zone === "exile" && (x.o.zoneChanges ?? 0) === x.zc)?.o;
+      const linked = e.revealed ? (s.resolving?.revealed ? [s.resolving.revealed] : []) : (s.linkedExile?.[key] ?? []);
+      const from = e.revealed ? "library" : "exile";
+      const card = linked.map((l) => ({ o: s.objects[l.id], zc: l.zc })).find((x) => x.o && x.o.zone === from && (x.o.zoneChanges ?? 0) === x.zc)?.o;
       const sc = (s.resolving!.scratch ??= {});
       if (!card) return;
       const p = player(s, ctx.controller);
@@ -814,7 +821,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (isType(d, "Land") && sc.may) {
         p.landsPlayedThisTurn++;
         moveObject(s, card.id, "battlefield");
-        log(s, `${p.name} plays ${d.name} from exile.`);
+        log(s, `${p.name} plays ${d.name} from ${e.revealed ? "their library" : "exile"}.`);
       }
       return;
     }
@@ -1303,6 +1310,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const o = obj(s, id);
         o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
       }
+      if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (ids.length)
         log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}.`);
       return;

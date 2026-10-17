@@ -439,6 +439,8 @@ export type ObjRef =
   | { ref: "sacrificed" }
   /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
   | { ref: "revealed" }
+  /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */
+  | { ref: "exiledTop" }
   /**
    * "Creatures you control get +1/+1 until end of turn. Untap those creatures": the permanents this resolution's last
    * continuous effect changed, locked in as it began (CR 611.2c), while they're still those objects on the battlefield.
@@ -455,7 +457,7 @@ export type ObjRef =
    * `of`: "each creature target player controls", "all lands that player controls": only that player's permanents (if
    * it's still a legal target, CR 608.2b).
    */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef }
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true }
   /**
    * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
@@ -1003,7 +1005,18 @@ export type Effect =
    * `linked`: the card's "return the exiled card" ability (CR 607.2a) returns what this exiled, see
    * returnLinked. `until`: it comes back right after the source leaves, without a trigger (CR 610.3).
    */
-  | { type: "exile"; what: ObjRef; until?: "sourceLeaves"; linked?: boolean }
+  | {
+      type: "exile";
+      what: ObjRef;
+      until?: "sourceLeaves";
+      linked?: boolean;
+      /**
+       * "For as long as that card remains exiled, its owner may cast it" (Aerial Extortionist), "... may play it" (`play`),
+       * "... without paying its mana cost" (`free`), airbend's "for {2} rather than its mana cost" (`cost`, CR 701.65a);
+       * "A spell cast (by an opponent) this way costs {2} more to cast" (`more`, `moreOpponents`). A token can't be cast.
+       */
+      ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true };
+    }
   /**
    * "Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to
    * its mana cost." (Snapcaster Mage), "each instant and sorcery card in your graveyard ..." (Past in Flames): only the
@@ -1039,7 +1052,7 @@ export type Effect =
    * "You may play the exiled card without paying its mana cost": the card this permanent's hideaway exiled, as this
    * resolves. A land only on your turn with a land play left (CR 305.2-3, rulings on Evercoat Ursine).
    */
-  | { type: "playLinked" }
+  | { type: "playLinked"; /** Kinship's "you may play that card without paying its mana cost" (Leaf-Crowned Elder): the revealed card, from the library. */ revealed?: true }
   /** Cipher's spell ability (CR 702.99a): if this spell is a card, you may exile it encoded on a creature you control. */
   | { type: "cipher" }
   /**
@@ -1305,7 +1318,7 @@ export type Effect =
    * `newTargets`: "you may choose new targets for the copy" (707.10c).
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
-  | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true }
+  | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }
@@ -1389,6 +1402,8 @@ export type Effect =
       attacking?: boolean;
       /** "For each opponent, create ... that's tapped and attacking that player": `n` for each opponent, attacking them. */
       attackingEach?: boolean;
+      /** "... attacking that player or a planeswalker they control" (Adeline): its controller chooses which as they enter. */
+      orPlaneswalker?: true;
       /** "With N +1/+1 counters on it": it enters with them (incubate, CR 701.53a). */
       counters?: { counter: CounterKind; n: Amount };
       /**
@@ -1538,7 +1553,13 @@ export type Effect =
    * knowing the earlier answers (CR 101.4), then `effects` happen to those who chose to ({ ref: "choseThisWay" }).
    * `wheel`: the number of cards drawn, for the bots' answer.
    */
-  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number }
+  /**
+   * `each`: a tempting offer and the like ("Each opponent may create a Treasure token. For each opponent who does, you
+   * create a Treasure token"): `effects` happen for each player who chose to, as if they were "you", one after another,
+   * and players who can't do it aren't asked (`need`: they must control one of these, or have one in their graveyard). `perAccepted`: then these, once
+   * for each player who did (only opponents with `opponents`), with that player as "that player" (PlayerRef "eachOne").
+   */
+  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; need?: { zone: "battlefield" | "graveyard"; filter: TargetSpec }; perAccepted?: { effects: Effect[]; opponents?: true } }
   /**
    * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards
    * a card". Each player in APNAP order picks one of `options` they can do (or none) and, for a discard or a sacrifice,
@@ -1708,7 +1729,7 @@ export type Effect =
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
-  | { type: "playerGains"; keywords: string[] }
+  | { type: "playerGains"; keywords: string[]; /** "Until your next turn" rather than until end of turn (Noble Heritage). */ untilYourNextTurn?: true }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the
    * controller, votes for one of `options` (words with no rules meaning, 701.38b), or for one of the permanents or cards
@@ -2778,8 +2799,13 @@ export interface CompiledCard {
   lifeFloor?: number;
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
   drawTwoInstead?: true;
-  /** "Room abilities of dungeons you own trigger an additional time" (Hama Pashar, CR 603.2d). */
-  roomsTwice?: true;
+  /**
+   * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
+   * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant).
+   */
+  firstDrawLook?: true;
+  /** "Room abilities of dungeons you own trigger an additional time" (Hama Pashar, CR 603.2d): how many instances, granted ones too (Dungeon Delver). */
+  roomsTwice?: number;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents" | "enchanted";
   /**

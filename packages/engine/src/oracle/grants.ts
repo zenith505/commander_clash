@@ -25,10 +25,11 @@ export function compileGranted(text: string): CompiledCard {
 /**
  * The kinds of static abilities an effect can give an object and the engine runs (see `grantedStatics` in layers.ts and
  * `withGranted` in cards.ts): continuous effects in layer 7 or the rules that apply after abilities are settled in layer
- * 6 (CR 613.1f-g), cost changes, counter and token replacements, and "enters with an additional counter". Ones that
+ * 6 (CR 613.1f-g), cost changes, counter and token replacements, "enters with an additional counter" and
+ * "room abilities trigger an additional time", and a draw replacement (Scion of Halaster). Ones that
  * change types, colors or abilities would have to come out of the same layers that grant them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional"]);
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook"]);
 export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => !["2", "4", "5", "6"].includes(layerOf(m)) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
 
 /**
@@ -131,6 +132,11 @@ export function parseGrants(text: string): Modification[] | null {
     // Myriad too: several instances each trigger (CR 702.116b).
     if (/^myriad$/i.test(w)) {
       out.push({ kind: "addAbility", text: "Myriad" });
+      continue;
+    }
+    // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).
+    if (/^(?:persist|undying)$/i.test(w)) {
+      out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
     // Ward is a triggered ability too (CR 702.21a); several instances each trigger (CR 702.21b).

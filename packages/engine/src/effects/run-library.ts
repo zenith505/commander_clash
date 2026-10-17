@@ -33,6 +33,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const p = player(s, pid);
         const ids = p.library.slice(0, amountNow(s, e.n, ctx));
         for (const id of ids) moveObject(s, id, "exile");
+        if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
         // An empty library: nothing happens (ingest rulings).
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
       }

@@ -1,9 +1,9 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player } from "../game";
+import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
+import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -258,6 +258,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = a && s.objects[a.id];
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === a.zc ? [o] : [];
   }
+  if (ref.ref === "exiledTop") {
+    const ex = s.resolving?.exiledTop;
+    const o = ex && s.objects[ex.id];
+    return o && o.zone === "exile" && (o.zoneChanges ?? 0) === ex.zc ? [o] : [];
+  }
   if (ref.ref === "revealed") {
     const rv = s.resolving?.revealed;
     const o = rv && s.objects[rv.id];
@@ -303,7 +308,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
-    return s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false));
+    const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : undefined;
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))));
+    if (!ref.andSelf) return others;
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+    return here && !others.includes(me) ? [me, ...others] : others;
   }
   return s.battlefield
     .map((id) => obj(s, id))
@@ -769,4 +779,17 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;
   // A spell's reflexive trigger: its source is the spell, gone from the stack, so as it last existed there (CR 113.7a).
   return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell || item?.fromSpell ? { spell: true as const } : {}) };
+}
+
+/**
+ * The creature types of this ability's source: as it is on the battlefield, or as it last existed there once it has
+ * left (CR 608.2h), or its card if it never was. Changeling-like "every creature type" is "all" (CR 702.73a).
+ */
+export function sourceCreatureTypes(s: GameState, ctx: ResolveCtx): Set<string> | "all" {
+  const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  if (src && src.zone === "battlefield" && (ctx.sourceZc === undefined || (src.zoneChanges ?? 0) === ctx.sourceZc)) return creatureTypesOf(s, src);
+  const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+  const last = lk?.creatureTypes && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc) ? lk.creatureTypes : undefined;
+  if (last) return last === "all" ? "all" : new Set(last);
+  return ctx.sourceDef.keywords.includes("Changeling") ? "all" : new Set(ctx.sourceDef.subtypes.filter((t) => CREATURE_TYPES.has(t)));
 }

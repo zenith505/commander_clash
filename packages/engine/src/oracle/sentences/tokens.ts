@@ -23,11 +23,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "An X/X green Ooze creature token": X is the spell's or ability's own, or defined by "where X is ..." (body.ts defineX).
   // "For each opponent, create a 1/1 black Ninja creature token that's tapped and attacking that player" (Endless Foot
   // Assault, Veteran Soldier): one group for each opponent, each attacking that opponent (CR 508.4), all at once.
-  if ((m = /^[Ff]or each opponent, (?:you )?(create .+? that(?:'s| are) tapped and attacking) that (?:player|opponent)$/.exec(s))) {
+  // "... attacking that player or a planeswalker they control" (Adeline): which one is chosen as they enter (rulings).
+  if ((m = /^[Ff]or each opponent, (?:you )?(create .+? that(?:'s| are) tapped and attacking) that (?:player|opponent)( or a planeswalker they control)?$/.exec(s))) {
     const fx = parseSentence(`C${m[1]!.slice(1)}`, ctx);
     const tok = fx?.length === 1 ? fx[0] : undefined;
     if (tok?.type !== "createToken" || !tok.attacking || tok.who.ref !== "you") return null;
-    return [{ ...tok, attacking: undefined, tapped: true, attackingEach: true }];
+    return [{ ...tok, attacking: undefined, tapped: true, attackingEach: true, ...(m[2] ? { orPlaneswalker: true as const } : {}) }];
   }
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";

@@ -3,12 +3,11 @@ import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
-import { CREATURE_TYPES } from "../keywords";
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected } from "./resolve";
+import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes } from "./resolve";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
 import { describePay } from "./describe";
@@ -60,7 +59,14 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Each player decides in APNAP order, seeing the earlier answers (CR 101.4); then it happens to those who chose to.
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.mayQueue) {
-        sc.mayQueue = apnap(s, players(s, e.who, ctx));
+        // Someone who can't do it isn't asked (CR 101.3): "put two +1/+1 counters on a creature they control" with none.
+        const need = e.need;
+        const can = (pid: PlayerId) =>
+          !need ||
+          (need.zone === "battlefield"
+            ? s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, need.filter, obj(s, id), pid, false))
+            : player(s, pid).graveyard.some((id) => printedMatches(need.filter, defOf(s, obj(s, id)))));
+        sc.mayQueue = apnap(s, players(s, e.who, ctx)).filter(can);
         sc.mayers = [];
       }
       while (sc.mayQueue.length) {
@@ -73,6 +79,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.may = undefined;
         sc.mayQueue.shift();
       }
+      if (e.each) return eachAccepted(s, e, ctx);
       // Each instruction once, also when one of them waits on a player (a draw that stops for dredge).
       for (sc.mayStep ??= 0; sc.mayStep < e.effects.length; sc.mayStep++) if (runEffect(s, e.effects[sc.mayStep]!, ctx) === "paused") return "paused";
       return;
@@ -298,17 +305,14 @@ function revealedIs(s: GameState, filter: TargetSpec): boolean {
 
 /**
  * Does the revealed card share a creature type with this ability's source (kinship)? The source as it is on the
- * battlefield; once gone, its card (its creature types as it last existed aren't kept). Changeling counts in any zone
- * (CR 702.73a).
+ * battlefield; once gone, as it last existed there (CR 608.2h), or its card if it never was. Changeling counts in any
+ * zone (CR 702.73a).
  */
 function revealedSharesType(s: GameState, ctx: ResolveCtx): boolean {
   const rv = s.resolving?.revealed;
   const o = rv && s.objects[rv.id];
   if (!o || (o.zoneChanges ?? 0) !== rv.zc) return false;
-  const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-  const here = src && src.zone === "battlefield" && (ctx.sourceZc === undefined || (src.zoneChanges ?? 0) === ctx.sourceZc);
-  const mine = here ? creatureTypesOf(s, src) : ctx.sourceDef.keywords.includes("Changeling") ? "all" : new Set(ctx.sourceDef.subtypes.filter((t) => CREATURE_TYPES.has(t)));
-  return shareCreatureType(mine, creatureTypesOf(s, o));
+  return shareCreatureType(sourceCreatureTypes(s, ctx), creatureTypesOf(s, o));
 }
 
 /** How many "if" instructions are running inside one another right now: each keeps its place in `scratch.ifs`. */
@@ -568,4 +572,29 @@ function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number
 function describePenalty(e: Extract<Effect, { type: "punisher" }>): string {
   const lose = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
   return typeof lose === "number" ? `Lose ${lose} life` : "Take the penalty";
+}
+
+/**
+ * A tempting offer's instructions for each player who accepted, as if each were "you" (rulings on Tempt with Glory: then
+ * the second part once for each opponent who did, "that player" being them). One player's after another; each run starts
+ * with the choices of the one before forgotten, while what the resolution held before it began is kept.
+ */
+function eachAccepted(s: GameState, e: Extract<Effect, { type: "eachMay" }>, ctx: ResolveCtx): "paused" | void {
+  const sc = s.resolving!.scratch!;
+  const did = sc.mayers ?? [];
+  const second = e.perAccepted ? did.filter((p) => !e.perAccepted!.opponents || opponents(s, ctx.controller).includes(p)) : [];
+  const runs = [...did.map((p) => ({ p, fx: e.effects, as: p })), ...second.map((p) => ({ p, fx: e.perAccepted!.effects, as: ctx.controller }))];
+  sc.offer ??= { i: 0, keep: [...Object.keys(sc), "offer", "mayStep"] };
+  while (sc.offer.i < runs.length) {
+    const run = runs[sc.offer.i]!;
+    if (player(s, run.p).lost) {
+      sc.offer.i++;
+      continue;
+    }
+    const sub: ResolveCtx = { ...ctx, controller: run.as, eachOne: run.p };
+    for (sc.mayStep ??= 0; sc.mayStep < run.fx.length; sc.mayStep++) if (runEffect(s, run.fx[sc.mayStep]!, sub) === "paused") return "paused";
+    for (const k of Object.keys(sc) as (keyof typeof sc)[]) if (!sc.offer.keep.includes(k)) delete sc[k];
+    sc.mayStep = undefined;
+    sc.offer.i++;
+  }
 }

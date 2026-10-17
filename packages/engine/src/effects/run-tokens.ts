@@ -6,8 +6,9 @@ import { copyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault } from "./triggers";
+import { attackChoices } from "./run-zones";
 import { copiedValues } from "./run-copies";
-import { invalidateCharacteristics } from "../layers";
+import { controllerOf, invalidateCharacteristics } from "../layers";
 
 /**
  * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
@@ -98,6 +99,23 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "createToken": {
       const n = amountNow(s, e.n, ctx);
+      // "Attacking that player or a planeswalker they control" (Adeline): what each opponent's tokens attack is chosen
+      // first, as they enter (CR 508.4, rulings), one opponent at a time; then they're all created at once.
+      if (e.attackingEach && e.orPlaneswalker && inCombat(s) && s.activePlayer === ctx.controller) {
+        const sc = (s.resolving!.scratch ??= {});
+        const picks = (sc.attackEach ??= {});
+        for (const opp of apnap(s, opponents(s, ctx.controller))) {
+          if (picks[opp] !== undefined) continue;
+          const options = attackChoices(s, ctx.controller, ctx.sourceId).filter((a) => a.player === opp);
+          if (options.length < 2) continue;
+          if (sc.attackWhom === undefined) {
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: options.map((a) => a.key), labels: options.map((a) => a.label), prompt: `choose what the ${e.token.name} token${n === 1 ? "" : "s"} for ${player(s, opp).name} attack${n === 1 ? "s" : ""}` };
+            return "paused";
+          }
+          picks[opp] = sc.attackWhom;
+          sc.attackWhom = undefined;
+        }
+      }
       // "Attached to it": what was just put onto the battlefield, found before this list starts over.
       const hosts = e.attachTo && objects(s, e.attachTo, ctx).map((o) => o.id);
       if (s.resolving) s.resolving.created = [];
@@ -121,11 +139,18 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
   // One group for each opponent, attacking that opponent if it's this player's combat (CR 508.4), tapped either way.
   if (e.attackingEach) {
     const pid = ctx.controller;
+    const picks = s.resolving?.scratch?.attackEach ?? {};
     for (const opp of apnap(s, opponents(s, pid))) {
       const k = tokensToCreate(s, pid, e.token, n);
       const defender = inCombat(s) && s.activePlayer === pid ? opp : undefined;
-      for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: true, attacking: defender });
-      if (k) log(s, `${src} creates ${k === 1 ? "a" : k} tapped${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined ? ` (attacking ${player(s, defender).name})` : ""}.`);
+      // A planeswalker chosen for this opponent's tokens, if it's still there (Adeline).
+      const pw = defender !== undefined ? /^\d+:(.+)$/.exec(picks[opp] ?? "")?.[1] : undefined;
+      const walker = pw && s.objects[pw]?.zone === "battlefield" && controllerOf(s, s.objects[pw]!) === opp ? s.objects[pw] : undefined;
+      for (let i = 0; i < k; i++) {
+        const t = createToken(s, pid, e.token, { tapped: true, attacking: defender });
+        if (walker && t?.zone === "battlefield" && t.attacking !== undefined) t.attackingPermanent = { id: walker.id, zc: walker.zoneChanges ?? 0 };
+      }
+      if (k) log(s, `${src} creates ${k === 1 ? "a" : k} tapped${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined ? ` (attacking ${walker ? `${defOf(s, walker).name} (${player(s, defender).name})` : player(s, defender).name})` : ""}.`);
     }
     return;
   }
@@ -194,7 +219,7 @@ export function tokenDef(t: TokenSpec): CardDef {
   };
 }
 
-export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number> } = {}) {
+export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number> } = {}): GameObject {
   const o = newObject(s, tokenDef(t), pid, "exile");
   o.isToken = true;
   // It enters like any permanent, so ETB triggers see it, with any counters it's created with (CR 122.6, 614.1c).
@@ -202,6 +227,7 @@ export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { t
   if (opts.attacking !== undefined && o.zone === "battlefield") o.attacking = opts.attacking;
   s.resolving?.created?.push(o.id);
   noteCreated(s, pid, o);
+  return o;
 }
 
 /** A token `pid` created (CR 111.2), for "the number of Treasure tokens you created this turn". */

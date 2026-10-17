@@ -302,6 +302,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "arrangeTop", player: pid, top: keep, away: pend.cards.filter((id) => !keep.includes(id)) }];
     }
     if (pend.kind === "orderGraveyard") return [{ type: "orderGraveyard", player: pid, order: orderOwnGraveyard(s, pend.cards) }];
+    // A merged permanent's cards on top of its library: the cheapest drawn first; at the bottom it doesn't matter.
+    if (pend.kind === "orderLibrary") return [{ type: "orderLibrary", player: pid, order: pend.bottom ? pend.cards : [...pend.cards].sort((a, b) => mv(s, a) - mv(s, b)) }];
     if (pend.kind === "mulligan") return [{ type: "mulligan", player: pid, keep: !pend.canMulligan || keepsHand(s, pid, pend.taken) }];
     if (pend.kind === "bottomCards") return [{ type: "bottomCards", player: pid, objectIds: chooseBottom(s, pid, pend.count) }];
     if (pend.kind === "discardToHandSize") {

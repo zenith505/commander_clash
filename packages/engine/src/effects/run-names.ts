@@ -2,7 +2,7 @@ import type { Effect } from "../abilities";
 import { defOf } from "../cards";
 import { log, loseLife, moveObject, obj, player } from "../game";
 import { currentName } from "../names";
-import { shuffle } from "../rng";
+import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { bindChosen, printedMatches } from "./targeting";
 import { ResolveCtx, players } from "./resolve";
@@ -38,7 +38,7 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of ids) moveObject(s, id, "exile");
       r.exiledFromHand = fromHand;
       log(s, `${player(s, ctx.controller).name} searches ${p.name}'s graveyard, hand and library${name ? ` for cards named ${name}` : ""} and exiles ${ids.length || "none"}${ids.length ? ` (${fromHand} from their hand)` : ""}.`);
-      shuffle(s, p.library);
+      shuffleLibrary(s, p);
       log(s, `${p.name} shuffles their library.`);
       return;
     }

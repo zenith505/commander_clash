@@ -2,7 +2,7 @@ import type { AbilityBody, Effect, SpellCondition, TargetChoice, TargetSpec, Unl
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf } from "../layers";
-import { shuffle } from "../rng";
+import { shuffle, shuffleLibrary } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -75,14 +75,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
         return;
       }
+      // A merged permanent's cards each (CR 730.3c): one delayed trigger for each.
       if (e.each === "subjectCard") {
-        const card = objects(s, { ref: "subjectCard" }, ctx)[0];
-        if (card) addDelayed(s, e.when, ctx.controller, card, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(card));
+        for (const card of objects(s, { ref: "subjectCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(card));
         return;
       }
       if (e.each === "selfCard") {
-        const card = objects(s, { ref: "selfCard" }, ctx)[0];
-        if (card) addDelayed(s, e.when, ctx.controller, card, body);
+        for (const card of objects(s, { ref: "selfCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body);
         return;
       }
       if (e.each === "subject") {
@@ -270,7 +269,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (pid === undefined) return;
         const p = player(s, pid);
         if (e.shuffleFirst) {
-          shuffle(s, p.library);
+          shuffleLibrary(s, p);
           log(s, `${p.name} shuffles their library.`);
         }
         const at = p.library.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land"));

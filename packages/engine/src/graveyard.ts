@@ -61,11 +61,29 @@ export function closeGraveyardBatch(s: GameState) {
   for (const [owner, cards] of groups) (s.graveyardOrders ??= []).push({ owner, cards });
 }
 
-/** Ask the next owner to arrange cards that went to their graveyard together. False if there's nothing to arrange. */
+/**
+ * A merged permanent was put into its owner's library (CR 730.3a): its cards there (`cards`, the new objects) wait to be
+ * arranged by their owner, as cards put into a graveyard together do, unless the library is shuffled first.
+ */
+export function noteMergedToLibrary(s: GameState, owner: PlayerId, cards: { id: ObjectId; zc: number }[], bottom: boolean) {
+  const here = cards.filter((c) => s.objects[c.id]?.zone === "library" && s.objects[c.id]!.owner === owner);
+  if (here.length < 2) return;
+  (s.graveyardOrders ??= []).push({ owner, cards: here, library: { bottom, shuffles: player(s, owner).shuffles ?? 0 } });
+}
+
+/** Ask the next owner to arrange cards that went to their graveyard (or library) together. False if there's nothing to arrange. */
 export function askGraveyardOrder(s: GameState): boolean {
   while (s.graveyardOrders?.length) {
     const g = s.graveyardOrders.shift()!;
     const p = player(s, g.owner);
+    if (g.library) {
+      // Shuffled since, the cards aren't where they were put (CR 701.24a).
+      if ((p.shuffles ?? 0) !== g.library.shuffles || p.lost) continue;
+      const there = new Set(g.cards.filter((c) => s.objects[c.id]?.zone === "library" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id));
+      if (there.size < 2) continue;
+      s.pending = { kind: "orderLibrary", player: p.id, cards: p.library.filter((id) => there.has(id)), ...(g.library.bottom ? { bottom: true as const } : {}), source: "The cards of a merged permanent put into your library" };
+      return true;
+    }
     const here = new Set(g.cards.filter((c) => s.objects[c.id]?.zone === "graveyard" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id));
     if (here.size < 2 || p.lost) continue;
     s.pending = { kind: "orderGraveyard", player: p.id, cards: p.graveyard.filter((id) => here.has(id)).reverse(), source: "Cards put into your graveyard at the same time" };
@@ -93,6 +111,19 @@ export function orderGraveyard(s: GameState, p: Player, order: ObjectId[]) {
   [...order].reverse().forEach((id, i) => (yard[slots[i]!] = id));
   s.pending = null;
   log(s, `${p.name} puts ${order.length} cards in their graveyard in this order, top first: ${order.map((id) => defOf(s, s.objects[id]!).name).join(", ")}.`);
+  if (s.resolving) continueResolution(s);
+}
+
+/** The answer to orderLibrary: `order` is the cards, the one nearest the top first. The order isn't revealed (CR 730.3a). */
+export function orderLibrary(s: GameState, p: Player, order: ObjectId[]) {
+  const pend = s.pending;
+  if (pend?.kind !== "orderLibrary" || pend.player !== p.id) throw new RulesError("nothing to arrange");
+  if (order.length !== pend.cards.length || new Set(order).size !== order.length || order.some((id) => !pend.cards.includes(id))) throw new RulesError("put each of those cards in the order once");
+  const lib = p.library;
+  const slots = pend.cards.map((id) => lib.indexOf(id)).sort((a, b) => a - b); // from the top down
+  order.forEach((id, i) => (lib[slots[i]!] = id));
+  s.pending = null;
+  log(s, `${p.name} puts ${order.length} cards ${pend.bottom ? "on the bottom of" : "on top of"} their library in the order they choose.`);
   if (s.resolving) continueResolution(s);
 }
 

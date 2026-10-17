@@ -413,6 +413,8 @@ export interface ManaLot {
 }
 
 export interface Player {
+  /** How many times their library has been shuffled (see rng.ts shuffleLibrary). */
+  shuffles?: number;
   /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
   noMaxHandSize?: true;
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
@@ -667,6 +669,11 @@ export interface LastKnown {
   suspected?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
+  /**
+   * A merged permanent `of` that left the battlefield (an ability triggered by its leaving): the other cards it became
+   * (CR 730.3c), which an effect finding the new object `of` finds too.
+   */
+  mergedCards?: { of: ObjectId; cards: { id: ObjectId; zc: number }[] };
 }
 
 /** Choices for a spell's additional costs (CR 601.2b, 601.2f-h). */
@@ -843,7 +850,12 @@ export type PendingDecision =
    * Cards put into this player's graveyard at the same time (CR 404.3), or with `whole` their whole graveyard ("reorder
    * your graveyard as you choose", Fossil Find): put them in any order. `cards` are as they are now, top first.
    */
-  | { kind: "orderGraveyard"; player: PlayerId; cards: ObjectId[]; source: string; whole?: true };
+  | { kind: "orderGraveyard"; player: PlayerId; cards: ObjectId[]; source: string; whole?: true }
+  /**
+   * A merged permanent was put into its owner's library (CR 730.3a): its cards are `cards` there, top first, together on
+   * top of the library or at the bottom, and the owner arranges them without revealing the order.
+   */
+  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string };
 
 export interface GameEvent {
   seq: number;
@@ -922,7 +934,8 @@ export interface GameState {
    * Permanents that left the battlefield in the current event (one effect, or one pass of state-based
    * actions): their leaves-the-battlefield abilities look back and see each other leave (CR 603.10a).
    */
-  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId }[];
+  /** `card`: its copiable values as it last existed (CR 603.10a), a key into `cards`. */
+  leftTogether?: { id: ObjectId; controller: PlayerId; hadAbilities: boolean; granted?: string[]; attachedTo?: ObjectId; card?: string }[];
   /**
    * Cards put into a graveyard in the current event (one instruction of a resolving spell or ability, one pass of
    * state-based actions, one action's costs), as they are there: their owner arranges them (CR 404.3). See graveyard.ts.
@@ -931,7 +944,8 @@ export interface GameState {
   /** The objects the current event (as `graveyardBatch` counts events) moved, for "one or more" triggers (CR 603.2c). */
   zoneBatch?: ZoneMove[];
   /** Groups of two or more cards that went to one graveyard at the same time, waiting for their owner to arrange them. */
-  graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[] }[];
+  /** `library`: a merged permanent's cards put into its owner's library together (CR 730.3a), unless it's shuffled since (`shuffles`, Player.shuffles then). */
+  graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number } }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
@@ -1377,6 +1391,8 @@ export type Action =
   | { type: "arrangeTop"; player: PlayerId; top: ObjectId[]; away: ObjectId[] }
   /** Answer to orderGraveyard: the same cards in their new order, first = top. */
   | { type: "orderGraveyard"; player: PlayerId; order: ObjectId[] }
+  /** Answer to orderLibrary: the same cards in their new order, first = nearest the top. */
+  | { type: "orderLibrary"; player: PlayerId; order: ObjectId[] }
   /** Answer to searchLibrary: the cards found (first = the one for `firstTo`). */
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
   /** Answer to a distribute decision: how many counters each permanent gets (left out: none). */

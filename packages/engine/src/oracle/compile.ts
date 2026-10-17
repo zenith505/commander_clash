@@ -217,6 +217,9 @@ export function normalizeSelf(d: CardDef): string {
   // "Your team" means the same as "you" in a game that isn't between teams (CR 102.4): "Warriors your team controls",
   // "if your team gained life this turn".
   t = t.replace(/\byour team controls\b/g, "you control").replace(/\byour team gained\b/g, "you gained");
+  // Azra Bladeseeker: "each player on your team may discard a card, then each player who discarded a card this way draws
+  // a card" is you alone.
+  t = t.replace(/\beach player on your team may discard a card, then each player who discarded a card this way draws a card\b/g, "you may discard a card. If you do, draw a card");
   return t;
 }
 

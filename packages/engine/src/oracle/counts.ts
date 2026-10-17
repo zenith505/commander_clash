@@ -30,10 +30,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const n = num(m[3]!) * (m[2]!.toLowerCase() === "minus" ? -1 : 1);
     return c && { ...c, plus: (c.plus ?? 0) + n };
   }
-  // "Half your life total, rounded up", "half the number of Forests you control, rounded down" (CR 107.1a).
-  if ((m = /^half (.+?),? rounded (up|down)$/i.exec(p))) {
+  // "Half your life total, rounded up", "half the number of Forests you control, rounded down" (CR 107.1a), or rounded as
+  // the ability's "Round up each time." says.
+  if ((m = /^half (.+?)(?:,? rounded (up|down))?$/i.exec(p))) {
+    const round = (m[2]?.toLowerCase() ?? ctx?.halfRound) as "up" | "down" | undefined;
     const c = m[1] === "X" ? { count: { kind: "x" } as Count } : parseCount(m[1]!, ctx);
-    return c && !c.half && !c.negate ? { ...c, half: m[2]!.toLowerCase() as "up" | "down" } : null;
+    return round && c && !c.half && !c.negate ? { ...c, half: round } : null;
   }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control".
   if (!each && (m = /^the greatest power among (other )?(creatures you control|creatures on the battlefield)$/i.exec(p))) {
@@ -167,6 +169,17 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return spec?.kind === "object" && (spec.types?.length || spec.subtypes?.length) ? count({ kind: "permanents", filter: { ...spec, text: p }, other: true }) : null;
   }
   return null;
+}
+
+/** How "half ..." is rounded: as its own ", rounded up" says, else as the ability's "Round up each time." (CR 107.1a). */
+export function roundOf(word: string | undefined, ctx: Ctx | null): "up" | "down" | undefined {
+  return (word?.toLowerCase() ?? ctx?.halfRound) as "up" | "down" | undefined;
+}
+
+/** "Half X", rounded as `roundOf` says: the X it was cast or activated with. */
+export function halfX(word: string | undefined, ctx: Ctx | null): AmountExpr | null {
+  const half = roundOf(word, ctx);
+  return half ? { count: { kind: "x" }, half } : null;
 }
 
 /**

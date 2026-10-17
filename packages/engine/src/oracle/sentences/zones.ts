@@ -4,7 +4,7 @@ import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../
 import { NUM, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
-import { parseBoundCount, parseCount } from "../counts";
+import { parseBoundCount, parseCount, roundOf } from "../counts";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
 import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
@@ -424,6 +424,16 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = /^(.+?) sacrifices? a creature (?:with the greatest power among creatures (?:they control|that player controls)|they control with the greatest power)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
+  }
+  // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
+  // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before
+  // anyone chooses (rulings on Fraying Omnipotence, CR 107.1a).
+  if ((m = /^(?:(.+?) )?[Ss]acrifices? half the (.+?) (you|they|that player) controls?(?: of (?:their|his or her) choice)?(?:, rounded (up|down))?$/.exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : ({ ref: "you" } as const);
+    const filter = pickFilter(m[2]!);
+    const half = roundOf(m[4], ctx);
+    if (!who || !filter || filter.kind !== "object" || !half || (who.ref === "you") !== (m[3] === "you")) return null;
+    return [{ type: "pick", who, filter, n: { count: { kind: "permanents", filter, whose: { ref: "eachOne" } }, half }, action: "sacrifice" }];
   }
   if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

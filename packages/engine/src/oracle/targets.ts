@@ -70,6 +70,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
+  // "Whenever ~ deals combat damage to a player, they lose half their life" (Unstoppable Slasher): that player, while no
+  // other player has been named.
+  if (x === "they" && ctx.eventPlayer && ctx.lastPlayerTarget === undefined && !ctx.chosenOpponent) return { ref: "eventPlayer" };
   if (x === "defending player" && ctx.defending) return { ref: "eventPlayer" };
   if (x === "enchanted player" || x === "enchanted opponent") return { ref: "enchantedPlayer" };
   // "Any number of target players each mill two cards" (CR 601.2c, 115.6): one entry for them all until it's cast

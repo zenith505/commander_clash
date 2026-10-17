@@ -1750,6 +1750,13 @@ export type TriggerEvent =
   /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
   | "youRollDie"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
+  /**
+   * "Whenever you're dealt damage", "whenever an opponent is dealt damage", "whenever enchanted player is dealt damage": once
+   * for all the damage dealt to that player at the same time (rulings on Grievous Wound); the event amount is that damage.
+   */
+  | "youAreDealtDamage"
+  | "opponentIsDealtDamage"
+  | "enchantedPlayerDealtDamage"
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
   /** "Whenever an opponent activates an ability that isn't a mana ability" (see TriggeredAbility.activates). */
@@ -1880,8 +1887,8 @@ export interface TriggeredAbility {
    * went. The card is the subject ("exile it").
    */
   sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
-  /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information. */
-  ifNoCounter?: "+1/+1" | "-1/-1";
+  /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
+  ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /**
    * Evolve (CR 702.100a): "if that creature's power is greater than this creature's power and/or
    * that creature's toughness is greater than this creature's toughness", checked as it triggers and
@@ -2033,6 +2040,11 @@ export interface ActivatedAbility {
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
   lifeCost?: number;
+  /**
+   * "Pay half your life, rounded up" as part of the cost (CR 119.4, 107.1a): half the life total as the cost is worked out
+   * (CR 601.2f), 0 with 0 or less life (rulings on Lurking Evil).
+   */
+  halfLifeCost?: "up" | "down";
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
   /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */

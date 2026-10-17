@@ -71,6 +71,8 @@ export interface Ctx {
   subjectLeft?: boolean;
   /** This sentence defines its own X ("..., where X is ..."): "up to X target ..." isn't the spell's X then. */
   whereX?: boolean;
+  /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
+  halfRound?: "up" | "down";
 }
 
 /**
@@ -100,6 +102,8 @@ const checkableMay = (e: Effect) =>
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
+  // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
+  (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "number") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
   (e.type === "putOntoBattlefield" && e.what.ref === "graveyardEnd" && !e.atEndStep && !e.haste) ||
   // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return. "You may
@@ -315,6 +319,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
   };
+  // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
+  // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
+  const roundEach = /(?:^|\s)Round (up|down) each time\.?$/.exec(text.trim());
+  if (roundEach) {
+    text = text.trim().slice(0, roundEach.index);
+    ctx.halfRound = roundEach[1] as "up" | "down";
+  }
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
@@ -324,6 +335,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   let rowToken: string | undefined;
+  // The instructions split off after a ", then" (the first part of each sentence stays out).
+  const thenParts = new Set<string>();
+  const thenPart = (p: string) => (thenParts.add(p), p);
   const sentences = splitSentences(text.trim())
     .map((x) => x.replace(/\.$/, "").trim())
     // A results table's row (CR 706.3a): a marker, then its instructions, up to the next row.
@@ -342,7 +356,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i, all) => (i ? thenSubject(all[0]!, p) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -355,6 +369,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;
+  // Where the sentence before started, counting the parts split off at ", then" as one sentence with it: "Draw a card,
+  // then discard a card. If you have a full party, instead draw three cards." (The Destined Thief) replaces both.
+  let prevWhole = 0;
+  let curWhole = 0;
   // Where the targets of the sentence before and of this one start.
   let prevTargets = 0;
   let curTargets = 0;
@@ -362,6 +380,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   let payFirst: { pay: PayCost; text: string } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
+  // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
+  let digWhere: AmountExpr | undefined;
   // A look that a "you may pay ... If you do," before it depends on (see payFirst).
   let digPaid: { pay: PayCost; text: string } | null = null;
   // "If {B} was spent to cast ~, you may have target creature get -3/-3 until end of turn" (Cankerous Thirst): the "you
@@ -410,6 +430,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     }
     if (!closeGate()) return null;
     [prevStart, curStart] = [curStart, effects.length];
+    if (!thenParts.has(sentences[si]!)) [prevWhole, curWhole] = [curWhole, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
     // "Add {R}. Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4): the mana the sentence
     // before added, unless it can only be spent some ways.
@@ -621,10 +642,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const def = look[3] ? parseCount(look[3], ctx) : undefined;
       if (look[3] && !def) return null;
       dig = { type: "dig", n: def ? replaceX(X, def) : amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
+      digWhere = def ?? undefined;
       continue;
     }
     if (dig) {
-      const done = parseDig(s, dig, ctx);
+      const done = parseDig(s, dig, ctx, digWhere);
       if (!done) return null;
       if (done === "more") continue;
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
@@ -998,7 +1020,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
     const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (ifState && insteadOf) {
-      const previous = effects.slice(prevStart);
+      const from = thenParts.has(sentences[si]!) ? prevStart : prevWhole;
+      const previous = effects.slice(from);
       const t = ifState[2]!.replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "");
       const before = ctx.targets.length;
       // "Create a Treasure token. If you've completed a dungeon, create three of those tokens instead" (Safana).
@@ -1007,11 +1030,12 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
-      // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one).
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher")) return null;
+      // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
+      // sacrificing and discarding, which only wait on which ones (Vona's Hunger).
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
-      effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
+      effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
       continue;
     }
     // "You lose 2 life unless you control another Pirate": the instruction happens only if the condition is false as it
@@ -1668,8 +1692,11 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
   // "Any number of target players each mill a card and lose 1 life" (Tinybones Joins Up): all of them both times.
   const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^any number of target (players|opponents) each$/i.test(subject) ? "Each of those players" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
   if (!again) return null;
-  const first = parseSentence(`${subject} ${m[2]}`, ctx);
-  const second = first && parseSentence(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`, ctx);
+  // "Target player draws cards equal to half the number of cards in their library and loses half their life" (Peer into
+  // the Abyss): either part may be "... equal to ...".
+  const one = (t: string) => attempt(ctx, () => parseSentence(t, ctx)) ?? attempt(ctx, () => parseEqualTo(t, ctx));
+  const first = one(`${subject} ${m[2]}`);
+  const second = first && one(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`);
   return first && second ? [...first, ...second] : null;
 }
 

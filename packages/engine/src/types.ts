@@ -1196,6 +1196,7 @@ export interface Resolving {
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     untilNonland?: { hit?: ObjectId; caster: PlayerId }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
+    nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
     found?: ObjectId[]; // the cards a library search found
     /** "Each player puts a creature card from their graveyard onto the battlefield" (Exhume): players still to choose, and the cards chosen so far. */

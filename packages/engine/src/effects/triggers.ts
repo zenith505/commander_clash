@@ -76,6 +76,8 @@ export type TriggerSourceEvent =
   | { type: "lifeGained"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
   | { type: "lifeLost"; player: PlayerId; amount: number }
+  /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
+  | { type: "playerDealtDamage"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "dungeonCompleted"; player: PlayerId }
@@ -394,7 +396,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       o,
       ev.controller,
       (e, t) =>
-        (((e === "selfDies" && ev.wasCreature) || e === "selfToGraveyard") && ev.to === "graveyard" && !(t.ifNoCounter && (ev.counters[t.ifNoCounter] ?? 0) > 0)) ||
+        (((e === "selfDies" && ev.wasCreature) || e === "selfToGraveyard") && ev.to === "graveyard" && !(t.ifNoCounter && (t.ifNoCounter === "any" ? Object.values(ev.counters).some((n) => n > 0) : (ev.counters[t.ifNoCounter] ?? 0) > 0))) ||
         e === "selfLeaves" ||
         e === "selfLostControl",
       withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers,
@@ -527,6 +529,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (you !== ev.player) add(o, you, (e) => e === "opponentLosesLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
+  } else if (ev.type === "playerDealtDamage") {
+    // "That many" is the damage; "they" and "that player" the player dealt it. An Aura's controller controls its ability.
+    const info = { player: ev.player, amount: ev.amount };
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    }
   } else if (ev.type === "ringTempted") {
     // "Whenever the Ring tempts you" (CR 701.54d), "if you chose a creature other than ~ as your Ring-bearer" (CR 603.4);
     // "whenever you choose a creature as your Ring-bearer".

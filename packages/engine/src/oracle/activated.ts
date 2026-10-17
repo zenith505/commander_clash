@@ -35,10 +35,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
-  const costs = m[1]!;
+  // "Pay half your life, rounded up" (Murderous Betrayal) has a comma of its own: read it apart from the other costs.
+  const halfLife = /Pay half your life, rounded (up|down)/.exec(m[1]!);
+  const costs = halfLife ? m[1]!.replace(halfLife[0], "Pay half your life") : m[1]!;
   // Sacrificing other permanents or discarding cards as part of the cost (CR 602.2b, 601.2h).
   const extra: AdditionalCost[] = [];
   let removeCounters: ActivatedAbility["removeCounters"];
@@ -166,7 +168,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
   // libraries isn't compiled.
   const mana = manaAbilityKind(body);
-  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || keyword))) return "fail";
+  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || keyword || halfLife))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
   return {
@@ -188,6 +190,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(costLess ? { costLess } : {}),
     ...(activateIf ? { activateIf } : {}),
     ...(life ? { lifeCost: Number(life[1]) } : {}),
+    ...(halfLife ? { halfLifeCost: halfLife[1] as "up" | "down" } : {}),
     ...(energy ? { energyCost: energy } : {}),
     ...(extra.length ? { costs: extra } : {}),
     ...(removeCounters ? { removeCounters } : {}),

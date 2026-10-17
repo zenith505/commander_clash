@@ -1670,7 +1670,8 @@ function checkX(d: CardDef, out: CompiledCard) {
   // "Monstrosity X" (CR 701.37c): "when ~ becomes monstrous" abilities use the X it became monstrous with.
   const monstrousX = out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "monstrosity" && usesX(e.n)));
   out.triggers = out.triggers.filter((tr) => {
-    if (!usesX(tr.body) || (tr.event === "selfEnters" && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX)) return true;
+    // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX)) return true;
     bad(tr.body.text);
     return false;
   });

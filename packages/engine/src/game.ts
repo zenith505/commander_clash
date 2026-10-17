@@ -12,7 +12,7 @@ import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
-import { evalAmount } from "./amounts";
+import { evalAmount, halve } from "./amounts";
 import { addMana, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
@@ -1164,6 +1164,11 @@ const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.tur
 /** Can this player lose life, or does "you can't lose life this turn" stop it (CR 119.8)? */
 export function canLoseLife(s: GameState, pid: PlayerId): boolean {
   return !turnRule(s, pid, "cantLoseLife");
+}
+
+/** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
+export function halfLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility): number {
+  return ab.halfLifeCost ? halve(Math.max(0, player(s, pid).life), ab.halfLifeCost) : 0;
 }
 
 /** The most life `pid` can pay (CR 119.4): none while they can't lose life (CR 119.8). */
@@ -3538,6 +3543,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
   if (ab.lifeCost && payableLife(s, p.id) < ab.lifeCost) return `you can't pay ${ab.lifeCost} life`; // CR 119.4, 119.8
+  const half = halfLifeCost(s, p.id, ab);
+  if (half && payableLife(s, p.id) < half + (ab.lifeCost ?? 0)) return `you can't pay ${half} life`; // CR 119.4, 119.8
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
@@ -3667,7 +3674,9 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
   const abCost = activationCost(s, p.id, o, ab, targets);
-  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id))!;
+  // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
+  const halfLife = halfLifeCost(s, p.id, ab);
+  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - (ab.lifeCost ?? 0))!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -3676,7 +3685,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
   }
-  loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0));
+  loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0) + halfLife);
+  if (halfLife) log(s, `${p.name} pays ${halfLife} life (half their life, rounded ${ab.halfLifeCost}).`);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   // "Put a -1/-1 counter on ~" (Devoted Druid): through the replacement effects on counters (Vizier of Remedies rulings).

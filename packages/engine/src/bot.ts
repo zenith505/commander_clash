@@ -60,6 +60,7 @@ import {
   auraHostFor,
   auraHostKey,
   payableLife,
+  halfLifeCost,
   linkedExileCards,
   MAX_HAND_SIZE,
   hasNoMaxHandSize,
@@ -1915,6 +1916,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
       if ((ab.sacrificeSelf && !cashIn) || ab.exileSelf || freeCost || ab.station) continue;
+      // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
+      if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
       if (ab.body.effects.some((e) => e.type === "counters" && e.counter === "level") && (o.counters.level ?? 0) >= lastStriation(s, o, "level")) continue;
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.

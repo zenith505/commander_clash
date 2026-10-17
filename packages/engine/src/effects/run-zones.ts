@@ -6,7 +6,7 @@ import { putCounters } from "../counters";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, objectMatches, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, amountNow, amountCtx } from "./resolve";
+import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
@@ -77,8 +77,9 @@ export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: Pla
 function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const r = s.resolving!;
   const sc = (r.scratch ??= {});
-  const n = (sc.n ??= amountNow(s, e.n, ctx));
   let who = players(s, e.who, ctx);
+  // Each player's own number when it's "half the creatures they control" (CR 107.1a), all worked out before anyone picks.
+  const nFor = amountFor(s, e.n, ctx, who);
   // "Each opponent sacrifices a permanent of their choice unless they pay {3}": each chooses in turn order whether to pay
   // (CR 101.4), then those who didn't choose what to sacrifice (rulings).
   if (e.unless) {
@@ -100,7 +101,13 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   }
   while (sc.queue.length) {
     const pid = sc.queue[0]!;
+    const n = nFor[pid] ?? 0;
     const options = pickOptions(s, e, pid, ctx.sourceId);
+    if (!n) {
+      sc.chosen![pid] = [];
+      sc.queue.shift();
+      continue;
+    }
     if (options.length > n) {
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.least ? `${e.filter.text} with the least toughness` : e.greatest ? `${e.filter.text} with the greatest power` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}) };
       return "paused";

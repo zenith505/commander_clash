@@ -5,7 +5,7 @@ import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
 import { NUM, NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
-import { parseBoundCount, parseCount } from "../counts";
+import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
@@ -362,6 +362,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Drawing
   if ((m = new RegExp(`^(?:You )?[Dd]raw ${NUMX} cards?$`).exec(s))) return [{ type: "draw", who: { ref: "you" }, n: amt(m[1]!) }];
+  // "Draw half X cards, rounded down" (Wan Shi Tong), "you gain half X life and draw half X cards. Round down each time."
+  // (Hydroid Krasis, CR 107.1a).
+  if ((m = /^(?:(.+?) )?(draws?|gains?|loses?) half X (cards|life)(?:, rounded (up|down))?$/i.exec(s)) && /^draw/i.test(m[2]!) === (m[3] === "cards")) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : ({ ref: "you" } as const);
+    const n = halfX(m[4], ctx);
+    if (!who || !n) return null;
+    const verb = m[2]!.toLowerCase();
+    return [{ type: verb.startsWith("draw") ? "draw" : verb.startsWith("gain") ? "gainLife" : "loseLife", who, n }];
+  }
   if ((m = new RegExp(`^(.+?) draws? ${NUMX} cards?$`, "i").exec(s)) && !/ may /i.test(m[1]!)) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "draw", who, n: amt(m[2]!) }] : null;
@@ -370,10 +379,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^Gain ${NUMX} life$`).exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: amt(m[1]!) }];
   // "You lose half your life, rounded up", "each opponent loses half their life, rounded up": each of them half their own
   // life total (CR 107.1a).
-  if ((m = /^(.+?) (?:loses?) half (your|their|that player's|his or her) life, rounded (up|down)$/i.exec(s))) {
+  if ((m = /^(.+?) (?:loses?) half (your|their|that player's|his or her) life(?:, rounded (up|down))?$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    if (!who || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
-    return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half: m[3]!.toLowerCase() as "up" | "down" } }];
+    const half = roundOf(m[3], ctx);
+    if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
+    return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half } }];
   }
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

@@ -54,13 +54,15 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
     .map((o) => {
       const abs = manaAbilitiesOn(s, o);
       const treasure = isTreasure(s, o);
+      // Tapping it for mana triggers something of its own (Forbidden Orchard gives an opponent a Spirit): last.
+      const tapRider = abilitiesOf(s, o).triggers.some((t) => t.event === "tappedForMana" && !t.manaTap?.filter) ? 2 : 0;
       const options = manaOptions(s, o)
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
         .filter((x) => x.adds.length > 0 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, abs[x.ability]!.spendOnly!, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
-          return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
+          return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
         });
       if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];

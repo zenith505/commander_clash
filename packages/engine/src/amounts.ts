@@ -284,13 +284,17 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return types.size;
     }
     case "greatestPower": {
+      // 0 with none, or with only negative values (rulings on Inscription of Abundance: no life gained or lost).
       let best = 0;
       const filter = bindChosen(c.filter, ctx.chosen);
+      const whose = c.whose && refPlayers(s, c.whose, ctx);
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         const ch = view(o);
-        if (ch && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = Math.max(best, ch.power);
+        if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) {
+          best = Math.max(best, c.toughness ? ch.toughness : ch.power);
+        }
       }
       return best;
     }
@@ -417,7 +421,7 @@ function describeCount(c: Count): string {
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":
-      return `the greatest power among ${c.other ? "other " : ""}${c.filter.text}`;
+      return `the greatest ${c.toughness ? "toughness" : "power"} among ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestManaValue":
       return `the greatest mana value among ${c.filter.text}`;
     case "kicked":

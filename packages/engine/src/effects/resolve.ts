@@ -193,6 +193,7 @@ function manaAbilityResolved(s: GameState, item: StackItem, made: ManaType[]): v
   const m = item.manaAbility!;
   const o = item.sourceId ? s.objects[item.sourceId] : undefined;
   if (!m.tapped || !o) return;
+  if (o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: item.controller });
   const results = manaTriggerResults(s, item.controller, o, { tap: true } as ManaAbility, made);
   const extra = m.extra ?? [];
   const picked = results.length === 1 ? results[0]! : results.find((r) => r.extra.length === extra.length && r.extra.every((x, i) => x === extra[i]));

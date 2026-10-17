@@ -20,11 +20,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // another player's instruction (No Way Out) is the plain "create".
   // "... creature token with flying and haste named Hornet" (Hornet Cannon), "... tokens named Cadet": that name rather than
   // its subtypes (CR 111.4).
-  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+)/(\\d+) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
+  // "An X/X green Ooze creature token": X is the spell's or ability's own, or defined by "where X is ..." (body.ts defineX).
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
+    const xx = m[4] === "X" || m[5] === "X";
+    if (xx && (m[4] !== "X" || m[5] !== "X")) return null;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
-    const token = parseToken(Number(m[4]), Number(m[5]), m[6]!, m[7]);
+    const token = parseToken(xx ? 0 : Number(m[4]), xx ? 0 : Number(m[5]), m[6]!, m[7]);
     const how = `${m[3] ?? ""} ${m[9] ?? ""}`;
-    const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}) };
+    const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}), ...(xx ? { pt: X } : {}) };
     const named = m[8] ? { name: m[8], named: true as const } : {};
     return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token: { ...token, ...named }, ...state }] : null;
   }

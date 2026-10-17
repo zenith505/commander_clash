@@ -13,6 +13,7 @@ import { discardCards } from "./run-library";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
+import { voteWins } from "./run-votes";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -237,6 +238,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? objects(s, e.cond.what, ctx).some((o) => o.zone === "battlefield" && o.suspected !== undefined)
             : e.cond.kind === "state"
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)
+            : e.cond.kind === "voteWins"
+            ? voteWins(s, e.cond.option, !!e.cond.orTie)
             : e.cond.kind === "xAtLeast"
             ? (ctx.x ?? 0) >= e.cond.n
             : kickedMatches(ctx.kicked, e.cond);

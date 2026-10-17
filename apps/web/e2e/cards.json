@@ -174,6 +174,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e8df915f-f509-4c6c-9261-a5a16c3f06c5",
+  "name": "Ballot Broker",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Advisor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "While voting, you may vote an additional time. (The votes can be for different choices or for the same choice.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f28b21a6-f7ce-437a-8c5b-0423cb55cefb",
   "name": "Banishing Light",
   "manaCost": "{2}{W}",
@@ -1030,6 +1061,34 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2025-06-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "acf4d685-a718-42f7-9a7a-dee069ae8db2",
+  "name": "Council's Judgment",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Will of the council — Starting with you, each player votes for a nonland permanent you don't control. Exile each permanent with the most votes or tied for most votes.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Will of the council"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -5502,6 +5561,34 @@
   "commanderLegal": "legal",
   "set": "lea",
   "releasedAt": "1993-08-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ee7d2c2f-e32f-4be6-82ac-ff1e32055376",
+  "name": "Tyrant's Choice",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Will of the council — Starting with you, each player votes for death or torture. If death gets more votes, each opponent sacrifices a creature of their choice. If torture gets more votes or the vote is tied, each opponent loses 4 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Will of the council"
+  ],
+  "commanderLegal": "legal",
+  "set": "cns",
+  "releasedAt": "2014-06-06",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false

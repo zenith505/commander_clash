@@ -4267,6 +4267,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "vote") {
+    // A vote (CR 701.38a), or "none" to pass on an extra vote that's optional (see runVotesEffect).
+    const v = r.scratch?.vote;
+    if (!v) throw new RulesError("nothing to vote on");
+    v.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "enchant") {
     // What an Aura entering without being cast enchants, chosen as it enters (CR 303.4f).
     const sc = (r.scratch ??= {});

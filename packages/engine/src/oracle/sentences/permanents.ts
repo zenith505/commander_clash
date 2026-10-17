@@ -13,6 +13,8 @@ import { canonicalKeyword } from "../../keywords";
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
+  // Illusion of Choice (CR 701.38): the votes of every vote this turn are this player's to make.
+  if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
   // "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect that lasts
   // (CR 614.1c, 611.2b).
   const untilTapped = /^Until your next turn, ([a-z][^,]*?) enter tapped$/.exec(s);
@@ -178,6 +180,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
+  }
+  // "Return each card with the most votes or tied for most votes to your hand" (Custodi Squire): cards in your graveyard.
+  if (ctx.vote?.among && (m = /^Return (each card with the most votes or tied for most votes) to your hand$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "bounce", what }] : null;
   }
   if ((m = /^Return ((?:all|each) .+?) to (?:their|its) owners?'s? hands?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

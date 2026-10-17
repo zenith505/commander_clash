@@ -50,6 +50,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const text = `${m[3]!} ${who}`;
     return { count: { kind: "greatestPower", filter: { ...spec, text }, ...(m[2] ? { other: true as const } : {}), ...(m[1] === "toughness" ? { toughness: true as const } : {}), ...(whose ? { whose } : {}) } };
   }
+  // "For each death vote", "the number of profit votes": the votes for that word in the ability's vote (CR 701.38).
+  if ((m = /^(?:the number of )?(.+?) votes?$/i.exec(p)) && ctx?.vote?.options?.includes(m[1]!)) return { count: { kind: "votes", option: m[1]! } };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
   // "Draw a card for each creature destroyed this way" (Decree of Pain), "for each permanent destroyed this way", "the

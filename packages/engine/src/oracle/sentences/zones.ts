@@ -180,6 +180,10 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Return all land cards from your graveyard to the battlefield tapped" (Will of the Sultai), "Return all basic land cards
   // from all graveyards to the battlefield tapped under their owners' control" (Planar Birth), "Return all enchantment
   // cards from your graveyard to the battlefield" (Replenish: each Aura's controller chooses what it enchants, CR 303.4f).
+  // "Each player returns each creature card from their graveyard to the battlefield" (Magister of Worth): the same as from
+  // all graveyards under their owners' control.
+  const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s);
+  if (eachReturns) s = `Return all ${eachReturns[1]} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
   if ((m = /^Return all (.+?) cards from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
     const kinds = m[1]!.replace(/,? and /g, " or ").replace(/, /g, " or ");
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });

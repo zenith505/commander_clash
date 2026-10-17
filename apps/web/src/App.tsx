@@ -3695,6 +3695,30 @@ function Controls({
         ))}
       </div>
     );
+  if (pending?.kind === "chooseOption" && pending.what === "vote" && pending.player === HUMAN)
+    // A vote (CR 701.38): a word, or a permanent or card ("id@zc"), shown with whose it is; the earlier votes in the prompt.
+    return (
+      <div className="controls vote-pick">
+        <span>
+          <strong>{pending.source}:</strong> {pending.prompt}
+        </span>
+        {pending.options.map((o, i) => {
+          const id = o.split("@")[0]!;
+          const card = o.includes("@") && s.objects[id];
+          return (
+            <button
+              key={o}
+              className={o === "none" ? "ghost" : ""}
+              onMouseEnter={() => card && onHover(cardOf(s, id))}
+              onMouseLeave={() => onHover(null)}
+              onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}
+            >
+              {pending.labels?.[i] ?? o}
+            </button>
+          );
+        })}
+      </div>
+    );
   if (pending?.kind === "chooseOption" && pending.what === "keyword" && pending.player === HUMAN)
     return (
       <div className="controls keyword-pick">

@@ -994,6 +994,13 @@ export function compile(d: CardDef): CompiledCard {
       out.exhaustAgain = true;
       continue;
     }
+    // "While voting, you get an additional vote" (Brago's Representative), "... you may vote an additional time" (Ballot
+    // Broker): CR 701.38d.
+    const extraVote = /^While voting, you (get an additional vote|may vote an additional time)\.$/.exec(line);
+    if (extraVote && !out.extraVote) {
+      out.extraVote = extraVote[1]!.startsWith("get") ? "get" : "may";
+      continue;
+    }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
       out.beginOnBattlefield = true;
       continue;

@@ -23,6 +23,7 @@ import { runSpellsEffect, addDelayed } from "./run-spells";
 import { runNamesEffect } from "./run-names";
 import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
+import { runVotesEffect, votedObjects } from "./run-votes";
 import { closeZoneBatch, fireEvent } from "./triggers";
 
 export interface ResolveCtx {
@@ -218,6 +219,7 @@ export function apnap(s: GameState, pids: PlayerId[]): PlayerId[] {
 
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
+  if (ref.ref === "voted") return votedObjects(s);
   if (ref.ref === "self") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // If it left the battlefield (even if it came back), it's a different object now (CR 400.7).
@@ -674,6 +676,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDiceEffect(s, e, ctx, src);
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
+    case "vote":
+    case "chooseVotes":
+      return runVotesEffect(s, e, ctx, src);
     case "may":
     case "eachMay":
     case "punisher":

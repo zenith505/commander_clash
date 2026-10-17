@@ -197,12 +197,16 @@ export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null 
   const next = /^The next time (a source of your choice|that creature|it) would deal (combat )?damage( to you)? this turn, (prevent half that damage, rounded (up|down)|prevent that damage|it deals double that damage instead)$/i.exec(t);
   if (next) {
     const subject = /^(?:that creature|it)$/i.test(next[1]!);
+    // "A source of your choice ... prevent that damage" is a prevention rule (prevention.ts), with its riders.
+    if (!subject && /^prevent that damage$/i.test(next[4]!)) return undefined;
     if (until || (subject && !ctx.subjectIt && !(ctx.subject && /^that creature$/i.test(next[1]!)))) return null;
     const mod: DamageMod = /^it deals/.test(next[4]!) ? { op: "times", n: 2, nextTime: true, text } : next[5] ? { op: "half", prevent: true, ...(next[5] === "down" ? { up: true as const } : {}), nextTime: true, text } : { op: "prevent", prevent: true, nextTime: true, text };
     if (next[2]) mod.combat = "only";
     if (next[3]) mod.to = { players: "you" };
     return [{ type: "damageMod", mod, ...(subject ? { bySubject: true as const } : { choose: { kind: "object" as const, text: "source" } }) }];
   }
+  // "That source deals that damage to you instead" (Jade Monolith) is a redirection (prevention.ts), not an amount.
+  if (/, (?:it|that source) deals that damage to .+ instead$/.test(t)) return undefined;
   if (!/would deal (?:combat |noncombat )?damage\b.*, (?:it|that source) deals |would deal .*, instead it deals /.test(t)) return undefined;
   if (!until) {
     if (!/ this turn(?=,| to )/.test(t)) return undefined;

@@ -1,3 +1,4 @@
+import { ANY_COUNTER } from "../abilities";
 import type { AmountExpr, DamageRecipient, ObjRef, PlayerRef, TargetSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
@@ -520,10 +521,11 @@ export function parseTargetPhrase(
     extra.dealtDamageThisTurn = true;
     p = p.slice(0, hurt.index);
   }
-  // "creature with a +1/+1 counter on it", "creatures with ice counters on them"
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice) counter on it|([+-]1\/[+-]1|ice) counters on them)/.exec(p);
+  // "creature with a +1/+1 counter on it", "creatures with ice counters on them", "creature you control with a counter on
+  // it" (any kind)
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice) counter on it|([+-]1\/[+-]1|ice) counters on them|(a) counter on it|(one or more) counters on (?:it|them))/.exec(p);
   if (counter) {
-    extra.counter = counter[1] ?? counter[2]!;
+    extra.counter = counter[3] || counter[4] ? ANY_COUNTER : (counter[1] ?? counter[2]!);
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
   }
   // "creature card from your graveyard", "card from a graveyard": a card in that zone (CR 109.2a).

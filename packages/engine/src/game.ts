@@ -11,7 +11,7 @@ import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, spellTargetSpecs } from "./oracle";
-import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
+import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { addMana, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle } from "./rng";
@@ -3620,7 +3620,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
-  if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
+  if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
@@ -3688,9 +3688,19 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
   const more = ab.mana ? 0 : activationTax(s, o);
-  const cost = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
-  if (!ab.equip && !ab.costLess) return cost;
+  const cost1 = more ? { ...cost0, symbols: [...cost0.symbols, { kind: "generic" as const, amount: more }] } : cost0;
+  // Power-up: "If this permanent entered this turn, this ability's cost is reduced by this permanent's mana cost" (CR
+  // 702.193a-b, 118.7).
+  const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
+  const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
+  if (!ab.equip && !ab.costLess && !powerUp) return cost;
   let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
+  // "Power-up abilities of other creatures you control cost {3} less to activate." (Hulk, Gamma Goliath)
+  for (const id of powerUp ? s.battlefield : []) {
+    const src = obj(s, id);
+    const n = abilitiesOf(s, src).powerUpLess;
+    if (n && src.id !== o.id && controllerOf(s, src) === pid && controllerOf(s, o) === pid && objIsType(s, o, "Creature")) less += n;
+  }
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
   for (const id of ab.equip ? s.battlefield : []) {
     const src = obj(s, id);
@@ -3710,6 +3720,14 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
   const g = splitGeneric(cost, 0);
   const left = Math.max(0, g.extra - less);
   return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...g.cost.symbols] };
+}
+
+/**
+ * "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man, Hollywood Hero; CR
+ * 702.193a): how many more times than once, one for each such permanent.
+ */
+function powerUpAgain(s: GameState, pid: PlayerId): number {
+  return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).powerUpAgain).length;
 }
 
 /** What permanents' "activated abilities [of sources with the chosen name] cost {2} more to activate" add (CompiledCard.activationTaxes). */

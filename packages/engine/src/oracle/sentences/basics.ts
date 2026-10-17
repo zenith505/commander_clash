@@ -372,7 +372,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Damage equal to its power" (Orca, Siege Demon): worked out the same way, with what the ability knows then.
   // "Among up to X target creatures" with X damage (Ravenous Gigantotherium) is the same: at least 1 each. "8 damage
   // divided as you choose among X target creatures" (Meteor Swarm): exactly the spell's X targets, so X is 8 at most.
-  if ((m = /^~ deals (\d+|one|two|three|four|five|six|seven|eight|nine|ten|X|X plus 1|damage equal to .+?) (?:damage )?divided as you choose among (one or two|one, two, or three|any number of|up to X|X) (targets|target .+)$/i.exec(s))) {
+  if ((m = /^~ deals (\d+|one|two|three|four|five|six|seven|eight|nine|ten|X|X plus 1|damage equal to .+?) (?:damage )?divided as you choose among (one or two|one, two, or three|any number of|up to X|X|up to (?:two|three|four|five|six|seven|eight|nine|ten)) (targets|target .+)$/i.exec(s))) {
     const equal = /^damage equal to (.+)$/.exec(m[1]!);
     const counted = equal ? parseCount(equal[1]!, ctx) : null;
     if (equal && !counted) return null;
@@ -452,6 +452,13 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
   // An ability's own X is checked with the ability (compile.ts checkX, activated.ts).
   if (among === "up to X") {
     if (amount !== "X") return null;
+    among = "any number of";
+  }
+  // "5 damage divided as you choose among up to five targets" (Iron Fist): at least 1 each (CR 601.2d), so as many
+  // targets as there is damage at most, like "any number of".
+  const upTo = /^up to (\w+)$/.exec(among);
+  if (upTo && upTo[1] !== "X") {
+    if (typeof amount !== "string" || !/^\w+$/.test(amount) || amount === "X" || num(upTo[1]!) !== num(amount)) return null;
     among = "any number of";
   }
   if (isX && (among !== "any number of" || (ctx.whereX && amount !== "X"))) return null;

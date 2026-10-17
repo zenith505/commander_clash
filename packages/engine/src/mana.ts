@@ -244,3 +244,34 @@ export function spentMeets(spent: ManaSpent | undefined, req: import("./abilitie
 
 /** "The amount of {S} spent to cast ~": the mana from snow sources spent on it (CR 107.4h). */
 export const snowSpent = (spent: ManaSpent | undefined): number => Object.values(spent?.snow ?? {}).reduce((a, b) => a + (b ?? 0), 0);
+
+/**
+ * A cost reduced by an amount of mana written as a mana cost ("reduced by this permanent's mana cost", power-up, CR
+ * 702.193b, 118.7): each colored or colorless symbol takes off a symbol of its type, or a hybrid or Phyrexian symbol
+ * that can be paid with it (the half is chosen as the reduction applies, CR 118.7e, Morophon rulings); when the cost
+ * has none, it takes off one generic mana (118.7b-d). A hybrid symbol in the reduction picks a half the cost has
+ * (118.7e), a Phyrexian one reduces by its color (118.7f), {S} by one generic (118.7g) and {2/W} by two generic, and X
+ * is 0 (107.3b). Generic reductions apply last and only to generic mana (118.7a).
+ */
+export function reduceByManaCost(cost: ParsedCost, by: ParsedCost): ParsedCost {
+  const symbols = [...cost.symbols];
+  let generic = 0;
+  // The symbol of the cost a mana of one of `colors` can stand for: one of exactly that type first.
+  const take = (colors: readonly ManaType[]): boolean => {
+    let i = symbols.findIndex((sym) => sym.kind === "colored" && colors.includes(sym.color));
+    if (i < 0) i = symbols.findIndex((sym) => (sym.kind === "hybrid" && sym.options.some((c) => colors.includes(c))) || ((sym.kind === "phyrexian" || sym.kind === "twoHybrid") && colors.includes(sym.color)));
+    if (i < 0) return false;
+    symbols.splice(i, 1);
+    return true;
+  };
+  for (const sym of by.symbols) {
+    if (sym.kind === "generic") generic += sym.amount;
+    else if (sym.kind === "colored" || sym.kind === "phyrexian") generic += take([sym.color]) ? 0 : 1;
+    else if (sym.kind === "hybrid") generic += take(sym.options) ? 0 : 1;
+    else if (sym.kind === "twoHybrid") generic += 2;
+    else if (sym.kind === "snow") generic += 1;
+  }
+  const g = splitGeneric({ ...cost, symbols }, 0);
+  const left = Math.max(0, g.extra - generic);
+  return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...g.cost.symbols] };
+}

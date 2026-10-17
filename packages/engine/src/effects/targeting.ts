@@ -1,3 +1,4 @@
+import { ANY_COUNTER } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
@@ -56,7 +57,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name") return false;
-  if (spec.counter && !(o.counters[spec.counter] ?? 0)) return false;
+  if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
   if (spec.named !== undefined && (o.faceDown || c.name !== spec.named)) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());

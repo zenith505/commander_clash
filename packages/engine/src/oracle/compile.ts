@@ -189,6 +189,16 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
 
 export const QUOTED_SOURCE_NAME = "\u27easource\u27eb";
 
+/** "He", "she", "him", "his" and "her" of a legendary card that names itself: "~" or "~'s". */
+function selfPronouns(t: string): string {
+  const kept: string[] = [];
+  return t
+    .replace(/\b(?:his or her|he or she|him or her)\b/gi, (m) => `\u0001${kept.push(m) - 1}\u0001`)
+    .replace(/\b(?:[Hh]is|[Hh]er(?= (?:power|toughness|owner's|owner|controller|name|loyalty|additional|sneak|other|text|mana)\b))\b/g, "~'s")
+    .replace(/\b(?:[Hh]e|[Ss]he|him|her)\b(?!')/g, "~")
+    .replace(/\u0001(\d+)\u0001/g, (_, n: string) => kept[Number(n)]!);
+}
+
 /** Replace every way a card refers to itself with "~". */
 export function normalizeSelf(d: CardDef): string {
   let t = stripReminder(d.oracleText);
@@ -211,6 +221,10 @@ export function normalizeSelf(d: CardDef): string {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
+  // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
+  // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in
+  // a quoted ability, where it would mean the object given the ability, and not "his or her" (an old way to say "their").
+  if (d.supertypes?.includes("Legendary")) t = t.split(/("[^"]*")/).map((part, i) => (i % 2 ? part : selfPronouns(part))).join("");
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
   t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case)\b/g, "~");
@@ -1018,6 +1032,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
       out.payWUBRG = true;
+      continue;
+    }
+    if (line === "Each power-up ability of permanents you control can be activated an additional time.") {
+      out.powerUpAgain = true;
+      continue;
+    }
+    const powerUpLess = /^Power-up abilities of other creatures you control cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (powerUpLess && !out.powerUpLess) {
+      out.powerUpLess = Number(powerUpLess[1]);
       continue;
     }
     const equipLess = /^Equip abilities you activate( of other Equipment| that target ~)? cost \{(\d+)\} less to activate\.$/.exec(line);

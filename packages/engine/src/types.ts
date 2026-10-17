@@ -1349,6 +1349,7 @@ export interface Resolving {
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
+    bottomOrders?: Record<string, ObjectId[]>; // putAllOnBottom: each owner's order, asked before anything moves
     ordered?: boolean; // "reorder your graveyard as you choose" asked already (graveyard.ts)
     forced?: ObjectId[]; // exileNamed's "all cards with that name" in the public graveyard, found without a choice (CR 701.23b)
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)

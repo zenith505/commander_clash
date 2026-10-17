@@ -1227,6 +1227,28 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "putAllOnBottom": {
+      const sc = (s.resolving!.scratch ??= {});
+      const all = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      const orders = (sc.bottomOrders ??= {});
+      // Each owner's cards, in APNAP order; tokens and commanders don't stay in a library, so there's nothing to order.
+      for (const pid of apnap(s, [...new Set(all.map((id) => obj(s, id).owner))])) {
+        if (orders[pid]) continue;
+        const cards = all.filter((id) => obj(s, id).owner === pid && !obj(s, id).isToken && !obj(s, id).isCommander);
+        if (cards.length > 1 && !sc.arranged) {
+          s.pending = { kind: "arrangeTop", player: pid, how: "bottom", cards, source: src };
+          return "paused";
+        }
+        orders[pid] = sc.arranged ? sc.arranged.top.filter((id) => cards.includes(id)) : cards;
+        sc.arranged = undefined;
+      }
+      const ordered = new Set(Object.values(orders).flat());
+      const moving = [...Object.values(orders).flat(), ...all.filter((id) => !ordered.has(id))].filter((id) => s.objects[id]?.zone === "battlefield");
+      if (moving.length) log(s, `${src} puts ${moving.map((id) => characteristics(s, obj(s, id)).name).join(", ")} on the bottom of their owners' libraries.`);
+      for (const id of moving) moveObject(s, id, "library");
+      sc.bottomOrders = undefined;
+      return;
+    }
     case "livingDeath": {
       const who = apnap(s, livingPlayers(s));
       const exiled: [ObjectId, number][] = [];

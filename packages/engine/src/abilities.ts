@@ -136,7 +136,15 @@ export type Count =
    * "The greatest power among creatures you control": 0 when there are none (rulings on Ghalta). `toughness`: "the greatest
    * toughness among". `whose`: "among creatures they control" (Inscription of Abundance), that player's creatures only.
    */
-  | { kind: "greatestPower"; filter: TargetSpec; other?: boolean; toughness?: true; whose?: PlayerRef }
+  | {
+      kind: "greatestPower";
+      filter: TargetSpec;
+      other?: boolean;
+      toughness?: true;
+      whose?: PlayerRef;
+      /** "The total power of creatures you control" (Ghalta): the sum, a negative power taking some off (rulings). */
+      total?: true;
+    }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   | { kind: "greatestManaValue"; filter: TargetSpec }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
@@ -487,6 +495,8 @@ export type PlayerRef =
   | { ref: "eachOpponent" }
   | { ref: "eachPlayer" }
   | { ref: "targetController"; index: number } // "its controller"
+  /** "That player or that planeswalker's controller" (Bonfire of the Damned): the target player, or the target planeswalker's controller. */
+  | { ref: "targetOrController"; index: number }
   | { ref: "targetOwner"; index: number } // "its owner": a targeted card's owner (Pharika's "Its owner creates ...")
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
   | { ref: "eventPlayer" }
@@ -999,6 +1009,11 @@ export type Effect =
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
+  /**
+   * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
+   * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
+   */
+  | { type: "exchangeLife"; a: PlayerRef; b: PlayerRef }
   | { type: "destroy"; what: ObjRef; noRegen?: boolean } // "It can't be regenerated."
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | { type: "regenerate"; what: ObjRef }
@@ -1188,6 +1203,11 @@ export type Effect =
    * (rulings); only the cards the first part exiled come back, under their owners' (the exilers') control.
    */
   | { type: "livingDeath" }
+  /**
+   * "Put all creatures on the bottom of their owners' libraries" (Terminus): all at once (rulings); each owner orders
+   * their cards first, without revealing the order (CR 401.4).
+   */
+  | { type: "putAllOnBottom"; filter: TargetSpec }
   | { type: "tap"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }

@@ -13,6 +13,7 @@ import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../sta
  * Whole sentences about every player's cards that other templates would take apart (tried before them), or undefined.
  */
 export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | undefined {
+  if (s === "Put all creatures on the bottom of their owners' libraries") return [{ type: "putAllOnBottom", filter: { kind: "object", types: ["Creature"], text: "creature" } }];
   // Living Death: each part for all players at once (rulings, Effect livingDeath).
   if (s === "Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then puts all cards they exiled this way onto the battlefield") return [{ type: "livingDeath" }];
   if (ctx.spell) return undefined;

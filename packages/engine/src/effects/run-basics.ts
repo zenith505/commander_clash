@@ -1,6 +1,6 @@
 import type { DamageRecipient, Effect } from "../abilities";
 import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
-import { addPhases, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
+import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, invalidateCharacteristics } from "../layers";
 import { dealDamage, dealDamageBatch, objectSource, type DamageEvent } from "../damage";
@@ -314,6 +314,25 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} gains ${n} life.`);
       }
       return;
+    case "exchangeLife": {
+      // Both players must still be there (an illegal target does nothing, CR 608.2b), and different (CR 701.12a).
+      const [a] = players(s, e.a, ctx);
+      const [b] = players(s, e.b, ctx);
+      if (a === undefined || b === undefined || a === b) return;
+      const [la, lb] = [player(s, a).life, player(s, b).life];
+      if (la === lb) return;
+      const [up, down] = la < lb ? [a, b] : [b, a];
+      const diff = Math.abs(la - lb);
+      // A player who can't gain life can't be given a higher total, nor one who can't lose life a lower one (CR 701.12c).
+      if (!canGainLife(s, up) || !canLoseLife(s, down)) {
+        log(s, `${player(s, a).name} and ${player(s, b).name} can't exchange life totals.`);
+        return;
+      }
+      log(s, `${player(s, a).name} and ${player(s, b).name} exchange life totals: ${player(s, up).name} gains ${diff} life and ${player(s, down).name} loses ${diff} life.`);
+      loseLife(s, down, diff);
+      gainLife(s, up, diff);
+      return;
+    }
     case "loseLife": {
       let total = 0;
       for (const pid of players(s, e.who, ctx)) {

@@ -392,6 +392,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const o = ctx.legal[ref.index] && t?.kind === "object" ? s.objects[t.id] : undefined;
       return o ? [o.owner] : [];
     }
+    case "targetOrController": {
+      const t = ctx.targets[ref.index];
+      return players(s, { ref: t?.kind === "player" ? "target" : "targetController", index: ref.index }, ctx);
+    }
     case "targetController": {
       const t = ctx.targets[ref.index];
       if (!ctx.legal[ref.index] || !t) return [];
@@ -530,6 +534,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "increaseSpeed":
     case "ascend":
     case "gainLife":
+    case "exchangeLife":
     case "loseLife":
     case "addCombatMana":
     case "addMana":
@@ -574,6 +579,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "putInGraveyard":
     case "exileGraveyard":
     case "livingDeath":
+    case "putAllOnBottom":
     case "returnFaceDownExiled":
     case "flicker":
     case "returnExiled":

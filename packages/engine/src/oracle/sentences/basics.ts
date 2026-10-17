@@ -16,6 +16,19 @@ import { parsePreventAll } from "../statics";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Exchange life totals with target opponent" (Mirror Universe), "two target players exchange life totals" (Axis of
+  // Mortality): CR 701.12c.
+  if ((m = /^[Ee]xchange life totals with (target opponent|target player)$/.exec(s))) {
+    const b = parsePlayer(m[1]!, ctx);
+    return b ? [{ type: "exchangeLife", a: { ref: "you" }, b }] : null;
+  }
+  if (/^(?:Have t|T)wo target players exchange life totals$/.test(s)) {
+    const first = addTarget(ctx, { kind: "player", text: "target player" });
+    const second = addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first] });
+    ctx.lastPlayerTarget = undefined;
+    return [{ type: "exchangeLife", a: { ref: "target", index: first }, b: { ref: "target", index: second } }];
+  }
+
   // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
   // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search
   // their library (CR 701.23a); a permanent found comes under your control.

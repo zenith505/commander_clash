@@ -1,4 +1,4 @@
-import type { Modification, Effect } from "../abilities";
+import type { AmountExpr, Modification, Effect } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind } from "./words";
@@ -20,7 +20,7 @@ import { parsePreventionSentence } from "./sentences/prevention";
  * put one of those cards back on top of your library") and where the rest go ("Put the rest into your
  * graveyard", "on the bottom of your library in a random order"). "more" while the rest is still to come.
  */
-export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>, ctx?: Ctx): Extract<Effect, { type: "dig" }> | "more" | null {
+export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>, ctx?: Ctx, whereX?: AmountExpr): Extract<Effect, { type: "dig" }> | "more" | null {
   const REST = "(into your graveyard|into your hand|on the bottom of your library(?: in (?:any|a random) order)?)";
   // Without "in a random order", the owner arranges the cards going to the bottom (CR 401.4).
   const restOf = (r: string) => (r === "into your graveyard" ? { rest: "graveyard" as const } : r === "into your hand" ? { rest: "hand" as const } : / random /.test(r) ? { rest: "bottom" as const, random: true as const } : { rest: "bottom" as const });
@@ -41,16 +41,17 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const count = /^an?$/.test(how) ? 1 : /^up to /.test(how) ? num(how.slice(6)) : 99;
       const required = how === "all" || (/^an?$/.test(how) && m[1] === "Put");
       if (/^(?:an?|up to one)$/.test(how) === /cards\b/.test(m[3]!)) return null;
-      // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), not a "where X is".
+      // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), or the X the look's "where X
+      // is ..." defined (Hatchery Spider), counted as it resolves (TargetSpec.bound).
       let what = m[3]!.replace(/\bcards\b/, "card").replace(/ and\/or /, " or ");
       const mvX = / with mana value X or less$/.exec(what);
       if (mvX) {
-        if (!ctx || !(ctx.spell || ctx.activated) || ctx.whereX) return null;
+        if (!ctx || (!whereX && !(ctx.spell || ctx.activated || ctx.selfCastSpell)) || ctx.whereX) return null;
         what = what.slice(0, mvX.index);
       }
       const filter = parseSearchFilter(what);
       if (!filter) return null;
-      if (mvX) Object.assign(filter, { xRange: { key: "manaValue", at: "most" }, text: `${filter.text} with mana value X or less` });
+      if (mvX) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: `${filter.text} with mana value X or less` });
       Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {

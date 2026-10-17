@@ -331,6 +331,8 @@ export interface GameObject {
   championed?: { id: ObjectId; zc: number; by: number };
   /** A replacement effect: if it would leave this zone, it's exiled instead (flashback, CR 702.34a; unearth, 702.84a). */
   exileIfLeaves?: ZoneName;
+  /** A spell: "if that spell would be put into your graveyard, exile it instead" (Torrential Gearhulk, CR 614.1a). */
+  exileIfToGraveyard?: true;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
@@ -767,7 +769,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1196,6 +1198,7 @@ export interface Resolving {
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     untilNonland?: { hit?: ObjectId; caster: PlayerId }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
+    nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
     found?: ObjectId[]; // the cards a library search found
     /** "Each player puts a creature card from their graveyard onto the battlefield" (Exhume): players still to choose, and the cards chosen so far. */
@@ -1221,8 +1224,14 @@ export interface Resolving {
     faceDownPick?: true;
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
+    /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
+    attackWhom?: string;
+    /** "Search your library and/or graveyard": "both", or "graveyard" alone (no shuffle). */
+    searchZones?: string;
+    /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
+    castingTarget?: ObjectId;
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     /** "Roll two d8 and choose one result": the index of the die chosen (see runDiceEffect). */
     rollChoice?: string;

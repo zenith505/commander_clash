@@ -214,6 +214,9 @@ export function normalizeSelf(d: CardDef): string {
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
   t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case)\b/g, "~");
+  // "Your team" means the same as "you" in a game that isn't between teams (CR 102.4): "Warriors your team controls",
+  // "if your team gained life this turn".
+  t = t.replace(/\byour team controls\b/g, "you control").replace(/\byour team gained\b/g, "you gained");
   return t;
 }
 
@@ -1670,7 +1673,8 @@ function checkX(d: CardDef, out: CompiledCard) {
   // "Monstrosity X" (CR 701.37c): "when ~ becomes monstrous" abilities use the X it became monstrous with.
   const monstrousX = out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "monstrosity" && usesX(e.n)));
   out.triggers = out.triggers.filter((tr) => {
-    if (!usesX(tr.body) || (tr.event === "selfEnters" && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX)) return true;
+    // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX)) return true;
     bad(tr.body.text);
     return false;
   });

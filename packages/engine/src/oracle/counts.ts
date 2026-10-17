@@ -30,10 +30,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const n = num(m[3]!) * (m[2]!.toLowerCase() === "minus" ? -1 : 1);
     return c && { ...c, plus: (c.plus ?? 0) + n };
   }
-  // "Half your life total, rounded up", "half the number of Forests you control, rounded down" (CR 107.1a).
-  if ((m = /^half (.+?),? rounded (up|down)$/i.exec(p))) {
+  // "Half your life total, rounded up", "half the number of Forests you control, rounded down" (CR 107.1a), or rounded as
+  // the ability's "Round up each time." says.
+  if ((m = /^half (.+?)(?:,? rounded (up|down))?$/i.exec(p))) {
+    const round = (m[2]?.toLowerCase() ?? ctx?.halfRound) as "up" | "down" | undefined;
     const c = m[1] === "X" ? { count: { kind: "x" } as Count } : parseCount(m[1]!, ctx);
-    return c && !c.half && !c.negate ? { ...c, half: m[2]!.toLowerCase() as "up" | "down" } : null;
+    return round && c && !c.half && !c.negate ? { ...c, half: round } : null;
   }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control".
   if (!each && (m = /^the greatest power among (other )?(creatures you control|creatures on the battlefield)$/i.exec(p))) {
@@ -81,6 +83,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return who && count({ kind: "life", who });
   }
   if (/^your speed$/i.test(p)) return count({ kind: "speed" });
+  // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
+  if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
   if (each && /^opponent(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
@@ -90,6 +94,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? you've cast your commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });
   // "For each creature in your party", "the number of creatures in your party" (CR 700.8).
   if (/^creatures? in your party$/i.test(p)) return count({ kind: "party" });
+  if (each ? /^1 life you(?:'ve| have)? gained this turn$/i.test(p) : /^the (?:total )?amount of life you(?:'ve| have)? gained this turn$/i.test(p)) return count({ kind: "lifeGainedThisTurn" });
   if (each ? /^1 life your opponents have lost this turn$/i.test(p) : /^the (?:total )?amount of life your opponents (?:have )?lost this turn$/i.test(p)) return count({ kind: "opponentsLifeLost" });
   if ((m = /^cards? in (your|that player's|target player's|their|target opponent's) (hand|library)$/i.exec(p))) {
     const who = whosePlayer(m[1]!, ctx);
@@ -167,6 +172,17 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return spec?.kind === "object" && (spec.types?.length || spec.subtypes?.length) ? count({ kind: "permanents", filter: { ...spec, text: p }, other: true }) : null;
   }
   return null;
+}
+
+/** How "half ..." is rounded: as its own ", rounded up" says, else as the ability's "Round up each time." (CR 107.1a). */
+export function roundOf(word: string | undefined, ctx: Ctx | null): "up" | "down" | undefined {
+  return (word?.toLowerCase() ?? ctx?.halfRound) as "up" | "down" | undefined;
+}
+
+/** "Half X", rounded as `roundOf` says: the X it was cast or activated with. */
+export function halfX(word: string | undefined, ctx: Ctx | null): AmountExpr | null {
+  const half = roundOf(word, ctx);
+  return half ? { count: { kind: "x" }, half } : null;
 }
 
 /**

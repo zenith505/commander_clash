@@ -4,7 +4,7 @@ import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../
 import { NUM, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
-import { parseBoundCount, parseCount } from "../counts";
+import { parseBoundCount, parseCount, roundOf } from "../counts";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { parseUnlessPays, type Ctx } from "../body";
 import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
@@ -187,11 +187,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
-  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?$/.exec(s))) {
+  // "You may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking"
+  // (Kinscaer Sentry): one card, attacking a player its controller chooses (CR 508.4).
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?( and attacking)?$/.exec(s))) {
+    if (m[5] && m[2] === "any number of") return null;
     // "A permanent card with mana value less than or equal to that damage" (Covert Technician): counted as it resolves.
     const filter = parseSearchFilter(m[3]!, (t) => parseBoundCount(t, ctx));
     if (filter === null) return null;
-    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}) }];
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}) }];
   }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
@@ -424,6 +427,16 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if ((m = /^(.+?) sacrifices? a creature (?:with the greatest power among creatures (?:they control|that player controls)|they control with the greatest power)$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who && who.ref !== "you" ? [{ type: "pick", who, filter: { kind: "object", types: ["Creature"], text: "creature" }, n: 1, action: "sacrifice", greatest: "power" }] : null;
+  }
+  // "Each player sacrifices half the non-God creatures they control of their choice, rounded down" (Zodiark), "sacrifice
+  // half the non-Demon permanents you control, rounded up" (Rakdos): each player half of their own, worked out before
+  // anyone chooses (rulings on Fraying Omnipotence, CR 107.1a).
+  if ((m = /^(?:(.+?) )?[Ss]acrifices? half the (.+?) (you|they|that player) controls?(?: of (?:their|his or her) choice)?(?:, rounded (up|down))?$/.exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : ({ ref: "you" } as const);
+    const filter = pickFilter(m[2]!);
+    const half = roundOf(m[4], ctx);
+    if (!who || !filter || filter.kind !== "object" || !half || (who.ref === "you") !== (m[3] === "you")) return null;
+    return [{ type: "pick", who, filter, n: { count: { kind: "permanents", filter, whose: { ref: "eachOne" } }, half }, action: "sacrifice" }];
   }
   if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

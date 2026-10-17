@@ -107,6 +107,10 @@ export type Count =
   | { kind: "party" }
   /** "The total amount of life your opponents have lost this turn", "for each 1 life your opponents have lost this turn" (CR 119.3). */
   | { kind: "opponentsLifeLost" }
+  /** "For each unspent green mana you have" (Omnath, Locus of Mana), "six or more unspent mana" (Ozai): what's in your mana pool (CR 106.4). */
+  | { kind: "unspentMana"; color?: Color }
+  /** "The amount of life you gained this turn", "for each 1 life you gained this turn" (CR 119.3, 119.9): its total, whatever was lost. */
+  | { kind: "lifeGainedThisTurn" }
   /** Devotion to a color, or to several (CR 700.5). */
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
@@ -282,7 +286,7 @@ export interface TargetSpec {
   suspected?: true;
   /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
   commander?: boolean;
-  /** "a card named ~": the source's name (only for searches). */
+  /** "a card named ~": the source's name; "a card named Ajani, Valiant Protector": that name (only for searches). */
   named?: string;
   /** None of these subtypes. */
   notSubtypes?: string[];
@@ -993,7 +997,8 @@ export type Effect =
    * the cards in their hand that match; without `may`, one if they have one. Not an Aura: that would need a choice of
    * what it enchants (CR 303.4f).
    */
-  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; may: boolean; any?: boolean }
+  /** `attacking`: "tapped and attacking" (CR 508.4), attacking a player its controller chooses (rulings on Kinscaer Sentry). */
+  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -1417,6 +1422,13 @@ export type Effect =
   | { type: "unearth" }
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
   | { type: "castFromExileFree" }
+  /**
+   * "You may cast target instant card from your graveyard without paying its mana cost" (Torrential Gearhulk): as it
+   * resolves, ignoring timing based on its type (CR 608.2g). `exileAfter`: "If that spell would be put into your
+   * graveyard, exile it instead" (GameObject.exileIfToGraveyard); "instantOrSorcery": "if an instant or sorcery spell cast
+   * this way would ..." (Scholar of the Lost Trove).
+   */
+  | { type: "castTargetFree"; what: ObjRef; exileAfter?: true | "instantOrSorcery" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
   /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */
@@ -1480,7 +1492,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean }
   /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
@@ -1516,7 +1528,12 @@ export type Effect =
    * among them without paying their mana costs" (Primeval Spawn): `maxMv` each, `totalMv` all together.
    */
   /** `untilMv`: "exile cards from the top of your library until you exile cards with total mana value 4 or greater" (Improvisation Capstone), instead of `n` cards. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number }
+  /**
+   * `filter`: "instant or sorcery spells"; `max`: "an instant or sorcery spell" (1), "up to two sorcery spells" (2).
+   * `rest`: where the exiled cards not cast go once it's done (they stay exiled without it): `toHand` those of the
+   * filter's types, the others to `dest` (Muse Vortex, Epic Experiment, Collected Conjuring).
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -1595,6 +1612,8 @@ export type SpellCondition =
   | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition }
+  /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
+  | { kind: "xAtLeast"; n: number }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
@@ -1750,6 +1769,13 @@ export type TriggerEvent =
   /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
   | "youRollDie"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
+  /**
+   * "Whenever you're dealt damage", "whenever an opponent is dealt damage", "whenever enchanted player is dealt damage": once
+   * for all the damage dealt to that player at the same time (rulings on Grievous Wound); the event amount is that damage.
+   */
+  | "youAreDealtDamage"
+  | "opponentIsDealtDamage"
+  | "enchantedPlayerDealtDamage"
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
   /** "Whenever an opponent activates an ability that isn't a mana ability" (see TriggeredAbility.activates). */
@@ -1880,8 +1906,8 @@ export interface TriggeredAbility {
    * went. The card is the subject ("exile it").
    */
   sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
-  /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information. */
-  ifNoCounter?: "+1/+1" | "-1/-1";
+  /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
+  ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /**
    * Evolve (CR 702.100a): "if that creature's power is greater than this creature's power and/or
    * that creature's toughness is greater than this creature's toughness", checked as it triggers and
@@ -2033,6 +2059,11 @@ export interface ActivatedAbility {
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
   lifeCost?: number;
+  /**
+   * "Pay half your life, rounded up" as part of the cost (CR 119.4, 107.1a): half the life total as the cost is worked out
+   * (CR 601.2f), 0 with 0 or less life (rulings on Lurking Evil).
+   */
+  halfLifeCost?: "up" | "down";
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
   /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */

@@ -6,13 +6,14 @@ import { putCounters } from "../counters";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, objectMatches, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, amountNow, amountCtx } from "./resolve";
+import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
 import { addDelayed, paidUnless } from "./run-spells";
-import { fireEvent, inCombat } from "./triggers";
+import { toBottom } from "./run-library";
+import { attackDefault, fireEvent, inCombat } from "./triggers";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
 export function isSuspended(s: GameState, o: GameObject): boolean {
@@ -77,8 +78,9 @@ export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: Pla
 function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx: ResolveCtx, src: string): "paused" | void {
   const r = s.resolving!;
   const sc = (r.scratch ??= {});
-  const n = (sc.n ??= amountNow(s, e.n, ctx));
   let who = players(s, e.who, ctx);
+  // Each player's own number when it's "half the creatures they control" (CR 107.1a), all worked out before anyone picks.
+  const nFor = amountFor(s, e.n, ctx, who);
   // "Each opponent sacrifices a permanent of their choice unless they pay {3}": each chooses in turn order whether to pay
   // (CR 101.4), then those who didn't choose what to sacrifice (rulings).
   if (e.unless) {
@@ -100,7 +102,13 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   }
   while (sc.queue.length) {
     const pid = sc.queue[0]!;
+    const n = nFor[pid] ?? 0;
     const options = pickOptions(s, e, pid, ctx.sourceId);
+    if (!n) {
+      sc.chosen![pid] = [];
+      sc.queue.shift();
+      continue;
+    }
     if (options.length > n) {
       s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.least ? `${e.filter.text} with the least toughness` : e.greatest ? `${e.filter.text} with the greatest power` : e.filter.text, options, count: n, ...(e.counter ? { counter: e.counter.kind } : {}) };
       return "paused";
@@ -474,6 +482,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${src} returns to the battlefield with haste.`);
       return;
     }
+    case "castTargetFree": {
+      // Cast as this resolves, or not (CR 608.2g); then "if that spell would be put into your graveyard, exile it
+      // instead" applies to the spell it became.
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.castingTarget !== undefined) {
+        const o = s.objects[sc.castingTarget];
+        const d = o && defOf(s, o);
+        if (o?.zone === "stack" && e.exileAfter && (e.exileAfter === true || isType(d!, "Instant") || isType(d!, "Sorcery"))) o.exileIfToGraveyard = true;
+        return;
+      }
+      const o = objects(s, e.what, ctx)[0];
+      if (!o || o.zone !== "graveyard") return;
+      sc.castingTarget = o.id;
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
+      if (castProblem(s, ctx.controller, o.id) === null) return "paused";
+      s.pending = null;
+      log(s, `${defOf(s, o).name} can't be cast.`);
+      return;
+    }
     case "castFromExileFree": {
       // Rebound (CR 702.88a): the card has to still be in exile, the same object (CR 400.7).
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
@@ -584,19 +611,39 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (st.done) return;
       const mvOf = (id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
       const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
+      // Done: the exiled cards that weren't cast go where `rest` says (rulings on Muse Vortex: all the instants and
+      // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
+      const finish = (): "paused" | undefined => {
+        st.done = true;
+        if (!e.rest) return;
+        const left = st.ids.map((x) => x.id).filter(exiled);
+        const toHand = e.rest.toHand ? left.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) : [];
+        for (const id of toHand) moveObject(s, id, "hand");
+        if (toHand.length) log(s, `${you.name} puts ${toHand.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their hand.`);
+        const others = left.filter((id) => !toHand.includes(id));
+        if (e.rest.dest === "graveyard") {
+          for (const id of others) moveObject(s, id, "graveyard");
+          if (others.length) log(s, `${you.name} puts ${others.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their graveyard.`);
+          return;
+        }
+        const byOwner = new Map<PlayerId, ObjectId[]>();
+        for (const id of others) byOwner.set(obj(s, id).owner, [...(byOwner.get(obj(s, id).owner) ?? []), id]);
+        for (const [owner, ids] of byOwner) toBottom(s, owner, ids, src, true);
+        return;
+      };
       if (st.casting) {
         // Cast: it's on the stack now (a new object, CR 400.7); declined: it stays in exile.
         if (exiled(st.casting)) st.declined.push(st.casting);
-        else if (st.budget !== undefined) st.budget -= mvOf(st.casting);
+        else {
+          if (st.budget !== undefined) st.budget -= mvOf(st.casting);
+          st.cast = (st.cast ?? 0) + 1;
+        }
         st.casting = undefined;
       }
       if (st.pick !== undefined) {
         const pick = st.pick;
         st.pick = undefined;
-        if (pick === "none" || !exiled(pick)) {
-          st.done = true;
-          return;
-        }
+        if (pick === "none" || !exiled(pick)) return finish();
         st.casting = pick;
         s.pending = { kind: "castFree", player: you.id, objectId: pick, source: src };
         return "paused";
@@ -609,11 +656,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       };
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && castable(id));
-      if (!options.length) {
-        st.done = true;
-        return;
-      }
+        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && castable(id));
+      if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the exiled cards without paying its mana cost${left}?` };
       return "paused";
@@ -885,6 +929,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return "paused";
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "hand" && o.owner === p.id);
+      // "Tapped and attacking" (CR 508.4): only during combat, attacking a player its controller chooses as it enters (it
+      // was never declared as an attacker, rulings on Kinscaer Sentry); outside combat it's only tapped (CR 506.3d).
+      const attackOptions = e.attacking && cards.some((o) => isType(defOf(s, o), "Creature")) ? attackChoices(s, p.id, ctx.sourceId) : [];
+      if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+        const name = defOf(s, cards[0]!).name;
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${name} attacks` };
+        return "paused";
+      }
+      const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
+      const defender = attack?.player;
       // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g).
       const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src);
       if (hosts === "paused") return "paused";
@@ -895,8 +949,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in ${p.name}'s hand.`);
             continue;
           }
-          log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          const attacks = defender !== undefined && isType(defOf(s, o), "Creature");
+          log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
           moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
+          if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
+            o.attacking = defender;
+            if (attack?.planeswalker) o.attackingPermanent = { id: attack.planeswalker, zc: obj(s, attack.planeswalker).zoneChanges ?? 0 };
+          }
         }
       });
       return;
@@ -1213,4 +1272,18 @@ export function enterAttacking(s: GameState, o: GameObject, returned: LastKnown)
     }
   }
   return true;
+}
+
+/**
+ * What a creature put onto the battlefield attacking may attack (CR 508.4): each opponent or a planeswalker they control,
+ * chosen by its controller; the one the source attacks first. None outside combat, or on another player's turn.
+ */
+export function attackChoices(s: GameState, pid: PlayerId, sourceId?: ObjectId): { key: string; label: string; player: PlayerId; planeswalker?: ObjectId }[] {
+  const first = attackDefault(s, pid, sourceId);
+  if (first === undefined) return [];
+  const foes = livingPlayers(s).filter((x) => x !== pid).sort((a, b) => (a === first ? -1 : b === first ? 1 : 0));
+  return foes.flatMap((x) => [
+    { key: String(x), label: player(s, x).name, player: x },
+    ...s.battlefield.filter((id) => objIsType(s, obj(s, id), "Planeswalker") && controllerOf(s, obj(s, id)) === x).map((id) => ({ key: `${x}:${id}`, label: `${defOf(s, obj(s, id)).name} (${player(s, x).name})`, player: x, planeswalker: id })),
+  ]);
 }

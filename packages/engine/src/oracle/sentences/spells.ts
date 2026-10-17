@@ -1,6 +1,6 @@
 // Sentences about sacrificing, milling, discarding, scry/surveil, fighting, counterspells, and copying spells.
 
-import { parseBoundCount, parseCount } from "../counts";
+import { parseBoundCount, parseCount, roundOf } from "../counts";
 import type { Effect, PlayerRef, TargetSpec } from "../../abilities";
 import type { SkipWhat } from "../../types";
 import { NUM, NUMX, amt, isGroup, isSeveral, num } from "../words";
@@ -47,10 +47,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return who ? [{ type: "mill", who, n: amt(m[2]!) }] : null;
   }
   // "Target player mills half their library, rounded down" (Traumatize): each of them half their own library (CR 107.1a).
-  if ((m = /^(.+?) mills? half (your|their|that player's|his or her) library, rounded (up|down)$/i.exec(s))) {
+  if ((m = /^(.+?) mills? half (your|their|that player's|his or her) library(?:, rounded (up|down))?$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
-    if (!who || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
-    return [{ type: "mill", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, half: m[3]!.toLowerCase() as "up" | "down" } }];
+    const half = roundOf(m[3], ctx);
+    if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
+    return [{ type: "mill", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, half } }];
   }
   // "Target player mills twice X cards" (Drown in Dreams).
   if ((m = /^(.+?) mills? twice X cards$/i.exec(s))) {
@@ -102,6 +103,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       out.push({ type: "draw", who, n });
     }
     return out;
+  }
+  // "Target opponent discards half the cards in their hand, rounded down" (Lord Xander), "each player ... discards half the
+  // cards in their hand. Round up each time." (Fraying Omnipotence): each player half their own hand, worked out before
+  // anyone discards (rulings on Fraying Omnipotence, CR 107.1a).
+  if ((m = /^(.+?) discards? half the cards in (your|their|his or her) hand(?:, rounded (up|down))?$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const half = roundOf(m[3], ctx);
+    if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
+    return [{ type: "discard", who, n: { count: { kind: "cardsInHand", who: { ref: "eachOne" } }, half } }];
   }
   if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

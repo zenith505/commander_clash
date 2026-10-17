@@ -60,6 +60,7 @@ import {
   auraHostFor,
   auraHostKey,
   payableLife,
+  halfLifeCost,
   linkedExileCards,
   MAX_HAND_SIZE,
   hasNoMaxHandSize,
@@ -217,6 +218,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "rollResult") return [{ type: "chooseOption", player: pid, choice: Number(pend.labels?.[1]) > Number(pend.labels?.[0]) ? "1" : "0" }];
     if (pend.kind === "chooseOption" && pend.what === "anchor") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
+    // A creature put onto the battlefield attacking: the player the source attacks, offered first.
+    // "Search your library and/or graveyard": both, for the most to choose from.
+    if (pend.kind === "chooseOption" && pend.what === "searchZones") return [{ type: "chooseOption", player: pid, choice: "both" }];
+    if (pend.kind === "chooseOption" && pend.what === "attackWhom") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Tap or untap: tap an opponent's untapped permanent, untap our own tapped one; otherwise leave it if we may.
     // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": the biggest one.
     if (pend.kind === "chooseOption" && pend.what === "castFromHand") {
@@ -1915,6 +1920,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Removing named counters (spore, charge) runs out; removing +1/+1 counters shrinks the creature, so not for free.
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
       if ((ab.sacrificeSelf && !cashIn) || ab.exileSelf || freeCost || ab.station) continue;
+      // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
+      if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
       if (ab.body.effects.some((e) => e.type === "counters" && e.counter === "level") && (o.counters.level ?? 0) >= lastStriation(s, o, "level")) continue;
       // Bots don't propose shortcuts (CR 732.2a): one that has found a loop goes round it only so many times a turn.

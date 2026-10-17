@@ -53,6 +53,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
+  [/^Whenever you're dealt damage, (.+)$/, "youAreDealtDamage"],
+  [/^Whenever an opponent is dealt damage, (.+)$/, "opponentIsDealtDamage"],
+  [/^Whenever enchanted player is dealt damage, (.+)$/, "enchantedPlayerDealtDamage"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
   [/^At the beginning of each (?:player's )?upkeep, (.+)$/, "eachUpkeep"],
   [/^At the beginning of your draw step, (.+)$/, "yourDrawStep"],
@@ -1018,6 +1021,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifCast = true;
         body0 = wasCast[1]!;
       }
+      // "When ~ dies, if it had no counters on it, return it ..." (Unstoppable Slasher): an intervening if (CR 603.4) on the
+      // creature as it last existed (CR 603.10a), which can't change.
+      let ifNoCounters = false;
+      const noCounters = /^if it had no counters on it, (.+)$/i.exec(body0);
+      if (noCounters) {
+        if (event !== "selfDies") return "fail" as const;
+        ifNoCounters = true;
+        body0 = noCounters[1]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -1045,9 +1057,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       let text = self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ") : body0;
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife";
+      const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage";
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
-      const damage = amount && event !== "youGainLife" && event !== "opponentLosesLife";
+      const damage = amount && event !== "youGainLife" && event !== "opponentLosesLife" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;
@@ -1061,13 +1074,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
       // "At the beginning of each postcombat main phase, the active player adds ..." (Belbe): that player is the active one.
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks a player, /.test(line);
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       return body
-        ? { event, body, ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

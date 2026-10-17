@@ -1,13 +1,13 @@
-import { allEffects, refCovers, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
+import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
-import { parseCount } from "./counts";
+import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
-import { boundAtTargeting, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
+import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseSearchFilter } from "./search";
 import { parseManaSpend } from "./mana-abilities";
 
@@ -71,6 +71,8 @@ export interface Ctx {
   subjectLeft?: boolean;
   /** This sentence defines its own X ("..., where X is ..."): "up to X target ..." isn't the spell's X then. */
   whereX?: boolean;
+  /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
+  halfRound?: "up" | "down";
 }
 
 /**
@@ -100,6 +102,8 @@ const checkableMay = (e: Effect) =>
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
+  // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
+  (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "number") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
   (e.type === "putOntoBattlefield" && e.what.ref === "graveyardEnd" && !e.atEndStep && !e.haste) ||
   // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return. "You may
@@ -315,6 +319,13 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
   };
+  // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
+  // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
+  const roundEach = /(?:^|\s)Round (up|down) each time\.?$/.exec(text.trim());
+  if (roundEach) {
+    text = text.trim().slice(0, roundEach.index);
+    ctx.halfRound = roundEach[1] as "up" | "down";
+  }
   const effects: Effect[] = [];
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
@@ -324,6 +335,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   let rowToken: string | undefined;
+  // The instructions split off after a ", then" (the first part of each sentence stays out).
+  const thenParts = new Set<string>();
+  const thenPart = (p: string) => (thenParts.add(p), p);
   const sentences = splitSentences(text.trim())
     .map((x) => x.replace(/\.$/, "").trim())
     // A results table's row (CR 706.3a): a marker, then its instructions, up to the next row.
@@ -342,7 +356,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i, all) => (i ? thenSubject(all[0]!, p) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$)/).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -355,6 +369,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;
+  // Where the sentence before started, counting the parts split off at ", then" as one sentence with it: "Draw a card,
+  // then discard a card. If you have a full party, instead draw three cards." (The Destined Thief) replaces both.
+  let prevWhole = 0;
+  let curWhole = 0;
   // Where the targets of the sentence before and of this one start.
   let prevTargets = 0;
   let curTargets = 0;
@@ -362,6 +380,8 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   let payFirst: { pay: PayCost; text: string } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
+  // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
+  let digWhere: AmountExpr | undefined;
   // A look that a "you may pay ... If you do," before it depends on (see payFirst).
   let digPaid: { pay: PayCost; text: string } | null = null;
   // "If {B} was spent to cast ~, you may have target creature get -3/-3 until end of turn" (Cankerous Thirst): the "you
@@ -410,6 +430,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     }
     if (!closeGate()) return null;
     [prevStart, curStart] = [curStart, effects.length];
+    if (!thenParts.has(sentences[si]!)) [prevWhole, curWhole] = [curWhole, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
     // "Add {R}. Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4): the mana the sentence
     // before added, unless it can only be spent some ways.
@@ -464,7 +485,9 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Shuffle your library, then exile the top four cards" (Hazoret's Undying Fury): your library, after the shuffle.
     const afterShuffle = si > 0 && sentences[si - 1] === "Shuffle your library";
     const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
-    const castAmong = castAmongHead && /^You may cast any number of spells(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // "You may cast an instant or sorcery spell with mana value X or less from among them ..." (Muse Vortex), "... up to
+    // two sorcery spells ..." (Collected Conjuring): only so many, of those types.
+    const castAmong = castAmongHead && /^You may cast (?:(any number of|up to two|an?) )?(?:(instant or sorcery|instant and sorcery|sorcery|instant) )?spells?(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying (?:their mana costs|its mana cost)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     // Improvisation Capstone: "Exile cards from the top of your library until you exile cards with total mana value 4 or
     // greater."
     const untilMv = /^Exile cards from the top of your library until you exile cards with total mana value (\d+) or greater$/.exec(s);
@@ -478,8 +501,58 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const whose = castAmongHead[2] ? (castAmongHead[2] === "your" ? "you" : castAmongHead[2] === "their" ? "that player" : castAmongHead[2].replace(/'s$/, "")) : castAmongHead[3] ?? "you";
       const who = parsePlayer(whose, ctx);
       if (!who) return null;
-      const limit = castAmong[2] ? amt(castAmong[2]) : undefined;
-      effects.push({ type: "castFromAmong", who, n: amt(n), ...(limit !== undefined ? (castAmong[1] ? { totalMv: limit } : { maxMv: limit }) : {}) });
+      const [, many, kinds, total, mv] = castAmong;
+      const one = many === "a" || many === "an";
+      // Plain "spells" needs "any number of"; "instant and sorcery spells" says it without (Epic Experiment).
+      if (!many && kinds !== "instant and sorcery") return null;
+      // "An instant or sorcery spell ... its mana cost", "spells ... their mana costs": the words agree.
+      if (one !== /its mana cost$/.test(sentences[si + 1]!.replace(/\.$/, "")) || (one && total)) return null;
+      const limit = mv ? amt(mv) : undefined;
+      const types = kinds ? (kinds === "sorcery" ? ["Sorcery"] : kinds === "instant" ? ["Instant"] : ["Instant", "Sorcery"]) : undefined;
+      const filter: TargetSpec | undefined = types ? { kind: "card", types: types as TargetSpec["types"] & string[], notTypes: [], notColors: [], text: `${kinds} card` } : undefined;
+      // What happens to the exiled cards not cast: "Then put the exiled instant and sorcery cards that weren't cast this
+      // way into your hand and the rest on the bottom of your library in a random order" (Muse Vortex), "Then put all
+      // cards exiled this way that weren't cast into your graveyard" (Epic Experiment), "Put the exiled cards not cast
+      // this way on the bottom of your library in a random order" (Collected Conjuring). Your own library only.
+      const restText = sentences[si + 2]?.replace(/\.$/, "").replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase()) ?? "";
+      const rest: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } | undefined =
+        kinds && new RegExp(`^Put the exiled ${kinds.replace(" or ", " and ")} cards that weren't cast this way into your hand and the rest on the bottom of your library in a random order$`).test(restText)
+          ? { dest: "bottomRandom", toHand: true }
+          : /^Put all cards exiled this way that weren't cast into your graveyard$/.test(restText)
+            ? { dest: "graveyard" }
+            : /^Put the exiled cards not cast this way on the bottom of your library in a random order$/.test(restText)
+              ? { dest: "bottomRandom" }
+              : undefined;
+      if (rest?.dest === "bottomRandom" && who.ref !== "you") return null;
+      effects.push({ type: "castFromAmong", who, n: amt(n), ...(limit !== undefined ? (total ? { totalMv: limit } : { maxMv: limit }) : {}), ...(filter ? { filter } : {}), ...(one ? { max: 1 } : many === "up to two" ? { max: 2 } : {}), ...(rest ? { rest } : {}) });
+      si += rest ? 2 : 1;
+      continue;
+    }
+    // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
+    // your graveyard, exile it instead." (Torrential Gearhulk): cast as it resolves (CR 608.2g), or not.
+    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from your graveyard) without paying its mana cost$/.exec(s);
+    if (castTarget) {
+      const rider = sentences[si + 1]?.replace(/\.$/, "");
+      const exileAfter = rider === "If that spell would be put into your graveyard, exile it instead" ? (true as const) : rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
+      const before = ctx.targets.length;
+      const what = parseCardTarget(castTarget[1]!, ctx, "you");
+      const t = ctx.targets[before];
+      // A land card can't be cast (CR 305.9).
+      if (!what || !exileAfter || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      effects.push({ type: "castTargetFree", what, exileAfter });
+      si++;
+      continue;
+    }
+    // "You may search your library and/or graveyard for a card named Ajani, Valiant Protector, reveal it, and put it into
+    // your hand. If you search your library this way, shuffle." (CR 701.23): one card, from either zone; whether the
+    // library is searched too is the player's choice as it resolves (search.orGraveyard).
+    const orYard = /^(?:([Yy]ou may) )?[Ss]earch your library and\/or graveyard for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?)$/.exec(s);
+    if (orYard && sentences[si + 1]?.replace(/\.$/, "") === "If you search your library this way, shuffle") {
+      const filter = parseSearchFilter(orYard[3]!, (t) => parseBoundCount(t, ctx));
+      if (filter === null) return null;
+      const dest: SearchDest = orYard[5] === "into your hand" ? { zone: "hand" } : { zone: "battlefield", ...(/tapped$/.test(orYard[5]!) ? { tapped: true } : {}) };
+      const search: Effect = { type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: !!orYard[4], dest, orGraveyard: true };
+      effects.push(orYard[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search);
       si++;
       continue;
     }
@@ -621,10 +694,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const def = look[3] ? parseCount(look[3], ctx) : undefined;
       if (look[3] && !def) return null;
       dig = { type: "dig", n: def ? replaceX(X, def) : amt(look[2]!), reveal: /^reveal/i.test(look[1]!) };
+      digWhere = def ?? undefined;
       continue;
     }
     if (dig) {
-      const done = parseDig(s, dig, ctx);
+      const done = parseDig(s, dig, ctx, digWhere);
       if (!done) return null;
       if (done === "more") continue;
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
@@ -717,7 +791,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // Agadeem Occultist, Nimbus Champion).
     const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
     if (atMost) {
-      const fx = parseOne(atMost[1]!, ctx);
+      // "You may return target creature to its owner's hand if that creature's power is ..." (Nimbus Champion): asked only
+      // if it holds.
+      const may = /^[Yy]ou may (.+)$/.exec(atMost[1]!);
+      const fx0 = parseOne(may ? may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1) : atMost[1]!, ctx);
+      const fx = fx0 && may ? fx0.some((e) => pauses(e)) ? null : [{ type: "may" as const, effects: fx0, text: may[1]! }] : fx0;
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       if (!fx || i !== curTargets || !t || t.optional || t.many || t.divided || !fx.every((e) => mentionsTarget(e, i))) return null;
@@ -975,9 +1053,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "If there are seven or more cards in your graveyard, create four Bear tokens instead."
     const insteadIf = /^(.+) instead if ([^,]+)$/.exec(s);
     if (insteadIf) s = `If ${insteadIf[2]}, ${insteadIf[1]!.charAt(0).toLowerCase()}${insteadIf[1]!.slice(1)} instead`;
-    // "Draw another card if you've completed a dungeon" (Imoen): "If you've completed a dungeon, draw a card". Only a
+    // "Draw another card if you've completed a dungeon" (Imoen): "If you've completed a dungeon, draw a card". "Target
+    // creature an opponent controls gets -4/-4 until end of turn if you gained life this turn" (Poisoner's Apprentice):
+    // the target is chosen either way, and the condition checked as it resolves (rulings). Only a
     // condition about the game (one the static parser reads), not about "it".
-    const trailIf = !insteadIf ? /^((?:Draw|Create|You gain|Each opponent loses|Put) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
+    const trailIf = !insteadIf ? /^((?:[Dd]raw|[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
     // "If ~ is a Warrior, put a flying counter on it and it becomes a ..." (Figure of Destiny, Ascendant Spirit): its
@@ -992,13 +1072,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
+    // "If X is 10 or more, creatures you control get +X/+X and gain haste until end of turn" (Finale of Devastation), "If
+    // X is 5 or more, destroy all other creatures" (Martial Coup): the X the spell was cast with (CR 107.3a), as well as
+    // what came before ("also"). Only a spell's own X.
+    const xAtLeast = /^If X is (\d+|one|two|three|four|five|six|seven|eight|nine|ten) or (?:more|greater), (?:also )?(.+)$/.exec(s);
+    if (xAtLeast && !/\binstead\b/.test(xAtLeast[2]!)) {
+      if (!ctx.spell || ctx.whereX) return null;
+      const inner = parseOne(xAtLeast[2]!.charAt(0).toUpperCase() + xAtLeast[2]!.slice(1), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });
+      continue;
+    }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
     // two instructions happens, as it resolves (CR 608.2c). "Instead only you draw a card" says the same.
     const insteadOf = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && /^instead,? |\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     if (ifState && insteadOf) {
-      const previous = effects.slice(prevStart);
+      const from = thenParts.has(sentences[si]!) ? prevStart : prevWhole;
+      const previous = effects.slice(from);
       const t = ifState[2]!.replace(/^instead,? (?:only )?/, "").replace(/ instead$/, "");
       const before = ctx.targets.length;
       // "Create a Treasure token. If you've completed a dungeon, create three of those tokens instead" (Safana).
@@ -1007,11 +1099,12 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
-      // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one).
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher")) return null;
+      // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
+      // sacrificing and discarding, which only wait on which ones (Vona's Hunger).
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
-      effects.splice(prevStart, effects.length - prevStart, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
+      effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
       continue;
     }
     // "You lose 2 life unless you control another Pirate": the instruction happens only if the condition is false as it
@@ -1668,8 +1761,11 @@ function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
   // "Any number of target players each mill a card and lose 1 life" (Tinybones Joins Up): all of them both times.
   const again = /^target (player|opponent)$/i.test(subject) ? "That player" : /^any number of target (players|opponents) each$/i.test(subject) ? "Each of those players" : /^(you|each player|each opponent|that player)$/i.test(subject) ? subject : null;
   if (!again) return null;
-  const first = parseSentence(`${subject} ${m[2]}`, ctx);
-  const second = first && parseSentence(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`, ctx);
+  // "Target player draws cards equal to half the number of cards in their library and loses half their life" (Peer into
+  // the Abyss): either part may be "... equal to ...".
+  const one = (t: string) => attempt(ctx, () => parseSentence(t, ctx)) ?? attempt(ctx, () => parseEqualTo(t, ctx));
+  const first = one(`${subject} ${m[2]}`);
+  const second = first && one(`${again.charAt(0).toUpperCase()}${again.slice(1)} ${m[3]}`);
   return first && second ? [...first, ...second] : null;
 }
 

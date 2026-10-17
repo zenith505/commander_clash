@@ -396,6 +396,20 @@ export function amountNow(s: GameState, a: Amount, ctx: ResolveCtx): number {
   return Math.max(0, evalAmount(s, a, amountCtx(s, ctx)));
 }
 
+/**
+ * The amount for each of `who`, worked out once before any of them acts and kept while it waits on their choices: their
+ * own when it counts "their" things ("half the cards in their hand", PlayerRef eachOne), else the same for all.
+ */
+export function amountFor(s: GameState, a: Amount, ctx: ResolveCtx, who: PlayerId[]): Record<string, number> {
+  const sc = (s.resolving!.scratch ??= {});
+  if (!sc.nFor) {
+    const each = JSON.stringify(a).includes('"eachOne"');
+    const same = each ? 0 : amountNow(s, a, ctx);
+    sc.nFor = Object.fromEntries(who.map((pid) => [pid, each ? amountNow(s, a, { ...ctx, eachOne: pid }) : same]));
+  }
+  return sc.nFor;
+}
+
 export const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   controller: ctx.controller,
   sourceId: ctx.sourceId,
@@ -506,6 +520,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnToBattlefield":
     case "unearth":
     case "castFromExileFree":
+    case "castTargetFree":
     case "destroy":
     case "regenerate":
     case "exile":

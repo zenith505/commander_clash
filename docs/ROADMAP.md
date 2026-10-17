@@ -1,6 +1,6 @@
 # Roadmap
 
-18,721 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+18,856 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -76,7 +76,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      Auditor's "When ~ enters and whenever you solve a Case" (the engine has a "solved" event for it).
    - "Enters with a number of counters equal to" still out: "three minus X" (Slumbering Trudge), Ulamog; Kurbis, Marath,
      Dyadrine and Gyrus are blocked on other lines.
-   - Dies-return still out: Unstoppable Slasher, Not Dead After All, Vincent's Limit Break, Phytotitan ("at the beginning
+   - Dies-return still out: Not Dead After All, Vincent's Limit Break, Phytotitan ("at the beginning
      of their next upkeep").
    - Several cards from among the top ones: "with total mana value N or less" (Ao, Michelangelo's Technique, Smelting
      Vat), two destinations in one sentence (Bounty of Skemfar, Wakanda Forever!), "tapped and attacking" (Arthur, Jet,
@@ -217,30 +217,50 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Still out from this round's search: Power of Persuasion ("until the end of your next turn" control), The Ozolith,
      Taeko, Nikara, Sandstone Oracle, Wrenn and Seven.
    - Bots take the higher die and the strongest opponent, and still don't use abilities that work from the graveyard.
-   Left from the round after #60 (filters up to an amount, unspent mana, half of an amount, "X or less", dies to the top
-   of the library):
-   - "With power / mana value less than or equal to <amount>" works for targets (an amount the source and its
-     controller alone decide: permanents, cards, life, devotion, party, greatest power or mana value, the source's own
-     power, toughness or counters), groups, searches and free casts; still out: "that damage" in other trigger shapes
-     (Broodcaller Scourge, Glamdring), casting a target card (Dreadhorde Arcanist), "your team" (Winter Soldier, Old Man
-     of the Sea, Sphere of Annihilation, Nimbus Champion), Quag Feast, Titan's Presence, Vulpine Harvester, Sundering
-     Archaic (colors spent), Hammerhead Tyrant.
-   - "Target ... with mana value X or less, where X is ..." works when X can be counted as targets are chosen
-     (Spellstutter Sprite, Unforgiving One); still out: the life you gained this turn (Celestine, Moseo, Rodolf),
-     damage dealt (Venerable Warsinger), players attacked (Custodi Soulcaller), reflexive "when you do" (Go-Shintai of
-     Hidden Cruelty), an ETB trigger's own X for a target (Dune Drifter, Kinetic Ooze), "total mana value X or less"
-     (Rampaging Yao Guai, Orcus, Ancient Brass Dragon), "from among them" (Genesis Hydra, Muse Vortex, Epic Experiment,
-     Sunbird's Invocation, Kamahl's Druidic Vow), "tapped and attacking" from hand (Kinscaer Sentry, Paladin Elizabeth
-     Taggerdy), "your library and/or graveyard" (Finale of Devastation, Vision Quest), Eldritch Evolution ("where X
-     is 2 plus the sacrificed creature's mana value" before the shuffle sentence), Rally the Ancestors.
-   - Unspent mana kept or turned colorless works (Kruphix, Horizon Stone, Upwelling, Leyline Tyrant's red); Omnath,
-     Locus of Mana and Ozai's counts of unspent mana are still out.
-   - Half an amount works for "lose half your life", "mill half their library", "where X is half ..." and "half the
-     sacrificed creature's power"; still out: "they lose half their life" (Grievous Wound), "Pay half your life" as a
-     cost (Lurking Evil, Murderous Betrayal, Temporal Extortion), "half that player's life total" per player (Heartless
-     Hidetsugu), "Round up each time" (Fraying Omnipotence, Pox Plague, Peer into the Abyss, Hydroid Krasis, Saw in
-     Half), half the damage (Ghosts of the Innocent, Dark Sphere, Backdraft), Aspect of Wolf, The Goose Mother, Banshee,
-     Chainer's Torment, Doomsday, Death Wish.
+   Left from the round after #60 and the round after Kruphix (filters up to an amount, unspent mana, half of an amount,
+   "X or less", life gained this turn, tapped and attacking from hand, library and/or graveyard, free casts from your
+   graveyard):
+   - "With power / mana value less than or equal to <amount>" works for targets, groups, searches and free casts, and
+     "you may ... if that creature's power is less than or equal to" (Nimbus Champion); still out: "that damage" in other
+     trigger shapes (Broodcaller Scourge, Glamdring), "that spell's mana value" for a cast trigger's target (Hammerhead
+     Tyrant: targets are chosen without the trigger's event), Old Man of the Sea, Sphere of Annihilation, Quag Feast
+     ("the chosen permanent"), Titan's Presence (a reveal cost), Vulpine Harvester ("their total power"), Sundering
+     Archaic (colors spent).
+   - "Your team" is "you" (CR 102.4); still out: "each player on your team" (Azra Bladeseeker), "each of your
+     teammates" (Imperial Mask), "Partner with" (Khorvath, Regna, Pir, Sylvia).
+   - "Target ... with mana value X or less, where X is ..." works for the life you gained this turn (Celestine, Moseo);
+     still out: Rodolf (reflexive "when you do"), damage dealt (Venerable Warsinger), players attacked (Custodi
+     Soulcaller), Go-Shintai of Hidden Cruelty, an ETB trigger's own X for a target or an "if X is" (Dune Drifter,
+     Kinetic Ooze, Apocalypse Hydra), "total mana value X or less" (Rampaging Yao Guai, Orcus, Ancient Brass Dragon),
+     casting from revealed library cards (Sunbird's Invocation), Kamahl's Druidic Vow, Vision Quest (X counters and an
+     "if X is" haste), Eldritch Evolution, Rally the Ancestors, Wishing Well ("equal to the number of coin counters").
+   - The life you gained this turn: still out are Betor, Sproutback Trudge, Willowdusk ("whichever is greater"), Shanna
+     ("X can't be greater than"), Enlightened Confidant, Will, Scion of Peace (cost reduction by X), Tivash ("pay X
+     life"), Astarion, Ocelot Pride (city's blessing token copies), Witch of the Moors ("and you return"), Aerith and
+     Doctor Jane Foster ("return that card to the battlefield instead"), Follow the Lumarets, Lunar Convocation ("gained
+     and lost").
+   - "Put a creature card from your hand onto the battlefield tapped and attacking" works, with a choice of what it
+     attacks (CR 508.4); still out: Kaalia ("attacks an opponent"), Minion of the Mighty (pack tactics), Ilharg (back to
+     hand at the end step), Arni Metalbrow, Shadowfax ("lesser power"), Ultra Magnus, Strefan. Tokens created attacking
+     still attack what the source attacks, without the choice.
+   - "Search your library and/or graveyard" works (the planeswalker deck cards, Finale of Devastation); the player is
+     asked "library too, or only the graveyard?" only when the graveyard has a card that fits, so searching nothing just
+     to skip the shuffle isn't offered. "A card named A or B" and "... and/or a card named ..." (Bogbrew Witch, Alpine
+     Houndmaster, Dragonstorm Forecaster, Renowned Weaponsmith, Forging the Tyrite Sword) are out: a name may itself
+     hold "or" (Fight or Flight).
+   - "If X is N or more" works in a spell; still out: "instead" (Finale of Revelation), "destroy all other creatures"
+     after making tokens (Martial Coup), Banefire, Finale of Eternity and Finale of Promise.
+   - "You may cast target ... card from your graveyard without paying its mana cost" works (Torrential Gearhulk,
+     Dreadhorde Arcanist, Goblin Dark-Dwellers and 6 more); still out: "Until end of turn, you may cast" (Sins of the
+     Past), Vadrok (mutate). "Cast an instant or sorcery spell from among them" with where the rest go works (Muse
+     Vortex, Epic Experiment, Collected Conjuring).
+   - Half an amount: "they lose half their life", "pay half your life" (rulings: 0 with 0 or less life), "Round up each
+     time", each player's own half work; still out: Temporal Extortion ("any player may pay"), Heartless Hidetsugu
+     (per-recipient damage), Saw in Half, half the damage (Ghosts of the Innocent, Dark Sphere, Backdraft), Aspect of
+     Wolf, The Goose Mother, Banshee, Chainer's Torment, Doomsday, Death Wish, Split the Party and Tectonic Split (you
+     choose among another player's permanents), Contaminated Drink (rad counters), Contested Game Ball and War Elemental
+     ("dealt combat damage", "its owner").
+   - Bots take the first offer for "what does it attack" (the player the source attacks) and search both zones.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or

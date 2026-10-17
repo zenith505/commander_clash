@@ -154,6 +154,9 @@ export function dealDamage(
       if (!list.includes(`${from.id}@${zc}`)) list.push(`${from.id}@${zc}`);
     }
     (s.damageThisTurn ??= {})[p.id] = (s.damageThisTurn[p.id] ?? 0) + n;
+    // "Whenever you're dealt damage": once for the damage dealt at the same time (see dealPlanned).
+    if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);
+    else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     if (src.id) fireEvent(s, { type: "damagedPlayer", source: src.id, player: p.id, amount: n, combat: !!opts.combat });
     if (opts.combat) {
@@ -696,6 +699,9 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   return back;
 }
 
+/** The damage each player is being dealt by the damage dealtPlanned is dealing now, all at the same time. */
+let playerBatch: Map<PlayerId, number> | null = null;
+
 /**
  * Deal damage that happens at the same time, after its shields (see planShields), choosing for the players the way
  * a bot would (only combat damage stops to ask; see game.ts). Returns what each source dealt to each permanent or
@@ -710,6 +716,8 @@ export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lif
 export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }) } = {}): (DamageEvent & { dealt: number })[] {
   const back = commitShields(s, plan);
   const witherCounters = new Map<ObjectId, number>();
+  const outer = playerBatch;
+  playerBatch = new Map();
   const out = plan.final.map((e) => {
     const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
     const o = "object" in e.to ? obj(s, e.to.object) : undefined;
@@ -726,6 +734,9 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   const dealtTo = new Map<ObjectId, number>();
   for (const e of out) if ("object" in e.to && e.dealt > 0) dealtTo.set(e.to.object, (dealtTo.get(e.to.object) ?? 0) + e.dealt);
   for (const [id, amount] of dealtTo) fireEvent(s, { type: "wasDealtDamage", id, amount });
+  const toPlayers = playerBatch;
+  playerBatch = outer;
+  for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount });
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.
   for (const b of back) {
     const d = s.cards[b.cardId];

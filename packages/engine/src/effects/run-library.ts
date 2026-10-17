@@ -6,7 +6,7 @@ import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, pla
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, printedMatches } from "./targeting";
-import { ResolveCtx, apnap, players, amountNow, amountCtx, objects } from "./resolve";
+import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { chooseAuraHosts } from "./run-zones";
@@ -70,12 +70,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
       // discards the rest (n is per player then).
       const fewest = e.downToFewest ? (sc0.n ??= who.length ? Math.min(...who.map((pid) => player(s, pid).hand.length)) : 0) : 0;
-      const n = e.downToFewest ? 0 : (sc0.n ??= amountNow(s, e.n, ctx));
+      const nFor = e.downToFewest ? {} : amountFor(s, e.n, ctx, who);
       if (e.random && !e.hand) {
         for (const pid of apnap(s, who)) {
           const hand = player(s, pid).hand;
           const picked: ObjectId[] = [];
           const pool = [...hand];
+          const n = nFor[pid] ?? 0;
           for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
           discardCards(s, pid, picked, " at random", false, false, ctx.controller);
         }
@@ -100,6 +101,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           sc.queue.shift();
           continue;
         }
+        const n = nFor[pid] ?? 0;
         if (!e.hand && hand.length > n) {
           s.pending = { kind: "discard", player: pid, count: n, source: src, ...(e.filter ? { filter: e.filter } : {}) };
           return "paused";
@@ -365,10 +367,21 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (queue.length) {
         const p = player(s, queue[0]!);
         const n = (sc.n ??= amountNow(s, e.n, ctx));
+        // "Search your library and/or graveyard": the library too, or not (then no shuffle), chosen before looking. Only
+        // asked when the graveyard has a card that fits; otherwise both are searched.
+        const fits = (id: ObjectId) => !filter || printedMatches(filter, defOf(s, obj(s, id)));
+        if (e.orGraveyard && sc.searchZones === undefined) {
+          if (p.graveyard.some(fits)) {
+            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "searchZones", options: ["both", "graveyard"], labels: ["Library and graveyard", "Graveyard only"], prompt: "search your library too (then shuffle), or only your graveyard?" };
+            return "paused";
+          }
+          sc.searchZones = "both";
+        }
+        const yardOnly = sc.searchZones === "graveyard";
         // They've searched, found something or not (Archive Trap rulings).
         const searched = ((s.turnLog ??= {}).searched ??= []);
-        if (!searched.includes(p.id)) searched.push(p.id);
-        const cards = libOf(p.id).library.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        if (!yardOnly && !searched.includes(p.id)) searched.push(p.id);
+        const cards = [...(yardOnly ? [] : libOf(p.id).library), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
@@ -403,9 +416,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
         const shown = e.reveal || e.dest.zone === "battlefield" || e.dest.zone === "exile" ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
-        log(s, `${p.name} searches ${whose} library${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
+        const yardOnly = sc.searchZones === "graveyard";
+        const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
+        log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 || yardOnly ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
-        if (searchers.length === 1) shuffle(s, lib.library);
+        if (searchers.length === 1 && !yardOnly) shuffle(s, lib.library);
       }
       enterTogether(s, () => {
         for (const { pid, id } of moves) {
@@ -435,14 +450,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!sc.looked) {
         sc.looked = p.library.slice(0, amountNow(s, e.n, ctx));
         if (!sc.looked.length) return;
-        // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange).
-        const filter = e.filter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(e.filter) : e.filter;
+        // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), or an amount counted now
+        // (TargetSpec.bound: Hatchery Spider's "where X is the number of creature cards in your graveyard").
+        const filter = e.filter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(e.filter) : e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+        const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         const max = Math.min(e.count, options.length);
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {
-          const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${ctx.x ?? 0} or less`);
+          const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
           const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";

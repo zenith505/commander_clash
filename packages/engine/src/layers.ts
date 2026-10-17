@@ -986,7 +986,8 @@ function countSignature(s: GameState): string {
   const parts: string[] = [];
   for (const pid of s.turnOrder) {
     const p = s.players[pid]!;
-    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.graveyard.length}`);
+    // The mana pool too, for "for each unspent green mana you have" (Omnath, Locus of Mana).
+    parts.push(`${p.life},${p.hand.length},${p.library.length},${p.graveyard.length},${Object.values(p.manaPool).join(".")}`);
   }
   for (const id of s.battlefield) {
     const o = s.objects[id]!;

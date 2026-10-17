@@ -328,9 +328,11 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
  * "A spell that targets a permanent you control": one of its targets is still that object on the battlefield and matches
  * (it needn't still be a legal target for that spell), or "you" (rulings on Rebuff the Wicked).
  */
-function targetsMatch(s: GameState, targets: TargetChoice[], what: TargetSpec | "you", controller: PlayerId): boolean {
+export function targetsMatch(s: GameState, targets: TargetChoice[], what: TargetSpec | "you", controller: PlayerId): boolean {
   return targets.some((t) => {
     if (what === "you") return t.kind === "player" && t.id === controller;
+    // "A spell that targets an opponent" (Danitha), "... a player".
+    if (what.kind === "player") return t.kind === "player" && (!what.opponent || t.id !== controller);
     if (t.kind !== "object") return false;
     const o = s.objects[t.id];
     return !!o && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc) && objectMatches(s, what, o, controller, false);

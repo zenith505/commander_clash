@@ -9,7 +9,7 @@ import { RulesError } from "../types";
 import { spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -888,6 +888,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "If at least four mana was spent to cast it" (CR 603.4): a copy wasn't cast, so nothing was spent on it.
         // "If {S} of any of that spell's colors was spent": its colors as it was cast.
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
+        // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
+        if (t.cast.targets && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindChosen(t.cast.spell, o.chosen);
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);

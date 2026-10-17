@@ -997,9 +997,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "If there are seven or more cards in your graveyard, create four Bear tokens instead."
     const insteadIf = /^(.+) instead if ([^,]+)$/.exec(s);
     if (insteadIf) s = `If ${insteadIf[2]}, ${insteadIf[1]!.charAt(0).toLowerCase()}${insteadIf[1]!.slice(1)} instead`;
-    // "Draw another card if you've completed a dungeon" (Imoen): "If you've completed a dungeon, draw a card". Only a
+    // "Draw another card if you've completed a dungeon" (Imoen): "If you've completed a dungeon, draw a card". "Target
+    // creature an opponent controls gets -4/-4 until end of turn if you gained life this turn" (Poisoner's Apprentice):
+    // the target is chosen either way, and the condition checked as it resolves (rulings). Only a
     // condition about the game (one the static parser reads), not about "it".
-    const trailIf = !insteadIf ? /^((?:Draw|Create|You gain|Each opponent loses|Put) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
+    const trailIf = !insteadIf ? /^((?:[Dd]raw|[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
     // "If ~ is a Warrior, put a flying counter on it and it becomes a ..." (Figure of Destiny, Ascendant Spirit): its

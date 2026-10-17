@@ -252,6 +252,7 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "party":
     case "greatestPower":
     case "greatestManaValue":
+    case "lifeGainedThisTurn":
       return true;
     case "power":
     case "toughness":
@@ -297,8 +298,10 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const single = (n > 1 || !!many) && / from a single graveyard$/.test(mine0);
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
   const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "");
-  const parsed = n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { count: boundCount(ctx) });
+  const parsed = n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
+  // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
+  if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated) return null;
   const spec: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
   const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "card" ? [i] : []));
   let notSource = false;

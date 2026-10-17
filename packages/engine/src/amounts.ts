@@ -161,6 +161,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
     case "party":
       return partySize(s, ctx.controller, view);
+    case "lifeGainedThisTurn":
+      return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
     case "opponentsLifeLost":
       return Object.entries(s.turnLog?.lifeLost ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":

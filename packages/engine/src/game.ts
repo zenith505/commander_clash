@@ -2347,8 +2347,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
   const manaPaid = ab.manaCost ? spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o }) : null;
   if (ab.tap) tapPermanent(s, o);
-  // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3).
-  if (ab.tap) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
+  // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
+  // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
+  if (ab.tap && adds.length) fireEvent(s, { type: "tappedForMana", id: o.id, player: p.id });
   for (const t of tap ?? []) tapPermanent(s, obj(s, t));
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);

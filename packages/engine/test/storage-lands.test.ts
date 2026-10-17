@@ -5,7 +5,7 @@
 // don't untap while they have one (CR 502.3).
 
 import { describe, expect, it } from "vitest";
-import { act, activate, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, activate, card, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
 import { availableMana, botActions, isFullySupported, manaOptions, moveObject, planCast, waitingOn, type CardDef, type GameState, type ObjectId, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
@@ -22,6 +22,7 @@ const crucible = card("Crucible of the Spirit Dragon", "Land", "", {
 });
 const city = card("City of Shadows", "Land", "", { oracleText: "{T}, Exile a creature you control: Put a storage counter on this land.\n{T}: Add {C} for each storage counter on this land." });
 const ritual = card("Dark Ritual", "Instant", "{B}");
+const manabarbs = card("Manabarbs", "Enchantment", "{3}{R}", { oracleText: "Whenever a player taps a land for mana, this enchantment deals 1 damage to that player." });
 
 /** A game where `pid` controls none of their basic lands: they're moved to the graveyard. */
 function bare(hand: CardDef[] = []): { s: GameState; ap: PlayerId; ids: ObjectId[] } {
@@ -51,8 +52,10 @@ describe("storage lands", () => {
       [2, "BB"],
       [3, "BBB"],
     ]);
+    putOnBattlefield(s, ap, manabarbs);
     const s1 = act(s, { type: "activateMana", player: ap, objectId: v, mana: "B", ability: 0, combo: 2 });
     expect(pool(s1, ap).B).toBe(2);
+    expect(s1.triggerQueue).toHaveLength(1); // tapped for mana: Manabarbs
     expect(s1.objects[v]!.counters.storage).toBe(1);
     expect(s1.objects[v]!.tapped).toBe(true);
     expect(s1.log.some((l) => /removes 2 storage counters from Bottomless Vault/.test(l.text))).toBe(true);
@@ -64,9 +67,14 @@ describe("storage lands", () => {
   it("can be tapped removing none, and stores a counter at each upkeep it stays tapped", () => {
     const { s, ap } = bare();
     const v = putOnBattlefield(s, ap, vault);
+    putOnBattlefield(s, ap, manabarbs);
+    const life = s.players[ap]!.life;
     let s1 = act(s, { type: "activateMana", player: ap, objectId: v, mana: "B", ability: 0, combo: 0 });
     expect(s1.objects[v]!.tapped).toBe(true);
     expect(pool(s1, ap).B).toBe(0);
+    // No mana, so it wasn't tapped for mana (CR 106.12a, rulings on Bottomless Vault): Manabarbs doesn't trigger.
+    expect(s1.triggerQueue).toHaveLength(0);
+    expect(passAll(s1).players[ap]!.life).toBe(life);
     s1 = toUntap(s1, ap);
     expect(s1.pending).toMatchObject({ kind: "pickPermanents", action: "keepTapped", options: [v] });
     s1 = act(s1, { type: "pickPermanents", player: ap, ids: [v] });

@@ -163,10 +163,11 @@ const STEP_LABEL: Record<Step, string> = {
 };
 
 /**
- * Browser tests (apps/web/e2e) start the dev server straight into a game state they built with the engine
- * (`window.__ccTestState`, set before the page loads). Never present in a production build.
+ * Browser tests (apps/web/e2e) start the app straight into a game state they built with the engine
+ * (`window.__ccTestState`, set before the page loads). Only in the dev server and the e2e build (`vite build --mode e2e`),
+ * never in a production build.
  */
-const testState = import.meta.env.DEV ? (window as { __ccTestState?: GameState }).__ccTestState : undefined;
+const testState = import.meta.env.DEV || import.meta.env.MODE === "e2e" ? (window as { __ccTestState?: GameState }).__ccTestState : undefined;
 
 export function App() {
   if (testState) return <Table initial={testState} onQuit={() => location.reload()} />;

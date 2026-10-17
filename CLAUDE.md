@@ -42,9 +42,10 @@ card unsupported. Cite the CR number in a comment where the code implements a ru
 - `npm run typecheck` (root), `cd packages/engine && npx vitest run`
 - `npm run coverage` (supported card count), `npm run blockers`, `npm run simulate -- 20` (bot games)
 - `npm run dev`; play-test URL params `?hand=A|B&board=C&yard=D` (cards must be in your deck)
-- `npm run e2e`: browser tests (Playwright, Chromium) that click through the UI's prompts, about 2 minutes; not
+- `npm run e2e`: browser tests (Playwright, Chromium) that click through the UI's prompts, about 6 minutes; not
   part of `npx vitest run`. Each test builds its game state with the engine (`scene()` in `apps/web/e2e/scene.ts`:
-  who has what in hand, on the battlefield, in the library) and the dev server opens straight into it. The card
+  who has what in hand, on the battlefield, in the library) and the app opens straight into it. They run against a
+  test build (`vite build --mode e2e`, served by `vite preview`); `E2E_SERVER=dev npm run e2e` uses the dev server. The card
   definitions they use are in `apps/web/e2e/cards.json`; after quoting a new card name in a test, run
   `npm run e2e:cards` (needs the unpacked card data). Cloud sessions have Chromium preinstalled; on a PC run
   `npx playwright install chromium` once.

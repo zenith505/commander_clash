@@ -315,7 +315,7 @@ export function useGame(initial: GameState | null) {
   const stateRef = useRef(state);
   stateRef.current = state;
   // Browser tests read the engine state to check what a click did.
-  if (import.meta.env.DEV) (window as { __ccState?: GameState | null }).__ccState = state;
+  if (import.meta.env.DEV || import.meta.env.MODE === "e2e") (window as { __ccState?: GameState | null }).__ccState = state;
   const loopRef = useRef(loop);
   loopRef.current = loop;
   const setLoop = useCallback((l: LoopRecording | null) => {

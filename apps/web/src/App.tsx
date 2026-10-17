@@ -3499,12 +3499,30 @@ function Controls({
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong> instead of drawing, put one of the top two cards of your library into your graveyard; the other stays on top, then you draw it.
+          {pending.instead ? " Or replace the draw another way first, and don't look:" : ""}
         </span>
-        {pending.cards.map((id) => {
+        {pending.cards.length < 2 ? (
+          <button onClick={() => dispatch([{ type: "drawLook", player: HUMAN }])}>{pending.cards.length ? `${cardOf(s, pending.cards[0]!).name} to graveyard` : "Look"}</button>
+        ) : (
+          pending.cards.map((id) => {
+            const d = cardOf(s, id);
+            return (
+              <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, objectId: id }])}>
+                {d.name} to graveyard
+              </button>
+            );
+          })
+        )}
+        {pending.instead?.archive ? (
+          <button className="ghost" onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: "archive" }])}>
+            Draw {pending.instead.archive} instead
+          </button>
+        ) : null}
+        {(pending.instead?.dredge ?? []).map((id) => {
           const d = cardOf(s, id);
           return (
-            <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, objectId: id }])}>
-              {d.name} to graveyard
+            <button key={id} className="ghost" onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: { dredge: id } }])}>
+              Dredge {d.name} (mill {compileCard(d).dredge})
             </button>
           );
         })}

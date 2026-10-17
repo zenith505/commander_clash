@@ -108,7 +108,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "drawLook") {
-      // Keep the card we'd rather draw (what scry would keep), and bin the other.
+      // The look first, even when Alhammarret's Archive or dredge could replace that draw: they can still replace the
+      // draw it makes. Keep the card we'd rather draw (what scry would keep), and bin the other.
+      if (pend.cards.length < 2) return [{ type: "drawLook", player: pid }];
       const [a, b] = pend.cards as [string, string];
       const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
       return [{ type: "drawLook", player: pid, objectId: bin }];

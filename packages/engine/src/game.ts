@@ -424,7 +424,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       chooseDredge(s, p, action.objectId);
       break;
     case "drawLook":
-      chooseDrawLook(s, p, action.objectId);
+      chooseDrawLook(s, p, action.objectId, action.instead);
       break;
   }
   // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
@@ -1506,8 +1506,10 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", rea
  * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
  * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant to
  * commander creatures, CR 614.1a). Only the turn's first would-be draw, so the draw it makes isn't replaced again (614.5),
- * and two such abilities replace it once. The draw it makes can still be replaced by others (dredge, Alhammarret's
- * Archive). With one card in the library, that card goes to the graveyard: as much as possible (CR 609.3).
+ * and two such abilities replace it once. With one card in the library, that card goes to the graveyard: as much as
+ * possible (CR 609.3). When Alhammarret's Archive or dredge could replace the same draw, the player chooses which applies
+ * first (CR 616.1); if it's the look, they can still replace the draw it makes; if it's another, that was the first
+ * time, so the look is gone.
  */
 function firstDrawLook(s: GameState, pid: PlayerId, left: number, after?: "drawStep"): "paused" | void {
   const p = player(s, pid);
@@ -1516,26 +1518,49 @@ function firstDrawLook(s: GameState, pid: PlayerId, left: number, after?: "drawS
   const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook);
   if (!src) return;
   const cards = p.library.slice(0, 2);
-  log(s, `${p.name} looks at the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of their library instead of drawing (${nameOf(s, src)}).`);
-  if (cards.length === 2) {
-    s.pending = { kind: "drawLook", player: pid, source: nameOf(s, src), cards, left, ...(after ? { after } : {}) };
+  const archive = archiveDraws(s, pid);
+  const dredge = dredgeOptions(s, pid);
+  const instead = archive > 1 || dredge.length ? { ...(archive > 1 ? { archive } : {}), ...(dredge.length ? { dredge } : {}) } : undefined;
+  if (cards.length === 2 || instead) {
+    s.pending = { kind: "drawLook", player: pid, source: nameOf(s, src), cards, left, ...(after ? { after } : {}), ...(instead ? { instead } : {}) };
     return "paused";
   }
-  if (cards.length === 1) {
-    moveObject(s, cards[0]!, "graveyard");
-    log(s, `${p.name} puts ${nameOf(s, cards[0]!)} into their graveyard.`);
-  }
+  lookInstead(s, p, nameOf(s, src), cards);
 }
 
-/** Answering firstDrawLook: that card to the graveyard, the other stays on top; then the draw, the rest, and what was drawing. */
-function chooseDrawLook(s: GameState, p: Player, id: ObjectId) {
+function lookInstead(s: GameState, p: Player, source: string, cards: ObjectId[], bin?: ObjectId) {
+  if (!cards.length) return;
+  log(s, `${p.name} looks at the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of their library instead of drawing (${source}).`);
+  bin ??= cards.length === 1 ? cards[0] : undefined;
+  if (bin === undefined) return;
+  moveObject(s, bin, "graveyard");
+  log(s, cards.length === 1 ? `${p.name} puts ${nameOf(s, bin)} into their graveyard.` : `${p.name} puts ${nameOf(s, bin)} into their graveyard and the other card back on top, then draws.`);
+}
+
+/**
+ * Answering firstDrawLook: that card to the graveyard, the other stays on top; then the draw, the rest, and what was
+ * drawing. Or another replacement first: the Archive's draws, or a dredge, then the rest.
+ */
+function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archive" | { dredge: ObjectId }) {
   const pend = s.pending;
   if (pend?.kind !== "drawLook" || pend.player !== p.id) throw new RulesError("no cards to choose from");
-  if (!pend.cards.includes(id) || !p.library.includes(id)) throw new RulesError("that isn't one of the cards");
-  s.pending = null;
-  moveObject(s, id, "graveyard");
-  log(s, `${p.name} puts ${nameOf(s, id)} into their graveyard and the other card back on top, then draws.`);
-  if (!draw(s, p.id, pend.left + 1, pend.after)) return;
+  let more: [number, number];
+  if (instead === "archive") {
+    if (!pend.instead?.archive) throw new RulesError("no other way to replace that draw");
+    s.pending = null;
+    more = [pend.left, drawsInstead(s, p.id)];
+  } else if (instead) {
+    if (!pend.instead?.dredge?.includes(instead.dredge) || !dredgeOptions(s, p.id).includes(instead.dredge)) throw new RulesError("that card can't be dredged");
+    s.pending = null;
+    dredgeInstead(s, p, instead.dredge);
+    more = [pend.left, 0];
+  } else {
+    if (pend.cards.length === 2 && (id === undefined || !pend.cards.includes(id) || !p.library.includes(id))) throw new RulesError("that isn't one of the cards");
+    s.pending = null;
+    lookInstead(s, p, pend.source, pend.cards, pend.cards.length === 2 ? id : undefined);
+    more = [pend.left + 1, 0];
+  }
+  if (!draw(s, p.id, more[0], pend.after, more[1])) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
 }
@@ -1551,9 +1576,15 @@ function drawsInstead(s: GameState, pid: PlayerId): number {
     p.firstDrawStepDraw = s.turn;
     return 1;
   }
-  const k = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoInstead).length;
-  if (k) log(s, `${p.name} draws ${2 ** k} cards instead of one.`);
-  return 2 ** k;
+  const n = archiveDraws(s, pid);
+  if (n > 1) log(s, `${p.name} draws ${n} cards instead of one.`);
+  return n;
+}
+
+/** What drawsInstead would make of `pid`'s next draw, without counting it. */
+function archiveDraws(s: GameState, pid: PlayerId): number {
+  if (s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn) return 1;
+  return 2 ** s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoInstead).length;
 }
 
 function drawOne(s: GameState, pid: PlayerId): boolean {
@@ -1601,18 +1632,21 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
  * Dredge instead of drawing (CR 702.52a): mill N, then return the card to hand; it isn't a draw. Or draw. Then the
  * rest of the draws, and whatever was drawing carries on.
  */
+function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
+  const n = compileCard(defOf(s, obj(s, id))).dredge!;
+  const milled = p.library.slice(0, n);
+  for (const c of milled) moveObject(s, c, "graveyard");
+  moveObject(s, id, "hand");
+  log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
+}
+
 function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
   const pend = s.pending;
   if (pend?.kind !== "dredge" || pend.player !== p.id) throw new RulesError("no draw to replace");
   if (id !== undefined && !pend.options.includes(id)) throw new RulesError("that card can't be dredged");
   s.pending = null;
-  if (id !== undefined) {
-    const n = compileCard(defOf(s, obj(s, id))).dredge!;
-    const milled = p.library.slice(0, n);
-    for (const c of milled) moveObject(s, c, "graveyard");
-    moveObject(s, id, "hand");
-    log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
-  } else drawOne(s, p.id);
+  if (id !== undefined) dredgeInstead(s, p, id);
+  else drawOne(s, p.id);
   const ready = pend.ready ?? 1;
   if (!draw(s, p.id, pend.left - ready, pend.after, ready - 1)) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });

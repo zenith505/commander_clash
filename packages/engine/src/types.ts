@@ -860,7 +860,20 @@ export type PendingDecision =
    * into your graveyard and the other back on top" (Scion of Halaster): which of `cards` goes to the graveyard; then
    * the player draws, and `left` more draws, and `after` carries on as with dredge.
    */
-  | { kind: "drawLook"; player: PlayerId; source: string; cards: ObjectId[]; left: number; after?: "drawStep" }
+  | {
+      kind: "drawLook";
+      player: PlayerId;
+      source: string;
+      cards: ObjectId[];
+      left: number;
+      after?: "drawStep";
+      /**
+       * Other replacements of the same draw the player may apply first instead (CR 616.1): Alhammarret's Archive's
+       * "draw two cards instead" (`archive`, the draws it makes) or dredging one of `dredge`. Either uses up "the
+       * first time you would draw", so the look doesn't happen.
+       */
+      instead?: { archive?: number; dredge?: ObjectId[] };
+    }
   | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; /** Of those, draws this one already stands for (Alhammarret's Archive). */ ready?: number; after?: "drawStep" }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
@@ -1494,7 +1507,7 @@ export type Action =
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
-  | { type: "drawLook"; player: PlayerId; objectId: ObjectId }
+  | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | { dredge: ObjectId } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */

@@ -108,7 +108,8 @@ export type TriggerSourceEvent =
   | { type: "attacksAlone"; id: ObjectId }
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
-  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number }
+  /** With `planeswalker`, the damage was dealt to that planeswalker, and `player` controls it. */
+  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; planeswalker?: ObjectId }
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number }
   /** A permanent dealt damage to a player, in combat or not. */
@@ -735,6 +736,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
     }
+  } else if (ev.type === "combatDamageToPlayer" && ev.planeswalker) {
+    // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orPlaneswalker, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };

@@ -31,7 +31,7 @@ export interface FaceDownPlay {
 /** "enlist": the creature an attacker taps for its enlist ability (CR 702.154a). */
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -1151,6 +1151,11 @@ export type Effect =
   | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
   /**
+   * "Untap up to seven lands" (Palinchron, Snap): its controller chooses as it resolves, among any player's tapped lands
+   * (not targeted, rulings), from none up to `n`.
+   */
+  | { type: "untapUpTo"; n: Amount; filter: TargetSpec }
+  /**
    * "Tap or untap target permanent": its controller chooses which as it resolves (CR 608.2d); `may`: "you may tap or
    * untap", where doing neither is a choice too (one question).
    */
@@ -2046,6 +2051,8 @@ export interface TriggeredAbility {
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
   ifNotRenowned?: boolean;
+  /** "Whenever ~ deals combat damage to a player or planeswalker" (Psychic Frog): also to a planeswalker, once each. */
+  orPlaneswalker?: true;
   /** "When ~ enters, if it was kicked, ..." (an intervening if, CR 603.4). */
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */

@@ -217,3 +217,32 @@ describe("whenever something deals damage to you", () => {
     expect(s.objects[p]!.zone).toBe("hand");
   });
 });
+
+// "Whenever ~ deals combat damage to a player or planeswalker": to a planeswalker too (still on the battlefield as the
+// damage is dealt, CR 704.3), once for each.
+const butcher = card("Dreadhorde Butcher", "Creature — Zombie Warrior", "{B}{R}", { power: "1", toughness: "1", keywords: ["Haste"], oracleText: "Haste\nWhenever this creature deals combat damage to a player or planeswalker, put a +1/+1 counter on this creature.\nWhen this creature dies, it deals damage equal to its power to any target." });
+const cleaver = card("The Reaver Cleaver", "Legendary Artifact — Equipment", "{2}{R}", { keywords: ["Treasure", "Equip"], oracleText: 'Equipped creature gets +1/+1 and has trample and "Whenever this creature deals combat damage to a player or planeswalker, create that many Treasure tokens."\nEquip {3}' });
+const plainBear = card("Plain Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2", oracleText: "Whenever this creature deals combat damage to a player, draw a card." });
+
+describe("combat damage to a player or planeswalker", () => {
+  it("parse", () => supported(butcher, cleaver, plainBear));
+
+  it("Dreadhorde Butcher grows hitting a planeswalker or a player; a player-only trigger doesn't hit for the planeswalker", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const v = putOnBattlefield(s0, opp, vraska);
+    s0.objects[v]!.counters.loyalty = 5;
+    const b1 = putOnBattlefield(s0, ap, butcher);
+    const b2 = putOnBattlefield(s0, ap, butcher);
+    const pb = putOnBattlefield(s0, ap, plainBear);
+    const cl = putOnBattlefield(s0, ap, cleaver);
+    s0.objects[cl]!.attachedTo = pb;
+    const hand = s0.players[ap]!.hand.length;
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: b1, defender: opp, planeswalker: v }, { attacker: b2, defender: opp }, { attacker: pb, defender: opp, planeswalker: v }] });
+    s = resolveAll(passUntil(s, "main2", ap));
+    expect(s.objects[b1]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[b2]!.counters["+1/+1"]).toBe(1);
+    // The Cleaver's granted trigger: 3 damage to Vraska, 3 Treasures; the bear's own "to a player" didn't trigger.
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).length).toBe(3);
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+});

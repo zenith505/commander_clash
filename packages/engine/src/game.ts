@@ -5097,6 +5097,9 @@ function finishCombatDamage(s: GameState): boolean {
   for (const e of done) {
     dealt.set(key(e), (dealt.get(key(e)) ?? 0) + e.dealt);
     if ("player" in e.to && e.dealt) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: e.to.player, amount: e.dealt });
+    // To a planeswalker: still on the battlefield as the damage is dealt, before state-based actions (CR 704.3).
+    const pw = "object" in e.to && e.dealt ? s.objects[e.to.object] : undefined;
+    if (pw?.zone === "battlefield" && objIsType(s, pw, "Planeswalker")) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: controllerOf(s, pw), amount: e.dealt, planeswalker: pw.id });
   }
   // "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage.
   const groups = new Map<string, { controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }>();

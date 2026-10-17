@@ -4497,6 +4497,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ac914d98-221e-426c-8a50-342896b15f9e",
+  "name": "Snap",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target creature to its owner's hand. Untap up to two lands.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dds",
+  "releasedAt": "2017-03-31",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5f0d3be8-e63e-4ade-ae58-6b0c14f2ce6d",
   "name": "Snow-Covered Forest",
   "manaCost": "",

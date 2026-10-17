@@ -174,6 +174,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Cipher: encode it on the creature most likely to deal combat damage to a player.
     if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
+    if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
@@ -1469,6 +1470,8 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const mine = options.every((id) => controllerOf(s, obj(s, id)) === pid);
     return [...options].sort((a, b) => (mine ? 1 : -1) * (worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))).slice(0, count);
   }
+  // "Untap up to seven lands": ours, not an opponent's.
+  if (action === "untap") return options.filter((id) => controllerOf(s, obj(s, id)) === pid).slice(0, count);
   // Another player's permanents (Split the Party): theirs worth the most.
   const theirs = options.some((id) => controllerOf(s, obj(s, id)) !== pid);
   const cost = (id: ObjectId) => {

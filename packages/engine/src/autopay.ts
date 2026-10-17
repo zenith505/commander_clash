@@ -58,7 +58,8 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
       const tapRider = abilitiesOf(s, o).triggers.some((t) => t.event === "tappedForMana" && !t.manaTap?.filter) ? 2 : 0;
       const options = manaOptions(s, o)
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
-        .filter((x) => x.adds.length > 0 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, abs[x.ability]!.spendOnly!, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
+        // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs.
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, abs[x.ability]!.spendOnly!, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };

@@ -3187,9 +3187,12 @@ function ModeMenu({
   );
 }
 
-/** Ways to make mana with this permanent right now (paying any mana they cost with other sources). */
+/**
+ * Ways to make mana with this permanent right now (paying any mana they cost with other sources). A storage land can
+ * also be tapped removing no counters, to start storing them (Bottomless Vault).
+ */
 function usableManaOptions(s: GameState, o: GameObject): ManaOption[] {
-  return manaOptions(s, o).filter((x) => x.adds.length > 0 && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo) !== null);
+  return manaOptions(s, o).filter((x) => (x.adds.length > 0 || x.removes === 0) && planManaAbility(s, HUMAN, o.id, x.ability, x.mana, undefined, undefined, x.combo) !== null);
 }
 
 function AbilityMenu({
@@ -3340,10 +3343,14 @@ function AbilityMenu({
         !inYard &&
         usableManaOptions(s, o).map((x) => {
           const ab = manaAbilitiesOn(s, o)[x.ability]!;
-          const cost = ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it");
+          // A storage land's: how many counters this button removes.
+          const cost = ab.text
+            .slice(0, ab.text.indexOf(": Add"))
+            .replace(/~/g, "it")
+            .replace(/Remove (?:any number of|X) (\S+) counters/, (_, k: string) => (x.removes === 1 ? `Remove a ${k} counter` : `Remove ${x.removes === 0 ? "no" : x.removes} ${k} counters`));
           return (
             <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
-              <RulesText text={cost} />: add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" />
+              <RulesText text={cost} />: {x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>
           );

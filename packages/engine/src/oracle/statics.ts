@@ -48,6 +48,13 @@ export function parseEntersChoice(line: string): EntersChoice | null {
  * (CR 207.2c); the condition is spelled out after it.
  */
 export function parseConditionalStatic(line: string): StaticAbility | null {
+  // Depletion lands: "~ doesn't untap during your untap step if it has a depletion counter on it" is the same as "as
+  // long as it has one" (checked as the untap step begins, CR 502.3).
+  const ifCounter = /^~ doesn't untap during your untap step if it has an? ([a-z]+) counter on it\.$/.exec(line);
+  if (ifCounter) {
+    const st = parseConditionalStatic(`As long as ~ has a ${ifCounter[1]} counter on it, it doesn't untap during your untap step.`);
+    return st && { ...st, text: line };
+  }
   const text = line.replace(/^[A-Z][A-Za-z' -]+(?: \d+)? — /, "").replace(/\.$/, "");
   let statement: string | undefined;
   let cond: string | undefined;

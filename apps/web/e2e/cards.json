@@ -581,6 +581,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e43413e4-be17-49af-978a-26210d05f52a",
+  "name": "Bottomless Vault",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\nYou may choose not to untap this land during your untap step.\nAt the beginning of your upkeep, if this land is tapped, put a storage counter on it.\n{T}, Remove any number of storage counters from this land: Add {B} for each storage counter removed this way.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "fem",
+  "releasedAt": "1994-11-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "36cd2364-d113-47d1-b2c4-b088d9eb88dd",
   "name": "Brainstorm",
   "manaCost": "{U}",
@@ -715,6 +742,36 @@
   "set": "shm",
   "releasedAt": "2008-05-02",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2031bc31-81cc-407a-8615-29832f586bbc",
+  "name": "Calciform Pools",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{1}, {T}: Put a storage counter on this land.\n{1}, Remove X storage counters from this land: Add X mana in any combination of {W} and/or {U}.",
+  "colors": [],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "C",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsp",
+  "releasedAt": "2006-10-06",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

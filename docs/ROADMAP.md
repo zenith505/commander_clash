@@ -1,6 +1,6 @@
 # Roadmap
 
-19,648 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,695 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -20,6 +20,24 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    second half of split cards and adventures aren't in `cards.json`. Rebuilding it with every face needs the Scryfall
    bulk file on Ken's PC (Scryfall is blocked from the cloud), then the shared `cards.json.gz` replaced.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
+   Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
+   Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
+   like Hickory Woodlot and Land Cap):
+   - Votes still out: Tivit ("enters or deals combat damage"), Council Guardian (protection from the colors with the
+     most votes), Split Decision ("Choose target spell", then "the spell"), Messenger Jays ("for each card drawn this
+     way"), Sail into the West, Galadriel, Expropriate, Fateful Tempest, Selvala's Stampede, Travel Through Caradhras;
+     votes for a player (Mob Verdict, Círdan), Trap the Trespassers, Truth or Consequences ("an opponent at random");
+     the Sagas Vault 11 and Trial of a Time Lord; "whenever players finish voting" (Grudge Keeper, Model of Unity,
+     Erestor: an opponent counts only if none of their votes match yours, rulings); Elrond; the Planechase "Will of the
+     Planeswalkers" cards.
+   - Bots vote by a rough count of what each choice does for them (bot-votes.ts), and always take an optional extra
+     vote.
+   - Storage lands still out: Crucible of the Spirit Dragon (X mana in any combination of all five colors: too many
+     buttons), City of Shadows ("Exile a creature you control" cost); Decree of Silence and Force Bubble (depletion
+     counters as a trigger's or replacement's count).
+   - Autopay and bots take one storage counter at a time from a storage land (never more than a payment needs, so
+     a bigger amount is only from the land's menu); a bot keeps Bottomless Vault-style lands tapped until they have
+     three counters, and doesn't use "{1}, {T}: Put a storage counter" on purpose.
    Left from the card names round (CR 201.4: Meddling Mage, Pithing Needle, Cabal Therapy, Memoricide, Surgical
    Extraction, Conjurer's Ban, Reflector Mage, Kindle):
    - The names offered are those of the cards in this game, so typing in the picker can show a name that's only in a
@@ -444,8 +462,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      control; teamwork counts a negative power as 0 (like crew). Bots use teamwork and conspire only with creatures
      that couldn't attack anyway, and promise a gift only when it turns on something of the spell's own.
    Left from the untap/entwine/distribute/job select/bargain round:
-   - "For as long as ~ remains tapped" (23 of 45 supported): storage lands' "remove any number of storage counters"
-     (Bottomless Vault, Dwarven Hold, Sand Silos and others), dynamic target filters (Vedalken Shackles' "power less
+   - "For as long as ~ remains tapped" (27 of 40 legal supported): dynamic target filters (Vedalken Shackles' "power less
      than or equal to the number of Islands", Old Man of the Sea, Entrancing Lyre's X, Seasinger), "a creature of an
      opponent's choice" (Preacher), "isn't of the chosen type" (Callous Oppressor), "other than ~" (Hisoka's Guard),
      attacking/blocked filters (Ice Floe, Whip Vine), "loses all abilities" (Immovable Rod), "becomes untapped"

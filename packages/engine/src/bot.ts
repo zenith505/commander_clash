@@ -171,7 +171,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Exert (CR 701.43d): for its "when you do" bonus, while there's life to spare for it not untapping.
     if (pend.kind === "pickPermanents" && pend.action === "exert") return [{ type: "pickPermanents", player: pid, ids: chooseExert(s, pid, pend.options) }];
     // "You may choose not to untap ~": keep it tapped while one of its "for as long as ~ remains tapped" effects lasts.
-    if (pend.kind === "pickPermanents" && pend.action === "keepTapped") return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id)) }];
+    // Keep tapped what an effect lasts for while it's tapped, and a storage land saving up (Bottomless Vault gets a counter
+    // at upkeep while tapped) until it has three.
+    if (pend.kind === "pickPermanents" && pend.action === "keepTapped") {
+      const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id)) }];
+    }
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).

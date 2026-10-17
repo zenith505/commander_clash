@@ -930,6 +930,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");
       if (/\bthat (much|many)\b/.test(rest)) return "fail";
     }
+    // "At the beginning of your upkeep, if ~ is tapped, put a storage counter on it" (Bottomless Vault): "it" is ~, the
+    // only thing named.
+    if (/^~ /.test(intervening[2]!) && /^At /.test(intervening[1]!)) rest = rest.replace(/( counters? on) it\.$/, "$1 ~.");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
   }

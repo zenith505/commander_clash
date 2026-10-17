@@ -1,7 +1,7 @@
 // Mana abilities (CR 605) as they are on the battlefield: what each one can make right now,
 // whether it can be activated, and which one to use for a given mana.
 
-import { allEffects, type ActivatedAbility, type ManaAbility, type ManaTrigger } from "./abilities";
+import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
 import { abilityProblem, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
@@ -71,7 +71,26 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   }
   // A combination is picked by its number (`combo`); these are the types it could make (CR 106.7).
   if (p.kind === "combos") return [...new Set(p.options.flat())];
+  if (p.kind === "removeX") return p.colors;
   return commanderIdentity(s, controllerOf(s, o));
+}
+
+/**
+ * The ways to activate a storage land's ability (ManaProduce "removeX"), numbered as `combo`: each number of counters
+ * from `min` to how many are on it, and for two colors each split of that much mana between them (CR 107.3a).
+ */
+export function removeXCombos(o: GameObject, p: Extract<ManaProduce, { kind: "removeX" }>): ManaType[][] {
+  const out: ManaType[][] = [];
+  const [a, b] = p.colors;
+  for (let x = p.min; x <= (o.counters[p.counter] ?? 0); x++)
+    for (let i = x; i >= (b ? 0 : x); i--) out.push([...Array<ManaType>(i).fill(a!), ...Array<ManaType>(x - i).fill(b ?? a!)]);
+  return out;
+}
+
+/** The combinations an ability is activated with (ManaOption.combo), or null if it has none to choose from. */
+export function manaCombos(o: GameObject, ab: ManaAbility): ManaType[][] | null {
+  const p = ab.produces;
+  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : null;
 }
 
 /**
@@ -104,6 +123,7 @@ export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choic
 function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
   const p = ab.produces;
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
+  if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
   if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {
     // CR 106.1: worked out as the ability resolves, with the permanent as "~" and its controller as "you".
     const n = evalAmount(s, p.n, { controller: controllerOf(s, o), sourceId: o.id });
@@ -124,8 +144,13 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
 export interface ManaOption {
   ability: number;
   mana: ManaType;
-  /** "Add {W}{W}, {W}{U}, or {U}{U}": which combination (ManaProduce "combos"); `mana` is its first. */
+  /**
+   * "Add {W}{W}, {W}{U}, or {U}{U}": which combination (ManaProduce "combos"); `mana` is its first. For a storage land
+   * (ManaProduce "removeX"), how many counters it removes and how that mana is split.
+   */
   combo?: number;
+  /** A storage land's: how many counters it removes. */
+  removes?: number;
   adds: ManaType[];
   extra?: ManaType[];
   /** The part of `adds` that's snow mana (CR 107.4h): its own if the source is snow, a triggered ability's if that one's is. */
@@ -196,11 +221,12 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
   const pid = controllerOf(s, o);
   const sources = manaTriggerSources(s);
   return manaAbilitiesOn(s, o).flatMap((ab, ability) => {
-    const p = ab.produces;
-    const picks: { mana: ManaType; combo?: number }[] = p.kind === "combos" ? p.options.map((c, combo) => ({ mana: c[0]!, combo })) : manaChoices(s, o, ab).map((mana) => ({ mana }));
+    const combos = manaCombos(o, ab);
+    const picks: { mana: ManaType; combo?: number }[] = combos ? combos.map((c, combo) => ({ mana: c[0] ?? manaChoices(s, o, ab)[0]!, combo })) : manaChoices(s, o, ab).map((mana) => ({ mana }));
     return picks.flatMap(({ mana, combo }) => {
       const adds = manaProduced(s, o, ab, mana, combo);
-      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
+      const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length } : {};
+      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
     });
   });
 }
@@ -236,6 +262,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.lifeCost && payableLife(s, pid) < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4, 119.8
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
+  if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;
   if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, parseManaCost(ab.manaCost), { ability: o })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
@@ -248,7 +275,9 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
 
 /** How much a player gives up by using it, beyond the tap: lower is better. */
 export function manaPenalty(ab: ManaAbility): number {
-  return (ab.sacrificeSelf || ab.onceEver ? 8 : 0) + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap ? 1 : 0);
+  // A storage land's counters are saved-up mana: spent only when nothing else will do.
+  const stored = ab.produces.kind === "removeX" ? 6 : 0;
+  return (ab.sacrificeSelf || ab.onceEver ? 8 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter ? 1 : 0);
 }
 
 /**
@@ -259,7 +288,7 @@ export function pickManaAbility(s: GameState, pid: PlayerId, o: GameObject, mana
   const abs = manaAbilitiesOn(s, o);
   return abs
     .map((ab, i) => ({ ab, i }))
-    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost && ab.produces.kind !== "combos")
+    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost && !manaCombos(o, ab))
     .sort((a, b) => manaPenalty(a.ab) - manaPenalty(b.ab))[0]?.i;
 }
 

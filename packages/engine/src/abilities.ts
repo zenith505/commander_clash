@@ -2366,7 +2366,14 @@ export type ManaProduce =
    */
   | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean }
   /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
-  | { kind: "combos"; options: ManaType[][] };
+  | { kind: "combos"; options: ManaType[][] }
+  /**
+   * Storage lands: "Remove any number of storage counters from ~: Add {B} for each storage counter removed this way"
+   * (`colors` one color, `min` 0), "Remove X storage counters from ~: Add X mana in any combination of {U} and/or {B}"
+   * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
+   * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
+   */
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).
@@ -2400,6 +2407,10 @@ export interface ManaAbility {
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
   spendOnly?: ManaSpend;
+  /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
+  putCounter?: CounterKind;
+  /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
+  sacrificeIfNo?: CounterKind;
 }
 
 /**

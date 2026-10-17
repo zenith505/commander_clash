@@ -1931,6 +1931,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "68715465-6cf9-4006-87e9-31f227fe9ed3",
+  "name": "Furnace of Rath",
+  "manaCost": "{1}{R}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Double"
+  ],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "93a0e938-b916-47ec-9803-369e885e253c",
   "name": "Future Sight",
   "manaCost": "{2}{U}{U}{U}",
@@ -2947,6 +2975,32 @@
   "set": "mmq",
   "releasedAt": "1999-10-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7e529372-cec7-40d7-a1ac-1dce1764f8b2",
+  "name": "Lashknife Barrier",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, draw a card.\nIf a source would deal damage to a creature you control, it deals that much damage minus 1 to that creature instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "pls",
+  "releasedAt": "2001-02-05",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

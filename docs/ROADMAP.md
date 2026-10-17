@@ -1,6 +1,6 @@
 # Roadmap
 
-19,504 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,587 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,6 +15,10 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
+0. Double-faced, split, adventure, prepare and flip cards (846 legal cards, the largest group left) can't be supported
+   from the current card data: `tools/build-cards.ts` keeps only the first face (`card_faces[0]`), so back faces, the
+   second half of split cards and adventures aren't in `cards.json`. Rebuilding it with every face needs the Scryfall
+   bulk file on Ken's PC (Scryfall is blocked from the cloud), then the shared `cards.json.gz` replaced.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the Roles/modified/can't be regenerated/equip round:
    - Role cards still out on other lines: Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
@@ -323,8 +327,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
-     graveyard, copy with haste); Season of the Witch ("destroy all untapped creatures that didn't attack this turn,
-     except for creatures that couldn't attack") and Seasons Past ("any number of cards with different mana values").
+     graveyard, copy with haste).
    Left from the delayed-triggers-with-a-duration round ("until end of turn, whenever ...", CR 603.7b):
    - Only cast, dies and combat-damage-to-a-player events can be such a trigger; still out: tapped for mana (High
      Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Subira ("a creature you control with power 2 or
@@ -336,6 +339,22 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
      Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko, Genku.
      Random modes still out: Outlaws' Merriment, Typhoid Mary.
+   Left from the round after Seasons (lists of targets, Vivid, Gates/Deserts/Caves, counts):
+   - Lists of targets under one verb work for destroy, exile, tap, untap and return to hand; still out: lists returning
+     to the battlefield (they enter at the same time; Thwart the Grave also has commas inside one target), and "it" or
+     "its controller" after a list (Acolyte Hybrid-style "its controller draws").
+   - Vivid still out: Aurora Awakener, Sanar ("reveal until X permanent/nonland cards"), Prismabasher ("up to X
+     target"), Prismatic Undercurrents ("up to X basic land cards"), First Family ("and spells you've cast this turn"),
+     General Tazri ("colors among those creatures"), Happily Ever After.
+   - "Cards drawn this turn" still out: Fists of Flame, Proft's Eidetic Memory ("minus one"), Molten Psyche, Niko Aris,
+     Immortus, Elenda and Azor, Deem Inferior and Sylvan Library (other lines).
+   - "Differently named" still out: Neriv ("differently named tokens"), Survey Mechan (an activated ability costing
+     {X} less), Ellywick's emblem.
+   - "Players being attacked" works for Pack Attack; the rest are out on other lines (Amber Gristle O'Maul, Apothecary
+     White, Commander Liara Portyr, Dimir Strandcatcher, Iron Mastiff, Norn's Decree, Suppressor Skyguard).
+   - Gates still out: Gond Gate, Guild Summit, Sage of the Maze (other lines).
+   - "Didn't attack this turn" without Season of the Witch's exception (Aggression, Air Nomad Student, Erg Raiders,
+     Kratos, Angel's Trumpet) isn't parsed yet; `GameObject.couldAttack` records who could attack each turn.
    Left from the X/X tokens, tapped-for-mana and "for as long as you control" round:
    - Tapped-for-mana triggers still out: Price of Glory (intervening "if it's not that player's turn"), Mana Web,
      Treasure Nabber; the Offerings with two "choose an opponent" choices in one ability.

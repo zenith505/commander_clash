@@ -102,7 +102,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
 function parseTargetList(s: string, ctx: Ctx): Effect[] | null | undefined {
   const m = /^(Destroy|Exile|Tap|Untap|Return) ((?:up to one )?target .+?)( from your graveyard to your hand| to (?:its|their) owners?'s? hands?)?$/.exec(s);
   if (!m) return undefined;
-  const parts = m[2]!.split(/,? (?:and\/or|and|or) (?=(?:up to one )?target )|, (?=(?:up to one )?target )/);
+  const parts = m[2]!.split(/,? (?:and\/or|and) (?=(?:up to one )?target )|, (?=(?:up to one )?target )/);
   if (parts.length < 2 || parts.some((p) => !/^(?:up to one )?target [^,]+$/.test(p) || / and /.test(p))) return undefined;
   if (m[1] === "Return" && !m[3]) return undefined;
   // Two required targets of a removal spell are already a sentence of their own (Plague Spores).

@@ -6,7 +6,7 @@ import { card, modal, resolveUntil } from "./ui";
 
 test("Seasons Past: a second card with the same mana value can't be chosen", async ({ page }) => {
   const s = scene({ hand: ["Seasons Past"], board: LANDS, yard: ["Grizzly Bears", "Runeclaw Bear", "Lightning Bolt", "Hill Giant"] });
-  const [bears, runeclaw, bolt, giant] = ["Grizzly Bears", "Runeclaw Bear", "Lightning Bolt", "Hill Giant"].map((n) => one(s, n));
+  const [bears, runeclaw, bolt, giant] = ["Grizzly Bears", "Runeclaw Bear", "Lightning Bolt", "Hill Giant"].map((n) => one(s, n)) as [string, string, string, string];
   await open(page, s);
   await card(page, "Seasons Past", s).click();
   await resolveUntil(page, (st) => st.pending?.kind === "searchLibrary");

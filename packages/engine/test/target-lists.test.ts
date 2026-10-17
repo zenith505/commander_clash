@@ -43,6 +43,12 @@ describe("lists of targets under one instruction", () => {
     expect(compileCard(reconstruct).spell!.targets).toHaveLength(5);
   });
 
+  it("doesn't read \"target A or target B\" as two targets: that's one target, chosen from either", () => {
+    const either = card("Test Either", "Instant", "{1}{U}", { oracleText: "Return target creature or target land to its owner's hand." });
+    const t = compileCard(either).spell?.targets;
+    expect(t === undefined || t.length !== 2).toBe(true);
+  });
+
   it("Boom Box: destroys each target chosen, and may leave some unchosen", () => {
     let { s, ap, opp } = setup([]);
     const box = putOnBattlefield(s, ap, boomBox);

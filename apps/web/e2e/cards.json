@@ -3087,6 +3087,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "794ad296-4718-45b7-ab85-6ae45903ada7",
+  "name": "Jungle Wayfinder",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warrior"
+  ],
+  "oracleText": "When this creature enters, each player may search their library for a basic land card, reveal it, put it into their hand, then shuffle.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b96b1341-0c15-4816-be2d-5cc98b2afb63",
   "name": "Khorvath Brightflame",
   "manaCost": "{5}{R}",
@@ -4309,6 +4340,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "82372776-bedd-4893-92ad-f1272f9c3250",
+  "name": "Quicksilver Wall",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Wall",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender (This creature can't attack.)\n{4}: Return this creature to its owner's hand. Any player may activate this ability.",
+  "power": "1",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "30997b43-fc13-41d3-8064-1ccc2cb6fd2b",
   "name": "Raging Goblin",
   "manaCost": "{R}",
@@ -4963,6 +5026,32 @@
   "set": "spm",
   "releasedAt": "2025-09-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b83a3ba0-249e-4c39-bbf0-cb005413f7d2",
+  "name": "Show and Tell",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

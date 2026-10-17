@@ -984,6 +984,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id].slice(-pending.count)));
       return;
     }
+    // Another player's permanent with an ability any player may activate (Feral Hydra, Quicksilver Wall).
+    if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN && abilitiesOf(s, o).activated.some((ab) => ab.anyPlayer)) return setMenu(o.id);
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
     if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || compileCard(cardOf(s, o.id)).foretell || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
@@ -3273,6 +3275,26 @@ function AbilityMenu({
   const choice = inHand && land ? entersRulesOf(s, HUMAN, objectId).entersTappedChoice : undefined;
   // Airbend's "{2} rather than its mana cost", "without paying its mana cost" (Release to the Wind).
   const exiledFor = o.zone === "exile" && o.mayPlay?.player === HUMAN ? o.mayPlay : undefined;
+  // Another player's permanent: only its abilities any player may activate (CR 602.2), which you'd control (CR 113.8).
+  if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN)
+    return (
+      <div className="ability-menu">
+        <strong>{d.name}</strong>
+        {abilitiesOf(s, o).activated.map((ab, i) => {
+          if (!ab.anyPlayer) return null;
+          const problem = abilityProblem(s, HUMAN, objectId, i);
+          const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
+          return (
+            <button key={i} disabled={!ok} title={problem ?? "Any player may activate this ability; you control it."} onClick={() => onUse(objectId, i)}>
+              <RulesText text={ab.text.replace(/~/g, d.name).replace(/ Any player may activate this ability\.$/, "")} />
+            </button>
+          );
+        })}
+        <button className="ghost" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    );
   return (
     <div className="ability-menu">
       <strong>{d.name}</strong>

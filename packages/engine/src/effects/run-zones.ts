@@ -266,7 +266,7 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
       hp.queue.shift();
       continue;
     }
-    const what = `${e.any ? "any number of " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
+    const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
     s.pending = { kind: "searchLibrary", player: pid, source: src, what, cards, min: 0, max: e.any ? cards.length : 1, fromHand: true };
     return "paused";
   }
@@ -1010,7 +1010,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const most = !e.lesserPower ? Infinity : me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? power(s, me) : (ctx.lki?.power ?? (ctx.sourceId ? s.lastKnown?.[ctx.sourceId]?.power : undefined) ?? -Infinity);
         const cards = p.hand.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
         if (!cards.length) return;
-        const what = `${e.any ? "any number of " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
+        const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? cards.length : 1, fromHand: true };
         return "paused";
       }

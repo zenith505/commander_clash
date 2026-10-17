@@ -104,6 +104,14 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let costLess: ActivatedAbility["costLess"];
   // "Activate only if this card is in your graveyard" (Loathsome Troll): it works only from there (CR 113.6j).
   let inYard = false;
+  // "Any player may activate this ability" (CR 602.2): its controller is whoever activates it (CR 113.8), "you" in it
+  // being that player; "but only during their turn" is the activator's turn.
+  let anyPlayer = false;
+  const anyone = / Any player may activate this ability(?: but only ([^.]+))?\.$/.exec(effectText);
+  if (anyone) {
+    anyPlayer = true;
+    effectText = `${effectText.slice(0, anyone.index)}${anyone[1] ? ` Activate only ${anyone[1].replace(/\btheir\b/g, "your")}.` : ""}`;
+  }
   for (let found = true; found; ) {
     found = false;
     if (/ Activate only if ~ is in your graveyard\.$/.test(effectText) && !inYard && !keyword) {
@@ -180,7 +188,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || keyword || halfLife))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
+  // Any player's: only costs any player can pay (mana, life, their own cards and permanents), not ones that tap,
+  // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
+  if (anyPlayer && (tap || mana !== "stack" || fromYard || fromHand || exileOwn || /Sacrifice ~|Exert ~|Remove |on ~|~/.test(costs) || halfLife || energy)) return "fail";
   return {
+    ...(anyPlayer ? { anyPlayer: true as const } : {}),
     manaCost,
     tap,
     sacrificeSelf: /Sacrifice ~/.test(costs),

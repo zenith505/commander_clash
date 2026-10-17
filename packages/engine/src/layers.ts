@@ -371,6 +371,7 @@ const PERMANENT_CARD_TYPES = ["Artifact", "Battle", "Creature", "Enchantment", "
 function inWindow(s: GameState, w: TimingWindow): boolean {
   switch (w) {
     case "upkeep":
+    case "draw":
     case "end":
     case "declareAttackers":
     case "declareBlockers":

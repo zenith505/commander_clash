@@ -976,7 +976,7 @@ export const timedCondition = (c: StaticCondition | undefined): boolean =>
  * attackers), "combatAfterBlocks" (once blockers are declared, 506.8f: not in a combat whose declare blockers step was
  * skipped), and the steps "declareAttackers", "declareBlockers" and "endCombat", once their turn-based actions are done.
  */
-export type TimingWindow = "upkeep" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
+export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
 
 /**
  * "Only before combat", "only before attackers are declared", "only before blockers are declared", "only before the
@@ -2346,6 +2346,8 @@ export interface ActivatedAbility {
   station?: true;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
+  /** "Any player may activate this ability" (CR 602.2): not only its controller; the one who does controls it (CR 113.8). */
+  anyPlayer?: true;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */

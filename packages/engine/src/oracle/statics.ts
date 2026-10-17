@@ -216,6 +216,8 @@ export function parseDuring(text: string): StaticCondition | null {
     return { kind: "during", window: !m[2] ? "combat" : /before/.test(m[2]) ? "combatBeforeBlocks" : "combatAfterBlocks", ...whose(m[1]) };
   if ((m = /^(your|an opponent's|any|each) upkeep(?: step)?$/.exec(text))) return { kind: "during", window: "upkeep", ...whose(m[1] === "any" || m[1] === "each" ? undefined : m[1]) };
   if ((m = /^(your|an opponent's) end step$/.exec(text))) return { kind: "during", window: "end", ...whose(m[1]) };
+  // "Any player may activate this ability but only during their draw step" (Well of Knowledge): the activator's.
+  if (text === "your draw step") return { kind: "during", window: "draw", turn: "you" };
   if ((m = /^(?:the|(your)) declare (attackers|blockers) step( on your turn| on an opponent's turn)?$/.exec(text)))
     return { kind: "during", window: m[2] === "attackers" ? "declareAttackers" : "declareBlockers", ...whose(m[1] ?? m[3]) };
   if (text === "the end of combat step") return { kind: "during", window: "endCombat" };

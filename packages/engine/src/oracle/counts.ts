@@ -74,6 +74,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return { count: { kind: "greatestControlled", filter: { ...spec, text: m[1]! }, ...(m[2] === "an opponent" ? { opponents: true as const } : {}) } };
   }
   if (!each && /^the greatest number of cards an opponent has drawn this turn$/i.test(p)) return { count: { kind: "greatestDrawn" } };
+  // "For each card you've drawn this turn", "the number of cards they've drawn this turn" (CR 121.1: cards drawn, not put
+  // into the hand otherwise).
+  if ((m = /^cards? (you've|you have|they've|they have|that player has) drawn this turn$/i.exec(p))) {
+    const who = /^you/i.test(m[1]!) ? ({ ref: "you" } as PlayerRef) : whosePlayer(/^they/i.test(m[1]!) ? "their" : "that player's", ctx);
+    return who && { count: { kind: "drawnThisTurn", who } };
+  }
   if (!each) {
     const nb = /^the (?:total )?number of (.+)$/i.exec(p);
     if (nb) return parseCount(nb[1]!, ctx, true);
@@ -95,7 +101,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
-  if (each && /^opponent(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
+  // "For each player being attacked", "the number of opponents being attacked" (Pack Attack, Dimir Strandcatcher).
+  if (/^(?:players?|opponents?) being attacked$/i.test(p)) return count({ kind: "playersAttacked" });
+  // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
+  if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
@@ -126,6 +135,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "devotion", colors: [m[1]!, m[2]].filter(Boolean).map((w) => COLOR_WORDS[w!.toLowerCase()]!) });
   // Domain.
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
+  // Vivid: "the number of colors among permanents you control".
+  if (/^colou?rs among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
   // Converge: "the number of colors of mana spent to cast this spell", "for each color of mana spent to cast it".
@@ -156,6 +167,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
   if ((m = /^(Aura|Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
     return count({ kind: "attachedToSelf", subtypes: [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
+  if ((m = /^differently named (.+?) you control$/i.exec(p))) {
+    const c = parseCount(`${m[1]} you control`, ctx, each);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other ? { count: { ...c.count, differentNames: true, filter: { ...c.count.filter, text: `differently named ${c.count.filter.text}` } } } : null;
+  }
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
   // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
   if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't) .+))?$/i.exec(p))) {

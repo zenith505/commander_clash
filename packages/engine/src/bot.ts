@@ -150,6 +150,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
+    // "Cards with different mana values" (Seasons Past): the best card of each mana value.
+    if (pend.kind === "searchLibrary" && pend.distinctManaValues) {
+      const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
+      return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => mv(s, x) === mv(s, id)) === i) }];
+    }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).

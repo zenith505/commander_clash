@@ -310,6 +310,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const item = s.resolving?.item;
         const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
         if (!o) return;
+        if (e.bottom) {
+          if (o.zone === "stack") {
+            log(s, `${defOf(s, o).name} is put on the bottom of its owner's library.`);
+            moveObject(s, o.id, "library"); // instead of its owner's graveyard (CR 608.2n); a copy ceases to exist (707.10a)
+          }
+          return;
+        }
         owners.add(o.owner);
         if (o.zone === "stack") {
           log(s, `${defOf(s, o).name} is shuffled into its owner's library.`);

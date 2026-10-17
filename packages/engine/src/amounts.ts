@@ -94,15 +94,18 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.event?.amount ?? 0;
     case "permanents": {
       let n = 0;
+      const names = new Set<string>();
       const filter = bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         const ch = view(o);
-        if (ch && (!whose || whose.includes(ch.controller)) && objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) n++;
+        if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
+        if (!c.differentNames) n++;
+        else if (ch.name && !o.faceDown) names.add(ch.name);
       }
-      return n;
+      return c.differentNames ? names.size : n;
     }
     case "greatestControlled": {
       // Each player's own count, the most of them (0 with none); players who have left the game control nothing.
@@ -116,6 +119,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "greatestDrawn":
       // Opponents who have left the game too (rulings).
       return Math.max(0, ...s.players.filter((p) => p.id !== ctx.controller).map((p) => (p.draws?.turn === s.turn ? p.draws.n : 0)));
+    case "playersAttacked":
+      return s.players.filter((p) => !p.lost && s.battlefield.some((id) => s.objects[id]!.attacking === p.id && !s.objects[id]!.attackingPermanent)).length;
+    case "drawnThisTurn":
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.draws?.turn === s.turn ? s.players[pid]!.draws!.n : 0), 0);
     case "cardsInHand":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.hand.length, 0);
     case "cardsInLibrary":
@@ -308,6 +315,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return best;
     }
+    case "colorsAmongPermanents": {
+      const colors = new Set<string>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (ch && ch.controller === ctx.controller) for (const col of ch.colors) colors.add(col);
+      }
+      return colors.size;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       for (const id of s.battlefield) {
@@ -369,7 +384,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
+      return `#${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
     case "cardsInHand":
       return "#cards in hand";
     case "cardsInLibrary":
@@ -418,6 +433,8 @@ function describeCount(c: Count): string {
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";
+    case "colorsAmongPermanents":
+      return "#colors among your permanents";
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":
@@ -438,6 +455,10 @@ function describeCount(c: Count): string {
       return `the greatest number of ${c.filter.text} ${c.opponents ? "an opponent" : "a player"} controls`;
     case "greatestDrawn":
       return "the greatest number of cards an opponent has drawn this turn";
+    case "drawnThisTurn":
+      return "#cards drawn this turn";
+    case "playersAttacked":
+      return "#players being attacked";
     case "treasureSpent":
       return "mana from Treasures spent";
     case "snowSpent":

@@ -1080,11 +1080,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const mvMax = e.mvMax === undefined ? undefined : amountNow(s, e.mvMax, ctx);
         const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
         const cards = p.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
-        const max = Math.min(e.n, cards.length);
+        const max = e.distinctManaValues ? new Set(cards.map((id) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)))).size : Math.min(e.n, cards.length);
         if (!max) return;
         const kind = filter?.text ?? "card";
-        const what = e.n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand" };
+        const what = e.distinctManaValues
+          ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different mana values`
+          : e.n === 1
+            ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
+            : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}) };
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));

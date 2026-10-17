@@ -607,6 +607,7 @@ export function moveObject(
   o.noRegenTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
   o.attacked = undefined;
+  o.couldAttack = undefined;
   o.exertedTurn = undefined;
   // Kumano: "If a creature dealt damage by ~ this turn would die, exile it instead" (CR 614.1a), while Kumano is on the
   // battlefield or leaving it at the same time (rulings).
@@ -1802,10 +1803,14 @@ function beginStep(s: GameState, step: Step): void {
         s.triggerQueue.push({ sourceId: l.subject.id, sourceCardId: l.sourceCardId, controller: l.controller, index: -1, subject: l.subject, body: { targets: [], effects: [{ type: "loseGame", who: { ref: "you" } }], text: "At the beginning of that turn's end step, you lose the game." } });
       }
       break;
-    case "declareAttackers":
-      if (potentialAttackers(s, ap).length === 0 || opponents(s, ap).length === 0) return beginStep(s, "endCombat");
+    case "declareAttackers": {
+      // Which creatures could be declared as attackers this turn (CR 508.1a), for "except for creatures that couldn't attack".
+      const able = opponents(s, ap).length ? potentialAttackers(s, ap) : [];
+      for (const o of able) o.couldAttack = s.turn;
+      if (able.length === 0) return beginStep(s, "endCombat");
       s.pending = { kind: "declareAttackers", player: ap };
       return;
+    }
     case "declareBlockers": {
       s.blockersStep = { turn: s.turn, combat: s.combatsThisTurn ?? 0 };
       const attacked = livingPlayers(s).filter((pid) => attackers(s).some((a) => a.attacking === pid));
@@ -4065,6 +4070,8 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (found.length > pend.max) throw new RulesError(`find at most ${pend.max}`);
   // Searching simply for a number of cards, you find as many as you can (CR 701.23d).
   if (found.length < pend.min) throw new RulesError(`find ${pend.min} card${pend.min === 1 ? "" : "s"}`);
+  if (pend.distinctManaValues && new Set(found.map((id) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)))).size !== found.length)
+    throw new RulesError("choose cards with different mana values");
   r.scratch = { ...r.scratch, found };
   s.pending = null;
   continueResolution(s);

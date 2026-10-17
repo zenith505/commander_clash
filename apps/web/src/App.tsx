@@ -2885,8 +2885,11 @@ function LibrarySearch({
     groups.set(name, [...(groups.get(name) ?? []), id]);
   }
   const sorted = [...groups].sort((a, b) => a[0].localeCompare(b[0]));
+  // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
+  const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
+  const clashes = (id: string) => !!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id));
   const add = (ids: string[]) => {
-    const next = ids.find((id) => !found.includes(id));
+    const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
   };
   const where = (i: number) => (pending.firstTo ? (i === 0 ? pending.firstTo : pending.othersTo) : null);
@@ -2915,7 +2918,9 @@ function LibrarySearch({
               ? `The rest go ${dig.rest}.`
               : pending.firstTo
                 ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
-                : `Found ${found.length} of ${pending.max}.`}
+                : pending.distinctManaValues
+                  ? `Chosen ${found.length}. Each must have a different mana value.`
+                  : `Found ${found.length} of ${pending.max}.`}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
             {found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
@@ -2964,9 +2969,9 @@ function LibrarySearch({
             {sorted.map(([name, ids]) => {
               const left = ids.filter((id) => !found.includes(id)).length;
               const d = cardOf(s, ids[0]!);
-              const can = left > 0 && found.length < pending.max;
+              const can = left > 0 && found.length < pending.max && !clashes(ids[0]!);
               return (
-                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)}>
+                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? "You already chose a card with this mana value" : undefined}>
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                 </div>

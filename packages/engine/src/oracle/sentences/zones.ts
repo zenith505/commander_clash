@@ -55,6 +55,8 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   if (/^Exile ~$/i.test(s) && ctx.spell) return [{ type: "exileSpell" }];
   // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
   if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
+  // Seasons Past: "Put ~ on the bottom of its owner's library", likewise the resolving spell itself (CR 608.2n).
+  if (/^Put ~ on the bottom of its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell", bottom: true }];
   // "When ~ dies, shuffle it into its owner's library", "When ~ is put into a graveyard from anywhere, ...": the card where
   // it went. "At the beginning of the end step, ~'s owner shuffles it into their library": the permanent.
   if (ctx.selfCard && /^[Ss]huffle (?:it|~) into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
@@ -120,6 +122,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
+  }
+  // "Return any number of cards with different mana values from your graveyard to your hand" (Seasons Past): chosen as it
+  // resolves (rulings), no two with the same mana value; X in a mana cost is 0 and a card with no mana cost has 0 (CR 202.3).
+  if ((m = /^[Rr]eturn any number of (.+?) with different mana values from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
+    const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card").replace(/ and\/or /g, " or "));
+    if (filter === null) return null;
+    return [{ type: "chooseFromGraveyard", n: 0, upTo: true, distinctManaValues: true, ...(filter ? { filter } : {}) }];
   }
   // "Return a creature card from your graveyard to the battlefield" (Summon Undead), "... tapped" (Port of Karfell), "... with
   // a finality counter on it" (Charnel Serenade): chosen as it resolves, not targeted, under your control (CR 110.2a).

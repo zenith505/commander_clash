@@ -12,7 +12,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 
 /** Spell and enchantment subtypes a filter can name: "Spirit or Arcane spell", "a Cartouche you control" (CR 205.3h, 205.3k). */
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
-const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure"];
+const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave"];
 
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
@@ -416,7 +416,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const ofChosen = /^creatures of the chosen type$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that didn't attack this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
@@ -487,6 +487,13 @@ export function parseTargetPhrase(
   if (attacked) {
     extra.combat = "attackedThisTurn";
     p = p.slice(0, attacked.index);
+  }
+  // "Destroy all untapped creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
+  // the Witch): the ones that could have been declared as attackers but weren't (rulings).
+  const couldnt = / that didn't attack this turn, except for creatures that couldn't attack$/.exec(p);
+  if (couldnt) {
+    extra.combat = "couldButDidntAttack";
+    p = p.slice(0, couldnt.index);
   }
   // "Destroy all creatures that aren't enchanted" (Winds of Rath), "target creature that isn't enchanted" (Brainspoil).
   const bare = / that (?:isn't|aren't|is not|are not) enchanted$/.exec(p);

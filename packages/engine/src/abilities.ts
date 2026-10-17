@@ -928,8 +928,8 @@ export type StaticCondition =
   | { kind: "libraryAtMost"; n: number }
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
   | { kind: "opponentPoison"; n: number }
-  /** Raid: "if you attacked this turn" (with one or more creatures). */
-  | { kind: "attackedThisTurn" }
+  /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
+  | { kind: "attackedThisTurn"; not?: true }
   /** "If you've committed a crime this turn" (CR 700.13). */
   | { kind: "committedCrime" }
   /** A Case's solved designation (CR 719.3b): "Solved — [ability]" (702.169); `not`: a "To solve" trigger's "this Case is not solved" (719.3a). */

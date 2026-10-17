@@ -995,7 +995,8 @@ export type Effect =
    * the cards in their hand that match; without `may`, one if they have one. Not an Aura: that would need a choice of
    * what it enchants (CR 303.4f).
    */
-  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; may: boolean; any?: boolean }
+  /** `attacking`: "tapped and attacking" (CR 508.4), attacking a player its controller chooses (rulings on Kinscaer Sentry). */
+  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).

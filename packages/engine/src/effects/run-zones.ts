@@ -12,7 +12,7 @@ import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
 import { addDelayed, paidUnless } from "./run-spells";
-import { fireEvent, inCombat } from "./triggers";
+import { attackDefault, fireEvent, inCombat } from "./triggers";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
 export function isSuspended(s: GameState, o: GameObject): boolean {
@@ -892,6 +892,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return "paused";
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "hand" && o.owner === p.id);
+      // "Tapped and attacking" (CR 508.4): only during combat, attacking a player its controller chooses as it enters (it
+      // was never declared as an attacker, rulings on Kinscaer Sentry); outside combat it's only tapped (CR 506.3d).
+      const attackOptions = e.attacking && cards.some((o) => isType(defOf(s, o), "Creature")) ? attackChoices(s, p.id, ctx.sourceId) : [];
+      if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+        const name = defOf(s, cards[0]!).name;
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${name} attacks` };
+        return "paused";
+      }
+      const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
+      const defender = attack?.player;
       // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g).
       const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src);
       if (hosts === "paused") return "paused";
@@ -902,8 +912,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             log(s, `${defOf(s, o).name} has nothing to enchant, so it stays in ${p.name}'s hand.`);
             continue;
           }
-          log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          const attacks = defender !== undefined && isType(defOf(s, o), "Creature");
+          log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
           moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
+          if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
+            o.attacking = defender;
+            if (attack?.planeswalker) o.attackingPermanent = { id: attack.planeswalker, zc: obj(s, attack.planeswalker).zoneChanges ?? 0 };
+          }
         }
       });
       return;
@@ -1220,4 +1235,18 @@ export function enterAttacking(s: GameState, o: GameObject, returned: LastKnown)
     }
   }
   return true;
+}
+
+/**
+ * What a creature put onto the battlefield attacking may attack (CR 508.4): each opponent or a planeswalker they control,
+ * chosen by its controller; the one the source attacks first. None outside combat, or on another player's turn.
+ */
+export function attackChoices(s: GameState, pid: PlayerId, sourceId?: ObjectId): { key: string; label: string; player: PlayerId; planeswalker?: ObjectId }[] {
+  const first = attackDefault(s, pid, sourceId);
+  if (first === undefined) return [];
+  const foes = livingPlayers(s).filter((x) => x !== pid).sort((a, b) => (a === first ? -1 : b === first ? 1 : 0));
+  return foes.flatMap((x) => [
+    { key: String(x), label: player(s, x).name, player: x },
+    ...s.battlefield.filter((id) => objIsType(s, obj(s, id), "Planeswalker") && controllerOf(s, obj(s, id)) === x).map((id) => ({ key: `${x}:${id}`, label: `${defOf(s, obj(s, id)).name} (${player(s, x).name})`, player: x, planeswalker: id })),
+  ]);
 }

@@ -187,11 +187,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
-  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?$/.exec(s))) {
+  // "You may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking"
+  // (Kinscaer Sentry): one card, attacking a player its controller chooses (CR 508.4).
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?( and attacking)?$/.exec(s))) {
+    if (m[5] && m[2] === "any number of") return null;
     // "A permanent card with mana value less than or equal to that damage" (Covert Technician): counted as it resolves.
     const filter = parseSearchFilter(m[3]!, (t) => parseBoundCount(t, ctx));
     if (filter === null) return null;
-    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}) }];
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}) }];
   }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();

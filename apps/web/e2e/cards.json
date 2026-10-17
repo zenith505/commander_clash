@@ -2757,6 +2757,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fdf0fba8-f335-419c-b96b-e99037727c43",
+  "name": "Kinscaer Sentry",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Kithkin Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kithkin",
+   "Soldier"
+  ],
+  "oracleText": "First strike, lifelink\nWhenever this creature attacks, you may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking, where X is the number of attacking creatures you control.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d69b1e68-8d8e-460b-9eb4-6a68be886197",
   "name": "Kodama of the West Tree",
   "manaCost": "{2}{G}",
@@ -4047,6 +4081,36 @@
   "set": "spg",
   "releasedAt": "2024-09-27",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "60ba93eb-39e6-4af2-9c66-cd38f72daff2",
+  "name": "Savannah Lions",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Cat",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "a25",
+  "releasedAt": "2018-03-16",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

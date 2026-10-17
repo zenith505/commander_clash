@@ -767,7 +767,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1224,6 +1224,8 @@ export interface Resolving {
     linkedPick?: true;
     castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
+    /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
+    attackWhom?: string;
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     /** "Roll two d8 and choose one result": the index of the die chosen (see runDiceEffect). */
     rollChoice?: string;

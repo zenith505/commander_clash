@@ -3459,7 +3459,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

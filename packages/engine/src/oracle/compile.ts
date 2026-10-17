@@ -1011,7 +1011,12 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     if (line === "Room abilities of dungeons you own trigger an additional time.") {
-      out.roomsTwice = true;
+      out.roomsTwice = 1;
+      continue;
+    }
+    // Scion of Halaster's granted ability: a replacement for the player's first draw each turn (CR 614.1a, 614.5).
+    if (line === "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them into your graveyard and the other back on top of your library. Then draw a card.") {
+      out.firstDrawLook = true;
       continue;
     }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
@@ -1476,12 +1481,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "When you cast or cycle ~, ...", "When you cycle ~ and when ~ dies, ...", "Whenever ~ enters or attacks, ...",
-    // "When ~ enters or dies, ...": one ability that triggers on either event, which works like two with the same
-    // effect (CR 702.29c). The text is read for each event ("it" after it died is the card).
+    // "When ~ enters or dies, ...", "When ~ enters and at the beginning of your upkeep, ...": one ability that triggers on
+    // either event, which works like two with the same effect (CR 702.29c). The text is read for each event ("it" after it
+    // died is the card).
     const twice =
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
+      /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
-      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player), (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
@@ -1491,7 +1498,9 @@ export function compile(d: CardDef): CompiledCard {
           ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]
           : twice[1] === "the creature it haunts dies"
             ? [`When ~ enters, ${effect}`, `When the creature ~ haunts dies, ${effect}`]
-            : [`When ~ enters, ${effect}`, `${/^attacks/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
+            : /^at the beginning/.test(twice[1]!)
+              ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
+            : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);
       else for (const t of both) out.triggers.push(bindThisAbility(t as TriggeredAbility, line));

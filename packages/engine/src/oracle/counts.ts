@@ -261,6 +261,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if ((x === "that spell's" || x === "the spell's") && ctx.lastObjectTarget !== undefined) return ctx.targets[ctx.lastObjectTarget]?.kind === "spell" ? { ref: "target", index: ctx.lastObjectTarget } : null;
   // "Return target card from your graveyard to your hand. You gain life equal to that card's mana value": the card
   // targeted, wherever it went (Healing Technique, Razor Hippogriff).
+  // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value" (Tavern Brawler).
+  if ((x === "that card's" || x === "the exiled card's") && ctx.exiledTop) return { ref: "exiledTop" };
   if (x === "that card's") return ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" ? { ref: "target", index: 0 } : null;
   // In a cast trigger, the spell cast ("discover X, where X is that spell's mana value").
   if (x === "that spell's") return ctx.castSpell ? { ref: "castSpell" } : null;

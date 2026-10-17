@@ -1,5 +1,70 @@
 [
  {
+  "oracleId": "38515f89-348b-4cf3-b7bd-1f6fe4ce2fba",
+  "name": "Adeline, Resplendent Cathar",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Vigilance\nAdeline's power is equal to the number of creatures you control.\nWhenever you attack, for each opponent, create a 1/1 white Human creature token that's tapped and attacking that player or a planeswalker they control.",
+  "power": "*",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e101b744-9175-4aa5-bf80-d6944359e538",
+  "name": "Airbending Lesson",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Instant — Lesson",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [
+   "Lesson"
+  ],
+  "oracleText": "Airbend target nonland permanent. (Exile it. While it's exiled, its owner may cast it for {2} rather than its mana cost.)\nDraw a card.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Airbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fd949f82-fc10-4e37-8aa9-6c7569fe3c55",
   "name": "Akroma's Will",
   "manaCost": "{3}{W}",
@@ -2836,6 +2901,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cfb756dd-6fe1-430a-8f04-8b10cac62a86",
+  "name": "Isamaru, Hound of Konda",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Legendary Creature — Dog",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dog"
+  ],
+  "oracleText": "",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "chk",
+  "releasedAt": "2004-10-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b2c6aa39-2d2a-459c-a555-fb48ba993373",
   "name": "Island",
   "manaCost": "",
@@ -2902,6 +2999,39 @@
   "set": "mkm",
   "releasedAt": "2024-02-09",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cc2b6e58-2d6f-495e-95f3-9496105c4cba",
+  "name": "Jace Beleren",
+  "manaCost": "{1}{U}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Planeswalker — Jace",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Jace"
+  ],
+  "oracleText": "+2: Each player draws a card.\n−1: Target player draws a card.\n−10: Target player mills twenty cards.",
+  "loyalty": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "dd2",
+  "releasedAt": "2008-11-07",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4526,6 +4656,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "227ddf6c-d21a-48da-84fb-395c7e096914",
+  "name": "Scion of Halaster",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Enchantment — Background",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Background"
+  ],
+  "oracleText": "Commander creatures you own have \"The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them into your graveyard and the other back on top of your library. Then draw a card.\"",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4538ec2c-867e-412b-b6e3-a57f8e29ba84",
   "name": "Scrabbling Claws",
   "manaCost": "{1}",
@@ -5425,6 +5585,30 @@
   "set": "usg",
   "releasedAt": "1998-10-12",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "cc4f1023-09e4-4f27-8712-be72e9694a80",
+  "name": "Tempting Contract",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, each opponent may create a Treasure token. For each opponent who does, you create a Treasure token.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

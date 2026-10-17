@@ -12,7 +12,7 @@ import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
 import { phaseOut } from "../phasing";
-import { keywordLabel } from "../keywords";
+import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../keywords";
 
 /**
  * Proliferate (CR 701.27a): choose any number of permanents and players with counters; each gets another of
@@ -565,11 +565,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "playerGains": {
       // The chosen color or player filled in now (CR 608.2h); until end of turn (CR 514.2).
       const mod = fixMods(s, [{ kind: "addKeywords", keywords: e.keywords }], ctx)[0];
-      const keywords = mod?.kind === "addKeywords" ? mod.keywords : [];
+      // "Protection from that player": the player this instruction is being done for (Noble Heritage).
+      const keywords = (mod?.kind === "addKeywords" ? mod.keywords : []).flatMap((k) => (k !== THAT_PLAYER_PROTECTION ? [k] : ctx.eachOne !== undefined ? [protectionFromPlayer(ctx.eachOne)] : []));
       if (!keywords.length) return;
       const p = player(s, ctx.controller);
-      p.gained = [...new Set([...(p.gained ?? []), ...keywords])];
-      log(s, `${p.name} gains ${keywords.map((k) => keywordLabel(k, (x) => player(s, x).name).toLowerCase()).join(" and ")} until end of turn.`);
+      if (e.untilYourNextTurn) p.gainedUntilNextTurn = [...new Set([...(p.gainedUntilNextTurn ?? []), ...keywords])];
+      else p.gained = [...new Set([...(p.gained ?? []), ...keywords])];
+      log(s, `${p.name} gains ${keywords.map((k) => keywordLabel(k, (x) => player(s, x).name).toLowerCase()).join(" and ")} ${e.untilYourNextTurn ? "until their next turn" : "until end of turn"}.`);
       return;
     }
     case "attach": {

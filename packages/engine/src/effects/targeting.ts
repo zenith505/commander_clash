@@ -253,9 +253,12 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
 
 const inRange = (n: number, r: Range) => (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max) && (r.parity === undefined || (n % 2 === 0) === (r.parity === "even"));
 
+/** What a player gained until end of turn or until their next turn. */
+const gainedBy = (s: GameState, pid: PlayerId): string[] => [...(s.players[pid]?.gained ?? []), ...(s.players[pid]?.gainedUntilNextTurn ?? [])];
+
 /** Hexproof or shroud a player has from a permanent they control ("You have hexproof"), or until end of turn ("You gain shroud"). */
 export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shroud" | undefined {
-  const gained = s.players[pid]?.gained ?? [];
+  const gained = gainedBy(s, pid);
   if (gained.includes("Shroud")) return "shroud";
   let out: "hexproof" | undefined = gained.includes("Hexproof") ? "hexproof" : undefined;
   for (const id of s.battlefield) {
@@ -273,7 +276,7 @@ export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shr
  * a source that player controls (`src`: "you gain protection from the color of your choice until end of turn", 702.16b-e)?
  */
 export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId | undefined, src?: SourceQuality): boolean {
-  const gained = s.players[pid]?.gained ?? [];
+  const gained = gainedBy(s, pid);
   const holder = { controller: pid };
   if (src && protectedFrom(gained, src.controller === undefined && from !== undefined ? { ...src, controller: from } : src, holder)) return true;
   // "You have protection from the chosen card name" (Runed Halo): anything with that name, its own sources too.

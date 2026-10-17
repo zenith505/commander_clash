@@ -15,6 +15,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
+  // Airbend (CR 701.65a): exile them; for as long as each card stays exiled, its owner may cast it by paying {2} rather
+  // than its mana cost (a token ceases to exist, a land can't be played, rulings on Airbending Lesson).
+  if ((m = /^[Aa]irbend (.+)$/.exec(s))) {
+    const fx = parseSentence(`Exile ${m[1]!}`, ctx);
+    const ex = fx?.length === 1 ? fx[0] : undefined;
+    if (ex?.type !== "exile" || ex.until || ex.linked || !["target", "each", "subject"].includes(ex.what.ref)) return null;
+    return [{ ...ex, ownerMay: { cost: "{2}" } }];
+  }
   // "Discard a card and sacrifice an artifact, a creature, and a land": in that order.
   if ((m = /^Discard a card and (sacrifice .+)$/.exec(s))) {
     const rest = parseZonesSentence(m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1), ctx);

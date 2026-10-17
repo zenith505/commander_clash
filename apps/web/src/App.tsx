@@ -3271,6 +3271,8 @@ function AbilityMenu({
   const land = isLand(s, objectId);
   const playable = inHand && (land ? canPlayLand(s, objectId) : canCastWithTaps(s, objectId));
   const choice = inHand && land ? entersRulesOf(s, HUMAN, objectId).entersTappedChoice : undefined;
+  // Airbend's "{2} rather than its mana cost", "without paying its mana cost" (Release to the Wind).
+  const exiledFor = o.zone === "exile" && o.mayPlay?.player === HUMAN ? o.mayPlay : undefined;
   return (
     <div className="ability-menu">
       <strong>{d.name}</strong>
@@ -3286,7 +3288,7 @@ function AbilityMenu({
       )}
       {inHand && !foretold && (
         <button disabled={!playable} onClick={() => onPlay()}>
-          {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
+          {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : exiledFor?.cost ? <>Cast it for <ManaCost cost={exiledFor.cost} size="sm" /></> : exiledFor?.free ? "Cast it without paying its mana cost" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
       {inHand &&
@@ -3467,6 +3469,23 @@ function Controls({
         <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>
           Don't
         </button>
+      </div>
+    );
+  }
+  if (pending?.kind === "drawLook" && pending.player === HUMAN) {
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> instead of drawing, put one of the top two cards of your library into your graveyard; the other stays on top, then you draw it.
+        </span>
+        {pending.cards.map((id) => {
+          const d = cardOf(s, id);
+          return (
+            <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, objectId: id }])}>
+              {d.name} to graveyard
+            </button>
+          );
+        })}
       </div>
     );
   }

@@ -423,6 +423,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "dredge":
       chooseDredge(s, p, action.objectId);
       break;
+    case "drawLook":
+      chooseDrawLook(s, p, action.objectId);
+      break;
   }
   // Mana abilities activated just before casting are part of paying for it (CR 601.2g): what they
   // trigger ("whenever a creature dies" from sacrificing a Scion) waits until the spell is cast.
@@ -671,7 +674,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}) };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)) };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -1484,6 +1487,8 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", rea
   while (n > 0 || ready > 0) {
     if (ready === 0) {
       n--;
+      const look = firstDrawLook(s, pid, n, after);
+      if (look === "paused") return false;
       ready = drawsInstead(s, pid);
     }
     const options = dredgeOptions(s, pid);
@@ -1495,6 +1500,44 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", rea
     if (!drawOne(s, pid)) break;
   }
   return true;
+}
+
+/**
+ * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
+ * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant to
+ * commander creatures, CR 614.1a). Only the turn's first would-be draw, so the draw it makes isn't replaced again (614.5),
+ * and two such abilities replace it once. The draw it makes can still be replaced by others (dredge, Alhammarret's
+ * Archive). With one card in the library, that card goes to the graveyard: as much as possible (CR 609.3).
+ */
+function firstDrawLook(s: GameState, pid: PlayerId, left: number, after?: "drawStep"): "paused" | void {
+  const p = player(s, pid);
+  if (p.firstWouldDraw === s.turn) return;
+  p.firstWouldDraw = s.turn;
+  const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).firstDrawLook);
+  if (!src) return;
+  const cards = p.library.slice(0, 2);
+  log(s, `${p.name} looks at the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of their library instead of drawing (${nameOf(s, src)}).`);
+  if (cards.length === 2) {
+    s.pending = { kind: "drawLook", player: pid, source: nameOf(s, src), cards, left, ...(after ? { after } : {}) };
+    return "paused";
+  }
+  if (cards.length === 1) {
+    moveObject(s, cards[0]!, "graveyard");
+    log(s, `${p.name} puts ${nameOf(s, cards[0]!)} into their graveyard.`);
+  }
+}
+
+/** Answering firstDrawLook: that card to the graveyard, the other stays on top; then the draw, the rest, and what was drawing. */
+function chooseDrawLook(s: GameState, p: Player, id: ObjectId) {
+  const pend = s.pending;
+  if (pend?.kind !== "drawLook" || pend.player !== p.id) throw new RulesError("no cards to choose from");
+  if (!pend.cards.includes(id) || !p.library.includes(id)) throw new RulesError("that isn't one of the cards");
+  s.pending = null;
+  moveObject(s, id, "graveyard");
+  log(s, `${p.name} puts ${nameOf(s, id)} into their graveyard and the other card back on top, then draws.`);
+  if (!draw(s, p.id, pend.left + 1, pend.after)) return;
+  if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
+  else if (s.resolving) continueResolution(s);
 }
 
 /**
@@ -1742,6 +1785,7 @@ function startNextTurn(s: GameState) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
+  for (const p of s.players) if (began.has(p.id)) p.gainedUntilNextTurn = undefined;
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
@@ -2130,9 +2174,16 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   log(s, `${d.name} resolves and enters the battlefield${o.castAlt === "sneak" ? " tapped" : ""}.`);
   const sneak = o.castAlt === "sneak" ? o.sneak : undefined;
   o.sneak = undefined;
+  const gains = o.copyGains;
+  o.copyGains = undefined;
   moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}) });
   // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
   if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
+  if (gains && o.zone === "battlefield") {
+    // "The copy gains haste and ...": the effect on the spell goes on applying to the token it became (CR 400.7a).
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: gains.timestamp, controller: gains.controller, sourceName: gains.source, duration: "game", affected: [o.id], mods: gains.mods });
+    invalidateCharacteristics(s);
+  }
   if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
   if (o.zone === "battlefield" && o.castAlt === "blitz") blitzed(s, o, item.controller);
   if (o.zone === "battlefield" && o.castAlt === "warp") warped(s, o, item.controller);
@@ -2243,7 +2294,7 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): boole
 }
 
 /** How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana). */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free"> | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "cost" | "more"> | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   return linkedPlayPermission(s, o, pid) ? { anyType: true } : undefined;
 }
@@ -2668,6 +2719,11 @@ export function castProblem(
   // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
   // additional cost (Toxic Deluge's rulings).
   if ((free || plotted) && !madness && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
+  // Cast from exile without paying its mana cost, or for airbend's {2} (CR 107.3b, 701.65a; rulings on Airbending Lesson).
+  const fromExile = !free && !choices?.via && o.zone === "exile" ? exilePermission(s, o, pid) : undefined;
+  if (fromExile?.cost && (choices?.alt || choices?.faceDown)) return `${d.name} can be cast from exile only for ${fromExile.cost}`;
+  if (fromExile?.free && !choices?.alt && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
+  if (fromExile?.cost && !parseManaCost(fromExile.cost).hasX && x && manaX) return "X is 0 unless the cost you pay has {X}"; // airbend's {2} (CR 107.3b)
   if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
@@ -2729,12 +2785,16 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const anyType = (c: ParsedCost): ParsedCost => (exiled?.anyType ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   const freeFromExile = !!exiled?.free && !how.faceDown && !how.alt;
+  // "A spell cast this way costs {2} more" (Soul Partition): an increase (CR 601.2f).
+  if (exiled?.more && !madness && freeCastOf(s, pid) !== o.id) mods.more += exiled.more;
   if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o)) || freeFromExile) return { cost: anyType(parseManaCost(kickCost)), extra: Math.max(0, mods.more - mods.less) };
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
   // So do evoke, dash, bestow and madness (CR 702.74a, 702.109a, 702.103a, 702.35a).
-  const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt, s, pid)?.mana ?? d.manaCost);
+  // Airbend's "{2} rather than its mana cost" (CR 701.65a), an alternative cost.
+  const airbent = !how.faceDown && !how.alt && freeCastOf(s, pid) !== o.id ? exiled?.cost : undefined;
+  const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt, s, pid)?.mana ?? airbent ?? d.manaCost);
   const mana = anyType(parseManaCost(base + kickCost));
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;

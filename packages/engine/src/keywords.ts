@@ -131,6 +131,8 @@ export const CHOSEN_PLAYER_PROTECTION = "Protection from the chosen player";
  * one player (CR 702.16k), whoever the permanent's own chosen player is.
  */
 export const protectionFromPlayer = (pid: number) => `Protection from player #${pid}`;
+/** "For each opponent who does, you gain protection from that player" (Noble Heritage): filled in with that player. */
+export const THAT_PLAYER_PROTECTION = "Protection from that player";
 const PLAYER_PROTECTION = /^Protection from player #(\d+)$/;
 /** A keyword as shown to people: "Protection from player #2" names that player. */
 export const keywordLabel = (k: string, name: (pid: number) => string) => k.replace(PLAYER_PROTECTION, (_, n: string) => `Protection from ${name(Number(n))}`);

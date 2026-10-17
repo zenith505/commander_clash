@@ -203,6 +203,8 @@ export interface GameObject {
   movedWith?: { id: ObjectId; zc: number }[];
   /** A copy of a spell (CR 707.10): not a card; it ceases to exist off the stack (707.10a), or becomes a token (608.3f). */
   spellCopy?: boolean;
+  /** "The copy gains haste and ..." (Nalfeshnee): an effect on the copy, which goes on applying to the token it becomes (CR 400.7a). */
+  copyGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string };
   /** Regeneration shields made this turn (CR 701.19a); each replaces one destruction. */
   regenShields?: number;
   /** "Prevent the next N damage that would be dealt to it this turn": what's left of such shields (CR 615.7). */
@@ -278,6 +280,10 @@ export interface GameObject {
     anyType?: true;
     /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
     castOnly?: true;
+    /** Airbend's "by paying {2} rather than paying its mana cost" (CR 701.65a): an alternative cost, the only way. */
+    cost?: string;
+    /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */
+    more?: number;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
@@ -486,6 +492,8 @@ export interface Player {
    * player"): Hexproof, Shroud or a protection keyword (CR 702.11d, 702.16b-e, 702.18d), lost in the cleanup step (514.2).
    */
   gained?: string[];
+  /** The same, until this player's next turn ("you gain protection from that player until your next turn", CR 611.2b). */
+  gainedUntilNextTurn?: string[];
   /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
   exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
@@ -510,6 +518,8 @@ export interface Player {
   draws?: { turn: number; n: number };
   /** The turn of their draw step in which they last drew (the first card drawn in it isn't doubled by Alhammarret's Archive). */
   firstDrawStepDraw?: number;
+  /** The turn this player last would have drawn a card: "the first time you would draw a card each turn" (Scion of Halaster). */
+  firstWouldDraw?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
   /** The turn this player last committed a crime (CR 700.13), for "if you've committed a crime this turn". */
@@ -845,6 +855,12 @@ export type PendingDecision =
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
    */
+  /**
+   * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
+   * into your graveyard and the other back on top" (Scion of Halaster): which of `cards` goes to the graveyard; then
+   * the player draws, and `left` more draws, and `after` carries on as with dredge.
+   */
+  | { kind: "drawLook"; player: PlayerId; source: string; cards: ObjectId[]; left: number; after?: "drawStep" }
   | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; /** Of those, draws this one already stands for (Alhammarret's Archive). */ ready?: number; after?: "drawStep" }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
@@ -1123,7 +1139,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number> }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all" }>;
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
@@ -1267,6 +1283,8 @@ export interface Resolving {
   countered?: Record<ObjectId, { zc: number; x: number }>;
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
   revealed?: { id: ObjectId; zc: number };
+  /** The one card an "exile the top card of your library" exiled, for "that card's mana value" (Tavern Brawler). */
+  exiledTop?: { id: ObjectId; zc: number };
   /** The cards its mill instructions milled, as they are in the graveyard ("if a card with the chosen name was milled this way"). */
   milled?: { id: ObjectId; zc: number }[];
   /** How many cards its exileNamed instruction exiled from the hand ("for each card exiled from their hand this way"). */
@@ -1313,6 +1331,8 @@ export interface Resolving {
     mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)
     mayers?: PlayerId[]; // and those who chose to
     mayStep?: number; // how many of its instructions are done
+    /** A tempting offer's runs (see eachAccepted): the one going on, and the scratch kept between them. */
+    offer?: { i: number; keep: string[] };
     /** The "if"s running, outermost first: whether each one's condition held as it was reached, and its instructions done. */
     ifs?: { holds: boolean; step: number }[];
     /** A punisher (see its effect): players still to choose, what each chose (an option's index or "none"), the round. */
@@ -1378,6 +1398,8 @@ export interface Resolving {
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;
+    /** "Tapped and attacking that player or a planeswalker they control": each opponent's pick (an attackChoices key). */
+    attackEach?: Record<number, string>;
     /** "Search your library and/or graveyard": "both", or "graveyard" alone (no shuffle). */
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
@@ -1465,6 +1487,8 @@ export type Action =
   | { type: "finishAssistedCast"; player: PlayerId; cancel?: boolean }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
+  /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
+  | { type: "drawLook"; player: PlayerId; objectId: ObjectId }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */

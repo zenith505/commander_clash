@@ -251,6 +251,10 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     more("countMods");
     more("othersEnterWithCounters");
     more("entersWithAdditional");
+    // Dungeon Delver's granted "Room abilities ... trigger an additional time": one more per instance (rulings).
+    const rooms = (base.roomsTwice ?? 0) + extra.reduce((n, x) => n + (x.roomsTwice ?? 0), 0);
+    if (rooms) hit.roomsTwice = rooms;
+    if (extra.some((x) => x.firstDrawLook)) hit.firstDrawLook = true;
     byKey.set(key, hit);
   }
   return hit;

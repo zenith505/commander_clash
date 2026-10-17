@@ -107,6 +107,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const plan = castPlan(s, pid, pend.objectId, true);
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
+    if (pend.kind === "drawLook") {
+      // Keep the card we'd rather draw (what scry would keep), and bin the other.
+      const [a, b] = pend.cards as [string, string];
+      const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
+      return [{ type: "drawLook", player: pid, objectId: bin }];
+    }
     if (pend.kind === "dredge") {
       const pick = chooseDredge(s, pid, pend.options);
       return [{ type: "dredge", player: pid, ...(pick ? { objectId: pick } : {}) }];

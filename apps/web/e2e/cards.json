@@ -2720,6 +2720,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b96b1341-0c15-4816-be2d-5cc98b2afb63",
+  "name": "Khorvath Brightflame",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Partner with Sylvia Brightspear (When this creature enters, target player may put Sylvia into their hand from their library, then shuffle.)\nFlying, haste\nKnights your team controls have flying and haste.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Partner with",
+   "Haste",
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3246eff5-8739-469f-a401-e5de927dd6bb",
   "name": "Khârn the Betrayer",
   "manaCost": "{3}{R}",
@@ -4596,6 +4633,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9ad61841-9894-41da-bdd8-248c2ce21b00",
+  "name": "Split the Party",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose target player. Return half the creatures they control to their owner's hand, rounded up.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "afr",
+  "releasedAt": "2021-07-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5cd17347-5558-46f9-b8bb-ae5deeb1f229",
   "name": "Sram's Expertise",
   "manaCost": "{2}{W}{W}",
@@ -4735,6 +4798,43 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "22a93a6d-fe58-4135-8ac2-6b92e9bb75a3",
+  "name": "Sylvia Brightspear",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Partner with Khorvath Brightflame (When this creature enters, target player may put Khorvath into their hand from their library, then shuffle.)\nDouble strike\nDragons your team controls have double strike.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Partner with",
+   "Partner",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -1334,7 +1334,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Partner—Friends forever" and the other "partner—[text]" abilities only matter for deck building (CR 702.124i; see
     // commanderPairProblem).
-    if (/^Partner—(?:Character select|Father & son|Friends forever|Survivors)$/.test(line)) continue;
+    // "Doctor's companion" too (CR 702.124m).
+    if (/^(?:Partner—(?:Character select|Father & son|Friends forever|Survivors)|Doctor's companion)$/.test(line)) continue;
     // "Partner with [name]" is two abilities (CR 702.124j): the deck-building one (commanderPairProblem) and "When this
     // permanent enters, target player may search their library for a card named [name], reveal it, put it into their
     // hand, then shuffle."

@@ -776,7 +776,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** For "keep": the player whose permanents these are, when someone else chooses for them (Mythos of Snapdax). */ of?: PlayerId }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string }
   /** `x`: the trigger's X (an enters trigger's is its spell's, CR 107.3m), which "up to X target ..." can't choose more than. */

@@ -5788,6 +5788,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3dd196b6-a85a-4e3e-bb57-ec34241f8117",
+  "name": "Terminus",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Put all creatures on the bottom of their owners' libraries.\nMiracle {W} (You may cast this card for its miracle cost when you draw it if it's the first card you drew this turn.)",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Miracle"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d723a6f-854f-43df-9401-a4eb0c0f639f",
   "name": "The Weatherseed Treaty",
   "manaCost": "{2}{G}",

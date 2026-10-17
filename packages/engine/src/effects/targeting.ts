@@ -329,6 +329,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const kinds = spec.types?.length ? spec.types : ["Creature", "Planeswalker"];
     return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
+  // A mutating creature spell's target has the same owner as the spell (CR 702.140a).
+  if (spec.ownerIs !== undefined && o.owner !== spec.ownerIs) return false;
   return spec.kind === "object" && objectMatches(s, spec, o, controller, true, src);
 }
 

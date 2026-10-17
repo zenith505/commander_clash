@@ -4,7 +4,7 @@ import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripRem
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
-import type { CardDef } from "../types";
+import type { CardDef, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
 import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
@@ -166,16 +166,22 @@ export function isFullySupported(d: CardDef): boolean {
  */
 /** `how`: the optional costs announced for it, which decide whether it has the targets of parts that need them (gateTargets). */
 export function spellTargetSpecs(d: CardDef, modes?: number[], how?: CastHow): TargetSpec[] {
+  // A mutating creature spell targets "a non-Human creature with the same owner as this spell" (CR 702.140a).
+  if (d.mutateOwner !== undefined) return [mutateTarget(d.mutateOwner)];
   const c = compileCard(d);
   if (c.spell) return gateTargets(withModes(c.spell, modes).targets, how);
   return c.enchant ? [c.enchant] : [];
 }
+
+/** What a mutating creature spell targets (CR 702.140a): a non-Human creature with the same owner as the spell. */
+export const mutateTarget = (owner: PlayerId): TargetSpec => ({ kind: "object", types: ["Creature"], notSubtypes: ["Human"], ownerIs: owner, text: "target non-Human creature with the same owner" });
 
 /**
  * The spell's effect as a body, for deciding what to target: a spell's text, or for an
  * Aura, what it will do to the enchanted permanent.
  */
 export function castingBody(d: CardDef): AbilityBody | undefined {
+  if (d.mutateOwner !== undefined) return { targets: [mutateTarget(d.mutateOwner)], effects: [], text: "Mutate" };
   const c = compileCard(d);
   if (c.spell) return c.spell;
   if (!c.enchant) return undefined;

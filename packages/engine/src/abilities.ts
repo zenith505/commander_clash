@@ -171,6 +171,8 @@ export type Count =
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
   | { kind: "devoured" }
+  /** "The number of times ~ has mutated" (CR 702.140d): the source's, also as it last existed (CR 608.2h). */
+  | { kind: "mutations" }
   /** "For each creature that died this turn" (CR 700.4); `yours`: "that died under your control this turn". */
   | { kind: "diedThisTurn"; yours?: true }
   /** "The number of (Treasure) tokens you created this turn" (CR 111.2): tokens its controller created. */
@@ -205,6 +207,8 @@ export interface TargetSpec {
   kind: "object" | "player" | "any" | "spell" | "card";
   /** For "card": whose graveyard ("your graveyard", "an opponent's graveyard"); unset = any graveyard. */
   owner?: "you" | "opponent";
+  /** For objects: owned by this player, a mutating creature spell's owner (CR 702.140a). */
+  ownerIs?: PlayerId;
   /** For objects/spells: at least one of these card types (empty = any permanent). */
   types?: string[];
   /** All of these card types: "artifact creature" (as opposed to "artifact or creature"). */
@@ -1895,6 +1899,7 @@ export type TriggerEvent =
   | "selfCountersPut"
   /** "When ~ becomes monstrous" (CR 701.37b). */
   | "selfBecomesMonstrous"
+  | "selfMutates"
   /** "When this Class becomes level 2" (CR 716.2a): TriggeredAbility.level. */
   | "selfBecomesLevel"
   /** Exert's "When you do" (CR 701.43d): this creature was exerted as it attacked. */
@@ -2567,7 +2572,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission";

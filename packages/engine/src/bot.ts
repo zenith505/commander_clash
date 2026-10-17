@@ -234,6 +234,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // The Sieges' Khans or Dragons (CR 614.12b): Khans, the long-term value (a card, counters, mana, a returned creature).
     // "Roll two d8 and choose one result" (the Endeavors): the higher one for the first instruction.
     if (pend.kind === "chooseOption" && pend.what === "rollResult") return [{ type: "chooseOption", player: pid, choice: Number(pend.labels?.[1]) > Number(pend.labels?.[0]) ? "1" : "0" }];
+    // Mutate (CR 702.140c): on top when the new card is the bigger body, since the merged creature has its power and
+    // toughness (730.2a); its abilities come along either way (702.140e).
+    if (pend.kind === "chooseOption" && pend.what === "mutate") {
+      const m = s.mutatingSpell;
+      const size = (d: CardDef | undefined) => (Number(d?.power) || 0) + (Number(d?.toughness) || 0);
+      const host = m && s.objects[m.host];
+      return [{ type: "chooseOption", player: pid, choice: m && host && size(defOf(s, obj(s, m.id))) < size(defOf(s, host)) ? "bottom" : "top" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "anchor") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
     // A creature put onto the battlefield attacking: the player the source attacks, offered first.

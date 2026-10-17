@@ -1,6 +1,7 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
-import { abilitiesOf, NO_ABILITIES, bestowedDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
+import { mergeSpell } from "./mutate";
+import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { playerProtectedFrom, spellManaValue } from "./effects/targeting";
@@ -10,7 +11,7 @@ import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, prot
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
-import { compileCard, spellTargetSpecs } from "./oracle";
+import { compileCard, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { addMana, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
@@ -515,6 +516,8 @@ function zoneList(s: GameState, o: GameObject): ObjectId[] | null {
       return (s.phasedOut ??= []);
     case "stack":
       return null; // tracked through s.stack
+    case "merged":
+      return null; // a component of a merged permanent (CR 730.2), see mutate.ts
   }
 }
 
@@ -631,9 +634,13 @@ export function moveObject(
     to = "library";
     log(s, `${player(s, o.owner).name} reveals ${defOf(s, o).name} and shuffles it into their library instead.`);
   }
+  // A merged permanent's components all go where it goes (CR 730.3, 730.3d), but the commander redirect below is the
+  // commander card's alone (903.9c).
+  const merged = fromZone === "battlefield" ? o.merged : undefined;
+  const partsTo = to;
   // A commander that would be put into its owner's library goes to the command zone instead, if its owner
   // wants (CR 903.9b); owners always do. Into a hand it stays: it can be cast from there without tax.
-  if (o.isCommander && to === "library" && fromZone !== "library") {
+  if ((merged ? merged.ownCommander : o.isCommander) && to === "library" && fromZone !== "library") {
     to = "command";
     log(s, `${defOf(s, o).name} goes to the command zone instead.`);
   }
@@ -662,6 +669,13 @@ export function moveObject(
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}) };
+  }
+  // Its components become objects of their own (CR 730.3): this one is the card or token it was.
+  o.movedWith = undefined;
+  if (merged) {
+    o.isToken = merged.ownToken;
+    o.isCommander = merged.ownCommander;
+    o.merged = undefined;
   }
   const exiledUntil = fromZone === "battlefield" ? o.exiledUntilLeaves : undefined;
   const attachments: ObjectId[] = []; // what was attached to it, for "whenever equipped creature dies"
@@ -694,6 +708,7 @@ export function moveObject(
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
     o.bestowed = undefined; // a bestowed spell is a bestowed Aura as it resolves, and nothing else is (CR 702.103b)
+    o.mutating = undefined; // so is a mutating creature spell (CR 702.140a-b)
     o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
     o.overloaded = undefined; // the text change lasts while it's a spell (CR 702.96a)
     o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
@@ -735,6 +750,7 @@ export function moveObject(
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
+  if (to === "battlefield") o.mutations = undefined; // and for "the number of times ~ has mutated"
   o.counters = {};
   o.counterTimestamps = undefined;
   o.controller = opts.controller ?? o.owner;
@@ -787,6 +803,7 @@ export function moveObject(
       ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}) } : {}),
     });
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
+  if (merged) o.movedWith = scatterMerged(s, merged.parts.filter((x) => x !== id), partsTo, !!opts.top);
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
     // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
@@ -830,6 +847,41 @@ export function moveObject(
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id });
   if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
+}
+
+/**
+ * The other components of a merged permanent that left the battlefield go to the zone it went to (CR 730.3), each a new
+ * object; a commander that would go to its owner's library goes to the command zone instead (903.9c). Returns them, so
+ * an effect that finds the new object finds them all (730.3c).
+ */
+function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean): { id: ObjectId; zc: number }[] {
+  const moved: { id: ObjectId; zc: number }[] = [];
+  for (const id of ids) {
+    const p = s.objects[id];
+    if (!p || p.zone !== "merged") continue;
+    const dest = p.isCommander && to === "library" ? "command" : to;
+    if (dest !== to) log(s, `${defOf(s, p).name} goes to the command zone instead.`);
+    p.zone = dest;
+    p.zoneChanges = (p.zoneChanges ?? 0) + 1;
+    p.mergedInto = undefined;
+    p.controller = p.owner;
+    p.timestamp = s.nextTimestamp++;
+    const list = zoneList(s, p);
+    if (list) top ? list.unshift(id) : list.push(id);
+    if (dest === "graveyard") noteToGraveyard(s, p);
+    if (dest === "graveyard" || dest === "exile") p.justMovedForCommander = p.isCommander;
+    if (dest === "graveyard" && !p.isToken) {
+      const yards = ((s.turnLog ??= {}).toGraveyard ??= {});
+      yards[p.owner] = (yards[p.owner] ?? 0) + 1;
+      const types = (s.turnLog.toGraveyardTypes ??= {});
+      for (const t of defOf(s, p).types) types[t] = (types[t] ?? 0) + 1;
+      if (!(s.descendedThisTurn ??= []).includes(p.owner)) s.descendedThisTurn.push(p.owner);
+    }
+    if (dest === "graveyard") (s.zoneBatch ??= []).push({ id, zc: p.zoneChanges, from: "merged", to: dest, owner: p.owner, ...(p.isToken ? { notCard: true as const } : {}), card: p.cardId });
+    moved.push({ id, zc: p.zoneChanges });
+  }
+  invalidateCharacteristics(s);
+  return moved;
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
@@ -1998,43 +2050,26 @@ function resolveTop(s: GameState) {
     o.spellCopy = undefined;
     o.isToken = true;
   }
-  if (isPermanentCard(d)) {
-    const enchant = compileCard(d).enchant;
-    if (enchant) {
-      // An Aura spell's target is checked on resolution like any other (CR 608.2b); it enters attached to it (CR 303.4f).
-      const t = item.targets?.[0];
-      const legal = !!t && (t.kind === "object" || t.kind === "player") && isLegalTarget(s, enchant, t, item.controller, d);
-      if (legal && t.kind === "player") {
-        // "Enchant player" (CR 702.5d): it enters attached to the player.
-        log(s, `${d.name} resolves and enters attached to ${player(s, t.id).name}.`);
-        moveObject(s, o.id, "battlefield", { controller: item.controller, attachToPlayer: t.id });
-        return;
-      }
-      if (legal && t.kind === "object") {
-        log(s, `${d.name} resolves and enters attached to ${nameOf(s, t.id)}.`);
-        moveObject(s, o.id, "battlefield", { controller: item.controller, attachTo: t.id });
-        return;
-      }
-      if (!o.bestowed) {
-        log(s, `${d.name} does nothing (its target is gone).`);
-        moveObject(s, o.id, "graveyard");
-        return;
-      }
-      // A bestowed Aura spell with an illegal target becomes a creature spell and resolves (CR 702.103e, 608.3b).
-      o.bestowed = undefined;
-      log(s, `${d.name}'s target is gone, so it resolves as a creature.`);
+  if (o.mutating) {
+    const t = item.targets?.[0];
+    if (t?.kind === "object" && isLegalTarget(s, mutateTarget(o.owner), t, item.controller, d)) {
+      // It merges with its target (CR 702.140c); its controller chooses top or bottom. It waits off the stack meanwhile.
+      const host = obj(s, t.id);
+      s.mutatingSpell = { id: o.id, host: host.id, controller: item.controller };
+      const name = nameOf(s, host.id);
+      s.pending = {
+        kind: "chooseOption", player: item.controller, source: d.name, what: "mutate", options: ["top", "bottom"], about: host.id,
+        labels: [`On top: it's ${d.name}, with ${name}'s abilities too`, `Underneath: it stays ${name}, with ${d.name}'s abilities too`],
+        prompt: `mutate onto ${name}: put ${d.name} on top or underneath`,
+      };
+      return;
     }
-    log(s, `${d.name} resolves and enters the battlefield${o.castAlt === "sneak" ? " tapped" : ""}.`);
-    const sneak = o.castAlt === "sneak" ? o.sneak : undefined;
-    o.sneak = undefined;
-    moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}) });
-    // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
-    if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
-    if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
-    if (o.zone === "battlefield" && o.castAlt === "blitz") blitzed(s, o, item.controller);
-    if (o.zone === "battlefield" && o.castAlt === "warp") warped(s, o, item.controller);
-    return;
+    // Its target is gone: it's a creature spell again and enters the battlefield (CR 702.140b).
+    o.mutating = undefined;
+    log(s, `${d.name}'s target is gone, so it resolves as a creature.`);
+    return resolvePermanentSpell(s, item, o, defOf(s, o));
   }
+  if (isPermanentCard(d)) return resolvePermanentSpell(s, item, o, d);
   const body = item.body ?? compileCard(d).spell;
   if (body) {
     log(s, `${d.name} resolves.`);
@@ -2045,6 +2080,44 @@ function resolveTop(s: GameState) {
     log(s, `${d.name} resolves. (Its effect is not implemented yet.)`);
   }
   if (s.objects[o.id]?.zone === "stack") moveObject(s, o.id, "graveyard");
+}
+
+/** A permanent spell resolves: it enters the battlefield (CR 608.3), an Aura attached to its target (303.4f). */
+function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: CardDef) {
+  const enchant = compileCard(d).enchant;
+  if (enchant) {
+    // An Aura spell's target is checked on resolution like any other (CR 608.2b); it enters attached to it (CR 303.4f).
+    const t = item.targets?.[0];
+    const legal = !!t && (t.kind === "object" || t.kind === "player") && isLegalTarget(s, enchant, t, item.controller, d);
+    if (legal && t.kind === "player") {
+      // "Enchant player" (CR 702.5d): it enters attached to the player.
+      log(s, `${d.name} resolves and enters attached to ${player(s, t.id).name}.`);
+      moveObject(s, o.id, "battlefield", { controller: item.controller, attachToPlayer: t.id });
+      return;
+    }
+    if (legal && t.kind === "object") {
+      log(s, `${d.name} resolves and enters attached to ${nameOf(s, t.id)}.`);
+      moveObject(s, o.id, "battlefield", { controller: item.controller, attachTo: t.id });
+      return;
+    }
+    if (!o.bestowed) {
+      log(s, `${d.name} does nothing (its target is gone).`);
+      moveObject(s, o.id, "graveyard");
+      return;
+    }
+    // A bestowed Aura spell with an illegal target becomes a creature spell and resolves (CR 702.103e, 608.3b).
+    o.bestowed = undefined;
+    log(s, `${d.name}'s target is gone, so it resolves as a creature.`);
+  }
+  log(s, `${d.name} resolves and enters the battlefield${o.castAlt === "sneak" ? " tapped" : ""}.`);
+  const sneak = o.castAlt === "sneak" ? o.sneak : undefined;
+  o.sneak = undefined;
+  moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}) });
+  // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
+  if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
+  if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
+  if (o.zone === "battlefield" && o.castAlt === "blitz") blitzed(s, o, item.controller);
+  if (o.zone === "battlefield" && o.castAlt === "warp") warped(s, o, item.controller);
 }
 
 /**
@@ -2455,6 +2528,16 @@ export function castProblem(
       o.overloaded = undefined;
     }
   }
+  if (choices?.alt === "mutate" && !o.mutating) {
+    // Cast for its mutate cost, it's a mutating creature spell with a target (CR 702.140a).
+    if (!altCost(defOf(s, o), "mutate")) return `${defOf(s, o).name} doesn't have mutate`;
+    o.mutating = true;
+    try {
+      return castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices);
+    } finally {
+      o.mutating = undefined;
+    }
+  }
   if (choices?.alt === "bestow" && !o.bestowed) {
     // Cast bestowed, only its characteristics as an Aura spell are looked at (CR 702.103d).
     if (!altCost(defOf(s, o), "bestow")) return `${defOf(s, o).name} doesn't have bestow`;
@@ -2852,7 +2935,7 @@ const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift
  * an overloaded cast, its "each" text (702.96a).
  */
 export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
-  alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : alt === "overload" && !obj(s, id).overloaded ? overloadedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
+  alt === "mutate" && !obj(s, id).mutating ? mutatingDef(defOf(s, obj(s, id)), obj(s, id).owner) : alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : alt === "overload" && !obj(s, id).overloaded ? overloadedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
 
 /**
  * "You may cast sorcery spells as though they had flash" (Hypersonic Dragon), "... spells ..." (Vedalken Orrery): a
@@ -2888,6 +2971,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
     o.overloaded = true; // CR 702.96a
+  }
+  if (choices.alt === "mutate" && !o.mutating) {
+    const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
+    if (problem) throw new RulesError(problem);
+    o.mutating = true; // a mutating creature spell from the moment it's cast (CR 702.140a)
   }
   if (choices.alt === "bestow" && !o.bestowed) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
@@ -4149,6 +4237,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     finishCombatDamage(s);
     return;
   }
+  if (pend.what === "mutate") {
+    // A mutating spell's controller puts it on top of the creature or underneath (CR 702.140c).
+    const m = s.mutatingSpell;
+    if (!m) throw new RulesError("nothing is mutating");
+    s.mutatingSpell = undefined;
+    const spell = obj(s, m.id);
+    const host = obj(s, m.host);
+    log(s, `${p.name} puts ${defOf(s, spell).name} ${choice === "top" ? "on top of" : "under"} ${nameOf(s, host.id)}: it mutates.`);
+    mergeSpell(s, spell, host, choice === "top");
+    return;
+  }
   if (pend.what === "enchant" && s.untilReturns?.auras[0]?.asking) {
     // An Aura returning from "until ~ leaves": its owner chose what it enchants (CR 303.4f).
     auraReturnChosen(s, choice);
@@ -5347,7 +5446,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     // Tokens that left the battlefield cease to exist (704.5d).
     for (const o of Object.values(s.objects)) {
       // A phased-out token still exists on the battlefield (CR 702.26d).
-      if (!o.isToken || o.zone === "battlefield" || o.zone === "stack" || o.zone === "phasedOut") continue;
+      if (!o.isToken || o.zone === "battlefield" || o.zone === "stack" || o.zone === "phasedOut" || o.zone === "merged") continue;
       const list = zoneList(s, o);
       if (list) list.splice(list.indexOf(o.id), 1);
       delete s.objects[o.id];

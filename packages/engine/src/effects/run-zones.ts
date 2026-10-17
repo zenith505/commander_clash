@@ -12,6 +12,7 @@ import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
+import { newObjects } from "../mutate";
 import { addDelayed, paidUnless } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
@@ -743,10 +744,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const before = o.zone === "battlefield" ? { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) } : undefined;
         moveObject(s, o.id, "exile");
         if (before && o.zone === "exile" && s.resolving) (s.resolving.exiled ??= []).push(before);
-        if (me && o.zone === "exile") (me.exiledUntilLeaves ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
-        // Linked to the source as it was when the ability triggered: if that object has already left, its
-        // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
-        if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0 });
+        // A merged permanent's cards are all exiled with it, and found by what returns it (CR 730.3c).
+        for (const l of newObjects(o)) {
+          if (s.objects[l.id]?.zone !== "exile") continue;
+          if (me) (me.exiledUntilLeaves ??= []).push(l);
+          // Linked to the source as it was when the ability triggered: if that object has already left, its
+          // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
+          if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push(l);
+        }
       }
       return;
     }
@@ -1208,11 +1213,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const d = defOf(s, o);
           log(s, `${src} exiles ${d.name}${e.at ? "" : " and returns it"}.`);
           moveObject(s, o.id, "exile");
-          if (o.isToken) continue; // a token that left the battlefield doesn't come back (CR 111.7)
-          if (e.at) {
-            first ??= o;
-            later.push({ id: o.id, zc: o.zoneChanges ?? 0 });
-          } else sc.flickered.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+          // A merged permanent comes back as all of its cards (CR 730.3c).
+          for (const l of newObjects(o)) {
+            const c = s.objects[l.id];
+            if (!c || c.isToken) continue; // a token that left the battlefield doesn't come back (CR 111.7)
+            if (e.at) {
+              first ??= c;
+              later.push(l);
+            } else sc.flickered.push(l);
+          }
         }
         if (first) {
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");

@@ -1,7 +1,7 @@
 import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
 import { characteristics, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted, overloadedText } from "./oracle";
-import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId } from "./types";
+import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
@@ -57,8 +57,23 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   if (o.faceDown) return withWard(o) ? FACE_DOWN_WARD : FACE_DOWN;
   const d = s.cards[copiedId(o)];
   if (!d) throw new Error(`missing card def ${copiedId(o)}`);
-  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : o.overloaded ? overloadedDef(d) : d;
+  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : o.overloaded ? overloadedDef(d) : o.mutating ? mutatingDef(d, o.owner) : d;
 };
+
+const mutatingDefs = new Map<string, CardDef>();
+
+/**
+ * A mutating creature spell (CR 702.140a): the card, targeting a non-Human creature with the same owner as the spell
+ * (`mutateOwner`, see spellTargetSpecs). Its characteristics are the card's.
+ */
+export function mutatingDef(d: CardDef, owner: PlayerId): CardDef {
+  const key = `${d.oracleId}|mutating:${owner}`;
+  const hit = mutatingDefs.get(key);
+  if (hit) return hit;
+  const out: CardDef = { ...d, oracleId: key, mutateOwner: owner };
+  mutatingDefs.set(key, out);
+  return out;
+}
 
 const overloaded = new Map<string, CardDef>();
 

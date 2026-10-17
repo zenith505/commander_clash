@@ -130,6 +130,8 @@ export type TriggerSourceEvent =
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number }
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
   | { type: "becameMonstrous"; id: ObjectId; x: number }
+  /** A mutating spell merged with this permanent (CR 702.140d). */
+  | { type: "mutates"; id: ObjectId }
   | { type: "becameLevel"; id: ObjectId; level: number }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
@@ -701,6 +703,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "becameMonstrous") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesMonstrous", undefined, undefined, undefined, undefined, ev.x);
+  } else if (ev.type === "mutates") {
+    // "Whenever this creature mutates" (CR 702.140d): an ability of the merged permanent, from any of its components.
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfMutates");
   } else if (ev.type === "turnedFaceUp") {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfTurnedFaceUp");

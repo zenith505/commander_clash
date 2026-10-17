@@ -220,6 +220,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
       return same ? (o.devoured ?? 0) : 0;
     }
+    case "mutations": {
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o) return 0;
+      const zc = o.zoneChanges ?? 0;
+      const same = ctx.sourceZc === undefined || zc === ctx.sourceZc || (zc === ctx.sourceZc + 1 && o.zone !== "battlefield");
+      return same ? (o.mutations ?? 0) : 0;
+    }
     case "stationPower": {
       // Its power as the ability resolves, or as it last existed; negative power puts on no counters (rulings).
       const st = ctx.stationed;
@@ -482,6 +489,8 @@ function describeCount(c: Count): string {
       return "the other result";
     case "flipsWon":
       return "flips won";
+    case "mutations":
+      return "times mutated";
     default:
       return c.kind;
   }

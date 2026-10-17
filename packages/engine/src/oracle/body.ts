@@ -7,7 +7,7 @@ import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
-import { boundAtTargeting, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
+import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseSearchFilter } from "./search";
 import { parseManaSpend } from "./mana-abilities";
 
@@ -528,6 +528,21 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       si += rest ? 2 : 1;
       continue;
     }
+    // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
+    // your graveyard, exile it instead." (Torrential Gearhulk): cast as it resolves (CR 608.2g), or not.
+    const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from your graveyard) without paying its mana cost$/.exec(s);
+    if (castTarget) {
+      const rider = sentences[si + 1]?.replace(/\.$/, "");
+      const exileAfter = rider === "If that spell would be put into your graveyard, exile it instead" ? (true as const) : rider === "If an instant or sorcery spell cast this way would be put into your graveyard, exile it instead" ? ("instantOrSorcery" as const) : undefined;
+      const before = ctx.targets.length;
+      const what = parseCardTarget(castTarget[1]!, ctx, "you");
+      const t = ctx.targets[before];
+      // A land card can't be cast (CR 305.9).
+      if (!what || !exileAfter || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      effects.push({ type: "castTargetFree", what, exileAfter });
+      si++;
+      continue;
+    }
     // "You may search your library and/or graveyard for a card named Ajani, Valiant Protector, reveal it, and put it into
     // your hand. If you search your library this way, shuffle." (CR 701.23): one card, from either zone; whether the
     // library is searched too is the player's choice as it resolves (search.orGraveyard).
@@ -776,7 +791,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // Agadeem Occultist, Nimbus Champion).
     const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
     if (atMost) {
-      const fx = parseOne(atMost[1]!, ctx);
+      // "You may return target creature to its owner's hand if that creature's power is ..." (Nimbus Champion): asked only
+      // if it holds.
+      const may = /^[Yy]ou may (.+)$/.exec(atMost[1]!);
+      const fx0 = parseOne(may ? may[1]!.charAt(0).toUpperCase() + may[1]!.slice(1) : atMost[1]!, ctx);
+      const fx = fx0 && may ? fx0.some((e) => pauses(e)) ? null : [{ type: "may" as const, effects: fx0, text: may[1]! }] : fx0;
       const i = ctx.targets.length - 1;
       const t = ctx.targets[i];
       if (!fx || i !== curTargets || !t || t.optional || t.many || t.divided || !fx.every((e) => mentionsTarget(e, i))) return null;

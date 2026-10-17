@@ -1420,6 +1420,13 @@ export type Effect =
   | { type: "unearth" }
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
   | { type: "castFromExileFree" }
+  /**
+   * "You may cast target instant card from your graveyard without paying its mana cost" (Torrential Gearhulk): as it
+   * resolves, ignoring timing based on its type (CR 608.2g). `exileAfter`: "If that spell would be put into your
+   * graveyard, exile it instead" (GameObject.exileIfToGraveyard); "instantOrSorcery": "if an instant or sorcery spell cast
+   * this way would ..." (Scholar of the Lost Trove).
+   */
+  | { type: "castTargetFree"; what: ObjRef; exileAfter?: true | "instantOrSorcery" }
   /** "You become the monarch" (CR 725). */
   | { type: "becomeMonarch"; who: PlayerRef }
   /** "You may play an additional land this turn" (CR 305.2a): `n` more land plays for you this turn. */

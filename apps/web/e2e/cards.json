@@ -4957,6 +4957,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a6395447-677d-4c39-8eda-2d57e527c94e",
+  "name": "Torrential Gearhulk",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Artifact Creature — Construct",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Construct"
+  ],
+  "oracleText": "Flash\nWhen this creature enters, you may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into your graveyard, exile it instead.",
+  "power": "5",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c1aecc8a-db3a-4158-b1f1-bfe06d782482",
   "name": "Tower Winder",
   "manaCost": "{1}{G}",

@@ -482,6 +482,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${src} returns to the battlefield with haste.`);
       return;
     }
+    case "castTargetFree": {
+      // Cast as this resolves, or not (CR 608.2g); then "if that spell would be put into your graveyard, exile it
+      // instead" applies to the spell it became.
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.castingTarget !== undefined) {
+        const o = s.objects[sc.castingTarget];
+        const d = o && defOf(s, o);
+        if (o?.zone === "stack" && e.exileAfter && (e.exileAfter === true || isType(d!, "Instant") || isType(d!, "Sorcery"))) o.exileIfToGraveyard = true;
+        return;
+      }
+      const o = objects(s, e.what, ctx)[0];
+      if (!o || o.zone !== "graveyard") return;
+      sc.castingTarget = o.id;
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
+      if (castProblem(s, ctx.controller, o.id) === null) return "paused";
+      s.pending = null;
+      log(s, `${defOf(s, o).name} can't be cast.`);
+      return;
+    }
     case "castFromExileFree": {
       // Rebound (CR 702.88a): the card has to still be in exile, the same object (CR 400.7).
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;

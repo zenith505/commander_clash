@@ -214,6 +214,9 @@ export function normalizeSelf(d: CardDef): string {
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
   t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case)\b/g, "~");
+  // "Your team" means the same as "you" in a game that isn't between teams (CR 102.4): "Warriors your team controls",
+  // "if your team gained life this turn".
+  t = t.replace(/\byour team controls\b/g, "you control").replace(/\byour team gained\b/g, "you gained");
   return t;
 }
 

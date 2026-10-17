@@ -331,6 +331,8 @@ export interface GameObject {
   championed?: { id: ObjectId; zc: number; by: number };
   /** A replacement effect: if it would leave this zone, it's exiled instead (flashback, CR 702.34a; unearth, 702.84a). */
   exileIfLeaves?: ZoneName;
+  /** A spell: "if that spell would be put into your graveyard, exile it instead" (Torrential Gearhulk, CR 614.1a). */
+  exileIfToGraveyard?: true;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
@@ -1228,6 +1230,8 @@ export interface Resolving {
     attackWhom?: string;
     /** "Search your library and/or graveyard": "both", or "graveyard" alone (no shuffle). */
     searchZones?: string;
+    /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
+    castingTarget?: ObjectId;
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     /** "Roll two d8 and choose one result": the index of the die chosen (see runDiceEffect). */
     rollChoice?: string;

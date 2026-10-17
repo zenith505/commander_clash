@@ -588,6 +588,11 @@ export function moveObject(
   // "If it would leave, exile it instead" (flashback, unearth): a replacement effect (CR 614.1a).
   if (o.exileIfLeaves === fromZone && to !== "exile") to = "exile";
   o.exileIfLeaves = undefined;
+  if (o.exileIfToGraveyard && fromZone === "stack" && to === "graveyard") {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard.`);
+  }
+  o.exileIfToGraveyard = undefined;
   // "If that creature would die this turn, exile it instead" (CR 614.1a).
   if (fromZone === "battlefield" && to === "graveyard" && o.exileIfDiesTurn === s.turn) {
     to = "exile";

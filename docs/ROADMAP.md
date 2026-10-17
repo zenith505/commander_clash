@@ -1,6 +1,6 @@
 # Roadmap
 
-19,471 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,504 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -323,10 +323,16 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
-     graveyard, copy with haste); Seasons of Gathering ("put a counter on a creature you control. It gains ...";
-     "choose artifact or enchantment. Destroy all permanents of the chosen type"), the Bold ("until the end of your next
-     turn, whenever you cast a spell") and Weaving ("choose an artifact or creature you control. Create a token that's
-     a copy of it"): "it" after a non-targeted choice needs a reference to the picked permanent.
+     graveyard, copy with haste); Season of the Witch ("destroy all untapped creatures that didn't attack this turn,
+     except for creatures that couldn't attack") and Seasons Past ("any number of cards with different mana values").
+   Left from the delayed-triggers-with-a-duration round ("until end of turn, whenever ...", CR 603.7b):
+   - Only cast, dies and combat-damage-to-a-player events can be such a trigger; still out: tapped for mana (High
+     Tide, Bubbling Muck), attacks, blocks, life gain, other damage, Subira ("a creature you control with power 2 or
+     less" as the dealer), Spiritualize and the rest of the 11 unsupported ones.
+   - "Whenever you cast a spell that targets ..." still out: "that targets only ..." (Leyline of Resonance, Loki,
+     Beamsplitter Mage, Feather), "targets ~" except heroic (Druid of Horns, Speedball), "an Equipment spell or a spell
+     that targets" (Danitha, Sword of Hope), and "those creatures" in the effect (Storm, Windrider; Dack's emblem).
+   - Crush Underfoot ("choose a Giant creature you control") is out because its Kindred type isn't parsed.
    - "Choose one that hasn't been chosen" cards still out on other lines: Breeches, Captive Audience, Gandalf, Gollum,
      Henrika, Kargan, Parapet Thrasher, Sol'Kanar, Survivor's Med Kit, Teval's Judgment, Fantastic Four, Zuko, Genku.
      Random modes still out: Outlaws' Merriment, Typhoid Mary.

@@ -1264,6 +1264,11 @@ export type Effect =
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
   | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef }
   /**
+   * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
+   * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
+   */
+  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration }
+  /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
    * `newTargets`: "you may choose new targets for the copy" (707.10c).
@@ -1976,6 +1981,13 @@ export type TriggerEvent =
    */
   | "batch";
 
+
+/**
+ * How long a delayed triggered ability with a duration lasts (CR 603.7b): "until end of turn" and "this turn" end in the
+ * cleanup step (CR 514.2), "until your next turn" as that turn begins (611.2b), "until the end of your next turn" in that
+ * turn's cleanup step.
+ */
+export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn";
 
 export interface TriggeredAbility {
   event: TriggerEvent;

@@ -1666,6 +1666,9 @@ function startNextTurn(s: GameState) {
     invalidateCharacteristics(s);
   }
   releasePhased(s, began);
+  // "Until your next turn, whenever ...": those end as that turn begins (CR 603.7b, 611.2b, 800.4m).
+  s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
+  if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
@@ -1898,6 +1901,9 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
 function finishCleanup(s: GameState) {
   closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
   s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
+  // Delayed triggered abilities lasting "until end of turn", or "until the end of your next turn" in that turn (CR 603.7b).
+  s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
+  if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);

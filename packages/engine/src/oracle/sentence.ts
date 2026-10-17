@@ -1,4 +1,4 @@
-import type { Amount, AmountExpr, Modification, Effect } from "../abilities";
+import type { Amount, AmountExpr, Modification, Effect, PlayerRef } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X } from "./words";
@@ -84,6 +84,17 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const theirs = mine && parseSentence(`${both[1]!.replace(/^./, (c) => c.toUpperCase())} ${both[2]}s ${both[3]}`, ctx);
     return mine && theirs ? [...mine, ...theirs] : null;
   }
+  // "Then each opponent who didn't draws a card" (Kynaios and Tiro), "each player who doesn't loses 3 life": right after
+  // an "each player may", those who didn't.
+  let m: RegExpExecArray | null;
+  if (ctx.eachChose && (m = /^(?:Then )?[Ee]ach (opponent|player) who (?:didn't|doesn't) (draws (a card|\w+ cards)|loses (\d+) life)$/.exec(s))) {
+    const who: PlayerRef = { ref: "notChoseThisWay", ...(m[1] === "opponent" ? { opponents: true as const } : {}) };
+    if (m[4]) return [{ type: "loseLife", who, n: Number(m[4]) }];
+    const n = m[3] === "a card" ? 1 : num(m[3]!.replace(/ cards$/, ""));
+    return Number.isInteger(n) ? [{ type: "draw", who, n }] : null;
+  }
+  // "Then each player who drew a card this way gains 1 life" (Kwain): those who chose to.
+  if (ctx.eachChose && (m = /^(?:Then )?[Ee]ach player who drew a card this way gains (\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "choseThisWay" }, n: Number(m[1]) }];
   const list = parseTargetList(s, ctx);
   if (list !== undefined) return list;
   for (const parse of SENTENCE_PARSERS) {

@@ -358,7 +358,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
     case "choseThisWay":
-      return (s.resolving?.scratch?.mayers ?? []).filter((p) => !player(s, p).lost);
+      return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost);
+    case "notChoseThisWay": {
+      const did = s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? [];
+      return (ref.opponents ? opponents(s, ctx.controller) : apnap(s, s.players.map((p) => p.id))).filter((p) => !did.includes(p) && !player(s, p).lost);
+    }
     case "punished":
       return (s.resolving?.scratch?.punished ?? []).filter((p) => !player(s, p).lost);
     case "damagedThisWay":

@@ -79,6 +79,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.may = undefined;
         sc.mayQueue.shift();
       }
+      // Who did, for the instructions after this one ("each player who drew a card this way gains 1 life").
+      s.resolving!.choseThisWay = [...sc.mayers!];
       if (e.each) return eachAccepted(s, e, ctx);
       // Each instruction once, also when one of them waits on a player (a draw that stops for dredge).
       for (sc.mayStep ??= 0; sc.mayStep < e.effects.length; sc.mayStep++) if (runEffect(s, e.effects[sc.mayStep]!, ctx) === "paused") return "paused";

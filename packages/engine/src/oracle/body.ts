@@ -14,6 +14,10 @@ import { parseTrigger } from "./triggers";
 
 export interface Ctx {
   targets: TargetSpec[];
+  /** Just after "each player may ..." (see PlayerRef choseThisWay): "each opponent who didn't" can follow. */
+  eachChose?: boolean;
+  /** "Each player may search ... and put it ...": its next sentence says who shuffles. */
+  eachSearched?: boolean;
   /** Parsing what follows "you may": "collect evidence 4" can only be done by choice. */
   mayNow?: boolean;
   /** In a trigger about another object ("blocks a creature"), "that creature" is that object. */
@@ -569,6 +573,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const offer = /^(?:Then )?[Ee]ach (opponent|player) may (.+)$/.exec(s);
     const does = offer && /^For each (opponent|player) who does, (.+)$/.exec(sentences[si + 1] ?? "");
     const offerFx = offer && does && !/\b(?:that player|it|its|them|this way|instead)\b/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    // "Each player may scry 1" (Eager Construct), "then each opponent may scry 1" (Myr Custodian), "each player may draw a
+    // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
+    // order (rulings on Eager Construct and Kaya, Intangible Slayer).
+    const alone = offer && !does && /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    if (offer && alone) {
+      effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!, each: true });
+      ctx.eachChose = true;
+      continue;
+    }
     if (offer && does && offerFx) {
       const then = parseOfferRest(does[2]!, ctx);
       if (then === null) return null;

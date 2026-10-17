@@ -1263,6 +1263,8 @@ export interface Resolving {
   damagedThisWay?: ObjectId[];
   /** Players its damage effects dealt damage to, for "players dealt damage this way". */
   playersDamagedThisWay?: PlayerId[];
+  /** "Each player may put ... onto the battlefield": those who did, for the instructions after it ("each opponent who didn't"). */
+  choseThisWay?: PlayerId[];
   /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
   drawnThisWay?: ObjectId[];
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
@@ -1373,6 +1375,8 @@ export interface Resolving {
     found?: ObjectId[]; // the cards a library search found
     /** "Each player puts a creature card from their graveyard onto the battlefield" (Exhume): players still to choose, and the cards chosen so far. */
     yardPicks?: { queue: PlayerId[]; picked: Record<string, ObjectId[]> };
+    /** "Each player may put ... from their hand onto the battlefield" (Show and Tell): players still to choose, and the cards chosen. */
+    handPicks?: { queue: PlayerId[]; picked: Record<string, ObjectId[]> };
     searchQueue?: PlayerId[]; // players still to search, in APNAP order ("each player searches their library", CR 101.4)
     searchedBy?: { pid: PlayerId; found: ObjectId[] }[]; // the cards each player who has searched found, in that order
     flickered?: { id: ObjectId; zc: number }[]; // cards a flicker exiled, to return once Auras' hosts are chosen

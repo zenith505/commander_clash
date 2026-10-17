@@ -382,7 +382,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
       const filter = filter0?.named === "~" ? { ...filter0, named: src } : filter0;
-      const who = e.who ? (e.who.ref === "eachPlayer" ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
+      const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);
       // "Search target opponent's library" (Bribery): you search it (CR 701.23a), and it's theirs that's shuffled.
@@ -392,6 +392,18 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (sc.found && queue.length) {
         searchedBy.push({ pid: queue.shift()!, found: sc.found });
         sc.found = undefined;
+        sc.may = undefined;
+      }
+      // "Each player may search": a player who declines doesn't search, or shuffle (rulings on Veteran Explorer).
+      while (e.may && queue.length && sc.may !== true) {
+        if (sc.may === false) {
+          queue.shift();
+          sc.may = undefined;
+          continue;
+        }
+        const kind = (filter?.text ?? "card").replace(/~/g, src);
+        s.pending = { kind: "chooseMay", player: queue[0]!, source: src, prompt: `search your library for ${e.upTo ? "up to " : ""}${amountNow(s, e.n, ctx) === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${amountNow(s, e.n, ctx)} ${kind.replace(/\bcard\b/, "cards")}`}` };
+        return "paused";
       }
       if (queue.length) {
         const p = player(s, queue[0]!);

@@ -14,6 +14,8 @@ import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, Trig
 export interface AmountCtx {
   controller: PlayerId;
   sourceId?: ObjectId;
+  /** The source's name: a spell's card's ("cards named ~", Kindle). */
+  sourceName?: string;
   /** The source's zoneChanges when the ability was created: "~" means that object only (CR 400.7). */
   sourceZc?: number;
   /** The announced X (CR 107.3a); 0 when there's none (CR 107.3g). */
@@ -143,11 +145,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const counts = Object.values(s.resolving?.discarded ?? {});
       return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
     }
-    case "cardsInGraveyard":
-      return refPlayers(s, c.who, ctx).reduce(
-        (n, pid) => n + s.players[pid]!.graveyard.filter((id) => !c.filter || printedMatches(bindChosen(c.filter, ctx.chosen), defOf(s, s.objects[id]!))).length,
-        0,
-      );
+    case "exiledFromHandThisWay":
+      return s.resolving?.exiledFromHand ?? 0;
+    case "cardsInGraveyard": {
+      // "Cards named ~" (Kindle, Accumulated Knowledge): the source's name, a permanent's as it is now (a copy's is what it
+      // copies, CR 707.2).
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const own = () => (src?.zone === "battlefield" ? characteristics(s, src).name : (ctx.sourceName ?? (src ? defOf(s, src).name : "")));
+      const filter = c.filter && (c.filter.named === "~" ? { ...c.filter, named: own() } : bindChosen(c.filter, ctx.chosen));
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.graveyard.filter((id) => !filter || printedMatches(filter, defOf(s, s.objects[id]!))).length, 0);
+    }
     case "life":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
     case "speed":
@@ -391,6 +398,8 @@ function describeCount(c: Count): string {
       return "#cards in library";
     case "discardedThisWay":
       return c.greatest ? "the most cards discarded" : "#cards discarded";
+    case "exiledFromHandThisWay":
+      return "#cards exiled from hand";
     case "greatestPowerExiled":
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":

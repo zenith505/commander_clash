@@ -1,4 +1,4 @@
-import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
+import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
@@ -8,7 +8,7 @@ import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
 import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
-import { parseSearchFilter } from "./search";
+import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { parseManaSpend } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
 
@@ -91,7 +91,7 @@ export interface Ctx {
  */
 function thenSubject(first: string, next: string): string {
   const who = /^(Target player|Target opponent|That player|Each player|Each opponent) /.exec(first);
-  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : who[1]} ${next}`;
+  if (who && /^(?:draws|discards|mills|loses|gains|sacrifices|shuffles|creates) /.test(next)) return `${/^Target /.test(who[1]!) ? "That player" : who[1]} ${next}`;
   return next.charAt(0).toUpperCase() + next.slice(1);
 }
 
@@ -143,6 +143,19 @@ const checkableMay = (e: Effect) =>
   (e.type === "continuous" && (e.what.ref === "self" || (e.what.ref === "target" && !e.what.n)) && e.duration === "endOfTurn");
 
 /**
+ * What a card name chosen as it resolves is for, from the instructions after it (bots, see NamePurpose): to find in your
+ * library (Demonic Consultation), to guess a top card or a card at random from your hand (Diviner's Lockbox, Predict,
+ * Cursed Scroll), to hit a player's hand, graveyard and library (Cabal Therapy, Memoricide), else to stop it (Conjurer's Ban).
+ */
+function namePurpose(rest: string): NamePurpose {
+  if (/\breveal cards from the top of your library until\b/i.test(rest)) return "find";
+  if (/\breveal the top (?:card|\w+ cards) of your library\b|\bmills a card\b/i.test(rest)) return "guess";
+  if (/\breveal a card at random from your hand\b/i.test(rest)) return "guessHand";
+  if (/\b(?:reveals (?:their|his or her) hand|graveyard, hand, and library)\b/i.test(rest)) return "theirs";
+  return "deny";
+}
+
+/**
  * What follows "Reveal the top card of your library": "If it's a creature card, put it into your hand", "If it isn't a
  * creature card, put it into your graveyard", then maybe "Otherwise, [you may] put it ..." and, after "put it onto the
  * battlefield", "That creature gains haste [until end of turn]" and "Sacrifice it at the beginning of the next end step".
@@ -150,6 +163,13 @@ const checkableMay = (e: Effect) =>
  */
 function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
   const first = /^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? "");
+  // "If that card has the chosen name, sacrifice ~ and draw three cards" (Diviner's Lockbox), after "choose a card name".
+  const named = !first && /^If (?:it|that card) has the chosen name, (.+)$/.exec(sentences[at] ?? "");
+  if (named) {
+    // Its targets are chosen as it's put on the stack, whatever the card turns out to be (CR 601.2c, 602.2b).
+    const then = revealedAction(named[1]!, ctx, true);
+    return then && { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: then }, next: at + 1 };
+  }
   if (!first) return null;
   const filter = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
   const then = filter && revealedAction(first[3]!, ctx);
@@ -281,17 +301,22 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
 }
 
 /** One thing done with the revealed card ("put it into your hand", "you may put it into your graveyard"), or "draw a card". */
-function revealedAction(text: string, ctx: Ctx): Effect[] | null {
+function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | null {
   // "You may reveal it and put it into your hand" (Frost Augur): a card only looked at is revealed as it's put there.
   const shown = /^you may reveal it and put it into your hand$/.test(text);
   if (shown) return [{ type: "may", effects: [{ type: "revealRevealed" }, { type: "bounce", what: { ref: "revealed" } }], text: "reveal the revealed card and put it into your hand" }];
   const m = /^(you may )?put (?:it|that card) (into your hand|into your graveyard|on the bottom of your library|onto the battlefield( tapped)?(?: under your control)?)$/.exec(text);
   if (!m) {
-    // Not about the card: "draw a card" (Track Down, Thrasios).
+    // Not about the card: "draw a card" (Track Down, Thrasios), "sacrifice ~ and draw three cards" (Diviner's Lockbox).
     if (/\b(?:it|its|that card|that card's)\b/.test(text)) return null;
+    const sac = /^sacrifice ~ and (.+)$/.exec(text);
+    if (sac) {
+      const rest = revealedAction(sac[1]!, ctx, targets);
+      return rest && [{ type: "sacrifice", what: { ref: "self" } }, ...rest];
+    }
     const before = ctx.targets.length;
     const fx = parseSentence(text.charAt(0).toUpperCase() + text.slice(1), ctx);
-    return fx && ctx.targets.length === before && !allEffects(fx).some((e) => PAUSING.has(e.type)) ? fx : null;
+    return fx && (targets || ctx.targets.length === before) && !allEffects(fx).some((e) => PAUSING.has(e.type)) ? fx : null;
   }
   const what = { ref: "revealed" as const };
   const dest = m[2]!;
@@ -660,10 +685,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Reveal the top card of your library. If it's a creature card, put it into your hand. Otherwise, you may put it into
     // your graveyard." (Nylea, Keen-Eyed; CR 701.20a): what's done depends on the revealed card's printed characteristics;
     // it stays in the library until an instruction moves it.
-    if (/^[Rr]eveal the top card of your library$/.test(s)) {
+    // "Choose a card name, then reveal a card at random from your hand. If that card has the chosen name, ~ deals 2 damage to
+    // any target." (Cursed Scroll): about that card, which stays in the hand.
+    const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);
+    if (/^[Rr]eveal the top card of your library$/.test(s) || (atRandom && /^If that card has the chosen name, /.test(sentences[si + 1] ?? ""))) {
       const r = parseRevealedIf(sentences, si + 1, ctx);
       if (!r) return null;
-      effects.push({ type: "revealTop" }, r.effect);
+      effects.push({ type: "revealTop", ...(atRandom ? { randomFromHand: true as const } : {}) }, r.effect);
       si = r.next - 1;
       continue;
     }
@@ -1105,10 +1133,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "suspect", what: prev.what, no: true });
       continue;
     }
+    // "Choose a card name, then target player mills a card. If a card with the chosen name was milled this way, you draw two
+    // cards. Otherwise, you draw a card." (Predict): about the cards that mill instruction put into the graveyard.
+    const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s);
+    if (ifMilled) {
+      const prev = effects[effects.length - 1];
+      // Not "its mana value" (Lammastide Weave): which card that is isn't kept.
+      if (prev?.type !== "mill" || /\b(?:it|its)\b/.test(ifMilled[1]!)) return null;
+      const inner = parseOne(ifMilled[1]!.charAt(0).toUpperCase() + ifMilled[1]!.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "milledIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: inner });
+      continue;
+    }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected") || prev.otherwise) return null;
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs") || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
@@ -1344,6 +1384,36 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (/^That player shuffles$/.test(s)) {
       const prev = effects[effects.length - 1];
       if (prev?.type === "search" && prev.library) continue;
+      // "Search target player's graveyard, hand, and library for ... Then that player shuffles" (Memoricide).
+      if (prev?.type === "exileNamed") continue;
+      return null;
+    }
+    // "Choose a nonland card name. Target player reveals their hand and discards all cards with that name." (Cabal
+    // Therapy): the name is chosen as it resolves (CR 201.4, 608.2d; rulings), and "that name" or "the chosen name" after
+    // it is that one. One per ability.
+    const nameChoice = /^Choose (an? (?:[a-z]+(?:, | ))*?card name(?: other than a basic land card name)?)$/.exec(s);
+    if (nameChoice) {
+      const c = parseCardNameChoice(nameChoice[1]!);
+      if (!c || allEffects(effects).some((x) => x.type === "choose" && x.choice === "cardName")) return null;
+      effects.push({ type: "choose", choice: "cardName", ...c, purpose: namePurpose(sentences.slice(si + 1).join(" ")) });
+      continue;
+    }
+    // "Reveal cards from the top of your library until you reveal a card with the chosen name. Put that card into your
+    // hand and exile all other cards revealed this way." (Demonic Consultation), "..., then put that card into your hand.
+    // Exile all other cards revealed this way, and you lose 1 life for each of the exiled cards." (Spoils of the Vault).
+    if (/^[Rr]eveal cards from the top of your library until you reveal a card with (?:the chosen|that) name$/.test(s)) {
+      const next = [sentences[si + 1], sentences[si + 2]].map((x) => x?.replace(/\.$/, ""));
+      const filter: TargetSpec = { kind: "card", chosen: "name", text: "card with the chosen name" };
+      if (next[0] === "Put that card into your hand and exile all other cards revealed this way") {
+        effects.push({ type: "revealUntil", filter, found: "hand", rest: "exile" });
+        si++;
+        continue;
+      }
+      if (next[0] === "Put that card into your hand" && /^Exile all other cards revealed this way(, and you lose 1 life for each of the exiled cards)?$/.test(next[1] ?? "")) {
+        effects.push({ type: "revealUntil", filter, found: "hand", rest: "exile", ...(/ life /.test(next[1]!) ? { lifePerRest: true as const } : {}) });
+        si += 2;
+        continue;
+      }
       return null;
     }
     // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not

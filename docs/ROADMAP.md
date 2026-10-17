@@ -1,6 +1,6 @@
 # Roadmap
 
-19,587 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,648 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -20,6 +20,22 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    second half of split cards and adventures aren't in `cards.json`. Rebuilding it with every face needs the Scryfall
    bulk file on Ken's PC (Scryfall is blocked from the cloud), then the shared `cards.json.gz` replaced.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
+   Left from the card names round (CR 201.4: Meddling Mage, Pithing Needle, Cabal Therapy, Memoricide, Surgical
+   Extraction, Conjurer's Ban, Reflector Mage, Kindle):
+   - The names offered are those of the cards in this game, so typing in the picker can show a name that's only in a
+     hidden library; a name from outside the game can't be chosen (it would do nothing here). The picker's first list
+     shows only cards you've seen.
+   - Still out: "if they can't" (Brain Pry), damage per revealed card (Thought Hemorrhage), "put all of them with that
+     name into your hand" (Desperate Research, Wood Sage, Tamiyo), Academic Probation's other mode, the chosen card
+     from a revealed hand (Lobotomy, Shimian Specter, Pick the Brain, Reap Intellect), Deadly Cover-Up, Deicide ("if the
+     exiled card is a God card"), Invasive Surgery, Kotose, "look at an opponent's hand, then choose any card name"
+     (Sorcerous Spyglass, Anointed Peacekeeper), Alpine Moon, Skyseer's Chariot, Cheering Fanatic, Null Chamber, Booby
+     Trap, Petrified Hamlet, names another player chooses (Conundrum Sphinx, Petra Sphinx, Vexing Arcanix), random
+     cards from an opponent's hand (Dementia Sliver, Nebuchadnezzar), Isperia, Mindblaze, Liar's Pendulum, Lammastide
+     Weave ("its mana value"), "an additional ... for each card named ~" (Growth Cycle, Rune Snag), "as you cast ~"
+     (Aether Burst), Sound the Call.
+   - Bots name what they've seen: an opponent's commander or permanent for a ban, a graveyard card for Memoricide, the
+     most common card in their own library or hand for a guess.
    Left from the Roles/modified/can't be regenerated/equip round:
    - Role cards still out on other lines: Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
      enchanted creature or enchantment creature"), Seeds of Innocence-style "the controller of each of those".
@@ -138,9 +154,9 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (Nissa's Revelation, Sapling of Colfenor, Baneful Omen), "repeat this process" (Countryside Crusher), casting it
      (Descendants' Path, Jadzi), several "If it's" lines (Druidic Satchel).
    - "Target X and all other Xs with the same name as that X" works on the battlefield; still out: cards in a graveyard
-     (Echoing Return, Rat King), "not named ~" (Detention Sphere), "search its controller's graveyard, hand, and
-     library for all cards with the same name" (Eradicate, Splinter, Scour, Sowing Salt, Crumble to Dust, The End),
-     Legion's End's "exiles all cards with that name from their hand".
+     (Echoing Return, Rat King), "not named ~" (Detention Sphere), Legion's End's "exiles all cards with that name from
+     their hand". (Splinter, Eradicate, Scour, Sowing Salt and Crumble to Dust work since the card names round; The End
+     is out on its cost line.)
    Left from the round after suspect (outlaws, conditional flash, discover X, keyword choices):
    - Discover still out: "you may tap two untapped artifacts and/or creatures you control. If you do, discover 3"
      (Caparocti Sunborn), "where X is the greatest power among them" (Aloy), "the mana value of the exiled card" (Ellie and

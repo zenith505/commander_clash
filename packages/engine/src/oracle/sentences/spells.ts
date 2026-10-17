@@ -275,8 +275,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Counter target spell if it has the same name as that card$/i.test(s) && ctx.activated && ctx.costLinked) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifCostCardName: true }];
   // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
   // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
-  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
-    const spec = parseTargetPhrase(m[2]!, { x: true });
+  // "Counter target spell with the chosen name" (Declaration of Naught): the name chosen as its source entered.
+  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[2]!, { x: true, chosen: !!ctx.activated && / with the chosen name\b/.test(m[2]!) });
     const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
     if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.whereX)) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];

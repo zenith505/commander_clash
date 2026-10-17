@@ -84,6 +84,8 @@ export interface SourceQuality {
   subtypes?: readonly string[];
   /** It's a spell (not an ability of the source), for "can't be the target of spells". */
   spell?: true;
+  /** Its name, for protection from a card name (Runed Halo, CR 702.16a). */
+  name?: string;
 }
 
 /** "Goblins" -> "Goblin", "Elves" -> "Elf", "Sphinxes" -> "Sphinx": a creature type's plural, as protection names it. */

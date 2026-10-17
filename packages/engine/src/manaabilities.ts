@@ -10,6 +10,7 @@ import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
 import { canPayFromPool, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
+import { nameActivationBan } from "./names";
 import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
@@ -223,6 +224,8 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (!ab) return `${name} has no such mana ability`;
   if (o.zone !== "battlefield" || controllerOf(s, o) !== pid) return "you don't control that permanent";
   if (characteristics(s, o).cantActivate === "all") return `${name}'s activated abilities can't be activated`; // Arrest: mana abilities too (CR 605.1a)
+  const banned = nameActivationBan(s, o, true); // Phyrexian Revoker: mana abilities too
+  if (banned) return banned;
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;

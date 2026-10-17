@@ -6,12 +6,13 @@ import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, 
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
-import { bindBound, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
+import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected } from "./resolve";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
 import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
+import { cardNameOptions } from "../names";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -164,6 +165,19 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "cardType", options: e.options ?? [] };
         return "paused";
       }
+      if (e.choice === "cardName") {
+        // "Choose a nonland card name" (CR 201.4), as it resolves (rulings on Cabal Therapy): asked each time it's reached.
+        const sc = (r.scratch ??= {});
+        if (sc.asked) return;
+        sc.asked = true;
+        const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+        const options = cardNameOptions(s, e.names);
+        r.chosen = { ...r.chosen, name: undefined };
+        if (chooser === undefined || !options.length) return;
+        const of = ctx.targets.find((t) => t?.kind === "player");
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
+        return "paused";
+      }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "basicLandType" ? "landType" : e.choice === "keyword" ? "keyword" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         if (chooser === undefined) return;
@@ -204,7 +218,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "spent"
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
             : e.cond.kind === "revealedIs"
-            ? revealedIs(s, e.cond.filter) !== !!e.cond.not
+            ? revealedIs(s, bindChosen(e.cond.filter, ctx.chosen)) !== !!e.cond.not
+            : e.cond.kind === "milledIs"
+            ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "targetWasYours"

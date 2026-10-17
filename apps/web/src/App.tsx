@@ -1192,6 +1192,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {pending?.kind === "chooseOption" && pending.what === "creatureType" && pending.player === HUMAN && (
             <TypePicker key={pending.source} s={s} pending={pending} onDone={(choice) => dispatch([{ type: "chooseOption", player: HUMAN, choice }])} />
           )}
+          {pending?.kind === "chooseOption" && pending.what === "cardName" && pending.player === HUMAN && (
+            <NamePicker key={pending.source} s={s} pending={pending} onHover={setHover} onDone={(choice) => dispatch([{ type: "chooseOption", player: HUMAN, choice }])} />
+          )}
           {pending?.kind === "searchLibrary" && (
             <LibrarySearch
               key={pending.source + pending.cards.join(",")}
@@ -2865,6 +2868,87 @@ function TypePicker({
   );
 }
 
+/**
+ * Choosing a card name (CR 201.4): Meddling Mage, Pithing Needle, Cabal Therapy. The names of cards you've seen (on the
+ * battlefield, in graveyards, exile and command zones, in your hand) first, then a search over every name offered.
+ */
+function NamePicker({
+  s,
+  pending,
+  onHover,
+  onDone,
+}: {
+  s: GameState;
+  pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>;
+  onHover: (d: CardDef | null) => void;
+  onDone: (choice: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const offered = new Set(pending.options);
+  const seen = new Map<string, { d: CardDef; where: Set<string> }>();
+  const note = (id: string, where: string) => {
+    const o = s.objects[id];
+    if (!o || o.faceDown || o.isToken) return;
+    const d = cardOf(s, id);
+    if (!offered.has(d.name)) return;
+    const e = seen.get(d.name) ?? { d, where: new Set<string>() };
+    e.where.add(where);
+    seen.set(d.name, e);
+  };
+  for (const id of s.battlefield) note(id, s.objects[id]!.controller === HUMAN ? "your battlefield" : "battlefield");
+  for (const p of s.players) {
+    for (const id of p.graveyard) note(id, "graveyard");
+    for (const id of p.command) note(id, "command zone");
+    for (const id of p.exile) note(id, "exile");
+  }
+  for (const id of s.players[HUMAN]!.hand) note(id, "your hand");
+  const shown = [...seen].sort((a, b) => a[0].localeCompare(b[0]));
+  const q = query.trim().toLowerCase();
+  const matches = q ? pending.options.filter((n) => n.toLowerCase().includes(q)).sort((a, b) => Number(!a.toLowerCase().startsWith(q)) - Number(!b.toLowerCase().startsWith(q)) || a.localeCompare(b)) : [];
+  const exact = matches.find((n) => n.toLowerCase() === q) ?? (matches.length === 1 ? matches[0] : undefined);
+  const about = pending.of !== undefined ? s.players[pending.of]?.name : undefined;
+  return (
+    <div className="modal-backdrop">
+      <div className="modal type-pick">
+        <header>
+          <strong>
+            {pending.source}: {pending.prompt ?? "choose a card name"}
+            {about ? ` (about ${about}'s cards)` : ""}
+          </strong>
+          <input autoFocus placeholder="Type a card name…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && exact && onDone(exact)} />
+        </header>
+        <div className="modal-body">
+          {q ? (
+            <>
+              <h4>Names matching “{query.trim()}”</h4>
+              <div className="type-list">
+                {matches.length === 0 && <span className="muted">No card in this game has a name like that.</span>}
+                {matches.slice(0, 60).map((n) => (
+                  <button key={n} className="ghost" data-name={n} onClick={() => onDone(n)}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <h4>Cards you've seen</h4>
+              <div className="type-list">
+                {shown.length === 0 && <span className="muted">Type to search for a name.</span>}
+                {shown.map(([n, e]) => (
+                  <button key={n} className="ghost" data-name={n} onClick={() => onDone(n)} {...hoverProps(e.d, onHover)}>
+                    {n} <span className="muted small">{[...e.where].join(", ")}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LibrarySearch({
   s,
   pending,
@@ -2880,11 +2964,15 @@ function LibrarySearch({
   const groups = new Map<string, string[]>();
   // Looking at the top cards: all of them are shown, in order, and only the ones that qualify can be taken.
   const dig = pending.dig;
+  // Memoricide's search of a player's graveyard, hand and library: the cards by the zone they're in.
+  const zones = pending.zonesOf !== undefined;
+  const ZONE_ORDER = ["graveyard", "hand", "library"];
   for (const id of dig ? [] : pending.cards) {
-    const name = cardOf(s, id).name;
+    const name = zones ? s.objects[id]!.zone : cardOf(s, id).name;
     groups.set(name, [...(groups.get(name) ?? []), id]);
   }
-  const sorted = [...groups].sort((a, b) => a[0].localeCompare(b[0]));
+  const sorted = [...groups].sort((a, b) => (zones ? ZONE_ORDER.indexOf(a[0]) - ZONE_ORDER.indexOf(b[0]) : a[0].localeCompare(b[0])));
+  const whose = zones ? s.players[pending.zonesOf!]!.name : "";
   // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
   const clashes = (id: string) => !!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id));
@@ -2908,7 +2996,9 @@ function LibrarySearch({
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from your graveyard`
                   : pending.fromGraveyard
                   ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to ${pending.fromGraveyard === "battlefield" ? "the battlefield" : "your hand"}`
-                  : `${pending.source}: search your library for ${pending.what}`}
+                  : zones
+                    ? `${pending.source}: search ${whose}'s graveyard, hand and library for ${pending.what} to exile`
+                    : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
             {" "}
@@ -2920,7 +3010,9 @@ function LibrarySearch({
                 ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.distinctManaValues
                   ? `Chosen ${found.length}. Each must have a different mana value.`
-                  : `Found ${found.length} of ${pending.max}.`}
+                  : pending.also?.length
+                    ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
+                    : `Found ${found.length} of ${pending.max}.`}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
             {found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
@@ -2963,7 +3055,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>{pending.fromGraveyard ? "Your graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
+          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.fromGraveyard ? "Your graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {
@@ -2974,6 +3066,7 @@ function LibrarySearch({
                 <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? "You already chose a card with this mana value" : undefined}>
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
+                  {zones && <span className="muted small" data-zone={name}>in {name}</span>}
                 </div>
               );
             })}
@@ -3752,7 +3845,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> choose a creature type.
+          <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : "choose a creature type."}
         </span>
       </div>
     );

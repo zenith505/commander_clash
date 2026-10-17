@@ -5,7 +5,7 @@ import { nextRandom, shuffle } from "../rng";
 import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, printedMatches } from "./targeting";
+import { bindBound, bindChosen, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
@@ -16,10 +16,15 @@ import type { AuraHost } from "../game";
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
     case "mill":
+      // Kept for "if a card with the chosen name was milled this way" (Predict).
+      s.resolving!.milled = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
-        for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
+        for (const id of p.library.slice(0, n)) {
+          moveObject(s, id, "graveyard");
+          if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+        }
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
       }
       return;
@@ -35,6 +40,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "revealTop": {
       // An empty library: nothing is revealed, and an "if it's a ... card" after it is false.
       const p = player(s, ctx.controller);
+      if (e.randomFromHand) {
+        // An empty hand likewise (Cursed Scroll).
+        const id = p.hand.length ? p.hand[Math.floor(nextRandom(s) * p.hand.length)] : undefined;
+        s.resolving!.revealed = id ? { id, zc: s.objects[id]!.zoneChanges ?? 0 } : undefined;
+        log(s, id ? `${p.name} reveals ${defOf(s, obj(s, id)).name} at random from their hand.` : `${p.name} has no card in hand to reveal.`);
+        return;
+      }
       const id = p.library[0];
       s.resolving!.revealed = id ? { id, zc: s.objects[id]!.zoneChanges ?? 0 } : undefined;
       if (id) log(s, e.look ? `${p.name} looks at the top card of their library.` : `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
@@ -65,6 +77,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     }
     case "discard": {
       const who = players(s, e.who, ctx);
+      // "Discards all cards with that name" (Cabal Therapy): the name chosen as it resolved.
+      const filter = e.filter && bindChosen(e.filter, ctx.chosen);
       // Worked out once, before anyone discards.
       const sc0 = (s.resolving!.scratch ??= {});
       // "Discards cards the same way" (Balancing Act): each keeps as many as the player with the fewest has, so
@@ -91,7 +105,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
-        const hand = player(s, pid).hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        const hand = player(s, pid).hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         if (e.downToFewest) {
           if (hand.length > fewest && fewest > 0) {
             s.pending = { kind: "discard", player: pid, count: hand.length - fewest, source: src };
@@ -103,7 +117,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         const n = nFor[pid] ?? 0;
         if (!e.hand && hand.length > n) {
-          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(e.filter ? { filter: e.filter } : {}) };
+          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}) };
           return "paused";
         }
         sc.chosen![pid] = [...hand]; // no choice to make: the whole hand (all the cards that match)

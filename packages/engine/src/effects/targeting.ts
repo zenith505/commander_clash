@@ -55,8 +55,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
-  if (spec.chosen === "type" || spec.chosen === "color") return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name") return false;
   if (spec.counter && !(o.counters[spec.counter] ?? 0)) return false;
+  // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
+  if (spec.named !== undefined && (o.faceDown || c.name !== spec.named)) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.notKeywords?.some(hasKw)) return false;
@@ -133,6 +135,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if ((kind === "type" || kind === "notType") && chosen?.type)
     return kind === "type" ? { ...rest, subtypes: [...(rest.subtypes ?? []), chosen.type] } : { ...rest, notSubtypes: [...(rest.notSubtypes ?? []), chosen.type] };
   if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
+  if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
   return kind === "notType" || kind === "notColor" ? rest : spec;
@@ -155,6 +158,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "basicLandType") return { ...chosen, landType: choice };
   if (what === "keyword") return { ...chosen, keyword: choice };
   if (what === "cardType") return { ...chosen, cardType: choice };
+  if (what === "cardName") return { ...chosen, name: choice };
   if (what === "opponent") return { ...chosen, player: Number(choice) };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };
@@ -169,7 +173,7 @@ export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): Sou
   const o = id ? s.objects[id] : undefined;
   if (o) return characteristics(s, o);
   const d = cardId ? s.cards[cardId] : undefined;
-  return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes } : { colors: [] };
+  return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name } : { colors: [] };
 }
 
 /** A spell's own characteristics (its card's) as a source of targeting: a spell (CR 113.7a doesn't apply to it). */
@@ -191,7 +195,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.anyOf && !spec.anyOf.some((a) => printedMatches(a, d))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.counter) return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.counter) return false;
   const hasKw = (k: string) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.notKeywords?.some(hasKw)) return false;
@@ -271,6 +275,8 @@ export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId 
   const gained = s.players[pid]?.gained ?? [];
   const holder = { controller: pid };
   if (src && protectedFrom(gained, src.controller === undefined && from !== undefined ? { ...src, controller: from } : src, holder)) return true;
+  // "You have protection from the chosen card name" (Runed Halo): anything with that name, its own sources too.
+  if (src?.name !== undefined && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && s.objects[id]!.chosen?.name === src.name && !!abilitiesOf(s, s.objects[id]!).protectionFromChosenName)) return true;
   if (from === undefined || from === pid) return false;
   if (protectedFromPlayer(gained, from, holder)) return true;
   return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youHave === "protection");

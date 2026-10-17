@@ -18,7 +18,7 @@ import { parseGroup, parseTargetPhrase } from "./targets";
 import { backupTriggers } from "./grants";
 import { dungeonTriggers } from "./dungeons";
 import { parseCountMod, parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
-import { parseSearchFilter } from "./search";
+import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { addStriation, simpleKeywords, striations } from "./striations";
 
 const cache = new Map<string, CompiledCard>();
@@ -669,6 +669,35 @@ export function compile(d: CardDef): CompiledCard {
         const c = /^an? (creature type|color)(?: other than (\w+))?$/.exec(part)!;
         (out.entersChoose ??= []).push({ what: c[1] === "color" ? "color" : "creatureType", ...(c[2] ? { except: c[2] } : {}) });
       }
+      continue;
+    }
+    // "As ~ enters, choose a nonland card name." (CR 614.12, 201.4): kept while it's on the battlefield, as Chosen.name.
+    const asName = /^As (?:~|it) enters, choose (an? .*?card name(?: other than a basic land card name)?)\.$/.exec(line);
+    const nameChoice = asName && parseCardNameChoice(asName[1]!);
+    if (asName) {
+      if (!nameChoice || out.entersChoose?.some((c) => c.what === "cardName")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "cardName", ...nameChoice });
+      continue;
+    }
+    // Meddling Mage, Gideon's Intervention, Pithing Needle (CR 201.4): what the name chosen as it entered does.
+    const nameBan =
+      line === "Spells with the chosen name can't be cast." ? ({ kind: "cast", who: "all" } as const)
+      : line === "Your opponents can't cast spells with the chosen name." ? ({ kind: "cast", who: "opponents" } as const)
+      : line === "Activated abilities of sources with the chosen name can't be activated." ? ({ kind: "activate" } as const)
+      : line === "Activated abilities of sources with the chosen name can't be activated unless they're mana abilities." ? ({ kind: "activate", exceptMana: true } as const)
+      : null;
+    if (nameBan) {
+      (out.nameBans ??= []).push(nameBan);
+      continue;
+    }
+    if (line === "You have protection from the chosen card name.") {
+      out.protectionFromChosenName = true;
+      continue;
+    }
+    // Suppression Field, Anointed Peacekeeper: generic mana more for activated abilities that aren't mana abilities.
+    const tax = /^Activated abilities( of sources with the chosen name)? cost \{(\d+)\} more to activate unless they're mana abilities\.$/.exec(line);
+    if (tax) {
+      (out.activationTaxes ??= []).push({ ...(tax[1] ? { filter: { kind: "card", chosen: "name", text: "sources with the chosen name" } } : {}), n: Number(tax[2]), text: line });
       continue;
     }
     // Thromok: "Devour X, where X is the number of creatures devoured this way" (CR 702.82a; X counters for each).
@@ -1646,7 +1675,7 @@ function checkCastingLinks(out: CompiledCard) {
     }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : needs.add("creatureType"));
+    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PROTECTION)) needs.add("color");
@@ -1663,6 +1692,8 @@ function checkCastingLinks(out: CompiledCard) {
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
     visit(ab);
   }
+  visit([out.costMods, out.activationTaxes]);
+  if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // "If evidence was collected" needs the "you may collect evidence N" it's linked to (CR 701.59c): in the spell, or its
   // permanent's enters trigger.

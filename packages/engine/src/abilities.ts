@@ -84,6 +84,8 @@ export type Count =
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   | { kind: "discardedThisWay"; greatest?: true }
+  /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
+  | { kind: "exiledFromHandThisWay" }
   /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
@@ -320,7 +322,7 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name";
   /**
    * "Target spell with a single target": a spell that targets exactly one thing once, whether or not that target is
    * still legal (rulings on Deflection).
@@ -1298,6 +1300,21 @@ export type Effect =
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**
+   * "Search target player's graveyard, hand, and library for any number of cards with that name and exile them. Then that
+   * player shuffles." (Memoricide, CR 701.23): the ability's controller finds them. `all`: "for all cards" (Cranial
+   * Extraction): the ones in the graveyard can't be left, those in the hidden hand and library can (CR 701.23b); `max`:
+   * "up to four cards" (Unmoored Ego). How many came from the hand is kept ("exiledFromHandThisWay"). The name is the one
+   * chosen (`filter` with chosen "name"), or `sameAs`: "with the same name as that spell" (Counterbore), target `sameAs`'s
+   * name as it last existed (CR 608.2h).
+   */
+  | { type: "exileNamed"; who: PlayerRef; filter: TargetSpec; all?: true; max?: number; sameAs?: number }
+  /**
+   * "Reveal cards from the top of your library until you reveal a card with the chosen name" (Demonic Consultation, CR
+   * 701.20a): `found`, where that card goes; `rest`, where the other revealed cards go (all of them when none is found);
+   * `lifePerRest`: "you lose 1 life for each of the exiled cards" (Spoils of the Vault).
+   */
+  | { type: "revealUntil"; filter: TargetSpec; found: "hand"; rest: "exile"; lifePerRest?: true }
+  /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
    * card" (then that card is exiled and the rest go on the bottom in a random order, or all of them go into your hand):
    * `who` has the library (default you). `then`: "castFree", that player (`ownerCasts`) or you may cast it now without
@@ -1375,7 +1392,7 @@ export type Effect =
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean } }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
-  | { type: "revealTop"; look?: true }
+  | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true }
   /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
   | { type: "revealRevealed" }
   /** "Put it into your graveyard": the revealed card, from the library (not milling, CR 701.17). */
@@ -1602,6 +1619,13 @@ export type Effect =
   | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec }
   /** "Target player can't play lands this turn" (Moonhold): no land plays for them until the turn ends (CR 305.2, 101.2). */
   | { type: "cantPlayLands"; who: PlayerRef }
+  /**
+   * "Until your next turn, spells with the chosen name can't be cast and lands with the chosen name can't be played"
+   * (Conjurer's Ban; `lands`), "Opponents can't cast spells with the chosen name until your next turn" (Academic
+   * Probation; `who`), "That creature's owner can't cast ... with the same name as that creature" (Reflector Mage;
+   * `sameAs`, that target's name as it last existed). Cards only: a copy of one can still be cast (rulings).
+   */
+  | { type: "banName"; who?: PlayerRef; lands?: true; sameAs?: number }
   /** "Damage can't be prevented this turn" (CR 615.12). */
   | { type: "noPrevention" }
   /**
@@ -1665,13 +1689,22 @@ export type Effect =
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
   | { type: "playerGains"; keywords: string[] }
-  | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef };
+  | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
 /** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
-export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent" | "cardType";
+/** "cardName": "Choose a card name", "as ~ enters, choose a nonland card name" (CR 201.4): the name of a card (Chosen.name). */
+export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName";
+
+/**
+ * What a chosen card name is for, so a bot can pick one: "deny", cards its opponents shouldn't use (Pithing Needle,
+ * Meddling Mage, Runed Halo); "theirs", cards a player has hidden in their hand or library (Cabal Therapy, Memoricide);
+ * "find", a card in its own library (Demonic Consultation); "guess", the top card of a library (Predict); "guessHand",
+ * a card at random from its own hand (Cursed Scroll); "own", cards of its own it's going to cast (Cheering Fanatic).
+ */
+export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
 export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor";
@@ -1760,7 +1793,9 @@ export type SpellCondition =
    */
   | { kind: "targetWasYours"; index: number }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
-  | { kind: "revealedIs"; filter: TargetSpec; not?: true };
+  | { kind: "revealedIs"; filter: TargetSpec; not?: true }
+  /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
+  | { kind: "milledIs"; filter: TargetSpec };
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
@@ -2405,8 +2440,8 @@ export type EntersChoice = { kind: "payLife"; n: number } | { kind: "reveal"; fi
  * to or taken off the total cost of matching spells. `n` is positive for more, negative for less.
  */
 export interface CostMod {
-  /** Whose spells: the permanent's controller's, their opponents', or everyone's. */
-  who: "you" | "opponents" | "all";
+  /** Whose spells: the permanent's controller's, their opponents', everyone's, or the enchanted player's (a Curse). */
+  who: "you" | "opponents" | "all" | "enchanted";
   /** Which spells (printed characteristics, with the chosen X counted in the mana value, CR 202.3e). */
   filter: TargetSpec;
   n: number;
@@ -2551,7 +2586,7 @@ export interface CompiledCard {
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string }[];
+  entersChoose?: { what: ChoiceKind; except?: string; names?: TargetSpec; purpose?: NamePurpose }[];
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */
@@ -2653,6 +2688,20 @@ export interface CompiledCard {
    * matching spell the player cast this turn, also before this permanent was on the battlefield (rulings).
    */
   castLimits?: { who: "each" | "you" | "enchanted"; filter?: TargetSpec; text: string }[];
+  /**
+   * What the name chosen as it entered does (Chosen.name, CR 201.4): "Spells with the chosen name can't be cast", "Your
+   * opponents can't cast spells with the chosen name", "Activated abilities of sources with the chosen name can't be
+   * activated [unless they're mana abilities]" (in every zone, rulings on Pithing Needle).
+   */
+  nameBans?: ({ kind: "cast"; who: "all" | "opponents" } | { kind: "activate"; exceptMana?: true })[];
+  /** "You have protection from the chosen card name" (Runed Halo, CR 702.16a): see playerProtectedFrom. */
+  protectionFromChosenName?: true;
+  /**
+   * "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field), "Activated abilities
+   * of sources with the chosen name cost {2} more ..." (Anointed Peacekeeper): generic mana added to the ability's cost
+   * (CR 602.2b applies 601.2f), for sources matching `filter` (by name in any zone); mana abilities aren't taxed.
+   */
+  activationTaxes?: { filter?: TargetSpec; n: number; text: string }[];
   /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
   beginOnBattlefield?: boolean;
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */

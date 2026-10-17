@@ -30,7 +30,8 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
       const second = first && !isGroup(first) && parseObject(two[2]!, ctx);
       return second && !isGroup(second) ? [] : null;
     }
-    const what = parseObject(m[1]!, ctx);
+    // "Choose target card in a graveyard other than a basic land card. Search its owner's ..." (Surgical Extraction).
+    const what = parseObject(m[1]!, ctx, /^target (?:.+ )?card\b/.test(m[1]!));
     return what && !isGroup(what) ? [] : null;
   }
   // "~ becomes a copy of target creature until end of turn, except it has this ability", "Until your next turn,

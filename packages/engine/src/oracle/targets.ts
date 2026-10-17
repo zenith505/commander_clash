@@ -475,12 +475,23 @@ export function parseTargetPhrase(
     p = `${phrase.trim().slice(0, bound.index)}${from ? from[0] : ""}`.toLowerCase();
   }
   p = p.replace(/\btime lords?\b/g, "time-lord");
+  // "Target card in a graveyard other than a basic land card" (Surgical Extraction): every card but the basic lands, the
+  // only cards with the basic supertype (CR 205.4c). Only for a card in a graveyard.
+  const otherThanBasic = / other than a basic land card\b/.test(p);
+  if (otherThanBasic) p = p.replace(/ other than a basic land card\b/, "");
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
   const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:the chosen|that) (creature type|type|color)/.exec(p);
   if (chosen) {
     if (!opts.chosen) return null;
     extra.chosen = chosen[2] === "color" ? (chosen[1] ? "notColor" : "color") : chosen[1] ? "notType" : "type";
     p = (p.slice(0, chosen.index) + p.slice(chosen.index + chosen[0].length)).trim();
+  }
+  // "Spell with the chosen name" (Declaration of Naught), "cards with that name" after "choose a card name" (CR 201.4).
+  const withName = / with (?:the chosen|that) name\b/.exec(p);
+  if (withName) {
+    if (!opts.chosen) return null;
+    extra.chosen = "name";
+    p = (p.slice(0, withName.index) + p.slice(withName.index + withName[0].length)).trim();
   }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);
@@ -707,8 +718,9 @@ export function parseTargetPhrase(
   };
   if (inGraveyard) {
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
-    return { kind: "card", ...filters, ...(owner ? { owner } : {}), text };
+    return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), text };
   }
+  if (otherThanBasic) return null;
   if (isSpell) return extra.keywords || extra.notKeywords || extra.anyOf || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
 }

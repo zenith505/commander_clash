@@ -20,6 +20,7 @@ import { proliferate, runPermanentsEffect } from "./run-permanents";
 import { runTokensEffect, createToken } from "./run-tokens";
 import { runCopiesEffect } from "./run-copies";
 import { runSpellsEffect, addDelayed } from "./run-spells";
+import { runNamesEffect } from "./run-names";
 import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
 import { closeZoneBatch, fireEvent } from "./triggers";
@@ -420,6 +421,7 @@ export function amountFor(s: GameState, a: Amount, ctx: ResolveCtx, who: PlayerI
 export const amountCtx = (s: GameState, ctx: ResolveCtx): AmountCtx => ({
   controller: ctx.controller,
   sourceId: ctx.sourceId,
+  ...(ctx.sourceDef ? { sourceName: ctx.sourceDef.name } : {}),
   sourceZc: ctx.sourceZc,
   x: ctx.x,
   event: ctx.event,
@@ -661,6 +663,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "search":
     case "dig":
       return runLibraryEffect(s, e, ctx, src);
+    case "exileNamed":
+    case "revealUntil":
+    case "banName":
+      return runNamesEffect(s, e, ctx, src);
     case "venture":
     case "takeInitiative":
       return runDungeonsEffect(s, e, ctx, src);

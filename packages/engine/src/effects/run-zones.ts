@@ -1,5 +1,6 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
+import { nameLandBan } from "../names";
 import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
@@ -791,7 +792,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.playLinked = true;
         if (isType(d, "Land")) {
           // A land is played only on your turn, with a land play left (CR 305.2b, 305.3).
-          if (s.activePlayer !== p.id || p.landsPlayedThisTurn >= landsAllowed(s, p.id)) {
+          if (s.activePlayer !== p.id || p.landsPlayedThisTurn >= landsAllowed(s, p.id) || nameLandBan(s, p.id, d)) {
             log(s, `${p.name} can't play ${d.name} now.`);
             return;
           }

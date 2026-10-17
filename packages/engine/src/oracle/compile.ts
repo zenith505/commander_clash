@@ -193,7 +193,9 @@ export const QUOTED_SOURCE_NAME = "\u27easource\u27eb";
 function selfPronouns(t: string): string {
   const kept: string[] = [];
   return t
-    .replace(/\b(?:his or her|he or she|him or her)\b/gi, (m) => `\u0001${kept.push(m) - 1}\u0001`)
+    // Left as they are: "his or her" (their), a copy's exceptions ("except his name is ~ and he's a 4/4", read by
+    // parseCopyExcept) and "if his sneak cost was paid" (read with the trigger).
+    .replace(/\b(?:his or her|he or she|him or her)\b|\bexcept [^."]*|\b(?:his|her) \w+ cost was paid\b/gi, (m) => `\u0001${kept.push(m) - 1}\u0001`)
     .replace(/\b(?:[Hh]is|[Hh]er(?= (?:power|toughness|owner's|owner|controller|name|loyalty|additional|sneak|other|text|mana)\b))\b/g, "~'s")
     .replace(/\b(?:[Hh]e|[Ss]he|him|her)\b(?!')/g, "~")
     .replace(/\u0001(\d+)\u0001/g, (_, n: string) => kept[Number(n)]!);
@@ -541,7 +543,7 @@ export function compile(d: CardDef): CompiledCard {
     // Exert (CR 701.43d): "You may exert ~ as it attacks. When you do, it gets +2/+2 until end of turn." The "when you
     // do" ability triggers when it's exerted (linked, CR 607.2h); "it" is the exerted creature itself.
     // Combat Celebrant: "If ~ hasn't been exerted this turn, you may exert it as it attacks" (with additional combats).
-    const exert = /^(?:You may exert ~|(If ~ hasn't been exerted this turn), you may exert it) as (?:it|he|she|they) attacks?\.(?: When you do, (.+))?$/.exec(line);
+    const exert = /^(?:You may exert ~|(If ~ hasn't been exerted this turn), you may exert it) as (?:it|he|she|they|~) attacks?\.(?: When you do, (.+))?$/.exec(line);
     if (exert) {
       const body = exert[2] ? parseBody(exert[2].replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|can't)\b)/, "~ ").replace(/^(?:he|she) /, "it "), { selfIt: true }) : undefined;
       if (out.exert || body === null) out.unsupported.push(raw);

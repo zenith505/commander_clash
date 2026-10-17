@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passAll, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
-import { activationCost, compileCard, isFullySupported, parseManaCost, reduceByManaCost, type CardDef, type GameState, type ManaType, type ParsedCost, type PlayerId, type TargetChoice } from "../src";
+import { activationCost, characteristics, compileCard, invalidateCharacteristics, isFullySupported, parseManaCost, reduceByManaCost, type CardDef, type GameState, type ManaType, type ParsedCost, type PlayerId, type TargetChoice } from "../src";
 import { addMana } from "../src/spend";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -187,5 +187,45 @@ describe("power-up", () => {
     const { s, ap } = setup([]);
     const d = enteredNow(s, ap, drone);
     expect(cost(s, ap, d)).toBe("{3}");
+  });
+});
+
+// Real oracle text (Scryfall).
+const razorfin = card("Razorfin Abolisher", "Creature — Merfolk Wizard", "{2}{U}", { power: "2", toughness: "2", oracleText: "{1}{U}, {T}: Return target creature with a counter on it to its owner's hand." });
+const themberchaud = card("Themberchaud", "Legendary Creature — Dragon", "{4}{R}{R}{R}", { power: "5", toughness: "5", keywords: ["Trample", "Exert"], oracleText: "Trample\nWhen Themberchaud enters, he deals X damage to each other creature without flying and each player, where X is the number of Mountains you control.\nYou may exert Themberchaud as he attacks. When you do, he gains flying until end of turn. (An exerted creature won't untap during your next untap step.)" });
+const huntbonder = card("Avenging Huntbonder", "Creature — Human Warrior", "{3}{W}{W}", { power: "3", toughness: "3", keywords: ["Double strike"], oracleText: "Double strike\nWhenever this creature attacks, put a double strike counter on another target attacking creature." });
+const jack = card("Jack of Hearts, Volatile Hero", "Legendary Creature — Alien Human Hero", "{1}{R}{R}", { power: "2", toughness: "2", keywords: ["Flying", "Power-up", "Haste"], oracleText: "Flying, haste\nWhen Jack of Hearts dies, he deals damage equal to his power to each creature.\nPower-up — {4}{R}{R}: Discard your hand, then draw three cards. Put two +1/+1 counters on Jack of Hearts. (Activate each power-up ability only once. Reduce the cost by his mana cost if he entered this turn.)" });
+const defeat = card("Liliana's Defeat", "Sorcery", "{B}", { oracleText: "Destroy target black creature or black planeswalker. If that permanent was a Liliana planeswalker, her controller loses 3 life." });
+
+describe("a counter of any kind, keyword counters of two words, 'he' and 'she'", () => {
+  it("parse", () => {
+    supported(razorfin, themberchaud, huntbonder, jack);
+    expect(compileCard(huntbonder).triggers[0]!.body.effects[0]).toMatchObject({ type: "counters", counter: "double strike" });
+    // "He" and "his" are Jack of Hearts himself.
+    expect(compileCard(jack).triggers[0]!.body.text).toBe("~ deals damage equal to ~'s power to each creature.");
+    // Not a legendary card: "her controller" is the Liliana's, not this card's.
+    expect(compileCard(defeat).unsupported.join(" ")).toContain("her controller");
+    // Themberchaud's exert ("as he attacks") still reads.
+    expect(compileCard(themberchaud).unsupported).toEqual([]);
+  });
+
+  it("Razorfin Abolisher: any kind of counter makes a creature a legal target", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const r = putOnBattlefield(s0, ap, razorfin);
+    const plain = putOnBattlefield(s0, opp, card("Plain Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const stunned = putOnBattlefield(s0, opp, card("Stunned Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    s0.objects[stunned]!.counters = { stun: 1 };
+    addMana(s0, ap, ["C", "U"], {});
+    expect(() => act(s0, { type: "activateAbility", player: ap, objectId: r, index: 0, targets: [target(plain)] })).toThrow(/illegal target/);
+    const s = passAll(act(s0, { type: "activateAbility", player: ap, objectId: r, index: 0, targets: [target(stunned)] }));
+    expect(s.objects[stunned]!.zone).toBe("hand");
+  });
+
+  it("a double strike counter gives double strike (CR 122.1b)", () => {
+    const { s, ap } = setup([]);
+    const b = putOnBattlefield(s, ap, card("Plain Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    s.objects[b]!.counters = { "double strike": 1 };
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[b]!).keywords).toContain("Double strike");
   });
 });

@@ -1277,7 +1277,8 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
-  if (!body.targets.some((x) => x.controller === "eventPlayer")) return body;
+  const isEvent = (x: TargetSpec) => x.controller === "eventPlayer";
+  if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x: TargetSpec): TargetSpec => (x.controller === "eventPlayer" ? (({ controller: _, ...rest }) => ({ ...rest, ...(who !== undefined ? { controlledBy: who } : { controller: "eventPlayer" as const }) }))(x) : x);
   return { ...body, targets: body.targets.map(fix), ...(body.modal ? { modal: { ...body.modal, modes: body.modal.modes.map((m) => ({ ...m, targets: m.targets?.map(fix) })) } } : {}) };
 }

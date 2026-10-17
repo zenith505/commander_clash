@@ -546,6 +546,7 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
  */
 function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let m: RegExpExecArray | null;
+  let toOpponent = false;
   let event: TriggerEvent;
   let phrase: string | undefined;
   let bodyText: string;
@@ -556,11 +557,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (?:a player|an opponent|one or more players), (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player|an opponent|one or more players), (.+)$/.exec(line))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
-    bodyText = m[2]!;
-    // Combat damage to a player always goes to an opponent here: attacks only go to opponents.
+    bodyText = m[3]!;
+    // Combat damage to a player always goes to an opponent here: attacks only go to opponents. "That opponent" is that
+    // player, "each other opponent" each opponent but them (Parapet Thrasher).
+    toOpponent = m[2] === "an opponent";
+    if (toOpponent) bodyText = otherOpponents(bodyText).replace(/\bthat opponent\b/g, "that player");
   } else return null;
   if (/\b(they|them|those creatures|their)\b/.test(bodyText) && !/that player/.test(bodyText)) return "fail"; // the attackers as a group aren't modeled
   let group: TargetSpec | undefined;
@@ -578,7 +582,11 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, bodyText) };
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}) };
+  if (toOpponent) {
+    const said = (b: AbilityBody): AbilityBody => ({ ...withOtherOpponents(b), text: withOtherOpponents(b).text.replaceAll("that player", "that opponent"), ...(b.modal ? { modal: { ...b.modal, modes: b.modal.modes.map(said) } } : {}) });
+    body = said(body);
+  }
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */

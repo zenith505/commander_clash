@@ -118,6 +118,22 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
 const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "body"]);
 
+/**
+ * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
+ * ability that triggers each time until then (CR 603.7b), the sentences after it its instructions. Undefined when `s`
+ * isn't one, null when it can't be compiled.
+ */
+function floatingTrigger(s: string, after: string[]): Effect | null | undefined {
+  const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
+  if (!m) return undefined;
+  const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
+  const trigger = parseTrigger(`W${text.slice(1)}.`);
+  if (!trigger || trigger === "fail" || !FLOATING_EVENTS.has(trigger.event) || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+  const when = m[1]!.toLowerCase();
+  const until = when === "until your next turn" ? "yourNextTurn" : when === "until the end of your next turn" ? "endOfYourNextTurn" : "endOfTurn";
+  return { type: "floatingTrigger", trigger, until };
+}
+
 /** Starts a results table row's marker sentence (see parseBody). */
 const ROW_MARK = "\u0001";
 
@@ -450,6 +466,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // Not under a leading condition ("If you do, put ... and it gains menace"): the condition is for both.
       const m = /^If /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
       return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+    })
+    // "You draw that many cards and ~ deals that much damage to each other opponent" (Kosei): two instructions, in order.
+    .flatMap((x) => {
+      const m = /^If /.test(x) ? null : /^([Yy]ou draw [^,]+?) and (~ deals .+)$/.exec(x);
+      return m ? [m[1]!, m[2]!] : [x];
     })
     .filter(Boolean);
   let prevStart = 0;
@@ -939,6 +960,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      // "You may pay {R}{G}{W}{U}. If you do, until end of turn, whenever he deals combat damage to an opponent, ..."
+      // (Human Torch): the delayed triggered ability, and the rest of the paragraph its instructions, if paid.
+      const floatingPaid = floatingTrigger(then[1]!, sentences.slice(si + 1));
+      if (floatingPaid !== undefined) {
+        if (!floatingPaid) return null;
+        effects.push({ type: "may", effects: [floatingPaid], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` });
+        payFirst = null;
+        si = sentences.length;
+        continue;
+      }
       // "You may pay {2}{U}. If you do, exile the top card of your library face down. You may look at that card ... You
       // may play that card ..." (Intet): the exile and its permissions depend on the payment.
       const paidFaceDown = parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
@@ -1620,16 +1651,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
-    // "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed
-    // triggered ability that triggers each time until then (CR 603.7b), the rest of the paragraph its instructions.
-    const floatingFor = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
-    if (floatingFor) {
-      const text = [floatingFor[2]!, ...sentences.slice(si + 1).map((x) => x.replace(/\.$/, ""))].join(". ");
-      const trigger = parseTrigger(`W${text.slice(1)}.`);
-      if (!trigger || trigger === "fail" || !FLOATING_EVENTS.has(trigger.event) || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
-      const when = floatingFor[1]!.toLowerCase();
-      const until = when === "until your next turn" ? "yourNextTurn" : when === "until the end of your next turn" ? "endOfYourNextTurn" : "endOfTurn";
-      effects.push({ type: "floatingTrigger", trigger, until });
+    // A delayed triggered ability with a duration (CR 603.7b): the rest of the paragraph is its instructions.
+    const floating = floatingTrigger(s, sentences.slice(si + 1));
+    if (floating !== undefined) {
+      if (!floating) return null;
+      effects.push(floating);
       si = sentences.length;
       continue;
     }

@@ -645,6 +645,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
+      if (cond.is === "hasCounter") return Object.values(src.counters).some((n) => (n ?? 0) > 0);
       if (cond.is === "saddled") return !!src.saddled; // CR 702.171b
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";

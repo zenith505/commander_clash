@@ -214,7 +214,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx) });
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
-  if (spec.xRange && ((!ctx.spell && !ctx.activated) || ctx.whereX)) return null;
+  // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
+  if (spec.xRange && !ctx.whereX && !ctx.spell && !ctx.activated) return null;
   return { ref: "target", index: addTarget(ctx, theirs ? { ...spec, controller: "eventPlayer", text: `target ${m[1]!}` } : spec) };
 }
 
@@ -232,7 +233,8 @@ function boundCount(ctx: Ctx): (text: string) => AmountExpr | null {
   };
 }
 
-function boundAtTargeting(a: AmountExpr): boolean {
+/** Can this amount be worked out as targets are chosen, from the source and its controller alone? */
+export function boundAtTargeting(a: AmountExpr): boolean {
   const c = a.count;
   const mine = (who: PlayerRef | undefined) => !who || who.ref === "you" || who.ref === "eachPlayer" || who.ref === "eachOpponent";
   switch (c.kind) {

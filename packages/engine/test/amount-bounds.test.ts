@@ -250,10 +250,45 @@ describe("amount bounds", () => {
 const chord = card("Chord of Calling", "Instant", "{X}{G}{G}{G}", { keywords: ["Convoke"], oracleText: "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nSearch your library for a creature card with mana value X or less, put it onto the battlefield, then shuffle." });
 const deed = card("Pernicious Deed", "Enchantment", "{1}{B}{G}", { oracleText: "{X}, Sacrifice this enchantment: Destroy each artifact, creature, and enchantment with mana value X or less." });
 const blackSun = card("Day of Black Sun", "Sorcery", "{X}{B}{B}", { oracleText: "Each creature with mana value X or less loses all abilities until end of turn. Destroy those creatures." });
+const sprite = card("Spellstutter Sprite", "Creature — Faerie Wizard", "{1}{U}", { power: "1", toughness: "1", keywords: ["Flash", "Flying"], oracleText: "Flash\nFlying\nWhen this creature enters, counter target spell with mana value X or less, where X is the number of Faeries you control." });
+const faerie = card("Test Faerie", "Creature — Faerie", "{U}", { power: "1", toughness: "1" });
 const scourge = card("Scourge of Fleets", "Creature — Kraken", "{5}{U}{U}", { power: "6", toughness: "6", oracleText: "When this creature enters, return each creature your opponents control with toughness X or less to its owner's hand, where X is the number of Islands you control." });
 
 describe("with mana value X or less", () => {
-  it("parse", () => supported(chord, deed, blackSun, scourge));
+  it("parse", () => supported(chord, deed, blackSun, scourge, sprite));
+
+  /** Casts Grizzly Bears, then Spellstutter Sprite in response, and lets the Sprite resolve. */
+  const sprited = (faeries: number) => {
+    const { s: s0, ap, ids } = setup([bear(), sprite]);
+    for (let i = 0; i < faeries; i++) putOnBattlefield(s0, ap, faerie);
+    let s = castOnly(s0, ap, ids[0]!, []);
+    s = castOnly(s, ap, ids[1]!, []);
+    for (let i = 0; i < 4 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, bears: ids[0]!, spell: s.stack.find((it) => it.objectId === ids[0])! };
+  };
+
+  it("Spellstutter Sprite: X counts your Faeries as the target is chosen", () => {
+    let { s, ap, bears, spell } = sprited(1); // two Faeries with the Sprite: Grizzly Bears can be targeted
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "stack", id: spell.id }] }));
+    expect(s.objects[bears]!.zone).toBe("graveyard");
+  });
+
+  it("Spellstutter Sprite: with only itself, a 2-mana spell isn't a legal target", () => {
+    const { s: s0, bears } = sprited(0);
+    expect(s0.pending).toBeFalsy();
+    const s = settle(s0);
+    expect(s.objects[bears]!.zone).toBe("battlefield");
+  });
+
+  it("Spellstutter Sprite: a Faerie leaving before it resolves makes the target illegal (CR 608.2b, rulings)", () => {
+    let { s, ap, bears, spell } = sprited(1);
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "stack", id: spell.id }] });
+    const other = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Test Faerie")!;
+    moveObject(s, other, "graveyard");
+    s = settle(s);
+    expect(s.objects[bears]!.zone).toBe("battlefield");
+  });
 
   it("Chord of Calling: the search offers only creature cards with mana value up to X", () => {
     const { s: s0, ap, ids } = setup([chord]);

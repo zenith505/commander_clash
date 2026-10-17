@@ -259,7 +259,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(m[2]!, { x: true });
     const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
-    if (!spec || unless === null || (spec.xRange && (!ctx.spell || ctx.whereX))) return null;
+    if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.whereX)) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (Sram's Expertise),
@@ -269,7 +269,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(You may c|C)ast an? (.*?spell(?: with mana value (?:(?:\d+|X) or less|less than or equal to .+?))?) from your hand( with mana value (?:(?:\d+|X) or less|less than or equal to .+?))? without paying its mana cost$/.exec(s)) && (m[1] === "You may c" || ctx.mayNow) && !(m[3] && / with /.test(m[2]!))) {
     m.splice(1, 1);
     m[1] = `${m[1]!}${m[2] ?? ""}`;
-    const filter = parseTargetPhrase(m[1]!, { x: true, count: (t) => parseBoundCount(t, ctx) });
+    // With "where X is ...", X is that amount, counted as it resolves (TargetSpec.bound, replaced in body.ts).
+    const filter = parseTargetPhrase(m[1]!, { x: !ctx.whereX, count: (t) => parseBoundCount(t, ctx) });
     if (filter?.kind !== "spell" || filter.controller || filter.targetsWhat || (filter.xRange && (!ctx.spell || ctx.whereX || filter.xRange.at !== "most"))) return null;
     return [{ type: "castFromHand", filter: { ...filter, text: m[1]! } }];
   }

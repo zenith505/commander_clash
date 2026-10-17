@@ -126,6 +126,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return count({ kind: "devotion", colors: [m[1]!, m[2]].filter(Boolean).map((w) => COLOR_WORDS[w!.toLowerCase()]!) });
   // Domain.
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
+  // Vivid: "the number of colors among permanents you control".
+  if (/^colou?rs among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
   // Converge: "the number of colors of mana spent to cast this spell", "for each color of mana spent to cast it".

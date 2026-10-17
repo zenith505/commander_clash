@@ -118,6 +118,8 @@ export type Count =
   | { kind: "attachedToSelf"; subtypes: string[] }
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes" }
+  /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
+  | { kind: "colorsAmongPermanents" }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
   | { kind: "graveyardCardTypes"; who: PlayerRef }
   /**

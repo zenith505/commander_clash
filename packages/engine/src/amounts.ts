@@ -308,6 +308,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return best;
     }
+    case "colorsAmongPermanents": {
+      const colors = new Set<string>();
+      for (const id of s.battlefield) {
+        const ch = view(s.objects[id]!);
+        if (ch && ch.controller === ctx.controller) for (const col of ch.colors) colors.add(col);
+      }
+      return colors.size;
+    }
     case "basicLandTypes": {
       const types = new Set<string>();
       for (const id of s.battlefield) {
@@ -418,6 +426,8 @@ function describeCount(c: Count): string {
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";
+    case "colorsAmongPermanents":
+      return "#colors among your permanents";
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":

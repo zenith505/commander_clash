@@ -12,7 +12,7 @@ import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
-import { newObjects } from "../mutate";
+import { foundWith, newObjects } from "../mutate";
 import { addDelayed, paidUnless } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
@@ -479,11 +479,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return soulbond(s, ctx, src);
     case "returnToBattlefield": {
       // Persist and undying return the card that was put into the graveyard, if it's still there as that
-      // same object (CR 400.7), under its owner's control.
-      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      if (!o || o.zone !== "graveyard" || (o.zoneChanges ?? 0) !== ctx.sourceZc) return;
-      log(s, `${src} returns to the battlefield${e.counter ? ` with a ${e.counter} counter on it` : ""}.`);
-      moveObject(s, o.id, "battlefield", { controller: o.owner, ...(e.counter ? { counters: { [e.counter]: 1 } } : {}) });
+      // same object (CR 400.7), under its owner's control; a merged permanent's cards each return (730.3c).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const cards = [...(me && (me.zoneChanges ?? 0) === ctx.sourceZc ? [me] : []), ...foundWith(s, ctx.lki, ctx.sourceId)].filter((o) => o.zone === "graveyard");
+      if (!cards.length) return;
+      log(s, `${src} returns to the battlefield${e.counter ? ` with a ${e.counter} counter on it` : ""}${cards.length > 1 ? ` (${cards.map((o) => defOf(s, o).name).join(", ")})` : ""}.`);
+      enterTogether(s, () => cards.forEach((o) => moveObject(s, o.id, "battlefield", { controller: o.owner, ...(e.counter ? { counters: { [e.counter]: 1 } } : {}) })));
       return;
     }
     case "unearth": {

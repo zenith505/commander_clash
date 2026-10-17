@@ -77,6 +77,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of each of your main phases, (.+)$/, "yourMain"],
   [/^When ~ is turned face up, (.+)$/, "selfTurnedFaceUp"],
   [/^Whenever ~ becomes tapped, (.+)$/, "selfBecomesTapped"],
+  [/^Whenever ~ becomes untapped, (.+)$/, "selfBecomesUntapped"],
   [/^When ~ becomes monstrous, (.+)$/, "selfBecomesMonstrous"],
   [/^Whenever ~ mutates, (.+)$/, "selfMutates"],
   [/^Whenever you exert a creature, (.+)$/, "youExert"],
@@ -90,6 +91,7 @@ const SELF_EVENTS: TriggerEvent[] = [
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous", "selfMutates",
+  "selfBecomesUntapped",
 ];
 
 /** What an attached permanent's creature does (see TriggeredAbility.host): the event, and what its text can say. */
@@ -113,6 +115,7 @@ const HOST_TRIGGERS: [RegExp, TriggerEvent, { thatMuch?: true; eventPlayer?: tru
   [/^deals damage, (.+)$/, "selfDealsDamage", { thatMuch: true }],
   [/^becomes the target of a spell or ability, (.+)$/, "selfBecomesTarget", {}],
   [/^becomes tapped, (.+)$/, "selfBecomesTapped", {}],
+  [/^becomes untapped, (.+)$/, "selfBecomesUntapped", {}],
   [/^is dealt damage, (.+)$/, "selfIsDealtDamage", { thatMuch: true }],
 ];
 
@@ -130,7 +133,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
   for (const [re, event, o] of HOST_TRIGGERS) {
     const h = re.exec(m[3]!);
     if (!h) continue;
-    if (m[2] !== "creature" && event !== "selfBecomesTapped") return "fail";
+    if (m[2] !== "creature" && event !== "selfBecomesTapped" && event !== "selfBecomesUntapped") return "fail";
     let text = h[1]!;
     // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm).
     if (m[1] && /\b(it|its|that creature)\b/i.test(text)) return "fail";
@@ -1001,12 +1004,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (filter?.kind !== "object") return "fail";
     return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind };
   }
-  // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped".
-  const tapped = /^Whenever an? (.+?) becomes tapped, (.+)$/.exec(line);
+  // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped", "Whenever a
+  // permanent becomes untapped" (Mesmeric Orb: "that permanent's controller").
+  const tapped = /^Whenever an? (.+?) becomes (tapped|untapped), (.+)$/.exec(line);
   if (tapped) {
     const filter = parseTargetPhrase(tapped[1]!);
-    const body = filter && filter.kind === "object" && parseBody(tapped[2]!, { subjectIt: true });
-    return filter && body ? { event: "permanentBecomesTapped", tappedFilter: filter, body } : "fail";
+    const body = filter && filter.kind === "object" && parseBody(tapped[3]!, { subjectIt: true });
+    return filter && body ? { event: tapped[2] === "tapped" ? "permanentBecomesTapped" : "permanentBecomesUntapped", tappedFilter: filter, body } : "fail";
   }
   const block = parseBlockTrigger(line);
   if (block) return block;

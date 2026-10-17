@@ -1,7 +1,7 @@
 import type { Effect } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { compileCard } from "../oracle";
-import { nextRandom, shuffle } from "../rng";
+import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
@@ -350,7 +350,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const pid of apnap(s, [...owners])) {
         const p = player(s, pid);
         if (p.lost) continue;
-        shuffle(s, p.library);
+        shuffleLibrary(s, p);
         log(s, `${p.name} shuffles their library.`);
       }
       return;
@@ -360,14 +360,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const p = player(s, pid);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])];
         for (const id of ids) moveObject(s, id, "library");
-        shuffle(s, p.library);
+        shuffleLibrary(s, p);
         log(s, `${p.name} shuffles their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"} into their library.`);
       }
       return;
     case "shuffle":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        shuffle(s, p.library);
+        shuffleLibrary(s, p);
         log(s, `${p.name} shuffles their library.`);
       }
       return;
@@ -450,7 +450,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
         log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 || yardOnly ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
-        if (searchers.length === 1 && !yardOnly) shuffle(s, lib.library);
+        if (searchers.length === 1 && !yardOnly) shuffleLibrary(s, lib);
       }
       // What it found and put onto the battlefield is "it" afterwards (Vision Quest's "it gains haste").
       if (e.n === 1 && !e.others && e.dest.zone === "battlefield") r.created = [];
@@ -473,7 +473,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "Then shuffles": after the cards are put onto the battlefield, each player who searched (CR 701.23, 701.20).
       if (searchers.length > 1)
         for (const pid of searchers) {
-          shuffle(s, player(s, pid).library);
+          shuffleLibrary(s, player(s, pid));
           log(s, `${player(s, pid).name} shuffles their library.`);
         }
       return;
@@ -540,7 +540,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       });
       if (e.rest === "shuffle") {
-        shuffle(s, p.library); // "Then shuffle" (CR 701.20)
+        shuffleLibrary(s, p); // "Then shuffle" (CR 701.20)
         log(s, `${p.name} shuffles their library.`);
       } else if (e.rest === "graveyard") {
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);

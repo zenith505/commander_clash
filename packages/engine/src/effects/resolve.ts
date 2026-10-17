@@ -25,6 +25,7 @@ import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
 import { closeZoneBatch, fireEvent } from "./triggers";
+import { foundWith } from "../mutate";
 
 export interface ResolveCtx {
   controller: PlayerId;
@@ -237,12 +238,13 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "selfCard") {
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
+    // A merged permanent's other cards too, for an ability triggered by its leaving (CR 730.3c).
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    return o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : [];
+    return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : []), ...foundWith(s, ctx.lki, ctx.sourceId)];
   }
   if (ref.ref === "subjectCard") {
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
-    return o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
+    return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : []), ...foundWith(s, ctx.lki, ctx.subject?.id)];
   }
   if (ref.ref === "pairedWithTarget") {
     const t = objects(s, { ref: "target", index: ref.index }, ctx)[0];

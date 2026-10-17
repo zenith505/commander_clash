@@ -9,15 +9,16 @@ import { defOf, faceUpDefOf } from "./cards";
 import { fireEvent } from "./effects";
 import { invalidateCharacteristics } from "./layers";
 import { normalizeSelf } from "./oracle";
-import type { CardDef, GameObject, GameState, ObjectId } from "./types";
+import type { CardDef, GameObject, GameState, LastKnown, ObjectId } from "./types";
 
 /**
  * The copiable values of a permanent `top` merged with `under` (CR 730.2a, 702.140e): `top`'s characteristics, and the
  * rules text of both, `under`'s calling itself by `top`'s name, since its abilities are the merged permanent's now.
- * Registered in `s.cards` under a key of its own.
+ * Registered in `s.cards` under a key made of both, so the same two make the same definition in any game (compileCard
+ * caches by key).
  */
 export function mergedDef(s: GameState, top: CardDef, under: CardDef): CardDef {
-  const key = `${top.oracleId}|merged:${s.nextId++}`;
+  const key = `${top.oracleId}|merged:${under.oracleId}`;
   const text = normalizeSelf(under).replace(/~/g, top.name);
   const keywords = [...top.keywords, ...under.keywords.filter((k) => !top.keywords.includes(k))];
   const d: CardDef = { ...top, oracleId: key, oracleText: [top.oracleText, text].filter(Boolean).join("\n"), keywords };
@@ -61,6 +62,19 @@ export function mergeSpell(s: GameState, spell: GameObject, host: GameObject, on
 /** An object that has left the battlefield and the components of it that went along, if it was merged (CR 730.3c). */
 export function newObjects(o: GameObject): { id: ObjectId; zc: number }[] {
   return [{ id: o.id, zc: o.zoneChanges ?? 0 }, ...(o.movedWith ?? [])];
+}
+
+/**
+ * The other cards of a merged permanent `id` that left the battlefield, for an ability triggered by its leaving (`lki`):
+ * an effect that finds the new object `id` became finds them too, still the objects they became (CR 730.3c, 400.7).
+ */
+export function foundWith(s: GameState, lki: LastKnown | undefined, id: ObjectId | undefined): GameObject[] {
+  const m = lki?.mergedCards;
+  if (!m || id === undefined || m.of !== id) return [];
+  return m.cards.flatMap((c) => {
+    const p = s.objects[c.id];
+    return p && p.zone !== "battlefield" && (p.zoneChanges ?? 0) === c.zc ? [p] : [];
+  });
 }
 
 /** The commander a merged permanent's damage counts for (CR 903.3c, 903.10a): its component that's a commander. */

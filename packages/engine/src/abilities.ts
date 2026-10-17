@@ -1887,6 +1887,8 @@ export type TriggerEvent =
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
+  | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
+  | "permanentBecomesUntapped" // "Whenever a permanent you control becomes untapped": see TriggeredAbility.tappedFilter
   /**
    * "Whenever you tap ~ for mana", "whenever a player taps a land for mana" (CR 106.12: activating a mana ability with {T}
    * in its cost), with a body that adds no mana, so it isn't a mana ability and uses the stack (CR 605.1b). See manaTap.
@@ -2084,7 +2086,10 @@ export interface TriggeredAbility {
    * (`filter`, the subject: "that land"); without a filter, ~ itself.
    */
   manaTap?: { by: "you" | "opponent" | "any"; filter?: TargetSpec };
-  /** For "permanentBecomesTapped": which permanent ("a Dwarf you control"); it's the subject ("put a wind counter on it"). */
+  /**
+   * For "permanentBecomesTapped" and "permanentBecomesUntapped": which permanent ("a Dwarf you control"); it's the subject
+   * ("put a wind counter on it").
+   */
   tappedFilter?: TargetSpec;
   /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */
   countersKind?: string;

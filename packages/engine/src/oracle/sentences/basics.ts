@@ -455,12 +455,14 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
     among = "any number of";
   }
   // "5 damage divided as you choose among up to five targets" (Iron Fist): at least 1 each (CR 601.2d), so as many
-  // targets as there is damage at most, like "any number of".
+  // targets as there is damage at most, like "any number of", but none at all is fine too (CR 115.6; rulings on
+  // Ravenous Gigantotherium: "You may choose zero targets").
   const upTo = /^up to (\w+)$/.exec(among);
   if (upTo && upTo[1] !== "X") {
     if (typeof amount !== "string" || !/^\w+$/.test(amount) || amount === "X" || num(upTo[1]!) !== num(amount)) return null;
     among = "any number of";
   }
+  const none = !!upTo && upTo[1] !== "X";
   if (isX && (among !== "any number of" || (ctx.whereX && amount !== "X"))) return null;
   if (among === "X" && (isX || !ctx.spell)) return null;
   const total = isX ? 0 : num(amount as string);
@@ -490,8 +492,9 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
     ctx.lastTargets = { index: first, n: 2 };
     return { index: first, n: 2, amount: x };
   }
+  const divided = { first, n, total, ...(none ? { upTo: true as const } : {}) };
   for (let k = 0; k < n; k++)
-    addTarget(ctx, { ...spec, divided: { first, n, total }, ...(k ? { optional: true, distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    addTarget(ctx, { ...spec, divided, ...(k || none ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
   // "Those permanents": all the target creatures or planeswalkers (Mythos of Vadrok); not with "targets", which may be players.
   if (what !== "targets") {
     ctx.lastObjectTarget = undefined;

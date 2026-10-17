@@ -1,5 +1,7 @@
 // Seeded PRNG (mulberry32). The state lives in GameState so replays are deterministic.
 
+import type { Player } from "./types";
+
 export function nextRandom(state: { rngState: number }): number {
   let t = (state.rngState = (state.rngState + 0x6d2b79f5) | 0);
   t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -12,4 +14,13 @@ export function shuffle<T>(state: { rngState: number }, arr: T[]): void {
     const j = Math.floor(nextRandom(state) * (i + 1));
     [arr[i], arr[j]] = [arr[j]!, arr[i]!];
   }
+}
+
+/**
+ * Shuffle a player's library (CR 701.24a), counted in `Player.shuffles`: cards put there before it no longer are where
+ * they were put, so their owner doesn't arrange them any more (CR 730.3a).
+ */
+export function shuffleLibrary(state: { rngState: number }, p: Player): void {
+  shuffle(state, p.library);
+  p.shuffles = (p.shuffles ?? 0) + 1;
 }

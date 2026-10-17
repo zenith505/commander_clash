@@ -15,9 +15,9 @@ import { compileCard, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { addMana, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
-import { nextRandom, shuffle } from "./rng";
+import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
-import { askGraveyardOrder, closeGraveyardBatch, noteToGraveyard, orderGraveyard, topGraveyardCards } from "./graveyard";
+import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
 import { CREATURE_TYPES, type SourceQuality } from "./keywords";
 import { spendPlan } from "./value";
 import { cardNameOptions, currentName, nameActivationBan, nameCastBan, nameLandBan } from "./names";
@@ -118,7 +118,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
       player.commanderCasts[cmd.id] = 0;
     }
     for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
-    shuffle(s, player.library);
+    shuffleLibrary(s, player);
   });
   // CR 103.1: randomly determine the starting player.
   const first = Math.floor(nextRandom(s) * setup.length);
@@ -187,7 +187,7 @@ function nextMulliganDecision(s: GameState) {
       for (const id of p.hand) obj(s, id).zone = "library";
       p.library.push(...p.hand);
       p.hand = [];
-      shuffle(s, p.library);
+      shuffleLibrary(s, p);
       draw(s, g, OPENING_HAND);
       delete p.draws; // CR 103.5, as above
       m.taken[g] = (m.taken[g] ?? 0) + 1;
@@ -361,6 +361,9 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "orderGraveyard":
       orderGraveyard(s, p, action.order);
+      break;
+    case "orderLibrary":
+      orderLibrary(s, p, action.order);
       break;
     case "searchLibrary":
       searchLibrary(s, p, action.found);
@@ -666,7 +669,7 @@ export function moveObject(
   const snapshot: GameObject | undefined = fromZone === "battlefield" ? { ...o, counters: lastCounters } : undefined;
   const snapshotKey = cardIdOf(o);
   if (fromZone === "battlefield") {
-    (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}) });
+    (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
     (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}) };
   }
@@ -804,6 +807,8 @@ export function moveObject(
     });
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (merged) o.movedWith = scatterMerged(s, merged.parts.filter((x) => x !== id), partsTo, !!opts.top);
+  // Into its owner's library, its owner arranges its cards there (CR 730.3a).
+  if (merged && partsTo === "library") noteMergedToLibrary(s, o.owner, [{ id, zc: o.zoneChanges ?? 0 }, ...o.movedWith!], !opts.top);
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
     // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
@@ -841,18 +846,18 @@ export function moveObject(
     for (const t of defOf(s, o).types) types[t] = (types[t] ?? 0) + 1;
   }
   if (fromZone === "battlefield")
-    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments });
+    fireEvent(s, { type: "dies", to, id, controller: lastController, ...(opts.sacrificed ? { sacrificed: true } : {}), hadAbilities, grantedAbilities: last.grantedAbilities, counters: lastCounters, wasCreature, power: last.power, toughness: last.toughness, snapshot, chars: last, attachments, ...(o.movedWith?.length ? { movedWith: o.movedWith } : {}) });
   // From the battlefield it's a leaves-the-battlefield ability: it looks back to the permanent, which may have had no
   // abilities (face down, Humility) (CR 603.10a).
   if (to === "graveyard" && !(fromZone === "battlefield" && !hadAbilities)) fireEvent(s, { type: "toGraveyard", id });
-  if (shuffleIn && to === "library") shuffle(s, player(s, o.owner).library);
+  if (shuffleIn && to === "library") shuffleLibrary(s, player(s, o.owner));
   if (exiledUntil?.length) returnUntilLeaves(s, exiledUntil, last.name);
 }
 
 /**
  * The other components of a merged permanent that left the battlefield go to the zone it went to (CR 730.3), each a new
- * object; a commander that would go to its owner's library goes to the command zone instead (903.9c). Returns them, so
- * an effect that finds the new object finds them all (730.3c).
+ * object; a commander that would go to its owner's library goes to the command zone instead (903.9c). Returns the ones
+ * that went there, so an effect that finds the new object finds them all (730.3c).
  */
 function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean): { id: ObjectId; zc: number }[] {
   const moved: { id: ObjectId; zc: number }[] = [];
@@ -878,7 +883,8 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
       if (!(s.descendedThisTurn ??= []).includes(p.owner)) s.descendedThisTurn.push(p.owner);
     }
     if (dest === "graveyard") (s.zoneBatch ??= []).push({ id, zc: p.zoneChanges, from: "merged", to: dest, owner: p.owner, ...(p.isToken ? { notCard: true as const } : {}), card: p.cardId });
-    moved.push({ id, zc: p.zoneChanges });
+    // A commander that went to the command zone instead isn't where the effect looks for the new objects.
+    if (dest === to) moved.push({ id, zc: p.zoneChanges });
   }
   invalidateCharacteristics(s);
   return moved;
@@ -1329,6 +1335,8 @@ export function untapPermanent(s: GameState, o: GameObject) {
   o.tapped = false;
   o.untaps = (o.untaps ?? 0) + 1;
   endWhileTapped(s);
+  // It "becomes untapped" (CR 701.26b); during the untap step, what that triggers waits for the upkeep (CR 502.4).
+  if (o.zone === "battlefield") fireEvent(s, { type: "untapped", id: o.id });
 }
 
 /**

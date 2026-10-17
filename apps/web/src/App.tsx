@@ -1216,6 +1216,17 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onDone={(top, away) => dispatch([{ type: "arrangeTop", player: HUMAN, top, away }])}
             />
           )}
+          {pending?.kind === "orderLibrary" && pending.player === HUMAN && (
+            <ArrangeTop
+              key={pending.cards.join(",")}
+              s={s}
+              how={pending.bottom ? "bottom" : "libraryTop"}
+              source={pending.source}
+              cards={pending.cards}
+              onHover={setHover}
+              onDone={(order) => dispatch([{ type: "orderLibrary", player: HUMAN, order }])}
+            />
+          )}
           {pending?.kind === "orderGraveyard" && pending.player === HUMAN && (
             <ArrangeTop
               key={pending.cards.join(",")}
@@ -2691,7 +2702,7 @@ function ArrangeTop({
   onDone,
 }: {
   s: GameState;
-  how: "scry" | "surveil" | "order" | "bottom" | "look" | "graveyard" | "wholeGraveyard";
+  how: "scry" | "surveil" | "order" | "bottom" | "look" | "graveyard" | "wholeGraveyard" | "libraryTop";
   /** Whose library, when it isn't yours. */
   owner?: string;
   source: string;
@@ -2758,6 +2769,8 @@ function ArrangeTop({
               ? `put the top ${cards.length} cards of ${owner ? `${owner}'s` : "your"} library back in any order`
               : how === "bottom"
                 ? `put ${cards.length} cards on the bottom of your library in any order`
+                : how === "libraryTop"
+                ? `put these ${cards.length} cards on top of your library in any order`
                 : how === "graveyard"
                   ? `put these ${cards.length} cards into your graveyard in any order`
                   : how === "wholeGraveyard"

@@ -108,7 +108,7 @@ export type TriggerSourceEvent =
   | { type: "unattached"; id: ObjectId; host: ObjectId }
   /** Another player gained control of it; `from` lost control (CR 603.2, "When you lose control of ~"). */
   | { type: "controlChanged"; id: ObjectId; from: PlayerId }
-  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[] }
+  | { type: "dies"; to: ZoneName; id: ObjectId; controller: PlayerId; sacrificed?: boolean; hadAbilities: boolean; grantedAbilities?: string[]; counters: Record<string, number>; wasCreature: boolean; power?: number; toughness?: number; /** It as it last existed on the battlefield. */ snapshot?: GameObject; chars?: Characteristics; /** The Auras and Equipment that were attached to it. */ attachments?: ObjectId[]; /** A merged permanent's other cards, where they went with it (CR 730.3c). */ movedWith?: { id: ObjectId; zc: number }[] }
   /** Every defending player has declared blockers (CR 509.3). */
   | { type: "blocksDeclared" }
   /** A player gained life (one life-gain event, CR 119.9). */
@@ -126,6 +126,7 @@ export type TriggerSourceEvent =
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
+  | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number }
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
@@ -470,6 +471,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       s.delayed = s.delayed!.filter((x) => x !== d);
       if (d.to?.includes(ev.to)) s.triggerQueue.push({ sourceId: ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body });
     }
+    // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
+    // a copy's from what it copied.
+    const lastAbilities = withGranted(ev.hadAbilities ? compileCard(ev.snapshot ? defOf(s, ev.snapshot) : defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers;
     // Persist and undying: "if it had no -1/-1 counters on it" (an intervening if, CR 603.4; last known information).
     add(
       o,
@@ -479,15 +483,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         (e === "selfDiesOrExiled" && (ev.to === "graveyard" || ev.to === "exile")) ||
         e === "selfLeaves" ||
         e === "selfLostControl",
-      withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers,
+      lastAbilities,
       undefined,
       undefined,
-      { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) },
+      { counters: ev.counters, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) },
     );
     // "Whenever ~ becomes unattached from a permanent": it left while attached (looking back in time, CR 603.10a), or what
     // was attached to it stayed.
     const host = ev.snapshot?.attachedTo ? s.objects[ev.snapshot.attachedTo] : undefined;
-    if (host) add(o, ev.controller, (e) => e === "selfBecomesUnattached", withGranted(ev.hadAbilities ? compileCard(defOf(s, o)) : NO_ABILITIES, ev.grantedAbilities ?? []).triggers, undefined, host);
+    if (host) add(o, ev.controller, (e) => e === "selfBecomesUnattached", lastAbilities, undefined, host);
     for (const a of ev.attachments ?? []) {
       const att = s.objects[a];
       if (att?.zone === "battlefield") add(att, controllerOf(s, att), (e) => e === "selfBecomesUnattached", undefined, undefined, o);
@@ -506,7 +510,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
     if (ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") : ev.to === "graveyard") && (!d.hadCounter || hadCounter);
@@ -520,7 +524,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const src = s.objects[left.id];
         if (!src) continue;
         if (src.zone === "battlefield") continue; // it already came back as a new object
-        consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
       fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers));
     }
@@ -529,7 +533,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
     // the same time (CR 603.10a), whatever zone it went to.
     if (ev.sacrificed && ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const consider = (src: GameObject, triggers?: TriggeredAbility[]) =>
         add(src, ev.controller, (e, t) => e === "youSacrifice" && !!t.sacrifices && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki);
@@ -537,7 +541,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
         if (!src || src.zone === "battlefield" || left.controller !== ev.controller) continue;
-        consider(src, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        consider(src, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
     }
   } else if (ev.type === "blocksDeclared") {
@@ -653,6 +657,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    }
+  } else if (ev.type === "untapped") {
+    // "Whenever ~ becomes untapped" (inspired), "whenever equipped creature becomes untapped", "whenever a permanent
+    // you control becomes untapped" (the untapped permanent is the subject).
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfBecomesUntapped");
+    addHosted(o, (e) => e === "selfBecomesUntapped");
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentBecomesUntapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
     }
   } else if (ev.type === "tappedForMana") {
     // "Whenever you tap ~ for mana", "whenever an opponent taps a Mountain for mana" (the land is the subject, "that

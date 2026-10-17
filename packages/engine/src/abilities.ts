@@ -1049,6 +1049,12 @@ export type Effect =
    */
   | { type: "moveLinked"; dest: "hand" | "graveyard"; one?: true; yours?: true; other?: true }
   /**
+   * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
+   * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
+   * the same objects in exile (CR 400.7).
+   */
+  | { type: "returnFaceDownExiled"; cards?: { id: ObjectId; zc: number }[] }
+  /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
    */
@@ -1176,6 +1182,12 @@ export type Effect =
    */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" }
   | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
+  /**
+   * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
+   * they control, then puts all cards they exiled this way onto the battlefield." Each part for all players at once
+   * (rulings); only the cards the first part exiled come back, under their owners' (the exilers') control.
+   */
+  | { type: "livingDeath" }
   | { type: "tap"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
@@ -2767,6 +2779,11 @@ export interface CompiledCard {
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   opponentsCantCastYourTurn?: true;
+  /**
+   * "During your turn, your opponents can't ... activate abilities of artifacts, creatures, or enchantments" (Grand
+   * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
+   */
+  opponentsCantActivateYourTurn?: true;
   /**
    * "You may cast ~ as though it had flash if you pay {2} more to cast it.": cast any time a sorcery couldn't have been,
    * its total cost is this much more (CR 601.2f).

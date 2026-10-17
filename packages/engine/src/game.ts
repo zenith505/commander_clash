@@ -2,7 +2,7 @@ import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { playerProtectedFrom, spellManaValue } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, COLOR_NAMES } from "./effects";
@@ -3821,7 +3821,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
-  const banned = nameActivationBan(s, o, !!ab.mana); // Pithing Needle, in any zone (rulings)
+  const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
   if (banned) return banned;
   if (ab.mana) {
     // A mana ability: with priority, or while paying mana for something (CR 605.3a), even under split second (702.61b).

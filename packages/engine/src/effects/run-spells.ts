@@ -57,7 +57,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // A spell's own object (it's on its way to the graveyard), or the source of the ability.
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
-      const body = { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
+      // Memory Jar: the cards this ability exiled face down go with the delayed trigger ("each card they exiled this way").
+      const exiled = (s.resolving?.faceDownExiled ?? []).map((x) => ({ id: x, zc: s.objects[x]?.zoneChanges ?? 0 }));
+      const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x));
+      const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
       if (e.when === "lostControl") {
         // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
         for (const o of objects(s, e.of!, ctx)) {

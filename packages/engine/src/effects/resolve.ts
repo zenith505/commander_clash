@@ -573,6 +573,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "putInLibrary":
     case "putInGraveyard":
     case "exileGraveyard":
+    case "livingDeath":
+    case "returnFaceDownExiled":
     case "flicker":
     case "returnExiled":
     case "exileIfDies":

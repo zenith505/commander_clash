@@ -893,7 +893,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         sc.faceDownPick = undefined;
         ids = (sc.found ?? []).filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === p.id);
-      } else if (e.from === "hand") ids = [...p.hand];
+      } else if (e.from === "hand") ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => [...player(s, pid).hand]);
       else {
         const n = e.n === undefined ? 1 : amountNow(s, e.n, ctx);
         ids = (e.who ? players(s, e.who, ctx) : [p.id]).flatMap((pid) => player(s, pid).library.slice(0, n));
@@ -1216,6 +1216,37 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
       if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
       enterTogether(s, () => ids.forEach((id) => moveObject(s, id, "battlefield", { controller: under(obj(s, id)), tapped: e.tapped, ...hosts.get(id) })));
+      return;
+    }
+    case "returnFaceDownExiled": {
+      const cards = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => obj(s, c.id));
+      for (const pid of apnap(s, [...new Set(cards.map((c) => c.owner))])) {
+        const mine = cards.filter((c) => c.owner === pid);
+        log(s, `${player(s, pid).name} returns ${mine.length} card${mine.length === 1 ? "" : "s"} they exiled to their hand (${src}).`);
+        for (const c of mine) moveObject(s, c.id, "hand");
+      }
+      return;
+    }
+    case "livingDeath": {
+      const who = apnap(s, livingPlayers(s));
+      const exiled: [ObjectId, number][] = [];
+      for (const pid of who) {
+        const cards = player(s, pid).graveyard.filter((id) => objIsType(s, obj(s, id), "Creature"));
+        if (cards.length) log(s, `${player(s, pid).name} exiles ${cards.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
+        for (const id of cards) {
+          moveObject(s, id, "exile");
+          if (obj(s, id).zone === "exile") exiled.push([id, obj(s, id).zoneChanges ?? 0]);
+        }
+      }
+      for (const pid of who) {
+        const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+        if (mine.length) log(s, `${player(s, pid).name} sacrifices ${mine.map((id) => characteristics(s, obj(s, id)).name).join(", ")}.`);
+        for (const id of mine) moveObject(s, id, "graveyard", { sacrificed: true });
+      }
+      // The same cards, if they're still in exile (a commander may have gone to the command zone instead).
+      const back = exiled.filter(([id, zc]) => s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === zc).map(([id]) => id);
+      if (back.length) log(s, `${src} puts ${back.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield.`);
+      enterTogether(s, () => back.forEach((id) => moveObject(s, id, "battlefield", { controller: obj(s, id).owner })));
       return;
     }
     case "putInGraveyard":

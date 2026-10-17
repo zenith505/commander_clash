@@ -1298,6 +1298,11 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastYourTurn = true;
       continue;
     }
+    if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
+      out.opponentsCantCastYourTurn = true;
+      out.opponentsCantActivateYourTurn = true;
+      continue;
+    }
     // "~ has flash as long as you've committed a crime this turn" (Take for a Ride), "You may cast ~ as though it had
     // flash if you control a Human" (Bard's Company), "Spell mastery — If there are two or more instant and/or sorcery
     // cards in your graveyard, you may cast ~ as though it had flash": whether it can be cast at instant speed now (CR

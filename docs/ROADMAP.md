@@ -1,6 +1,6 @@
 # Roadmap
 
-19,064 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,123 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -268,20 +268,29 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (a "player or battle" trigger), the Ajani emblem, Lightning Surge, Arrow Storm, Banefire and Demonfire
      (conditional "can't be prevented"), Flames of the Blood Hand, Volcano Hellion, and prevention with extra effects
      (Nine Lives, Swans of Bryn Argoll, Mindskinner, Hostility, Weeping Angel, Ironscale Hydra). A replacement applies
-     to all of one source's damage to one recipient at once, so one order per recipient. Bots' combat choices don't
-     count doublers.
+     to all of one source's damage to one recipient at once, so one order per recipient. Bots' attacks and blocks count
+     doublers, halvers and prevention.
    - Coin flips (CR 705) work for "If you win / lose the flip", "until you lose a flip" and "whenever you win a coin
      flip" (25 cards); still out: Krark's Thumb, Edgar's "come up heads" (705.3), heads or tails (Odds // Ends, Mana
      Clash, Two-Headed Giant, Rakdos the Showstopper, Molten Sentry), a flip for each (Mutalith Vortex Beast, Fighting
      Chance), Fiery Gambit, Game of Chaos, Squee's Revenge, Crooked Scales, Krark the Thumbless, Planar Chaos, and lines
-     that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots don't activate a flip
-     whose loss costs them something.
+     that are out for other reasons (Goblin Bangchuckers' "itself", Chance Encounter, Okaun). Bots weigh a flip whose loss costs
+     them something as the average of its two outcomes (Bottle of Suleiman), and use "phase out or bounce, else
+     sacrifice it" flips (Frenetic Efreet) only to save the permanent.
    - "Each other creature you control enters with an additional +1/+1 counter on it" works from permanents already on
      the battlefield (Renata, Grumgully, Dragonstorm Globe, Oath of Gideon, Arlinn); still out: "for each" (Giada,
      Bioengineered Future), "of the chosen type" (Metallic Mimic), conditions (Vampire Socialite, Dearly Departed),
      "this turn" (Combine Guildmage, Zameck Guildmage), mana that adds the counter (Animal Attendant, Guildmages' Forum),
      and one without "other" that could describe its own card.
    - Bots take the first offer for "what does it attack" (the player the source attacks) and search both zones.
+   - "Whenever a creature attacks you (or a planeswalker you control)", "whenever a creature blocks", "whenever a creature
+     you control becomes blocked", "whenever a source an opponent controls / a creature deals damage to you", "deals
+     combat damage to a player or planeswalker" and "untap up to N lands" work; still out: "player or battle" (Rankle,
+     Torbran's other lines), "untap up to N" other permanents, "if you controlled that permanent" (Boomerang Basics,
+     Geistwave), "attacking alone" on an Aura or a target (Security Bypass, Crowd of True Believers, Viper), "choose
+     target face-up exiled card" (Riftsweeper, Blink), and "At the beginning of the next end step, ..." about objects
+     named earlier in the ability (about 50 cards: Apprentice Necromancer, Memory Jar, Mystifying Maze, Semester's End,
+     Koya, Flickerform).
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or

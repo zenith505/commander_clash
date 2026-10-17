@@ -397,7 +397,8 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   // targets are chosen, in turn order from its controller (CR 601.2c, 102.2; players who left aren't, 800.4a).
   const i = s.turnOrder.indexOf(ctx.controller);
   const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost)) : body0;
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x;
+  const castBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "castSpell";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || castBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -410,6 +411,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
       const x = ctx.x ?? 0;
       t = { ...rest, [xRange.key]: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "most" ? { max: x } : { min: x }, text: rest.text.replace(/ x( or (?:less|greater))?$/, ` ${x}$1`) };
     }
+    // "With mana value less than or equal to that spell's mana value" (Hammerhead Tyrant): the spell that triggered it, as
+    // it was cast (rulings), which can't change.
+    if (castBound(t) && ctx.cause !== undefined) t = bindBound(s, t, ctx);
     // "With total mana value X or less": the X announced (CR 107.3a), or before then anything.
     if (t.total?.x) t = anyX ? (({ total: _, ...rest }) => rest)(t) : { ...t, total: { key: t.total.key, max: ctx.x ?? 0 }, text: t.text.replace(/ X or less\)$/, ` ${ctx.x ?? 0} or less)`) };
     return t;

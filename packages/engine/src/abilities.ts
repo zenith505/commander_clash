@@ -974,7 +974,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control": only those, or tied for it. */ greatest?: "power"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control": only those, or tied for it. */ greatest?: "power"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -1005,7 +1005,14 @@ export type Effect =
    * what it enchants (CR 303.4f).
    */
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking a player its controller chooses (rulings on Kinscaer Sentry). */
-  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean }
+  /**
+   * `lesserPower`: "a creature card with lesser power" than the source, or its last known power (rulings on Shadowfax).
+   * `attackingEvent`: "tapped and attacking that opponent" (Kaalia): the player the trigger's creature attacked, if
+   * they're still in the game (rulings). `haste`, `atEndStep`: "That creature gains haste. Sacrifice the creature at the
+   * beginning of the next end step" (Sneak Attack), "Return that creature to your hand at ..." (Ilharg): about the
+   * permanent it became, while it still is (CR 400.7, rulings).
+   */
+  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).

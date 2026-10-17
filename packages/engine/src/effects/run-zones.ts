@@ -100,10 +100,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     sc.queue = apnap(s, who);
     sc.chosen = {};
   }
+  // Among another player's permanents (Split the Party): the first of them, if they're still in the game.
+  const among = e.among ? players(s, e.among, ctx)[0] : undefined;
   while (sc.queue.length) {
     const pid = sc.queue[0]!;
     const n = nFor[pid] ?? 0;
-    const options = pickOptions(s, e, pid, ctx.sourceId);
+    const options = e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId)) : pickOptions(s, e, pid, ctx.sourceId);
     if (!n) {
       sc.chosen![pid] = [];
       sc.queue.shift();
@@ -922,7 +924,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const p = player(s, ctx.controller);
       if (!sc.found) {
         const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
-        const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        // "With lesser power" (Shadowfax): its power in your hand, less than the source's, or the source's as it last
+        // existed on the battlefield (rulings).
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        const most = !e.lesserPower ? Infinity : me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? power(s, me) : (ctx.lki?.power ?? (ctx.sourceId ? s.lastKnown?.[ctx.sourceId]?.power : undefined) ?? -Infinity);
+        const cards = p.hand.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
         if (!cards.length) return;
         const what = `${e.any ? "any number of " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? cards.length : 1, fromHand: true };
@@ -931,7 +937,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "hand" && o.owner === p.id);
       // "Tapped and attacking" (CR 508.4): only during combat, attacking a player its controller chooses as it enters (it
       // was never declared as an attacker, rulings on Kinscaer Sentry); outside combat it's only tapped (CR 506.3d).
-      const attackOptions = e.attacking && cards.some((o) => isType(defOf(s, o), "Creature")) ? attackChoices(s, p.id, ctx.sourceId) : [];
+      // "Attacking that opponent" (Kaalia): the player its creature attacked, even if it's attacking something else now, and
+      // with that player gone, it isn't attacking (rulings).
+      const eventFoe = e.attackingEvent ? ctx.event?.player : undefined;
+      const attackOptions = !e.attacking || !cards.some((o) => isType(defOf(s, o), "Creature")) ? [] : e.attackingEvent ? (eventFoe !== undefined && eventFoe !== p.id && !player(s, eventFoe).lost && attackChoices(s, p.id, ctx.sourceId).length ? [{ key: String(eventFoe), label: player(s, eventFoe).name, player: eventFoe }] : []) : attackChoices(s, p.id, ctx.sourceId);
       if (attackOptions.length > 1 && sc.attackWhom === undefined) {
         const name = defOf(s, cards[0]!).name;
         s.pending = { kind: "chooseOption", player: p.id, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what ${name} attacks` };
@@ -942,6 +951,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g).
       const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: p.id })), src);
       if (hosts === "paused") return "paused";
+      // "That creature gains haste": the permanents these cards became (CR 400.7), like tokens just created.
+      if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
         for (const o of cards) {
           const host = hosts.get(o.id);
@@ -955,6 +966,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
             if (attack?.planeswalker) o.attackingPermanent = { id: attack.planeswalker, zc: obj(s, attack.planeswalker).zoneChanges ?? 0 };
+          }
+          if (o.zone !== "battlefield") continue;
+          s.resolving?.created?.push(o.id);
+          if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+          if (e.atEndStep) {
+            const verb = e.atEndStep === "exile" ? "Exile" : e.atEndStep === "hand" ? "Return" : "Sacrifice";
+            addDelayed(s, "nextEndStep", p.id, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : e.atEndStep === "hand" ? { type: "bounce", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${verb} ~${e.atEndStep === "hand" ? " to your hand" : ""}.` });
           }
         }
       });

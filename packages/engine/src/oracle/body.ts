@@ -930,11 +930,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Return target creature card from your graveyard to the battlefield. That creature gains haste until end of turn.
     // Exile it at the beginning of the next end step." (Dawn of the Dead, Corpse Dance): about the permanent that card
     // became (CR 400.7), so part of putting it there.
+    // "You may put a creature card from your hand onto the battlefield. That creature gains haste. Sacrifice the creature at
+    // the beginning of the next end step." (Sneak Attack), "... Return that creature to your hand at the beginning of the
+    // next end step." (Ilharg) likewise.
     const haste = /^(?:That creature|It) gains haste( until end of turn)?$/.exec(s);
-    const atEnd = /^(Exile|Sacrifice) (?:it|that creature) at the beginning of the next end step$/.exec(s);
+    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to your hand at the beginning of the next end step$/.exec(s);
     if (haste || atEnd) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
+      const fromHand = put?.type === "putFromHand" && !put.any ? put : undefined;
+      if (fromHand && haste && !fromHand.haste && !fromHand.atEndStep) {
+        fromHand.haste = haste[1] ? "endOfTurn" : "game";
+        continue;
+      }
+      if (fromHand && atEnd && !fromHand.atEndStep) {
+        fromHand.atEndStep = atEnd[1] === "Exile" ? "exile" : atEnd[1] === "Return" ? "hand" : "sacrifice";
+        continue;
+      }
+      if (atEnd?.[1] === "Return") return null;
       const one = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") ? put : undefined;
       if (one && haste && !one.haste && !one.atEndStep) {
         one.haste = haste[1] ? "endOfTurn" : "game";
@@ -1526,7 +1539,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
     // One card put onto the battlefield: "Put a +1/+1 counter on it", "It gains haste until your next turn".
     const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
-    ctx.lastPut = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject;
+    ctx.lastPut = (put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject) || (put?.type === "putFromHand" && !put.any);
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).

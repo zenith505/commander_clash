@@ -40,7 +40,8 @@ describe("search your library and/or graveyard", () => {
   it("parse", () => {
     supported(outburst, devastation, glory, visage);
     expect(compileCard(outburst).spell!.effects[1]).toMatchObject({ type: "search", orGraveyard: true, filter: { named: "Chandra, Bold Pyromancer" }, reveal: true, dest: { zone: "hand" } });
-    expect(compileCard(card("Test Tutor", "Sorcery", "{1}", { oracleText: "Search your library for a card named Festering Newt or Bubbling Cauldron, reveal it, put it into your hand, then shuffle." })).unsupported).toHaveLength(1);
+    // "A or B" is one card with either name (named-or-and-from-hand.test.ts); "A and/or B" is up to one of each, not yet.
+    expect(compileCard(card("Test Tutor", "Sorcery", "{1}", { oracleText: "Search your library for a card named Alpine Watchdog and/or a card named Igneous Cur, reveal them, put them into your hand, then shuffle." })).unsupported).toHaveLength(1);
   });
 
   it("the graveyard only: no shuffle", () => {

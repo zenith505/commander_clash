@@ -1468,8 +1468,11 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
     const mine = options.every((id) => controllerOf(s, obj(s, id)) === pid);
     return [...options].sort((a, b) => (mine ? 1 : -1) * (worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))).slice(0, count);
   }
+  // Another player's permanents (Split the Party): theirs worth the most.
+  const theirs = options.some((id) => controllerOf(s, obj(s, id)) !== pid);
   const cost = (id: ObjectId) => {
     const o = obj(s, id);
+    if (theirs) return -worth(s, pid, o);
     return worth(s, pid, o) + (action === "bounce" && id === self ? 10 : 0) - (action === "bounce" && o.tapped ? 1 : 0);
   };
   return [...options].sort((a, b) => cost(a) - cost(b)).slice(0, count);

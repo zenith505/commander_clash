@@ -258,6 +258,9 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "toughness":
     case "counters":
       return c.of.ref === "self";
+    case "manaValue":
+      // "That spell's mana value" in a cast trigger (Hammerhead Tyrant): as it was cast, fixed then (settleDivided).
+      return c.of.ref === "castSpell";
     default:
       return false;
   }
@@ -581,6 +584,12 @@ export function parseTargetPhrase(
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
   }
+  // "Angel, Demon, or Dragon creature card" (Kaalia of the Vast): a creature that's one of those creature types; only the
+  // last one has the card type, so it's for all of them.
+  const sharedType = /^((?:[a-z]+, )*[a-z]+,? or )([a-z]+ (?:creature|creatures))$/.exec(p);
+  const typeAlts = sharedType ? [...sharedType[1]!.replace(/,? or $/, "").split(", "), sharedType[2]!.split(" ")[0]!] : [];
+  const sharedSubtypes = typeAlts.length > 1 && typeAlts.every((w) => CREATURE_TYPES.has(capital(w))) ? typeAlts.map(capital) : null;
+  if (sharedSubtypes) p = sharedType![2]!.replace(/^[a-z]+ /, "");
   const alts = p ? p.split(/,? or |, /) : [];
   // "artifact creature" is one object with both types; "artifact or creature" is either.
   const typeWords = alts.map((alt) => alt.trim().split(/\s+/).filter((w) => TYPE_WORDS[w]).length);
@@ -603,6 +612,7 @@ export function parseTargetPhrase(
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;
+  if (sharedSubtypes) subtypes.push(...sharedSubtypes);
   for (const alt of alts) {
     const words = alt.trim().split(/\s+/);
     for (let i = 0; i < words.length; i++) {

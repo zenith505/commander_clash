@@ -397,7 +397,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   // targets are chosen, in turn order from its controller (CR 601.2c, 102.2; players who left aren't, 800.4a).
   const i = s.turnOrder.indexOf(ctx.controller);
   const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost)) : body0;
-  if (!body.targets.some((t) => (t.divided?.amount && !t.divided.settled) || t.xRange)) return body;
+  const castBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "castSpell";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || castBound(t);
+  if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
     if (t.xRange && anyX) {
@@ -409,9 +411,15 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
       const x = ctx.x ?? 0;
       t = { ...rest, [xRange.key]: xRange.at === "exact" ? { min: x, max: x } : xRange.at === "most" ? { max: x } : { min: x }, text: rest.text.replace(/ x( or (?:less|greater))?$/, ` ${x}$1`) };
     }
+    // "With mana value less than or equal to that spell's mana value" (Hammerhead Tyrant): the spell that triggered it, as
+    // it was cast (rulings), which can't change.
+    if (castBound(t) && ctx.cause !== undefined) t = bindBound(s, t, ctx);
+    // "With total mana value X or less": the X announced (CR 107.3a), or before then anything.
+    if (t.total?.x) t = anyX ? (({ total: _, ...rest }) => rest)(t) : { ...t, total: { key: t.total.key, max: ctx.x ?? 0 }, text: t.text.replace(/ X or less\)$/, ` ${ctx.x ?? 0} or less)`) };
     return t;
   };
-  return { ...body, targets: body.targets.map(settle) };
+  // A modal ability's modes are chosen with its targets (CR 700.2a): theirs too.
+  return { ...body, targets: body.targets.map(settle), ...(body.modal ? { modal: { ...body.modal, modes: body.modal.modes.map((m) => (m.targets ? { ...m, targets: m.targets.map(settle) } : m)) } } : {}) };
 }
 
 /** The targets to choose from, as offerMany offers them. */
@@ -433,7 +441,40 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;
-  return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) && relatedOk(s, spec, chosen, t);
+  return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) && relatedOk(s, spec, chosen, t) && totalOk(s, specs, chosen, i, t);
+}
+
+/** The mana value or power a "with total ..." target adds (TargetSpec.total): of the card or permanent as it is now. */
+const totalPart = (s: GameState, key: "manaValue" | "power", c: TargetChoice | undefined): number => {
+  const o = c?.kind === "object" ? s.objects[c.id] : undefined;
+  if (!o) return 0;
+  return key === "power" ? power(s, o) : manaValue(parseManaCost(defOf(s, o).manaCost));
+};
+
+/**
+ * "With total mana value 6 or less" (TargetSpec.total): `t` for target `i`, with the others of the group already chosen,
+ * adds up to no more than the most (CR 601.2c). Before the X it's measured against is announced, anything.
+ */
+export function totalOk(s: GameState, specs: TargetSpec[], chosen: TargetChoice[], i: number, t: TargetChoice): boolean {
+  const total = specs[i]?.total;
+  if (!total || total.max === undefined || t.kind !== "object") return true;
+  let sum = totalPart(s, total.key, t);
+  specs.forEach((x, j) => {
+    if (j !== i && x.total && !x.skip) sum += totalPart(s, total.key, chosen[j]);
+  });
+  return sum <= total.max;
+}
+
+/**
+ * As it resolves, the targets of a "with total ..." group still legal must still add up to no more than the most, or
+ * every one of them is illegal (CR 608.2b; rulings on Nethroi, Apex of Death and Reunion of the House). `legal` is changed.
+ */
+export function checkTotals(s: GameState, specs: TargetSpec[], targets: TargetChoice[], legal: boolean[]) {
+  const group = specs.flatMap((x, i) => (x.total && x.total.max !== undefined && legal[i] ? [i] : []));
+  if (!group.length) return;
+  const { key, max } = specs[group[0]!]!.total!;
+  const sum = group.reduce((n, i) => n + totalPart(s, key, targets[i]), 0);
+  if (sum > max!) for (const i of group) legal[i] = false;
 }
 
 /** "From a single graveyard", "that share a creature type": how this target relates to the others of its group already chosen. */
@@ -498,7 +539,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || !!spec.many;
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {
@@ -508,7 +549,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
       return fill(i + 1);
     }
     for (const t of options[i]!) {
-      if ((specs[i]!.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) || !relatedOk(s, specs[i]!, chosen, t)) continue;
+      if ((specs[i]!.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) || !relatedOk(s, specs[i]!, chosen, t) || !totalOk(s, specs, chosen, i, t)) continue;
       chosen[i] = t;
       if (fill(i + 1)) return true;
     }

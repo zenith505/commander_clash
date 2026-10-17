@@ -422,6 +422,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of found) moves.push({ pid, id });
         if (searchers.length === 1 && !yardOnly) shuffle(s, lib.library);
       }
+      // What it found and put onto the battlefield is "it" afterwards (Vision Quest's "it gains haste").
+      if (e.n === 1 && !e.others && e.dest.zone === "battlefield") r.created = [];
       enterTogether(s, () => {
         for (const { pid, id } of moves) {
           const p = player(s, pid);
@@ -429,8 +431,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           if (to.zone === "libraryTop") {
             obj(s, id).zone = "library";
             p.library.unshift(id);
-          } else if (to.zone === "battlefield") moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id) });
-          else moveObject(s, id, to.zone);
+          } else if (to.zone === "battlefield") {
+            // "With X additional +1/+1 counters on it" (CR 614.1c).
+            const extra = to.counters ? Math.max(0, amountNow(s, to.counters.n, ctx)) : 0;
+            moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
+            if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
+          } else moveObject(s, id, to.zone);
         }
       });
       // "Then shuffles": after the cards are put onto the battlefield, each player who searched (CR 701.23, 701.20).

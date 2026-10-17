@@ -768,7 +768,7 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) ? undefined : printedCounters;
-  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent })) : 0;
+  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
@@ -846,12 +846,19 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = true;
   // A planeswalker enters with its printed loyalty in loyalty counters (CR 306.5b), its copiable values' if it's a copy.
   const loyalty = isType(defOf(s, o), "Planeswalker") ? Number.parseInt(defOf(s, o).loyalty ?? "", 10) : NaN;
-  if (loyalty > 0) putCounters(s, o, "loyalty", loyalty, true);
-  if (withCounters) putCounters(s, o, withCounters.counter, withCounters.n, true); // CR 614.1c
+  // The counters it enters with arrive at once (CR 614.1c): its own "enters with", a spell's "additional" ones (opts),
+  // and others' "enters with an additional" (Renata). Each kind is one placement, so Hardened Scales adds one, and its
+  // controller orders those replacement effects (CR 616.1) the way that gives the most.
+  const entering: Record<string, number> = {};
+  const add = (k: string, n: number) => n > 0 && (entering[k] = (entering[k] ?? 0) + n);
+  if (loyalty > 0) add("loyalty", loyalty);
+  if (withCounters) add(withCounters.counter, withCounters.n);
+  for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
+  for (const [k, n] of Object.entries(othersAddCounters(s, o))) add(k, n);
+  for (const [k, n] of Object.entries(entering)) putCounters(s, o, k, n, true);
   // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
   if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
     putCounters(s, o, "+1/+1", printed.bloodthirst, true);
-  for (const [k, n] of Object.entries(opts.counters ?? {})) putCounters(s, o, k, n, true);
   // "~ escapes with N +1/+1 counters on it" (CR 702.138c).
   if (opts.escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
   // Sunburst: only a resolving spell, and only for colored mana spent to cast it (CR 702.44b). Whether it enters as a
@@ -907,7 +914,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     return;
   }
   const ewc = printed.entersWithCounters;
-  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent })) : 0;
+  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 
@@ -1057,6 +1064,25 @@ function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: 
  * "Creatures your opponents control enter tapped" (Authority of the Consuls): permanents already on the battlefield, not
  * the entering one itself; such an effect wins over "enters tapped unless" (rulings), since it applies either way.
  */
+/**
+ * "Each other creature you control enters with an additional +1/+1 counter on it" (Renata, Called to the Hunt): from
+ * permanents already on the battlefield, so not ones entering at the same time (rulings on Renata, Grumgully, Dragonstorm
+ * Globe), judged by the permanent as it would exist there: one entering as a copy of a Human is a Human (CR 614.12,
+ * rulings on Grumgully).
+ */
+function othersAddCounters(s: GameState, o: GameObject): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const id of s.battlefield) {
+    if (id === o.id) continue;
+    const src = obj(s, id);
+    const rules = compileCard(defOf(s, src)).othersEnterWithCounters;
+    if (!rules || !characteristics(s, src).hasPrintedAbilities) continue;
+    const you = controllerOf(s, src);
+    for (const r of rules) if (objectMatches(s, r.filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+  }
+  return out;
+}
+
 function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
   if (s.entersTappedUntil?.some((r) => objectMatches(s, r.filter, o, r.controller, false))) return true;
   return s.battlefield.some((id) => {
@@ -3869,7 +3895,7 @@ function chooseTriggerTargets(s: GameState, p: Player, targets: TargetChoice[]) 
   if (pend?.kind !== "chooseTargets" || pend.player !== p.id) throw new RulesError("no targets to choose");
   const t = s.triggerQueue[0]!;
   // "Any number of target creatures": as many as were chosen (CR 601.2c, 603.3d).
-  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets);
+  const fit = fitMany({ targets: pend.specs, effects: [], text: "" }, targets, t.x ?? 0);
   if (typeof fit === "string") throw new RulesError(fit);
   const problem = targetProblem(s, fit.body.targets, fit.targets, p.id, sourceQuality(s, t.sourceId, t.sourceCardId), t.sourceId);
   if (problem) throw new RulesError(problem);

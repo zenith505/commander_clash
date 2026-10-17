@@ -270,6 +270,13 @@ export interface TargetSpec {
   sameGraveyardAs?: number[];
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
+  /**
+   * "Any number of target artifacts with total mana value 6 or less", "up to two target creature cards with total power
+   * 10 or less": with the other targets that have it, the targets chosen add up to no more than `max` (CR 601.2c), or
+   * the X announced (`x`, made into `max` as targets are chosen, see settleDivided). Checked again as it resolves: over
+   * it then, every one of them is illegal (CR 608.2b; rulings on Nethroi, Reunion of the House).
+   */
+  total?: { key: "manaValue" | "power"; max?: number; x?: true };
   /** true: tapped; false: untapped. */
   tapped?: boolean;
   /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
@@ -343,6 +350,8 @@ export interface TargetSpec {
 export interface SearchDest {
   zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile";
   tapped?: boolean;
+  /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
+  counters?: { counter: CounterKind; n: Amount };
 }
 
 /** Inclusive bounds; either end may be open. */
@@ -967,7 +976,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control": only those, or tied for it. */ greatest?: "power"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control": only those, or tied for it. */ greatest?: "power"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -998,7 +1007,14 @@ export type Effect =
    * what it enchants (CR 303.4f).
    */
   /** `attacking`: "tapped and attacking" (CR 508.4), attacking a player its controller chooses (rulings on Kinscaer Sentry). */
-  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean }
+  /**
+   * `lesserPower`: "a creature card with lesser power" than the source, or its last known power (rulings on Shadowfax).
+   * `attackingEvent`: "tapped and attacking that opponent" (Kaalia): the player the trigger's creature attacked, if
+   * they're still in the game (rulings). `haste`, `atEndStep`: "That creature gains haste. Sacrifice the creature at the
+   * beginning of the next end step" (Sneak Attack), "Return that creature to your hand at ..." (Ilharg): about the
+   * permanent it became, while it still is (CR 400.7, rulings).
+   */
+  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -1099,7 +1115,11 @@ export type Effect =
   | { type: "enterTappedUntil"; filter: TargetSpec }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
   /** `divided`: "distribute N counters among" the targets of `what`, each getting its part (CR 601.2d). */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true }
+  /**
+   * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
+   * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
+   */
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -2352,6 +2372,8 @@ export interface CompiledCard {
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
    */
   othersEnterTapped?: { filter: TargetSpec; text: string }[];
+  /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; text: string }[];
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
@@ -2380,7 +2402,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**

@@ -69,6 +69,11 @@ export interface Ctx {
   defending?: boolean;
   /** "Whenever another creature dies": the subject left the battlefield, so "it" and "that card" are the card where it went. */
   subjectLeft?: boolean;
+  /**
+   * An enters trigger of a card with {X} in its cost (or a "when you cast this spell" one): X is the X its spell was cast
+   * with (CR 107.3m, 107.3a), known as the trigger's targets are chosen, like a spell's.
+   */
+  ownX?: boolean;
   /** This sentence defines its own X ("..., where X is ..."): "up to X target ..." isn't the spell's X then. */
   whereX?: boolean;
   /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
@@ -293,7 +298,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -318,6 +323,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
+    ...(opts.ownX ? { ownX: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -546,14 +552,26 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "You may search your library and/or graveyard for a card named Ajani, Valiant Protector, reveal it, and put it into
     // your hand. If you search your library this way, shuffle." (CR 701.23): one card, from either zone; whether the
     // library is searched too is the player's choice as it resolves (search.orGraveyard).
-    const orYard = /^(?:([Yy]ou may) )?[Ss]earch your library and\/or graveyard for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?)$/.exec(s);
-    if (orYard && sentences[si + 1]?.replace(/\.$/, "") === "If you search your library this way, shuffle") {
+    // "... and put it onto the battlefield with X additional +1/+1 counters on it. If X is 4 or greater, it gains haste
+    // until end of turn. If you search your library this way, shuffle." (Vision Quest): the shuffle doesn't depend on
+    // what's between, so it goes with the search.
+    const orYard = new RegExp(`^(?:([Yy]ou may) )?[Ss]earch your library and\\/or graveyard for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?)(?: with (X|an|a|one|two|three) additional ${COUNTER} counters? on it)?$`).exec(s);
+    const isShuffle = (i: number) => sentences[i]?.replace(/\.$/, "") === "If you search your library this way, shuffle";
+    const shuffleAt = isShuffle(si + 1) ? si + 1 : orYard && !orYard[1] && isShuffle(si + 2) ? si + 2 : undefined;
+    if (orYard && shuffleAt !== undefined) {
       const filter = parseSearchFilter(orYard[3]!, (t) => parseBoundCount(t, ctx));
       if (filter === null) return null;
-      const dest: SearchDest = orYard[5] === "into your hand" ? { zone: "hand" } : { zone: "battlefield", ...(/tapped$/.test(orYard[5]!) ? { tapped: true } : {}) };
+      const dest: SearchDest =
+        orYard[5] === "into your hand"
+          ? { zone: "hand" }
+          : { zone: "battlefield", ...(/tapped$/.test(orYard[5]!) ? { tapped: true } : {}), ...(orYard[6] ? { counters: { counter: counterKind(orYard[7]!), n: /^an?$/.test(orYard[6]) ? 1 : amt(orYard[6]) } } : {}) };
+      if (orYard[6] === "X" && !ctx.spell && !ctx.ownX) return null;
       const search: Effect = { type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: !!orYard[4], dest, orGraveyard: true };
-      effects.push(orYard[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search);
-      si++;
+      const fx: Effect = orYard[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search;
+      effects.push(fx);
+      noteLast(ctx, [fx]);
+      if (shuffleAt === si + 1) si++;
+      else sentences.splice(shuffleAt, 1);
       continue;
     }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
@@ -924,11 +942,24 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // "Return target creature card from your graveyard to the battlefield. That creature gains haste until end of turn.
     // Exile it at the beginning of the next end step." (Dawn of the Dead, Corpse Dance): about the permanent that card
     // became (CR 400.7), so part of putting it there.
+    // "You may put a creature card from your hand onto the battlefield. That creature gains haste. Sacrifice the creature at
+    // the beginning of the next end step." (Sneak Attack), "... Return that creature to your hand at the beginning of the
+    // next end step." (Ilharg) likewise.
     const haste = /^(?:That creature|It) gains haste( until end of turn)?$/.exec(s);
-    const atEnd = /^(Exile|Sacrifice) (?:it|that creature) at the beginning of the next end step$/.exec(s);
+    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to your hand at the beginning of the next end step$/.exec(s);
     if (haste || atEnd) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
+      const fromHand = put?.type === "putFromHand" && !put.any ? put : undefined;
+      if (fromHand && haste && !fromHand.haste && !fromHand.atEndStep) {
+        fromHand.haste = haste[1] ? "endOfTurn" : "game";
+        continue;
+      }
+      if (fromHand && atEnd && !fromHand.atEndStep) {
+        fromHand.atEndStep = atEnd[1] === "Exile" ? "exile" : atEnd[1] === "Return" ? "hand" : "sacrifice";
+        continue;
+      }
+      if (atEnd?.[1] === "Return") return null;
       const one = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") ? put : undefined;
       if (one && haste && !one.haste && !one.atEndStep) {
         one.haste = haste[1] ? "endOfTurn" : "game";
@@ -1077,7 +1108,7 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // what came before ("also"). Only a spell's own X.
     const xAtLeast = /^If X is (\d+|one|two|three|four|five|six|seven|eight|nine|ten) or (?:more|greater), (?:also )?(.+)$/.exec(s);
     if (xAtLeast && !/\binstead\b/.test(xAtLeast[2]!)) {
-      if (!ctx.spell || ctx.whereX) return null;
+      if (!(ctx.spell || ctx.ownX) || ctx.whereX) return null;
       const inner = parseOne(xAtLeast[2]!.charAt(0).toUpperCase() + xAtLeast[2]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });
@@ -1520,7 +1551,11 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");
     // One card put onto the battlefield: "Put a +1/+1 counter on it", "It gains haste until your next turn".
     const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
-    ctx.lastPut = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject;
+    ctx.lastPut =
+      (put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject) ||
+      (put?.type === "putFromHand" && !put.any) ||
+      // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
+      (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
@@ -1587,6 +1622,7 @@ export function usesX(v: unknown): boolean {
     const o = v as Record<string, unknown>;
     if (o.count && (o.count as Count).kind === "x") return true;
     if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
+    if (o.xRange || (o.total as TargetSpec["total"])?.x || o.kind === "xAtLeast") return true; // "with mana value X or less", "if X is 5 or more"
     return Object.values(o).some(usesX);
   }
   return false;
@@ -1660,7 +1696,7 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
     case "scry":
     case "surveil":
     case "preventNext": {
-      if (e.type === "counters" && e.perLastKnownCounter) return null;
+      if (e.type === "counters" && (e.perLastKnownCounter || e.double)) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
     }

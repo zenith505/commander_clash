@@ -458,7 +458,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setDiscards([]);
     setTapPick(null);
     if (pending?.kind === "chooseTargets") {
-      const specs = offerTargets(s!, pending.specs, HUMAN, 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
+      const specs = offerTargets(s!, pending.specs, HUMAN, pending.x ?? 0, sourceQuality(s!, pending.sourceId), pending.sourceId);
       setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: pending.description });
     } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
@@ -3489,7 +3489,8 @@ function Controls({
   if (pending?.kind === "distribute" && pending.player === HUMAN)
     return <DistributeChoice key={`${pending.source}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
-    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : "return to your hand";
+    const theirs = pending.of !== undefined && pending.of !== HUMAN ? s.players[pending.of]!.name : undefined;
+    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : theirs ? "return to their owner's hand" : "return to your hand";
     const an = `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
     // Devour: any number of them; exploit: none or one (pending.min).
     const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
@@ -3523,7 +3524,7 @@ function Controls({
                 ? `cipher: click a creature of yours to exile ${pending.source} encoded on it. Whenever that creature deals combat damage to a player, you may cast a copy of ${pending.source} for free.`
                 : pending.action === "keep"
                 ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are sacrificed.`
-                : `click ${what} of yours to ${verb}.`}
+                : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
           {pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : "Return"}

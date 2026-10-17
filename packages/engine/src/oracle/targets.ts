@@ -218,7 +218,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
-  if (spec.xRange && !ctx.whereX && !ctx.spell && !ctx.activated) return null;
+  if (spec.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
   return { ref: "target", index: addTarget(ctx, theirs ? { ...spec, controller: "eventPlayer", text: `target ${m[1]!}` } : spec) };
 }
 
@@ -258,6 +258,9 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "toughness":
     case "counters":
       return c.of.ref === "self";
+    case "manaValue":
+      // "That spell's mana value" in a cast trigger (Hammerhead Tyrant): as it was cast, fixed then (settleDivided).
+      return c.of.ref === "castSpell";
     default:
       return false;
   }
@@ -290,20 +293,30 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Destroy X target creatures": exactly X of them (Eliminate the Competition).
   const many = range === "any number of" ? ("any" as const) : count === "X" ? (upTo ? ("x" as const) : ("exactX" as const)) : undefined;
   // A spell's X, or an activated ability's {X} (CR 107.3a, 602.2b), announced before targets are chosen.
-  if (count === "X" && (!(ctx.spell || ctx.activated) || ctx.whereX)) return null;
+  if (count === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const [required, n] = many ? [0, 1] : range ? (range.startsWith("one or two") ? [1, 2] : [1, 3]) : upTo ? [0, num(count!)] : another ? [1, 1] : [num(count!), num(count!)];
   if (n < 1 || n > 6) return null;
   const [mine0, theirs] = thatPlayerControls(phrase!, ctx);
   // "Cards from a single graveyard" (all in one), "creature cards that share a creature type" (each with each other).
   const single = (n > 1 || !!many) && / from a single graveyard$/.test(mine0);
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
-  const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "");
+  // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
+  const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
+  if (totalM && totalM[2] === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
+  const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
+  const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
   const parsed = n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
-  if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated) return null;
-  const spec: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
-  const before = ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "card" ? [i] : []));
+  if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
+  const spec0: TargetSpec = theirs ? { ...parsed, controller: "eventPlayer", text: `${parsed.text} that player controls` } : parsed;
+  // One group with a total to each ability: the targets that have it are that group.
+  if (total && ctx.targets.some((t) => t.total)) return null;
+  const spec: TargetSpec = total ? { ...spec0, total, text: `${spec0.text} (total ${total.key === "power" ? "power" : "mana value"} ${total.x ? "X" : total.max} or less)` } : spec0;
+  // "Destroy up to one target artifact or enchantment. ... any number of other target creatures" (Kinetic Ooze): no target
+  // before it was asked to be a creature, so "other" is other than the creature the ability is on.
+  const sameWord = (t: TargetSpec) => t.kind === "any" || !t.types?.length || !spec.types?.length || t.types.some((x) => spec.types!.includes(x));
+  const before = ctx.targets.flatMap((t, i) => ((t.kind === "object" || t.kind === "any" || t.kind === "card") && (another || ctx.spell || t.kind !== spec.kind || sameWord(t)) ? [i] : []));
   let notSource = false;
   if (other || another) {
     if (!before.length && ctx.spell) return null; // a spell has no source on the battlefield to be other than
@@ -571,6 +584,12 @@ export function parseTargetPhrase(
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
   }
+  // "Angel, Demon, or Dragon creature card" (Kaalia of the Vast): a creature that's one of those creature types; only the
+  // last one has the card type, so it's for all of them.
+  const sharedType = /^((?:[a-z]+, )*[a-z]+,? or )([a-z]+ (?:creature|creatures))$/.exec(p);
+  const typeAlts = sharedType ? [...sharedType[1]!.replace(/,? or $/, "").split(", "), sharedType[2]!.split(" ")[0]!] : [];
+  const sharedSubtypes = typeAlts.length > 1 && typeAlts.every((w) => CREATURE_TYPES.has(capital(w))) ? typeAlts.map(capital) : null;
+  if (sharedSubtypes) p = sharedType![2]!.replace(/^[a-z]+ /, "");
   const alts = p ? p.split(/,? or |, /) : [];
   // "artifact creature" is one object with both types; "artifact or creature" is either.
   const typeWords = alts.map((alt) => alt.trim().split(/\s+/).filter((w) => TYPE_WORDS[w]).length);
@@ -593,6 +612,7 @@ export function parseTargetPhrase(
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;
+  if (sharedSubtypes) subtypes.push(...sharedSubtypes);
   for (const alt of alts) {
     const words = alt.trim().split(/\s+/);
     for (let i = 0; i < words.length; i++) {

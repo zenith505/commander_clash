@@ -624,6 +624,20 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    // "Each other creature you control enters with an additional +1/+1 counter on it" (Renata, Called to the Hunt): a
+    // replacement effect on other permanents entering while this one is on the battlefield (CR 614.1c). Whether one
+    // without "other" that could describe itself applies to itself isn't worked out, so that stays out.
+    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
+    if (othersExtra) {
+      // "Each creature you control that's a Wolf or a Werewolf" (Arlinn, Voice of the Pack) is "each Wolf or Werewolf creature".
+      const that = /^creature you control that's an? ([A-Z]\w+) or an? ([A-Z]\w+)$/.exec(othersExtra[2]!);
+      const g = parseGroup(`each ${that ? `${that[1]} or ${that[2]} creature you control` : othersExtra[2]}`);
+      const types = g?.filter.types ?? [];
+      const couldBeSelf = !othersExtra[1] && d.types.some((ty) => types.includes(ty) || (!types.length && ty === "Creature"));
+      if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), text: line });
+      continue;
+    }
     // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player". "Secretly choose an opponent"
     // (Guardian Archon): the same, but only its controller knows who until it's revealed.
     const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
@@ -664,6 +678,14 @@ export function compile(d: CardDef): CompiledCard {
     // time a sorcery could have been cast (see castSpell).
     if (line === "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step.") {
       out.flashSacrifice = true;
+      continue;
+    }
+    // "~ enters with X +1/+1 counters on it. If X is 5 or more, it enters with an additional X +1/+1 counters on it."
+    // (Apocalypse Hydra): the X chosen, not the mana spent (rulings); one replacement effect (CR 614.1c).
+    const twiceX = /^~ enters with X \+1\/\+1 counters on it\. If X is (\d+) or more, it enters with an additional X \+1\/\+1 counters on it\.$/.exec(line);
+    if (twiceX) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: "+1/+1", n: { count: { kind: "x" } }, doubleIfXAtLeast: Number(twiceX[1]) };
       continue;
     }
     // Ravenous (CR 702.156a): "This permanent enters with X +1/+1 counters on it" and "When this permanent enters, if X
@@ -1312,7 +1334,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Partner—Friends forever" and the other "partner—[text]" abilities only matter for deck building (CR 702.124i; see
     // commanderPairProblem).
-    if (/^Partner—(?:Character select|Father & son|Friends forever|Survivors)$/.test(line)) continue;
+    // "Doctor's companion" too (CR 702.124m).
+    if (/^(?:Partner—(?:Character select|Father & son|Friends forever|Survivors)|Doctor's companion)$/.test(line)) continue;
+    // "Partner with [name]" is two abilities (CR 702.124j): the deck-building one (commanderPairProblem) and "When this
+    // permanent enters, target player may search their library for a card named [name], reveal it, put it into their
+    // hand, then shuffle."
+    const partnerWith = /^Partner with ([^()]+?)\.?$/.exec(line);
+    if (partnerWith) line = `When ~ enters, target player may search their library for a card named ${partnerWith[1]}, reveal it, put it into their hand, then shuffle.`;
     // Strive: "This spell costs {2}{G} more to cast for each target beyond the first" (CR 207.2c ability word).
     const strive = /^(?:Strive — )?(?:~|This spell) costs ((?:\{[^}]+\})+) more to cast for each target beyond the first\.$/.exec(line);
     if (strive && !out.strive) {

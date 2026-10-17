@@ -52,10 +52,18 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   if (/^card$/i.test(p)) return undefined;
   if (/^card named ~$/.test(p)) return { kind: "card", named: "~", text: "card named ~" };
-  // "A card named Ajani, Valiant Protector": that card's name, as printed. Not "a card named Festering Newt or Bubbling
-  // Cauldron", "... and/or a card named ...": a name may itself hold "or" (Fight or Flight), so those aren't read.
+  // "A card named Ajani, Valiant Protector": that card's name, as printed.
   const named = /^card named ([A-Z][^~]*)$/.exec(phrase);
-  if (named && /\b(?:or|and\/or)\b/.test(named[1]!)) return null;
+  if (named && /\b(?:or|and\/or)\b/.test(named[1]!)) {
+    // "A card named Festering Newt or Bubbling Cauldron", "a card named Ionize or a card named Electrolyze", "a card named
+    // Halvar, God of Battle or an Equipment card": either one. A name may itself hold "or" (Fight or Flight, Truth or
+    // Tale: one word each side, as every such name is), so "A or B" splits only between names of two or more words.
+    const or = /^(.+?) or (?:a card named (.+)|(an? .+ card))$/.exec(named[1]!) ?? /^(.+ .+) or ([A-Z].* .+)$/.exec(named[1]!);
+    if (!or || / or |\band\/or\b/.test(or[1]!) || (or[2] && / or |\band\/or\b/.test(or[2]))) return null;
+    const other = or[2] ? { kind: "card" as const, named: or[2], text: `card named ${or[2]}` } : parseSearchFilter(or[3]!.replace(/^an? /, ""));
+    if (!other) return null;
+    return { kind: "card", anyOf: [{ kind: "card", named: or[1]!, text: `card named ${or[1]}` }, other], text: p };
+  }
   if (named) return { kind: "card", named: named[1]!, text: `card named ${named[1]}` };
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);

@@ -4092,6 +4092,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   const r = s.resolving;
   if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor") throw new RulesError("nothing to choose");
+  if (pend.what === "searchZones") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
+    (r.scratch ??= {}).searchZones = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "attackWhom") {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the players or planeswalkers offered");
     (r.scratch ??= {}).attackWhom = choice;

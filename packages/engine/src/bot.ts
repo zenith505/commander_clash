@@ -219,6 +219,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "anchor") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "topOrBottom") return [{ type: "chooseOption", player: pid, choice: "top" }];
     // A creature put onto the battlefield attacking: the player the source attacks, offered first.
+    // "Search your library and/or graveyard": both, for the most to choose from.
+    if (pend.kind === "chooseOption" && pend.what === "searchZones") return [{ type: "chooseOption", player: pid, choice: "both" }];
     if (pend.kind === "chooseOption" && pend.what === "attackWhom") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     // Tap or untap: tap an opponent's untapped permanent, untap our own tapped one; otherwise leave it if we may.
     // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": the biggest one.

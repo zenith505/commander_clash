@@ -284,7 +284,7 @@ export interface TargetSpec {
   suspected?: true;
   /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
   commander?: boolean;
-  /** "a card named ~": the source's name (only for searches). */
+  /** "a card named ~": the source's name; "a card named Ajani, Valiant Protector": that name (only for searches). */
   named?: string;
   /** None of these subtypes. */
   notSubtypes?: string[];
@@ -1483,7 +1483,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean }
   /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
@@ -1603,6 +1603,8 @@ export type SpellCondition =
   | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition }
+  /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
+  | { kind: "xAtLeast"; n: number }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */

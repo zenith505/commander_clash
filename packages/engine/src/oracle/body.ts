@@ -1,9 +1,9 @@
-import { allEffects, refCovers, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
+import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
-import { parseCount } from "./counts";
+import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted } from "./grants";
@@ -528,6 +528,19 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       si += rest ? 2 : 1;
       continue;
     }
+    // "You may search your library and/or graveyard for a card named Ajani, Valiant Protector, reveal it, and put it into
+    // your hand. If you search your library this way, shuffle." (CR 701.23): one card, from either zone; whether the
+    // library is searched too is the player's choice as it resolves (search.orGraveyard).
+    const orYard = /^(?:([Yy]ou may) )?[Ss]earch your library and\/or graveyard for (a|an) (.+?)(, reveal it,)? and put it (into your hand|onto the battlefield(?: tapped)?)$/.exec(s);
+    if (orYard && sentences[si + 1]?.replace(/\.$/, "") === "If you search your library this way, shuffle") {
+      const filter = parseSearchFilter(orYard[3]!, (t) => parseBoundCount(t, ctx));
+      if (filter === null) return null;
+      const dest: SearchDest = orYard[5] === "into your hand" ? { zone: "hand" } : { zone: "battlefield", ...(/tapped$/.test(orYard[5]!) ? { tapped: true } : {}) };
+      const search: Effect = { type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: !!orYard[4], dest, orGraveyard: true };
+      effects.push(orYard[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search);
+      si++;
+      continue;
+    }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
     // counter on it" (Cauldron's Gift): one choice and one move, nothing in between (rulings), and not targeted.
     const yardPick = /^You may choose an? (.+? card) in your graveyard$/.exec(s);
@@ -1040,6 +1053,17 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       continue;
     }
     // "If you attacked this turn, create a Treasure token": checked as it resolves (CR 608.2c).
+    // "If X is 10 or more, creatures you control get +X/+X and gain haste until end of turn" (Finale of Devastation), "If
+    // X is 5 or more, destroy all other creatures" (Martial Coup): the X the spell was cast with (CR 107.3a), as well as
+    // what came before ("also"). Only a spell's own X.
+    const xAtLeast = /^If X is (\d+|one|two|three|four|five|six|seven|eight|nine|ten) or (?:more|greater), (?:also )?(.+)$/.exec(s);
+    if (xAtLeast && !/\binstead\b/.test(xAtLeast[2]!)) {
+      if (!ctx.spell || ctx.whereX) return null;
+      const inner = parseOne(xAtLeast[2]!.charAt(0).toUpperCase() + xAtLeast[2]!.slice(1), ctx);
+      if (!inner) return null;
+      effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });
+      continue;
+    }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the

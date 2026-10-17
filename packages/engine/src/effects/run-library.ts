@@ -367,10 +367,21 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (queue.length) {
         const p = player(s, queue[0]!);
         const n = (sc.n ??= amountNow(s, e.n, ctx));
+        // "Search your library and/or graveyard": the library too, or not (then no shuffle), chosen before looking. Only
+        // asked when the graveyard has a card that fits; otherwise both are searched.
+        const fits = (id: ObjectId) => !filter || printedMatches(filter, defOf(s, obj(s, id)));
+        if (e.orGraveyard && sc.searchZones === undefined) {
+          if (p.graveyard.some(fits)) {
+            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "searchZones", options: ["both", "graveyard"], labels: ["Library and graveyard", "Graveyard only"], prompt: "search your library too (then shuffle), or only your graveyard?" };
+            return "paused";
+          }
+          sc.searchZones = "both";
+        }
+        const yardOnly = sc.searchZones === "graveyard";
         // They've searched, found something or not (Archive Trap rulings).
         const searched = ((s.turnLog ??= {}).searched ??= []);
-        if (!searched.includes(p.id)) searched.push(p.id);
-        const cards = libOf(p.id).library.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        if (!yardOnly && !searched.includes(p.id)) searched.push(p.id);
+        const cards = [...(yardOnly ? [] : libOf(p.id).library), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
@@ -405,9 +416,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
         const shown = e.reveal || e.dest.zone === "battlefield" || e.dest.zone === "exile" ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
-        log(s, `${p.name} searches ${whose} library${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
+        const yardOnly = sc.searchZones === "graveyard";
+        const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
+        log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 || yardOnly ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
-        if (searchers.length === 1) shuffle(s, lib.library);
+        if (searchers.length === 1 && !yardOnly) shuffle(s, lib.library);
       }
       enterTogether(s, () => {
         for (const { pid, id } of moves) {

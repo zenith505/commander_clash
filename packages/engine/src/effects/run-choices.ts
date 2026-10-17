@@ -182,6 +182,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? objects(s, e.cond.what, ctx).some((o) => o.zone === "battlefield" && o.suspected !== undefined)
             : e.cond.kind === "state"
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller)
+            : e.cond.kind === "xAtLeast"
+            ? (ctx.x ?? 0) >= e.cond.n
             : kickedMatches(ctx.kicked, e.cond);
       return runBranch(s, holds, holds ? e.effects : (e.otherwise ?? []), ctx);
     }

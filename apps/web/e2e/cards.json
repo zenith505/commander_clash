@@ -4957,6 +4957,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c1aecc8a-db3a-4158-b1f1-bfe06d782482",
+  "name": "Tower Winder",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Snake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake"
+  ],
+  "oracleText": "Reach, deathtouch\nWhen this creature enters, search your library and/or graveyard for a card named Command Tower, reveal it, and put it into your hand. If you search your library this way, shuffle.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach",
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "otc",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "afaef788-34d1-460b-b884-9d7ae6ddeb18",
   "name": "Toxic Deluge",
   "manaCost": "{2}{B}",

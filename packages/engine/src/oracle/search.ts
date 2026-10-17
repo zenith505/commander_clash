@@ -52,6 +52,11 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   if (/^card$/i.test(p)) return undefined;
   if (/^card named ~$/.test(p)) return { kind: "card", named: "~", text: "card named ~" };
+  // "A card named Ajani, Valiant Protector": that card's name, as printed. Not "a card named Festering Newt or Bubbling
+  // Cauldron", "... and/or a card named ...": a name may itself hold "or" (Fight or Flight), so those aren't read.
+  const named = /^card named ([A-Z][^~]*)$/.exec(phrase);
+  if (named && /\b(?:or|and\/or)\b/.test(named[1]!)) return null;
+  if (named) return { kind: "card", named: named[1]!, text: `card named ${named[1]}` };
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);
   if (parts.length > 1 && parts.every((x) => / card$/.test(x))) {

@@ -1,6 +1,6 @@
 # Roadmap
 
-19,123 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,201 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -286,11 +286,21 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - "Whenever a creature attacks you (or a planeswalker you control)", "whenever a creature blocks", "whenever a creature
      you control becomes blocked", "whenever a source an opponent controls / a creature deals damage to you", "deals
      combat damage to a player or planeswalker" and "untap up to N lands" work; still out: "player or battle" (Rankle,
-     Torbran's other lines), "untap up to N" other permanents, "if you controlled that permanent" (Boomerang Basics,
-     Geistwave), "attacking alone" on an Aura or a target (Security Bypass, Crowd of True Believers, Viper), "choose
-     target face-up exiled card" (Riftsweeper, Blink), and "At the beginning of the next end step, ..." about objects
-     named earlier in the ability (about 50 cards: Apprentice Necromancer, Memory Jar, Mystifying Maze, Semester's End,
-     Koya, Flickerform).
+     Torbran's other lines), "untap up to N" other permanents, "attacking alone" on an Aura or a target (Security
+     Bypass, Crowd of True Believers, Viper), and "choose target face-up exiled card" (Riftsweeper, Blink).
+   Left from the delayed end step round ("sacrifice / exile / return it at the beginning of the next end step" about
+   objects named earlier, exile now and return later, "until your next end step", "if you controlled that permanent"):
+   - Still out: "That Dragon gains haste until end of turn" after a search (Arms Race, Meek Attack, Treacherous Urge,
+     Swift Warkite, Greasefang, Zirilan); "gets ... and gains" with no duration (Goblin Ski Patrol); named tokens
+     (Hornet Cannon, Giant Caterpillar); Manaform Hellkite, Urabrask's Forge, Fire Navy Trebuchet; "investigate X times"
+     (Disorder in the Court); "any number of target ... return each of them" (Semester's End, Brago); Flickerform
+     ("and all Auras attached to it"); Memory Jar (exile hands face down); Teferi's Time Twist, Phelia, Koya, Norin,
+     Conciliator's Duelist, Mistmeadow Vanisher, Vizier of Deferment, Charming Prince; Avacyn and Resurrection Orb,
+     From the Catacombs, Moira and Teshar, Kheru Lich Lord; copy tokens with "except" or "for each" (Hate Mirage,
+     Twinflame, Kindred Charge, Jaxis); Spinal Embrace, Lae'zel's Acrobatics, Golden Argosy, Identity Thief, Wake to
+     Slaughter; "If you controlled it, ... Otherwise, its controller" (Unyielding Gatekeeper) and Azog's amass.
+   - Simplifications: "sacrifice those creatures / them at the next end step" makes one delayed trigger per object
+     (CR 603.7 has one for all; no supported card can tell); a flicker's return is one trigger for all the cards.
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
@@ -329,8 +339,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      verse counters, monstrosity, kicker count); target counts with a group condition ("with total mana value 8 or
      less", "with different controllers", "that each have a different mana value", "with equal toughness"); "for each
      creature destroyed/exiled this way, its controller creates" (Descent of the Dragons, Hour of Need); "Shuffle any
-     number of target cards from your graveyard into your library"; "Return those cards ... at the beginning of the
-     next end step" after exiling several (Eerie Interlude, Brago); "Choose target creature you don't control. Each
+     number of target cards from your graveyard into your library"; "Choose target creature you don't control. Each
      creature you control deals damage equal to its power to that creature" (Kamahl's Will).
    - "Activate only if" mana abilities still out: "~ is a creature" (Flywheel Racer), "three or more lands with the
      same name", counters on ~ (Pyramid of the Pantheon, Tablet of Compleation).

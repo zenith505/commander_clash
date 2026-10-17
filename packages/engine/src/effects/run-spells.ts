@@ -66,8 +66,18 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
+      if (e.of) {
+        // About each of those permanents as it is now (CR 603.7c, 400.7).
+        for (const o of objects(s, e.of, ctx)) if (o.zone === "battlefield") addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
+        return;
+      }
       if (e.each === "created") {
         for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
+        return;
+      }
+      if (e.each === "subjectCard") {
+        const card = objects(s, { ref: "subjectCard" }, ctx)[0];
+        if (card) addDelayed(s, e.when, ctx.controller, card, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(card));
         return;
       }
       if (e.each === "selfCard") {

@@ -957,6 +957,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           ? ev.step === "cleanup"
           : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
+          : d.when === "yourNextEndStep"
+          ? ev.step === "end" && ev.active === d.controller && !(d.turn === s.turn && d.step === "end")
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
             : d.when === "eachYourPrecombatMain"

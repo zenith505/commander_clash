@@ -148,6 +148,8 @@ export type Count =
   | { kind: "rollResult" }
   /** "The other result" after "roll two dX and choose one result": the one not chosen. */
   | { kind: "rollOther" }
+  /** "For each flip you won" after "flip a coin until you lose a flip". */
+  | { kind: "flipsWon" }
   /** "For each {S} spent to cast ~", "the amount of {S} spent" (CR 107.4h): mana from snow sources spent on the spell. */
   | { kind: "snowSpent" }
   /** "For each creature it devoured" (CR 702.82b). */
@@ -1363,6 +1365,11 @@ export type Effect =
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
   /**
+   * "Flip a coin" (CR 705): its controller calls it and wins or loses the flip, for a following "If you win the flip, ..."
+   * (SpellCondition "wonFlip"); `untilLose`: "flip a coin until you lose a flip", counting the wins (Count "flipsWon").
+   */
+  | { type: "flipCoin"; untilLose?: true }
+  /**
    * "Roll a d20", "roll X six-sided dice", "roll two d20 and ignore the lower roll", "roll a d20 and add the number of
    * cards in your hand" (CR 706): the controller rolls; `add` and `subtract` modify the result (706.2). A results table
    * and "equal to the result" read it afterwards (SpellCondition "rollIn", Count "rollResult").
@@ -1655,6 +1662,8 @@ export type SpellCondition =
   | { kind: "youDid" }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
+  /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
+  | { kind: "wonFlip"; lost?: true }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
   | { kind: "destroyedThisWay" }
   /**
@@ -1842,6 +1851,11 @@ export type TriggerEvent =
   | "selfDealsDamageToCreature"
   | "selfDealsCombatDamageToCreature"
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
+  /** "Whenever you win a coin flip", "whenever you lose a coin flip" (CR 705.2): once per flip. */
+  | "youWinFlip"
+  | "youLoseFlip"
+  /** "Whenever a player wins a coin flip" (Okaun, Zndrsplt). */
+  | "playerWinsFlip"
   /** "Whenever you roll one or more dice": once per instruction to roll (CR 706); the event amount is the result. */
   | "youRollDice"
   /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */

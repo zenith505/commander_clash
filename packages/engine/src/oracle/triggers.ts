@@ -7,6 +7,10 @@ import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
   [/^When(?:ever)? ~ dies, (.+)$/, "selfDies"],
+  // Coin flips (CR 705.2): each one won or lost.
+  [/^Whenever you win a coin flip, (.+)$/, "youWinFlip"],
+  [/^Whenever you lose a coin flip, (.+)$/, "youLoseFlip"],
+  [/^Whenever a player wins a coin flip, (.+)$/, "playerWinsFlip"],
   // The God-Eternals: "When ~ dies or is put into exile from the battlefield" (CR 700.4: "dies" is going to a graveyard).
   [/^When(?:ever)? ~ dies or is put into exile from the battlefield, (.+)$/, "selfDiesOrExiled"],
   [/^When(?:ever)? ~ leaves the battlefield, (.+)$/, "selfLeaves"],

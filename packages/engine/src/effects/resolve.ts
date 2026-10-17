@@ -13,7 +13,7 @@ import type { ManaSpent } from "../mana";
 import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
-import { runDiceEffect } from "./run-dice";
+import { runCoinEffect, runDiceEffect } from "./run-dice";
 import { runDungeonsEffect } from "./run-dungeons";
 import { runZonesEffect } from "./run-zones";
 import { proliferate, runPermanentsEffect } from "./run-permanents";
@@ -657,6 +657,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runDungeonsEffect(s, e, ctx, src);
     case "roll":
       return runDiceEffect(s, e, ctx, src);
+    case "flipCoin":
+      return runCoinEffect(s, e, ctx, src);
     case "may":
     case "eachMay":
     case "punisher":

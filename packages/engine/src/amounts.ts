@@ -185,6 +185,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.rolled?.result ?? s.resolving?.item.rolled ?? ctx.event?.amount ?? 0;
     case "rollOther":
       return s.resolving?.rolled?.other ?? 0;
+    case "flipsWon":
+      return s.resolving?.flipped?.wins ?? 0;
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
@@ -436,6 +438,8 @@ function describeCount(c: Count): string {
       return "the result";
     case "rollOther":
       return "the other result";
+    case "flipsWon":
+      return "flips won";
     default:
       return c.kind;
   }

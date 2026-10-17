@@ -83,6 +83,7 @@ export type TriggerSourceEvent =
   | { type: "dungeonCompleted"; player: PlayerId }
   /** A player rolled dice (CR 706): each die that counts (706.6), its natural result and its result. */
   | { type: "diceRolled"; player: PlayerId; sides: number; dice: { natural: number; result: number }[]; result: number }
+  | { type: "coinFlipped"; player: PlayerId; won: boolean }
   | { type: "attacks"; id: ObjectId }
   /** A permanent became tapped (CR 701.26a). */
   | { type: "tapped"; id: ObjectId }
@@ -512,6 +513,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "When you roll a natural 20, return ~ from your graveyard to your hand" (Critical Hit, CR 113.6m).
     fromGraveyards((o, owner) => owner === ev.player && watch(o));
+  } else if (ev.type === "coinFlipped") {
+    // "Whenever you win a coin flip" (its controller's), "whenever a player wins a coin flip" (anyone's): once per flip.
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, (e) => (you === ev.player && e === (ev.won ? "youWinFlip" : "youLoseFlip")) || (ev.won && e === "playerWinsFlip"), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "dungeonCompleted") {
     for (const id of s.battlefield) {
       const o = obj(s, id);

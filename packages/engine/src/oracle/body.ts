@@ -985,6 +985,16 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       copy.newTargets = true;
       continue;
     }
+    // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
+    // wasn't flipped ("you may flip a coin").
+    const ifFlip = /^If you (win|lose) the flip, (.+)$/.exec(s);
+    if (ifFlip) {
+      const flipped = (es: Effect[]): boolean => es.some((e) => (e.type === "flipCoin" && !e.untilLose) || (e.type === "may" && flipped(e.effects)));
+      const inner = flipped(effects) && parseOne(ifFlip[2]!.charAt(0).toUpperCase() + ifFlip[2]!.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "wonFlip", ...(ifFlip[1] === "lose" ? { lost: true as const } : {}) }, effects: inner });
+      continue;
+    }
     // "Clash with an opponent. If you win, ... Otherwise, ...": decided by that clash (CR 701.30d).
     const ifWin = /^If you win, (.+)$/.exec(s);
     if (ifWin) {

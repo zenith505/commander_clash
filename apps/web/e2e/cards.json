@@ -91,6 +91,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d5c4d36c-54b3-4149-906b-a57a670260fc",
+  "name": "Alhammarret's Archive",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would gain life, you gain twice that much life instead.\nIf you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ori",
+  "releasedAt": "2015-07-17",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5acc8b39-3c3e-4012-8cfd-ac3c2c4ca982",
   "name": "Arc Lightning",
   "manaCost": "{2}{R}",
@@ -113,6 +137,38 @@
   "set": "ktk",
   "releasedAt": "2014-09-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f8aa1893-60e5-439e-9316-872a9f6b6c94",
+  "name": "Argothian Wurm",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wurm"
+  ],
+  "oracleText": "Trample\nWhen this creature enters, any player may sacrifice a land of their choice. If a player does, put this creature on top of its owner's library.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3087,6 +3143,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "794ad296-4718-45b7-ab85-6ae45903ada7",
+  "name": "Jungle Wayfinder",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warrior"
+  ],
+  "oracleText": "When this creature enters, each player may search their library for a basic land card, reveal it, put it into their hand, then shuffle.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b96b1341-0c15-4816-be2d-5cc98b2afb63",
   "name": "Khorvath Brightflame",
   "manaCost": "{5}{R}",
@@ -4309,6 +4396,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "82372776-bedd-4893-92ad-f1272f9c3250",
+  "name": "Quicksilver Wall",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Wall",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wall"
+  ],
+  "oracleText": "Defender (This creature can't attack.)\n{4}: Return this creature to its owner's hand. Any player may activate this ability.",
+  "power": "1",
+  "toughness": "6",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Defender"
+  ],
+  "commanderLegal": "legal",
+  "set": "pcy",
+  "releasedAt": "2000-06-05",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "30997b43-fc13-41d3-8064-1ccc2cb6fd2b",
   "name": "Raging Goblin",
   "manaCost": "{R}",
@@ -4963,6 +5082,32 @@
   "set": "spm",
   "releasedAt": "2025-09-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b83a3ba0-249e-4c39-bbf0-cb005413f7d2",
+  "name": "Show and Tell",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

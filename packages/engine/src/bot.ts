@@ -108,7 +108,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "drawLook") {
-      // Keep the card we'd rather draw (what scry would keep), and bin the other.
+      // The look first, even when Alhammarret's Archive or dredge could replace that draw: they can still replace the
+      // draw it makes. Keep the card we'd rather draw (what scry would keep), and bin the other.
+      if (pend.cards.length < 2) return [{ type: "drawLook", player: pid }];
       const [a, b] = pend.cards as [string, string];
       const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
       return [{ type: "drawLook", player: pid, objectId: bin }];
@@ -991,7 +993,12 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
   const lose = pu.lose ?? 0;
   const life = p.life - lose * made.filter((m) => m === "none").length;
   const lifeCost = (n: number) => (n >= life ? 1000 : n * (1 + 15 / Math.max(1, life - n)));
-  const penalty = pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : 4;
+  const mode = pu.mode;
+  // "Any player may ... If a player does" / "If no one does": worth it only to an opponent of its controller, about as
+  // much as a card, and not once another player has already settled it.
+  const controller = s.resolving?.item.controller;
+  const settled = mode && Object.entries(pu.made).some(([q, m]) => Number(q) !== pid && m.some((x) => x !== "none"));
+  const penalty = mode ? (controller === undefined || controller === pid || !opponents(s, controller).includes(pid) || settled ? 0 : 5) : pu.tokens ? 4 * pu.tokens : pu.lose !== undefined ? lifeCost(pu.lose) : 4;
   const handCost = (n: number) => {
     const cards = chooseDiscards(s, pid, takenDiscards + n).slice(takenDiscards);
     if (cards.length < n) return Infinity;
@@ -1008,8 +1015,10 @@ function choosePunisher(s: GameState, pid: PlayerId, options: string[]): string 
         .filter((x) => !x.isCommander)
         .map((x) => (objIsType(s, x, "Land") ? (lands(s, pid) >= 7 ? 2 : 6) : worth(s, pid, x)))
         .sort((a, b) => a - b);
-      return worths[takenSacs] ?? Infinity;
+      const n = w.n ?? 1;
+      return worths.length < takenSacs + n ? Infinity : worths.slice(takenSacs, takenSacs + n).reduce((a, b) => a + b, 0);
     }
+    if ("damage" in w) return lifeCost(w.damage);
     const mana = (w.pay.generic === undefined ? 0 : typeof w.pay.generic === "number" ? w.pay.generic : 3) + manaValue(parseManaCost(w.pay.cost));
     return availableMana(s, pid) >= mana ? mana / 2 + (w.pay.life ?? 0) : Infinity;
   };

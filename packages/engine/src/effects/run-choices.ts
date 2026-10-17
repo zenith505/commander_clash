@@ -2,12 +2,13 @@ import { allEffects, type Effect, type PayCost, type PunisherOption, type Target
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { autoEvidence, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes } from "./resolve";
+import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
+import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
 import { discardCards } from "./run-library";
 import { describePay } from "./describe";
@@ -79,6 +80,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.may = undefined;
         sc.mayQueue.shift();
       }
+      // Who did, for the instructions after this one ("each player who drew a card this way gains 1 life").
+      s.resolving!.choseThisWay = [...sc.mayers!];
       if (e.each) return eachAccepted(s, e, ctx);
       // Each instruction once, also when one of them waits on a player (a draw that stops for dredge).
       for (sc.mayStep ??= 0; sc.mayStep < e.effects.length; sc.mayStep++) if (runEffect(s, e.effects[sc.mayStep]!, ctx) === "paused") return "paused";
@@ -422,7 +425,9 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
 /** What a punisher's option reads as on its button: "Discard a card", "Sacrifice a nonland permanent", "Pay {2}". */
 export function punisherLabel(o: PunisherOption): string {
   if ("discard" in o) return o.discard === 1 ? "Discard a card" : `Discard ${o.discard} cards`;
-  if ("sacrifice" in o) return `Sacrifice ${/^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
+  if ("sacrifice" in o) return (o.n ?? 1) > 1 ? `Sacrifice ${o.n} ${o.sacrifice.text.replace(/\b(creature|land|artifact|permanent)\b/, "$1s")}` : `Sacrifice ${/^[aeiou]/i.test(o.sacrifice.text) ? "an" : "a"} ${o.sacrifice.text}`;
+  if ("damage" in o) return `Be dealt ${o.damage} damage`;
+  if (!o.pay.cost && o.pay.generic === undefined && o.pay.life) return `Pay ${o.pay.life} life`;
   return `Pay ${o.pay.cost}${o.pay.life ? ` and ${o.pay.life} life` : ""}`;
 }
 
@@ -431,8 +436,12 @@ export function punisherOptions(s: GameState, e: Extract<Effect, { type: "punish
   const p = player(s, pid);
   // With several picks (Rottenmouth Viper), the cards and permanents picked before can't be picked again (rulings).
   const discarding = made.reduce((n, m) => n + (e.options[Number(m)] && "discard" in e.options[Number(m)]! ? (e.options[Number(m)] as { discard: number }).discard : 0), 0);
-  const sacrificing = made.filter((m) => e.options[Number(m)] && "sacrifice" in e.options[Number(m)]!).length;
-  return e.options.flatMap((o, i) => (("discard" in o && p.hand.length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length <= sacrificing) ? [] : [i]));
+  const sacrificing = made.reduce((n, m) => {
+    const o = e.options[Number(m)];
+    return n + (o && "sacrifice" in o ? (o.n ?? 1) : 0);
+  }, 0);
+  // "Pay 5 life": only with at least that much (CR 119.4, rulings on Dash Hopes).
+  return e.options.flatMap((o, i) => (("discard" in o && p.hand.length < discarding + o.discard) || ("sacrifice" in o && pickOptions(s, { filter: o.sacrifice }, pid, sourceId).length < sacrificing + (o.n ?? 1)) || ("pay" in o && !o.pay.cost && !o.pay.generic && (o.pay.life ?? 0) > payableLife(s, pid)) ? [] : [i]));
 }
 
 /**
@@ -447,7 +456,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     const times = e.times === undefined ? 1 : amountNow(s, e.times, ctx);
     const picks = e.picks === undefined ? 1 : amountNow(s, e.picks, ctx);
     if (times <= 0 || picks <= 0) return;
-    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options: e.options, ...punisherHarm(e) };
+    sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options: e.options, ...punisherHarm(e), ...(e.mode ? { mode: e.mode } : {}) };
   }
   const pu = sc.punish;
   for (;;) {
@@ -460,17 +469,23 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           const can = p.lost ? [] : punisherOptions(s, e, pid, ctx.sourceId, made);
           if (!can.length) pu.picked[pid] = "none";
           // Only a payment: its own prompt has "Don't pay".
-          else if (can.length === 1 && e.options.length === 1 && "pay" in e.options[can[0]!]!) pu.picked[pid] = String(can[0]);
+          else if (!e.mode && can.length === 1 && e.options.length === 1 && "pay" in e.options[can[0]!]!) pu.picked[pid] = String(can[0]);
           else {
-            const penalty = describePenalty(e);
+            const penalty = e.mode ? "Don't" : describePenalty(e);
             const which = pu.picks > 1 ? ` (${made.length + 1} of ${pu.picks})` : "";
-            s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt: `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${penalty.toLowerCase()}?${which}` };
+            const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
+            const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${penalty.toLowerCase()}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
+            s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt };
             return "paused";
           }
         }
         const o = pu.picked[pid] === "none" ? undefined : e.options[Number(pu.picked[pid])];
-        if (o && "pay" in o) {
-          const paid = paidUnless(s, ctx, pid, o.pay, src, describePenalty(e).toLowerCase(), describePenalty(e).toLowerCase());
+        if (o && "pay" in o && e.mode && !o.pay.cost && !o.pay.generic && !o.pay.discard && o.pay.life) {
+          // "Any player may pay 5 life" (Dash Hopes): chosen on the prompt above, so paid now (CR 119.4).
+          loseLife(s, pid, o.pay.life);
+          log(s, `${p.name} pays ${o.pay.life} life.`);
+        } else if (o && "pay" in o) {
+          const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : paidUnless(s, ctx, pid, o.pay, src, describePenalty(e).toLowerCase(), describePenalty(e).toLowerCase());
           if (paid === "paused") return "paused";
           if (!paid) pu.picked[pid] = "none";
           sc.paid = undefined;
@@ -499,7 +514,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
       }
       const sacs = made.flatMap((m) => {
         const o = e.options[Number(m)];
-        return o && "sacrifice" in o ? [o.sacrifice] : [];
+        return o && "sacrifice" in o ? Array.from({ length: o.n ?? 1 }, () => o.sacrifice) : [];
       });
       if (sacs.length && !mine.sacrifice) {
         // The same kind of permanent each time (one sacrifice option when there are several picks, see the parser).
@@ -527,9 +542,28 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           log(s, `${player(s, pid).name} sacrifices ${defOf(s, x).name}.`);
           moveObject(s, id, "graveyard", { sacrificed: true });
         }
+      // "Have it deal 4 damage to them": the source deals it, to each who chose to, all at once.
+      const hurt = who.flatMap((pid) => pu.made[pid]!.flatMap((m) => {
+        const o = e.options[Number(m)];
+        return o && "damage" in o ? [{ pid, n: o.damage }] : [];
+      }));
+      if (hurt.length) {
+        const from = ctxSource(s, ctx);
+        dealDamageBatch(s, hurt.map((h) => ({ src: from, to: { player: h.pid }, n: h.n })));
+      }
       pu.acted = true;
       pu.penalty = 0;
       sc.mayStep = e.effects.length;
+    }
+    // "If a player does" / "If no one does": once, or not at all.
+    if (e.mode) {
+      const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
+      if (did === (e.mode === "ifAny")) {
+        if (sc.mayStep! >= e.effects.length) sc.mayStep = 0;
+        for (; sc.mayStep! < e.effects.length; sc.mayStep!++) if (runEffect(s, e.effects[sc.mayStep!]!, ctx) === "paused") return "paused";
+      }
+      sc.punish = sc.punished = sc.mayStep = undefined;
+      return;
     }
     // The penalty once for each "neither": the players with that many or more (rulings on Rottenmouth Viper).
     for (;;) {

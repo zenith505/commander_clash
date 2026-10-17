@@ -99,21 +99,26 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "createToken": {
       const n = amountNow(s, e.n, ctx);
-      // "Attacking that player or a planeswalker they control" (Adeline): what each opponent's tokens attack is chosen
-      // first, as they enter (CR 508.4, rulings), one opponent at a time; then they're all created at once.
+      // "Attacking that player or a planeswalker they control" (Adeline): what each token attacks is chosen first, as
+      // they enter (CR 508.4; rulings: "whether each token is attacking that opponent or a planeswalker they control"),
+      // one opponent at a time, each of the tokens a doubler makes for them too; then they're all created at once.
       if (e.attackingEach && e.orPlaneswalker && inCombat(s) && s.activePlayer === ctx.controller) {
         const sc = (s.resolving!.scratch ??= {});
         const picks = (sc.attackEach ??= {});
+        const k = tokensToCreate(s, ctx.controller, e.token, n);
         for (const opp of apnap(s, opponents(s, ctx.controller))) {
-          if (picks[opp] !== undefined) continue;
           const options = attackChoices(s, ctx.controller, ctx.sourceId).filter((a) => a.player === opp);
           if (options.length < 2) continue;
-          if (sc.attackWhom === undefined) {
-            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: options.map((a) => a.key), labels: options.map((a) => a.label), prompt: `choose what the ${e.token.name} token${n === 1 ? "" : "s"} for ${player(s, opp).name} attack${n === 1 ? "s" : ""}` };
-            return "paused";
+          const mine = (picks[opp] ??= []);
+          while (mine.length < k) {
+            if (sc.attackWhom === undefined) {
+              const which = k > 1 ? ` (${mine.length + 1} of ${k})` : "";
+              s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: options.map((a) => a.key), labels: options.map((a) => a.label), prompt: `choose what the ${e.token.name} token for ${player(s, opp).name} attacks${which}` };
+              return "paused";
+            }
+            mine.push(sc.attackWhom);
+            sc.attackWhom = undefined;
           }
-          picks[opp] = sc.attackWhom;
-          sc.attackWhom = undefined;
         }
       }
       // "Attached to it": what was just put onto the battlefield, found before this list starts over.
@@ -143,14 +148,20 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
     for (const opp of apnap(s, opponents(s, pid))) {
       const k = tokensToCreate(s, pid, e.token, n);
       const defender = inCombat(s) && s.activePlayer === pid ? opp : undefined;
-      // A planeswalker chosen for this opponent's tokens, if it's still there (Adeline).
-      const pw = defender !== undefined ? /^\d+:(.+)$/.exec(picks[opp] ?? "")?.[1] : undefined;
-      const walker = pw && s.objects[pw]?.zone === "battlefield" && controllerOf(s, s.objects[pw]!) === opp ? s.objects[pw] : undefined;
+      // The planeswalker chosen for each of this opponent's tokens, if it's still there (Adeline).
+      const walkerFor = (i: number) => {
+        const pw = defender !== undefined ? /^\d+:(.+)$/.exec(picks[opp]?.[i] ?? "")?.[1] : undefined;
+        return pw && s.objects[pw]?.zone === "battlefield" && controllerOf(s, s.objects[pw]!) === opp ? s.objects[pw] : undefined;
+      };
+      const at: string[] = [];
       for (let i = 0; i < k; i++) {
         const t = createToken(s, pid, e.token, { tapped: true, attacking: defender });
+        const walker = walkerFor(i);
         if (walker && t?.zone === "battlefield" && t.attacking !== undefined) t.attackingPermanent = { id: walker.id, zc: walker.zoneChanges ?? 0 };
+        if (defender !== undefined) at.push(walker ? `${defOf(s, walker).name} (${player(s, defender).name})` : player(s, defender).name);
       }
-      if (k) log(s, `${src} creates ${k === 1 ? "a" : k} tapped${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined ? ` (attacking ${walker ? `${defOf(s, walker).name} (${player(s, defender).name})` : player(s, defender).name})` : ""}.`);
+      const whom = [...new Set(at)].join(" and ");
+      if (k) log(s, `${src} creates ${k === 1 ? "a" : k} tapped${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined ? ` (attacking ${whom})` : ""}.`);
     }
     return;
   }

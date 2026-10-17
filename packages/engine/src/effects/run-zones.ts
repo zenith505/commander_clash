@@ -241,6 +241,60 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
 }
 
 /**
+ * "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield" (Show and
+ * Tell, Iwamori, Tempting Wurm, Kynaios and Tiro): the active player first, then the others in turn order, each choosing
+ * a card without revealing it (CR 101.4, 101.4a, rulings), so no one sees the others' picks; then all the chosen cards
+ * enter at the same time, each under its owner's control. Choices those cards need as they enter (an Aura's host, a
+ * Clone's copy) are made after all players have chosen, in APNAP order (rulings on Show and Tell).
+ */
+function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" }>, ctx: ResolveCtx, src: string): "paused" | void {
+  const sc = (s.resolving!.scratch ??= {});
+  const hp = (sc.handPicks ??= { queue: apnap(s, players(s, e.who!, ctx)), picked: {} });
+  const filter = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+  while (hp.queue.length) {
+    const pid = hp.queue[0]!;
+    const p = player(s, pid);
+    if (sc.found) {
+      hp.picked[pid] = sc.found.filter((id) => p.hand.includes(id));
+      sc.found = undefined;
+      log(s, hp.picked[pid]!.length ? `${p.name} chooses ${hp.picked[pid]!.length === 1 ? "a card" : `${hp.picked[pid]!.length} cards`} from their hand.` : `${p.name} chooses no card.`);
+      hp.queue.shift();
+      continue;
+    }
+    const cards = p.lost ? [] : p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+    if (!cards.length) {
+      hp.queue.shift();
+      continue;
+    }
+    const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
+    s.pending = { kind: "searchLibrary", player: pid, source: src, what, cards, min: 0, max: e.any ? cards.length : 1, fromHand: true };
+    return "paused";
+  }
+  const picks = apnap(s, Object.keys(hp.picked).map(Number) as PlayerId[]).flatMap((pid) => hp.picked[pid]!.filter((id) => obj(s, id).zone === "hand").map((id) => ({ o: obj(s, id), under: pid })));
+  s.resolving!.choseThisWay = apnap(s, Object.keys(hp.picked).map(Number) as PlayerId[]).filter((pid) => hp.picked[pid]!.length);
+  // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g). It can't
+  // enchant a card entering with it, which isn't on the battlefield yet.
+  const hosts = chooseAuraHosts(s, picks, src);
+  if (hosts === "paused") return "paused";
+  if (s.resolving) s.resolving.created = [];
+  enterTogether(s, () => {
+    for (const { o, under } of picks) {
+      const host = hosts.get(o.id);
+      const name = defOf(s, o).name;
+      if (defOf(s, o).subtypes.includes("Aura") && !host) {
+        log(s, `${name} has nothing to enchant, so it stays in ${player(s, under).name}'s hand.`);
+        continue;
+      }
+      log(s, `${player(s, under).name} puts ${name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+      moveObject(s, o.id, "battlefield", { controller: under, ...(e.tapped ? { tapped: true } : {}), ...host });
+      if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
+    }
+  });
+  sc.handPicks = undefined;
+  // What happens to those who did or didn't comes next ("then each opponent who didn't draws a card").
+}
+
+/**
  * "Each player chooses an artifact, a creature, an enchantment, and a land from among the permanents they control, then
  * sacrifices the rest" (see the keepRest effect): the active player first, then the others in turn order, each knowing
  * the choices before theirs (CR 101.4, rulings); then all the rest are sacrificed at the same time.
@@ -944,6 +998,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "putFromHand": {
+      if (e.who) return eachPutFromHand(s, e, ctx, src);
       // The player picks as it resolves, among the matching cards in their hand (CR 608.2d); it isn't playing a land.
       const sc = (s.resolving!.scratch ??= {});
       const p = player(s, ctx.controller);
@@ -955,7 +1010,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const most = !e.lesserPower ? Infinity : me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? power(s, me) : (ctx.lki?.power ?? (ctx.sourceId ? s.lastKnown?.[ctx.sourceId]?.power : undefined) ?? -Infinity);
         const cards = p.hand.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
         if (!cards.length) return;
-        const what = `${e.any ? "any number of " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
+        const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? cards.length : 1, fromHand: true };
         return "paused";
       }

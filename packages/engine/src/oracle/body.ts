@@ -11,9 +11,14 @@ import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTarge
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { parseManaSpend } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
+import { parsePunisherOptions } from "./sentences/basics";
 
 export interface Ctx {
   targets: TargetSpec[];
+  /** Just after "each player may ..." (see PlayerRef choseThisWay): "each opponent who didn't" can follow. */
+  eachChose?: boolean;
+  /** "Each player may search ... and put it ...": its next sentence says who shuffles. */
+  eachSearched?: boolean;
   /** Parsing what follows "you may": "collect evidence 4" can only be done by choice. */
   mayNow?: boolean;
   /** In a trigger about another object ("blocks a creature"), "that creature" is that object. */
@@ -569,6 +574,37 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const offer = /^(?:Then )?[Ee]ach (opponent|player) may (.+)$/.exec(s);
     const does = offer && /^For each (opponent|player) who does, (.+)$/.exec(sentences[si + 1] ?? "");
     const offerFx = offer && does && !/\b(?:that player|it|its|them|this way|instead)\b/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    // "Any player may sacrifice a land of their choice. If a player does, put ~ on top of its owner's library" (Argothian
+    // Wurm), "any opponent may have it deal 4 damage to them. If a player does, sacrifice ~" (Vexing Devil), "Any player
+    // may have ~ deal 5 damage to them. If no one does, target player draws three cards" (Browbeat): a punisher whose
+    // instructions happen once, if anyone did or if no one did (see its `mode`).
+    const anyMay = /^[Aa]ny (player|opponent) may (.+)$/.exec(s);
+    const anyThen = anyMay && /^If (a player does|no one does), (.+)$/.exec(sentences[si + 1] ?? "");
+    if (anyMay && anyThen) {
+      const options = parsePunisherOptions(anyMay[2]!.replace(/^(sacrifice|discard|pay|have)\b/, (w) => (w === "have" ? "have" : `${w}s`)), ctx);
+      // "Tap ~ and put a +1/+1 counter on it", "tap ~, you gain 3 life, and you draw a card": several instructions,
+      // with no targets of their own.
+      // "Destroy all creatures. Creatures destroyed this way can't be regenerated" (Breaking Point): its next sentence too.
+      const noRegen = /can't be regenerated$/.test(sentences[si + 2] ?? "") ? sentences[si + 2]! : "";
+      const thenText = anyThen[2]!.replace(/^(.+?), (you [^,]+), and (you .+)$/, (_, a: string, b: string, c: string) => `${a}. ${capital(b)}. ${capital(c)}`);
+      const one = options && !noRegen && thenText === anyThen[2] ? attempt(ctx, () => parseOne(capital(thenText), ctx)) : null;
+      const whole = options && !one ? parseBody(`${capital(thenText)}.${noRegen ? ` ${noRegen}.` : ""}`, { ...(ctx.selfIt || /~/.test(thenText) ? { selfIt: true } : {}), ...(ctx.selfCastSpell ? { selfCastSpell: true } : {}), ...(ctx.spell ? { spell: true } : {}) }) : null;
+      const then = one ?? (whole && !whole.targets.length ? whole.effects : null);
+      if (!options || !then) return null;
+      if (noRegen) si++;
+      effects.push({ type: "punisher", who: { ref: anyMay[1] === "player" ? "eachPlayer" : "eachOpponent" }, options, effects: then, mode: anyThen[1] === "a player does" ? "ifAny" : "ifNone", thenText: anyThen[2]! });
+      si++;
+      continue;
+    }
+    // "Each player may scry 1" (Eager Construct), "then each opponent may scry 1" (Myr Custodian), "each player may draw a
+    // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
+    // order (rulings on Eager Construct and Kaya, Intangible Slayer).
+    const alone = offer && !does && /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    if (offer && alone) {
+      effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!, each: true });
+      ctx.eachChose = true;
+      continue;
+    }
     if (offer && does && offerFx) {
       const then = parseOfferRest(does[2]!, ctx);
       if (then === null) return null;
@@ -2046,6 +2082,8 @@ export function parseUnlessPays(text: string, ctx: Ctx): UnlessPays | null {
   let m: RegExpExecArray | null;
   if (text === "{X}") return { cost: "", generic: X };
   if ((m = /^((?:\{(?:\d+|[WUBRGC])\})+)(?: and (\d+) life)?$/.exec(text))) return { cost: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
+  // "Pay 5 life" (Dash Hopes): only with that much life (CR 119.4).
+  if ((m = /^(\d+) life$/.exec(text))) return { cost: "", life: Number(m[1]) };
   if ((m = /^\{(\d+)\} for each (.+)$/.exec(text))) {
     const per = parseCount(m[2]!, ctx, true);
     const generic = per && scaleAmount(Number(m[1]), per);

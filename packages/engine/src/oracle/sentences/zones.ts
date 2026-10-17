@@ -211,6 +211,17 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
+  // "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield" (Show and
+  // Tell), "each opponent may put a legendary creature card ..." (Iwamori), "any number of ... cards" (Tempting Wurm):
+  // chosen in turn order without revealing them, then put there at the same time (see the putFromHand effect). "Then
+  // each opponent who didn't draws a card" (Kynaios and Tiro): those who put none.
+  if ((m = /^[Ee]ach (player|opponent) may put (a|an|any number of) (.+?) from their hand onto the battlefield( tapped)?$/.exec(s))) {
+    const filter = parseSearchFilter(m[3]!.replace(/\band\/or\b/g, "or"));
+    if (filter === null) return null;
+    const put: Effect = { type: "putFromHand", who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), may: true, ...(m[2] === "any number of" ? { any: true } : {}) };
+    ctx.eachChose = true;
+    return [put];
+  }
   // "You may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking"
   // (Kinscaer Sentry): one card, attacking a player its controller chooses (CR 508.4).
   if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(s))) {

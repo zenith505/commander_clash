@@ -48,8 +48,11 @@ export interface PayCost {
   energy?: number;
 }
 
-/** One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this, or pay. */
-export type PunisherOption = { discard: number } | { sacrifice: TargetSpec } | { pay: UnlessPays };
+/**
+ * One way to avoid a punisher's penalty: discard that many cards, sacrifice a permanent like this (`n` of them: "two
+ * creatures"), pay, or have the source deal that much damage to you ("any opponent may have it deal 4 damage to them").
+ */
+export type PunisherOption = { discard: number } | { sacrifice: TargetSpec; n?: number } | { pay: UnlessPays } | { damage: number };
 
 export interface UnlessPays {
   cost: string;
@@ -493,6 +496,8 @@ export type PlayerRef =
   | { ref: "opponentsAttackingEventPlayer" }
   /** The players who chose to in the "each player may ..." being resolved (see the eachMay effect). */
   | { ref: "choseThisWay" }
+  /** "Each opponent who didn't" (Kynaios and Tiro), "each player who doesn't": those not among choseThisWay, still in the game. */
+  | { ref: "notChoseThisWay"; opponents?: true }
   /** The players who did none of a punisher's options (see the punisher effect). */
   | { ref: "punished" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
@@ -974,7 +979,7 @@ export const timedCondition = (c: StaticCondition | undefined): boolean =>
  * attackers), "combatAfterBlocks" (once blockers are declared, 506.8f: not in a combat whose declare blockers step was
  * skipped), and the steps "declareAttackers", "declareBlockers" and "endCombat", once their turn-based actions are done.
  */
-export type TimingWindow = "upkeep" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
+export type TimingWindow = "upkeep" | "draw" | "end" | "afterUpkeep" | "combat" | "combatBeforeBlocks" | "combatAfterBlocks" | "declareAttackers" | "declareBlockers" | "endCombat" | TurnPoint;
 
 /**
  * "Only before combat", "only before attackers are declared", "only before blockers are declared", "only before the
@@ -1114,8 +1119,11 @@ export type Effect =
    * they're still in the game (rulings). `haste`, `atEndStep`: "That creature gains haste. Sacrifice the creature at the
    * beginning of the next end step" (Sneak Attack), "Return that creature to your hand at ..." (Ilharg): about the
    * permanent it became, while it still is (CR 400.7, rulings).
+   * `who`: "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield"
+   * (Show and Tell, Iwamori, Tempting Wurm): each of them chooses in APNAP order without revealing the card (CR 101.4a),
+   * then all the chosen cards enter at the same time; those who put one are choseThisWay afterwards.
    */
-  | { type: "putFromHand"; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
+  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -1529,6 +1537,8 @@ export type Effect =
       ifMvX?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
       ifCostCardName?: true;
+      /** "When you cast this spell, ... counter ~" (Brain Gorgers): the spell that triggered it, not a target (`index` -1). */
+      cause?: true;
     }
   /**
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
@@ -1569,7 +1579,13 @@ export type Effect =
    * each time all the way through (rulings on Torment of Hailfire).
    */
   /** `picks`: "for each blight counter on it, ... unless" (Rottenmouth Viper): each player chooses that many times first. */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount }
+  /**
+   * `mode`: "Any player may sacrifice a land of their choice. If a player does, ..." (Argothian Wurm, Desecration Demon,
+   * Vexing Devil) runs `effects` once if anyone did one of the options ("ifAny"); "Any player may have Browbeat deal 5
+   * damage to them. If no one does, ..." once if no one did ("ifNone"). Each player still chooses in turn order, knowing
+   * the earlier choices, and the chosen actions happen together (rulings on Clackbridge Troll and Vexing Devil).
+   */
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** What `effects` do, for the prompt. */ thenText?: string }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -1683,7 +1699,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster): at most one card of each name. */ oneEach?: true }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster): at most one card of each name. */ oneEach?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true }
   /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
@@ -2341,6 +2357,8 @@ export interface ActivatedAbility {
   station?: true;
   /** "Activate only once each turn" (CR 602.5b). */
   oncePerTurn?: boolean;
+  /** "Any player may activate this ability" (CR 602.2): not only its controller; the one who does controls it (CR 113.8). */
+  anyPlayer?: true;
   /** "Reveal the player you chose" (Guardian Archon): payable only if a player was secretly chosen for it as it entered. */
   revealChosen?: true;
   /** Exhaust: "Activate only once" (CR 702.177a), for as long as it's the same object (CR 400.7): see GameObject.activatedEver. */

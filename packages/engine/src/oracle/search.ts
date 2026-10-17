@@ -18,10 +18,12 @@ function searchDest(text: string): SearchDest {
  * hand" (Cultivate), "then shuffle and put that card on top" (Vampiric Tutor).
  */
 export function parseSearch(s: string, count?: (text: string) => AmountExpr | null): Effect[] | null {
-  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then) .+)$/i.exec(s);
+  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then) .+)$/i.exec(s);
   if (!m) return null;
   const upTo = !!m[1] || m[2] === "any number of";
-  const n = m[2] === "any number of" ? 99 : NUMBER_WORDS[m[2]!.toLowerCase()]!;
+  // "Up to X basic land cards" (New Frontiers): the X it was cast with.
+  if (m[2] === "X" && !m[1]) return null;
+  const n = m[2] === "any number of" ? 99 : m[2] === "X" ? X : NUMBER_WORDS[m[2]!.toLowerCase()]!;
   const reveal = /, reveal /.test(s);
   const rest = m[4]!;
   // Alpine Houndmaster: "a card named A and/or a card named B": up to one of each (one search, CR 701.23).

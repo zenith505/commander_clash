@@ -54,6 +54,22 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
     return [{ ...fx[0]!, who: { ref: "eachPlayer" } }];
   }
+  // "Each player may search their library for up to two basic land cards, put them onto the battlefield, then shuffle"
+  // (Veteran Explorer), "each opponent may search ... for a creature card and put it onto the battlefield. Then each
+  // player who searched their library this way shuffles" (Boldwyr Heavyweights): the active player searches or chooses
+  // not to, then each other player in turn order; then those who searched shuffle (rulings).
+  if ((m = /^[Ee]ach (player|opponent) may search their library for (.+?)(?:, (reveal (?:it|them|those cards), )?put (it|them|that card|those cards) (onto the battlefield(?: tapped)?|into their hand), then shuffle| and put (it|them|that card|those cards) (onto the battlefield(?: tapped)?|into their hand))$/.exec(s))) {
+    const [it, to] = m[4] ? [m[4], m[5]!] : [m[6]!, m[7]!];
+    const fx = parseSearch(`Search your library for ${m[2]!}, ${m[3] ?? ""}put ${it} ${to.replace(/ their hand$/, " your hand")}, then shuffle`, (x) => parseBoundCount(x, ctx));
+    if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.others) return null;
+    if (m[6]) ctx.eachSearched = true;
+    return [{ ...fx[0]!, who: { ref: m[1] === "player" ? "eachPlayer" : "eachOpponent" }, may: true }];
+  }
+  // Its "Then each player who searched their library this way shuffles": the search above does that.
+  if (ctx.eachSearched && /^(?:Then )?[Ee]ach player who searched their library this way shuffles$/.test(s)) {
+    ctx.eachSearched = false;
+    return [];
+  }
   // "For each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their
   // choice or discards a card" (Rottenmouth Viper): each player makes all the choices, then they all happen (rulings).
   if ((m = /^[Ff]or each ([a-z+\/0-9-]+) counter on (?:it|~), (.+)$/.exec(s)) && (ctx.selfIt || /on ~,/.test(s))) {
@@ -507,11 +523,19 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
  * A punisher's ways out: "sacrifices a nonland permanent of their choice or discards a card", "discards two cards or
  * sacrifices a creature or planeswalker of their choice", "pay {2}". Null if one isn't understood.
  */
-function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] | null {
+export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] | null {
   const out: PunisherOption[] = [];
   for (const part of text.split(/,? or (?=(?:discards?|sacrifices?|pays?) )/)) {
     let m: RegExpExecArray | null;
     if ((m = new RegExp(`^discards? ${NUM} cards?$`).exec(part))) out.push({ discard: num(m[1]!) });
+    // "Sacrifice two creatures of their choice" (Prowling Pangolin).
+    else if ((m = /^sacrifices? (two|three) (creatures|lands)(?: of (?:their|his or her) choice)?$/.exec(part))) {
+      const filter = pickFilter(m[2]!.replace(/s$/, ""));
+      if (!filter) return null;
+      out.push({ sacrifice: filter, n: num(m[1]!) });
+    }
+    // "Have it deal 4 damage to them" (Vexing Devil), "have Browbeat deal 5 damage to them": the source deals it.
+    else if ((m = /^ha(?:ve|s) (?:it|~) deal (\d+) damage to (?:them|that player)$/.exec(part))) out.push({ damage: Number(m[1]) });
     else if ((m = /^sacrifices? (?:an?|one) (.+?)(?: of (?:their|his or her) choice)?$/.exec(part))) {
       // "An artifact, a creature, or a land": one permanent that's any of them.
       const filter = pickFilter(m[1]!.replace(/, (?:or )?an? /g, (x) => x.replace(/an? $/, "")).replace(/ or an? /, " or "));

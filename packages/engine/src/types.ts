@@ -860,7 +860,20 @@ export type PendingDecision =
    * into your graveyard and the other back on top" (Scion of Halaster): which of `cards` goes to the graveyard; then
    * the player draws, and `left` more draws, and `after` carries on as with dredge.
    */
-  | { kind: "drawLook"; player: PlayerId; source: string; cards: ObjectId[]; left: number; after?: "drawStep" }
+  | {
+      kind: "drawLook";
+      player: PlayerId;
+      source: string;
+      cards: ObjectId[];
+      left: number;
+      after?: "drawStep";
+      /**
+       * Other replacements of the same draw the player may apply first instead (CR 616.1): Alhammarret's Archive's
+       * "draw two cards instead" (`archive`, the draws it makes) or dredging one of `dredge`. Either uses up "the
+       * first time you would draw", so the look doesn't happen.
+       */
+      instead?: { archive?: number; dredge?: ObjectId[] };
+    }
   | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; /** Of those, draws this one already stands for (Alhammarret's Archive). */ ready?: number; after?: "drawStep" }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
@@ -1263,6 +1276,8 @@ export interface Resolving {
   damagedThisWay?: ObjectId[];
   /** Players its damage effects dealt damage to, for "players dealt damage this way". */
   playersDamagedThisWay?: PlayerId[];
+  /** "Each player may put ... onto the battlefield": those who did, for the instructions after it ("each opponent who didn't"). */
+  choseThisWay?: PlayerId[];
   /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
   drawnThisWay?: ObjectId[];
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
@@ -1354,6 +1369,8 @@ export interface Resolving {
       /** For the bots: the life the penalty costs, or that it makes a token for its controller. */
       lose?: number;
       tokens?: number;
+      /** "If a player does" / "If no one does" (see the punisher effect). */
+      mode?: "ifAny" | "ifNone";
     };
     punished?: PlayerId[]; // those who did none of its options, this round
     /** "Sacrifice an artifact, a creature, and a land": players still to pick, the slot being picked, the picks so far. */
@@ -1373,6 +1390,8 @@ export interface Resolving {
     found?: ObjectId[]; // the cards a library search found
     /** "Each player puts a creature card from their graveyard onto the battlefield" (Exhume): players still to choose, and the cards chosen so far. */
     yardPicks?: { queue: PlayerId[]; picked: Record<string, ObjectId[]> };
+    /** "Each player may put ... from their hand onto the battlefield" (Show and Tell): players still to choose, and the cards chosen. */
+    handPicks?: { queue: PlayerId[]; picked: Record<string, ObjectId[]> };
     searchQueue?: PlayerId[]; // players still to search, in APNAP order ("each player searches their library", CR 101.4)
     searchedBy?: { pid: PlayerId; found: ObjectId[] }[]; // the cards each player who has searched found, in that order
     flickered?: { id: ObjectId; zc: number }[]; // cards a flicker exiled, to return once Auras' hosts are chosen
@@ -1399,7 +1418,7 @@ export interface Resolving {
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;
     /** "Tapped and attacking that player or a planeswalker they control": each opponent's pick (an attackChoices key). */
-    attackEach?: Record<number, string>;
+    attackEach?: Record<number, string[]>;
     /** "Search your library and/or graveyard": "both", or "graveyard" alone (no shuffle). */
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
@@ -1488,7 +1507,7 @@ export type Action =
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
-  | { type: "drawLook"; player: PlayerId; objectId: ObjectId }
+  | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | { dredge: ObjectId } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */

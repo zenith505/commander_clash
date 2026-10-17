@@ -403,7 +403,8 @@ const PLURAL_TYPES: Record<string, string> = {
  * ability's subject, "Creatures of the chosen type get +1/+1").
  */
 export function parseGroup(phrase: string, bare = false, count?: (text: string) => AmountExpr | null): { filter: TargetSpec; other: boolean } | null {
-  let p = phrase.trim();
+  // "Each nonland, nontoken permanent": the same as "each nonland nontoken permanent".
+  let p = phrase.trim().replace(/\b(non[a-z]+), (?=non[a-z]+ )/gi, "$1 ");
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);

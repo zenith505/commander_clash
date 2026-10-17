@@ -1463,7 +1463,7 @@ function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], to
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
-  if (action === "populate" || action === "pair" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
+  if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   // "Choose ..., then sacrifice the rest": keep our best permanents, and choosing for another player (Mythos of Snapdax),
   // leave them their least useful ones.
   if (action === "keep") {
@@ -1729,6 +1729,16 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   const c = card ? compileCard(card) : undefined;
+  if (what === "cardType") {
+    // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.
+    const hurts = c ? choiceHurts(c) : true;
+    const score = (ty: string) => s.battlefield.reduce((n, id) => {
+      const o = obj(s, id);
+      if (!characteristics(s, o).types.includes(ty)) return n;
+      return n + (controllerOf(s, o) === pid ? -1 : 1) * (hurts ? 1 : -1) * Math.max(1, worth(s, pid, o));
+    }, 0);
+    return [...options].sort((a, b) => score(b) - score(a))[0]!;
+  }
   // Protection from the chosen color is against what opponents have, above all the spell or ability
   // that's about to resolve against us.
   const protects = !!c && what === "color" && JSON.stringify(c).includes(CHOSEN_PROTECTION);

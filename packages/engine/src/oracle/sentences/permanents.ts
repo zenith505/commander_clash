@@ -195,6 +195,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const second = first && parseSentence(m[2]!, ctx);
     if (first && second) return [...first, ...second];
   }
+  // "Choose an artifact or creature you control. Create a token that's a copy of it" (Season of Weaving): picked as it
+  // resolves, not targeted (rulings); "it" is the one picked.
+  if ((m = /^Choose (an? .+?) you control$/i.exec(s))) {
+    const filter = pickFilter(m[1]!.replace(/^an? /i, ""));
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose" }];
+  }
   // "Put a +1/+1 counter on a creature you control": picked as it resolves, not targeted.
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {
     const filter = pickFilter(m[3]!.replace(/^an? /i, ""));

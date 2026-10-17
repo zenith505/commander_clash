@@ -206,6 +206,27 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         });
       return;
     }
+    case "floatingTrigger": {
+      // A delayed triggered ability with a duration (CR 603.7b). Its source is the spell, or the source of the ability
+      // making it; its controller, whoever controlled that as it resolved (CR 603.7d-e).
+      const item = s.resolving?.item;
+      const spell = item?.kind === "spell";
+      const id = spell ? item.objectId : ctx.sourceId;
+      const o = id ? s.objects[id] : undefined;
+      if (!id || !o) return;
+      (s.floatingTriggers ??= []).push({
+        id: `f${s.nextId++}`,
+        controller: ctx.controller,
+        sourceId: id,
+        sourceCardId: cardIdOf(o),
+        sourceZc: spell ? (o.zoneChanges ?? 0) : (ctx.sourceZc ?? o.zoneChanges ?? 0),
+        ...(spell || item?.fromSpell ? { fromSpell: true as const } : {}),
+        trigger: e.trigger,
+        until: e.until,
+        turn: s.turn,
+      });
+      return;
+    }
     case "cascade": {
       // CR 702.85a. The spell's mana value is its own, even if it has left the stack by now: as it last existed there
       // (CR 113.7a), its X included (CR 202.3e). A countered spell's cascade still resolves (rulings).

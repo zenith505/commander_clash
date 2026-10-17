@@ -154,6 +154,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent" };
         return "paused";
       }
+      if (e.choice === "cardType") {
+        // "Choose artifact or enchantment. Destroy all permanents of the chosen type": a choice of its own each time the
+        // instruction is reached (a mode chosen twice asks twice).
+        const sc = (r.scratch ??= {});
+        if (sc.asked) return;
+        sc.asked = true;
+        r.chosen = { ...r.chosen, cardType: undefined };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "cardType", options: e.options ?? [] };
+        return "paused";
+      }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "basicLandType" ? "landType" : e.choice === "keyword" ? "keyword" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         if (chooser === undefined) return;

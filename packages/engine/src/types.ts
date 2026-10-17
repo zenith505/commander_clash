@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TriggeredAbility, TriggerDuration } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -906,6 +906,13 @@ export interface GameState {
   flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
   nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true }[];
+  /**
+   * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
+   * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made
+   * them (603.7d-e), `sourceZc` as it was then: an ability about "~" is about that object only (603.7c, 400.7). `turn`: the
+   * turn it was made, for "until the end of your next turn".
+   */
+  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
@@ -1089,6 +1096,8 @@ export interface Chosen {
   landType?: string;
   /** "Gains your choice of menace or lifelink" (Rattleback Apothecary). */
   keyword?: string;
+  /** "Choose artifact or enchantment" (Season of Gathering): a card type. */
+  cardType?: string;
   /** "As ~ enters, choose a player" (True-Name Nemesis). */
   player?: PlayerId;
   /** "Secretly choose an opponent" (Guardian Archon): only its controller knows who, until it's revealed. */
@@ -1267,6 +1276,8 @@ export interface Resolving {
     auraHosts?: Record<ObjectId, string>;
     /** The Aura whose host is being chosen. */
     auraAsking?: ObjectId;
+    /** "Choose artifact or enchantment": this instruction has asked its question. */
+    asked?: true;
   };
 }
 

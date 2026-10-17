@@ -9,7 +9,7 @@ import { RulesError } from "../types";
 import { spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
+import { objectMatches, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
@@ -268,6 +268,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // While set, what the event is for "triggers an additional time" (Panharmonicon, Teysa Karlov, Isshin; CR 603.2d) and
   // the objects doing it, as they were then.
   let causedBy: Cause | null = null;
+  // While set, `add` is looking at a delayed triggered ability with a duration (CR 603.7b), made by a spell or ability.
+  let floating: NonNullable<GameState["floatingTriggers"]>[number] | null = null;
   // Abilities that trigger on the battlefield use the permanent's abilities right now;
   // leaves-the-battlefield triggers look back in time (CR 603.10a), so "dies" passes them in.
   const add = (
@@ -305,7 +307,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           sourceCardId: cardIdOf(o),
           controller,
           index,
-          sourceZc: o.zoneChanges ?? 0,
+          // A delayed one is about its source as it was when it was made (CR 603.7c).
+          sourceZc: floating ? floating.sourceZc : (o.zoneChanges ?? 0),
+          ...(floating ? { body: t.body, ...(floating.fromSpell ? { fromSpell: true as const } : {}) } : {}),
           ...(cause ? { cause } : {}),
           ...(subject ? { subject: { id: subject.id, zc: subject.zoneChanges ?? 0 } } : {}),
           ...(lki ? { lki } : {}),
@@ -316,7 +320,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         };
         s.triggerQueue.push(queued);
         // "That ability triggers an additional time" (CR 603.2d): only a permanent's (or one leaving's) own abilities.
-        if (!fromYard) for (let n = triggersAgain(s, o, controller, causedBy); n > 0; n--) s.triggerQueue.push({ ...queued });
+        // Not delayed triggered abilities (CR 603.2d).
+        if (!fromYard && !floating) for (let n = triggersAgain(s, o, controller, causedBy); n > 0; n--) s.triggerQueue.push({ ...queued });
       }
     });
   };
@@ -353,6 +358,24 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         } finally {
           fromYard = false;
         }
+      }
+    }
+  };
+  /**
+   * The delayed triggered abilities with a duration still in effect (CR 603.7b), each with its source object, wherever it
+   * is now, and its controller (603.7d-e); `f` adds the ones this event triggers. `self`: only those about this object, as
+   * the object it was when the ability was made (603.7c, 400.7).
+   */
+  const fromFloating = (f: (o: GameObject, controller: PlayerId, triggers: TriggeredAbility[]) => void, self?: GameObject) => {
+    for (const ft of [...(s.floatingTriggers ?? [])]) {
+      const o = s.objects[ft.sourceId];
+      if (!o || player(s, ft.controller).lost) continue;
+      if (self && (o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
+      floating = ft;
+      try {
+        f(o, ft.controller, [ft.trigger]);
+      } finally {
+        floating = null;
       }
     }
   };
@@ -497,6 +520,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (src.zone === "battlefield") continue; // it already came back as a new object
         consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
+      fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers));
     }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
     causedBy = null;
@@ -824,6 +848,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, w) !== dealerBy) continue;
       add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
     }
+    // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
+    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && objectMatches(s, t.dealer.filter, o, ctrl, false) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info));
     causedBy = null;
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);
@@ -850,7 +877,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
     if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
-    const castWatch = (o: GameObject, you: PlayerId) =>
+    const castWatch = (o: GameObject, you: PlayerId, triggers?: TriggeredAbility[]) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
@@ -861,12 +888,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "If at least four mana was spent to cast it" (CR 603.4): a copy wasn't cast, so nothing was spent on it.
         // "If {S} of any of that spell's colors was spent": its colors as it was cast.
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
+        // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
+        if (t.cast.targets && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindChosen(t.cast.spell, o.chosen);
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
-      }, undefined, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
+      }, triggers, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
+    fromFloating(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.
     const targeted = new Set(ev.copy ? [] : (item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
     for (const id of targeted) {

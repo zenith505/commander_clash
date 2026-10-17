@@ -280,6 +280,24 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
   let what = m[3]!.replace(/^an? /, "");
+  // "Whenever you cast a spell that targets a creature you control" (Season of Growth), "an instant or sorcery spell that
+  // targets a creature" (repartee), "... that targets an opponent or a creature an opponent controls" (Danitha): what
+  // one of its targets is as it's cast. "That targets only ..." isn't modeled.
+  const tg = / that targets (.+)$/.exec(what);
+  let targets: (TargetSpec | "you")[] | undefined;
+  if (tg) {
+    what = what.slice(0, tg.index);
+    targets = [];
+    for (const part of tg[1]!.split(/,? or (?=you\b|an? |one or more )/)) {
+      if (part === "you") { targets.push("you"); continue; }
+      const one = /^an? (.+)$/.exec(part);
+      const many = /^one or more (.+)$/.exec(part);
+      const phrase = one ? one[1]! : many ? many[1]!.replace(/^(\w+?)s\b/, "$1") : undefined;
+      const spec = phrase && !/\bonly\b|~/.test(phrase) ? parseTargetPhrase(phrase) : null;
+      if (spec?.kind !== "object" && spec?.kind !== "player") return "fail";
+      targets.push(spec);
+    }
+  }
   // "A creature spell with power 5 or greater" (Monstrous Vortex): the spell's power on the stack (spellMatches).
   const pw = / with (power|toughness) (\d+) or (greater|less)$/.exec(what);
   if (pw) what = what.slice(0, pw.index);
@@ -288,7 +306,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
-  if (pw) what = m[3]!.replace(/^an? /, "");
+  if (pw) what = m[3]!.replace(/^an? /, "").replace(/ that targets .+$/, "");
   // "Whenever you cast a spell, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR
   // 603.4) that can't change once it's cast. A copy wasn't cast, so no mana was spent on it.
   const treasure = /^if mana from a Treasure was spent to cast it, (.+)$/.exec(m[4]!);
@@ -306,7 +324,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}) }, body };
 }
 
 /**

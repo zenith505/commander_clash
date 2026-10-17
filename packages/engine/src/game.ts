@@ -1482,21 +1482,31 @@ export function removeFromCombat(s: GameState, o: GameObject) {
  * card that could, the draws stop for that choice and it returns false; answering it (chooseDredge) does the rest
  * of them, then carries on with what was drawing (`after`, or the resolving spell or ability).
  */
-export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", ready = 0): boolean {
-  // `ready`: draws a replacement effect already made of an earlier one, which nothing replaces again (CR 614.5).
-  while (n > 0 || ready > 0) {
-    if (ready === 0) {
+export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", made: number[] = []): boolean {
+  // `made`: draws a replacement effect already made of an earlier one, which that effect doesn't replace again (CR
+  // 614.5); each number is how many Alhammarret's Archives can still replace that draw.
+  made = [...made];
+  while (n > 0 || made.length) {
+    let archives: number;
+    if (!made.length) {
       n--;
       const look = firstDrawLook(s, pid, n, after);
       if (look === "paused") return false;
-      ready = drawsInstead(s, pid);
-    }
+      archives = archivesFor(s, pid);
+    } else archives = made.shift()!;
     const options = dredgeOptions(s, pid);
     if (options.length) {
-      s.pending = { kind: "dredge", player: pid, options, left: n + ready, ready, ...(after ? { after } : {}) };
+      // Dredge and an Archive could both replace this draw: the player picks which applies first (CR 616.1, Archive
+      // ruling). Not dredging means the Archive's "draw two instead", which isn't optional.
+      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(after ? { after } : {}) };
       return false;
     }
-    ready--;
+    if (archives) {
+      // Nothing can dredge, and a draw can't put a card with dredge into the graveyard: every Archive applies.
+      log(s, `${player(s, pid).name} draws ${2 ** archives} cards instead of one.`);
+      made.unshift(...Array<number>(2 ** archives).fill(0));
+      continue;
+    }
     if (!drawOne(s, pid)) break;
   }
   return true;
@@ -1544,21 +1554,23 @@ function lookInstead(s: GameState, p: Player, source: string, cards: ObjectId[],
 function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archive" | { dredge: ObjectId }) {
   const pend = s.pending;
   if (pend?.kind !== "drawLook" || pend.player !== p.id) throw new RulesError("no cards to choose from");
-  let more: [number, number];
+  let more: [number, number[]];
   if (instead === "archive") {
     if (!pend.instead?.archive) throw new RulesError("no other way to replace that draw");
     s.pending = null;
-    more = [pend.left, drawsInstead(s, p.id)];
+    const n = archivesFor(s, p.id) - 1;
+    log(s, `${p.name} draws two cards instead of one.`);
+    more = [pend.left, [n, n]];
   } else if (instead) {
     if (!pend.instead?.dredge?.includes(instead.dredge) || !dredgeOptions(s, p.id).includes(instead.dredge)) throw new RulesError("that card can't be dredged");
     s.pending = null;
     dredgeInstead(s, p, instead.dredge);
-    more = [pend.left, 0];
+    more = [pend.left, []];
   } else {
     if (pend.cards.length === 2 && (id === undefined || !pend.cards.includes(id) || !p.library.includes(id))) throw new RulesError("that isn't one of the cards");
     s.pending = null;
     lookInstead(s, p, pend.source, pend.cards, pend.cards.length === 2 ? id : undefined);
-    more = [pend.left + 1, 0];
+    more = [pend.left + 1, []];
   }
   if (!draw(s, p.id, more[0], pend.after, more[1])) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
@@ -1566,22 +1578,20 @@ function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archi
 }
 
 /**
- * How many cards one draw becomes: "If you would draw a card except the first one you draw in each of your draw
- * steps, draw two cards instead" (Alhammarret's Archive), each one doubling it again (rulings: two make four). Applied
- * before dredge, which can still replace each of those draws (the player would choose the order, CR 616.1).
+ * How many Alhammarret's Archives replace one draw: "If you would draw a card except the first one you draw in each of
+ * your draw steps, draw two cards instead", each one doubling it again (rulings: two make four). Each is its own
+ * replacement, so dredge can come before or after any of them (CR 616.1). Counts the draw step's first draw.
  */
-function drawsInstead(s: GameState, pid: PlayerId): number {
+function archivesFor(s: GameState, pid: PlayerId): number {
   const p = player(s, pid);
   if (s.step === "draw" && s.activePlayer === pid && p.firstDrawStepDraw !== s.turn) {
     p.firstDrawStepDraw = s.turn;
-    return 1;
+    return 0;
   }
-  const n = archiveDraws(s, pid);
-  if (n > 1) log(s, `${p.name} draws ${n} cards instead of one.`);
-  return n;
+  return Math.log2(archiveDraws(s, pid));
 }
 
-/** What drawsInstead would make of `pid`'s next draw, without counting it. */
+/** What archivesFor makes of `pid`'s next draw, without counting it. */
 function archiveDraws(s: GameState, pid: PlayerId): number {
   if (s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn) return 1;
   return 2 ** s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoInstead).length;
@@ -1645,10 +1655,14 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
   if (pend?.kind !== "dredge" || pend.player !== p.id) throw new RulesError("no draw to replace");
   if (id !== undefined && !pend.options.includes(id)) throw new RulesError("that card can't be dredged");
   s.pending = null;
+  const made = [...(pend.made ?? [])];
   if (id !== undefined) dredgeInstead(s, p, id);
-  else drawOne(s, p.id);
-  const ready = pend.ready ?? 1;
-  if (!draw(s, p.id, pend.left - ready, pend.after, ready - 1)) return;
+  else if (pend.archive) {
+    // The Archive first: two draws, which the other Archives and dredge can each still replace.
+    log(s, `${p.name} draws two cards instead of one.`);
+    made.unshift(pend.archive - 1, pend.archive - 1);
+  } else drawOne(s, p.id);
+  if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made)) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
 }

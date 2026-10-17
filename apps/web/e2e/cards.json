@@ -1459,6 +1459,36 @@
   "gameChanger": true
  },
  {
+  "oracleId": "cdc4048a-73ec-4ec1-a179-2b36c397bf1a",
+  "name": "Dakmor Salvage",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\n{T}: Add {B}.\nDredge 2 (If you would draw a card, you may mill two cards instead. If you do, return this card from your graveyard to your hand.)",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Dredge",
+   "Mill"
+  ],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1e6f2997-a84b-4302-9d8b-ca4928961d24",
   "name": "Daring Buccaneer",
   "manaCost": "{R}",

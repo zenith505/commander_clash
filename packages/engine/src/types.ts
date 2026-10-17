@@ -874,7 +874,20 @@ export type PendingDecision =
        */
       instead?: { archive?: number; dredge?: ObjectId[] };
     }
-  | { kind: "dredge"; player: PlayerId; options: ObjectId[]; left: number; /** Of those, draws this one already stands for (Alhammarret's Archive). */ ready?: number; after?: "drawStep" }
+  | {
+      kind: "dredge";
+      player: PlayerId;
+      options: ObjectId[];
+      left: number;
+      /** Of those, the draws after this one that a replacement already made (Alhammarret's Archive), each with how many Archives can still replace it. */
+      made?: number[];
+      /**
+       * Alhammarret's Archives that could replace this draw too (CR 616.1): not dredging applies one of them, "draw two
+       * cards instead", rather than drawing.
+       */
+      archive?: number;
+      after?: "drawStep";
+    }
   /**
    * Before the game: keep this opening hand or take a mulligan (CR 103.5). `taken` is how many
    * mulligans this player has taken so far; `bottomIfKept` how many cards keeping now costs.

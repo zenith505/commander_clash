@@ -116,7 +116,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "drawLook", player: pid, objectId: bin }];
     }
     if (pend.kind === "dredge") {
-      const pick = chooseDredge(s, pid, pend.options);
+      // With an Alhammarret's Archive too, the Archive first: each of the two draws it makes can still be dredged.
+      const pick = pend.archive ? undefined : chooseDredge(s, pid, pend.options);
       return [{ type: "dredge", player: pid, ...(pick ? { objectId: pick } : {}) }];
     }
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.

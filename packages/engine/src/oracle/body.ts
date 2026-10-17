@@ -116,7 +116,10 @@ const checkableMay = (e: Effect) =>
   (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice") && e.n === 1 && !e.unless) ||
   // "You may have it deal 3 damage to target creature. If you do, ...": done if that target is still legal.
   (e.type === "damage" && (e.to.ref === "target" || e.to.ref === "anyTarget") && !("n" in e.to && e.to.n) && !e.also && !e.divided) ||
-  (e.type === "bite" && e.b.ref === "target" && !e.b.n && (e.a.ref === "self" || e.a.ref === "target"));
+  (e.type === "bite" && e.b.ref === "target" && !e.b.n && (e.a.ref === "self" || e.a.ref === "target")) ||
+  // "You may have target creature you control get +2/+0 and gain haste until end of turn. If you do, ..." (Hazoret's
+  // Favor), "you may have it get +4/+0 until end of turn" (Attack-in-the-Box): done if that permanent is still there.
+  (e.type === "continuous" && (e.what.ref === "self" || (e.what.ref === "target" && !e.what.n)) && e.duration === "endOfTurn");
 
 /**
  * What follows "Reveal the top card of your library": "If it's a creature card, put it into your hand", "If it isn't a
@@ -415,6 +418,10 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
   };
   for (let si = 0; si < sentences.length; si++) {
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
+    // beginning of the next end step" (one instruction, no condition).
+    const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
+    if (atNext && !/\b(?:if|unless|then|instead)\b| to the battlefield/.test(atNext[2]!)) s = `${atNext[2]!.charAt(0).toUpperCase()}${atNext[2]!.slice(1)} at the beginning of ${atNext[1]} next end step`;
     if (s.startsWith(ROW_MARK)) {
       // Rows only after the roll (CR 706.3b).
       if (payFirst || dig || !closeGate() || !closeRow() || !allEffects(effects).some((e) => e.type === "roll")) return null;
@@ -478,10 +485,11 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     const impulseIf = /^If [^,]+, exile the top /.test(s) ? parseHowCast(s, ctx) : null;
     const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
-    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards|them)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
+    // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
+    const playIt = exTop && sentences[si + 1] && /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)$/.exec(sentences[si + 1]!.replace(/\.$/, ""));
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
-      const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
+      const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
       effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
       si++;
       continue;
@@ -810,6 +818,19 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // (Ghastly Demise), "Counter target spell if its mana value is less than or equal to ..." (Dispersal Shield): any such
     // object can be targeted, and the comparison is made as it resolves (rulings on Ghastly Demise, Prismatic Ending,
     // Agadeem Occultist, Nimbus Champion).
+    // "Return target nonland permanent to its owner's hand. If you controlled that permanent, draw a card." (Geistwave),
+    // "... If you controlled it, investigate." (Hotshot Investigators): about the one object target before it, checked as
+    // the spell or ability resolves (CR 608.2h).
+    const controlled = /^If you controlled (that permanent|that creature|that artifact|it), (.+)$/.exec(s);
+    if (controlled) {
+      const i = ctx.lastObjectTarget;
+      const t = i === undefined ? undefined : ctx.targets[i];
+      if (i === undefined || !t || t.kind !== "object" || t.many || t.divided || i !== ctx.targets.length - 1) return null;
+      const fx = parseOne(controlled[2]!.charAt(0).toUpperCase() + controlled[2]!.slice(1), ctx);
+      if (!fx || ctx.targets.length !== i + 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetWasYours", index: i }, effects: fx });
+      continue;
+    }
     const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
     if (atMost) {
       // "You may return target creature to its owner's hand if that creature's power is ..." (Nimbus Champion): asked only
@@ -926,8 +947,14 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
     // done. Only for things the engine can tell weren't possible (discarding with no cards in hand, ...).
     // "Exile target creature. Return that card to the battlefield under its owner's control at the beginning of
     // the next end step": the exile becomes a blink that comes back with a delayed trigger (CR 603.7).
-    const later =
-      /^(?:At the beginning of the next end step, return (?:it|that card|the exiled card) to the battlefield under (its owner's|your) control|Return (?:it|that card|the exiled card) to the battlefield under (its owner's|your) control at the beginning of the next end step)(?: with an? (\+1\/\+1) counter on it)?$/i.exec(s);
+    // "Exile any number of target creatures you control. Return those cards ..." (Eerie Interlude), "Exile all creatures. At
+    // the beginning of the next end step, return those cards to the battlefield under their owners' control" (Planar
+    // Guide), "... return it to the battlefield tapped ..." (Mystifying Maze), "... with a flying counter on it" (Salvation
+    // Swan); after "you may exile ~ target creature", "If you do, return that card ..." (Astral Slide).
+    const BACK = "(?:it|that card|the exiled card|those cards|the exiled cards|them|~)";
+    const UNDER = "(its owner's|their owner's|their owners'|your)";
+    const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of the next end step)(?: with an? ${COUNTER} counter on it)?$`);
+    const later = laterRe.exec(s);
     const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
@@ -935,11 +962,25 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
       effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[1] === "your" ? "you" : "owner" };
       continue;
     }
-    if (later) {
-      const prev = effects[effects.length - 1];
-      if (prev?.type !== "exile" || prev.until || prev.linked || isGroup(prev.what) || effects.length - 1 < 0) return null;
-      const under = (later[1] ?? later[2]) === "your" ? "you" : "owner";
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under, at: "nextEndStep", ...(later[3] ? { counter: "+1/+1" as const } : {}) };
+    // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the
+    // exiled cards ...", Disorder in the Court), or after "If you do," the exile that may be done or that had up to one
+    // target (Roll-Roll-Roll-Roll). With none, it's something else ("return that card" after a dies trigger).
+    const laterAt = ((): { into: Effect[]; at: number } | null => {
+      if (!later) return null;
+      const last = effects[effects.length - 1];
+      if (/^If you do, /.test(s)) {
+        if (last?.type === "may" && !last.pay && last.effects.length === 1 && last.effects[0]!.type === "exile") return { into: last.effects, at: 0 };
+        return last?.type === "exile" && last.what.ref === "target" ? { into: effects, at: effects.length - 1 } : null;
+      }
+      for (let i = effects.length - 1; i >= prevStart && i >= 0; i--) if (effects[i]!.type === "exile") return { into: effects, at: i };
+      return null;
+    })();
+    if (later && laterAt) {
+      const ex = laterAt.into[laterAt.at] as Extract<Effect, { type: "exile" }>;
+      if (ex.until || ex.linked || (ex.what.ref === "target" && ex.what.sameName) || (ex.what.ref !== "target" && ex.what.ref !== "each" && ex.what.ref !== "self")) return null;
+      const under = (later[2] ?? later[4]) === "your" ? "you" : "owner";
+      const counter = later[5] ?? later[6];
+      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}) };
       continue;
     }
     // "Return target creature card from your graveyard to the battlefield. That creature gains haste until end of turn.
@@ -962,7 +1003,6 @@ export function parseBody(text: string, opts: { subject?: boolean; subjectIt?: b
         fromHand.atEndStep = atEnd[1] === "Exile" ? "exile" : atEnd[1] === "Return" ? "hand" : "sacrifice";
         continue;
       }
-      if (atEnd?.[1] === "Return") return null;
       const one = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") ? put : undefined;
       if (one && haste && !one.haste && !one.atEndStep) {
         one.haste = haste[1] ? "endOfTurn" : "game";
@@ -1576,6 +1616,9 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
 /** What "it", "they" and "those creatures" can mean after these effects (the token just created, the group changed). */
 function noteLast(ctx: Ctx, fx: Effect[]) {
   const last = fx[fx.length - 1];
+  // "Create a 2/2 red Mutant creature token. It gains haste until end of turn. Destroy it at the beginning of the next end
+  // step" (Old Hob): an instruction about the tokens just created leaves "it" meaning them.
+  if (last && "what" in last && (last.what as ObjRef).ref === "created" && (ctx.lastCreated || ctx.lastCreatedAny)) return;
   {
     // A card just manifested or cloaked is "it" too (the dig puts it in `created`).
     const faceDown = last?.type === "dig" && (last.into === "manifest" || last.into === "cloak");

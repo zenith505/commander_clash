@@ -24,7 +24,7 @@ export function isSuspended(s: GameState, o: GameObject): boolean {
  * Put exiled cards onto the battlefield, all at once: an Aura's new controller chooses what it enchants as it enters,
  * and with nothing it can enchant it stays in exile (CR 303.4f-g, rulings on Flicker of Fate).
  */
-function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind): "paused" | void {
+function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind, tapped?: boolean): "paused" | void {
   const back = cards.filter((c) => isPermanentCard(defOf(s, c)));
   const hosts = chooseAuraHosts(s, back.map((o) => ({ o, under: under(o) })), src);
   if (hosts === "paused") return "paused";
@@ -36,8 +36,8 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
         log(s, `${d.name} has nothing to enchant, so it stays in exile.`);
         continue;
       }
-      log(s, `${src} returns ${d.name} to the battlefield${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { counters: { [counter]: 1 } } : {}) });
+      log(s, `${src} returns ${d.name} to the battlefield${tapped ? " tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { counters: { [counter]: 1 } } : {}), ...(tapped ? { tapped: true } : {}) });
     }
   });
 }
@@ -1180,33 +1180,45 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     case "flicker": {
-      // Exiled, then returned together once any Aura's host is chosen (CR 303.4f).
+      // Exiled, then returned together once any Aura's host is chosen (CR 303.4f). With `at`, one delayed trigger returns
+      // all the cards exiled this way together (CR 603.7), those still in exile then (CR 400.7).
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.flickered) {
         sc.flickered = [];
+        const later: { id: ObjectId; zc: number }[] = [];
+        let first: GameObject | undefined;
         for (const o of objects(s, e.what, ctx)) {
           if (o.zone !== "battlefield") continue;
           const d = defOf(s, o);
           log(s, `${src} exiles ${d.name}${e.at ? "" : " and returns it"}.`);
           moveObject(s, o.id, "exile");
           if (o.isToken) continue; // a token that left the battlefield doesn't come back (CR 111.7)
-          if (e.at)
-            addDelayed(s, "nextEndStep", ctx.controller, o, {
-              targets: [],
-              effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}) }],
-              text: `Return ${d.name} to the battlefield under ${e.under === "owner" ? "its owner's" : "your"} control.`,
-            });
-          else sc.flickered.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+          if (e.at) {
+            first ??= o;
+            later.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+          } else sc.flickered.push({ id: o.id, zc: o.zoneChanges ?? 0 });
+        }
+        if (first) {
+          const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
+          addDelayed(s, "nextEndStep", ctx.controller, first, {
+            targets: [],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}) }],
+            text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
+          });
         }
       }
       const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
-      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter);
+      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped);
     }
     case "returnExiled": {
-      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
-      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
-      return returnFromExile(s, [o], (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter);
+      const list = e.cards ?? (ctx.subject ? [ctx.subject] : []);
+      const back = list.map((l) => s.objects[l.id]).filter((o, i): o is GameObject => o?.zone === "exile" && (o.zoneChanges ?? 0) === list[i]!.zc);
+      if (!back.length) return;
+      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped);
     }
+    case "exileIfLeaves":
+      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfLeaves = "battlefield";
+      return;
     case "exileIfDies":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield" && (!e.ifCreature || objIsType(s, o, "Creature"))) o.exileIfDiesTurn = s.turn;
       return;
@@ -1266,7 +1278,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
       }
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : ""}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}.`);
       return;
     }
   }

@@ -120,26 +120,64 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Sacrifice it at end of combat", "destroy that creature at end of combat" (CR 511.2, 603.7), "return ~ to its
   // owner's hand at the beginning of the next cleanup step" (514.3a): a delayed trigger
   // about the source or about the object the trigger was about, with no targets of its own.
-  if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step|the beginning of the next end step)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
+  // "At the beginning of the next end step, sacrifice it" (Apprentice Necromancer, Momo's Heist): the same instruction.
+  if ((m = /^At the beginning of (the|your) next end step, ([a-z].+)$/.exec(s)) && !/\b(?:if|unless|then|instead)\b|,/.test(m[2]!)) return parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} at the beginning of ${m[1]} next end step`, ctx);
+  if ((m = /^(.+?) at (end of combat|the beginning of the next cleanup step|the beginning of (?:the|your) next end step)$/i.exec(s)) && !(ctx.lastCreatedAny && /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens)$/i.test(m[1]!))) {
     const before = ctx.targets.length;
-    const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
+    // "Sacrifice it", "its controller sacrifices it" (Celestial Sword): only a permanent its controller controls then
+    // (CR 701.21a), or whoever controls it then. In an activated ability of a permanent that names nothing else before
+    // ("{2}: ~ gets +1/+1 until end of turn. Sacrifice it at the beginning of the next end step", Deathknell Kami), "it" is ~.
+    const selfItNow = ctx.activated && !ctx.spell && !ctx.selfIt && ctx.lastObjectTarget === undefined && !ctx.lastCreated && !ctx.lastAttached && !ctx.subject && !ctx.subjectIt && !ctx.selfCard;
+    const withSelfIt = <T,>(f: () => T): T => {
+      const r = f();
+      if (r || !selfItNow) return r;
+      ctx.selfIt = true;
+      try {
+        return f();
+      } finally {
+        delete ctx.selfIt;
+      }
+    };
+    const sac = /^(Sacrifice|(?:Its|That creature's) controller sacrifices) (it|that creature|that token|the token|them|those creatures|those tokens)$/i.exec(m[1]!);
+    const sacWhat = sac && withSelfIt(() => parseObject(sac[2]!, ctx));
+    const inner: Effect[] | null = sac ? (sacWhat ? [{ type: "sacrifice", what: sacWhat, ...(/controller/.test(sac[1]!) ? { byController: true as const } : {}) }] : null) : withSelfIt(() => parseSentence(m![1]!.replace(/^./, (c) => c.toUpperCase()), ctx));
     if (!inner || ctx.targets.length !== before) return null;
     const refs = new Set<string>();
+    const whats = new Set<string>();
     let players = true;
     for (const y of allEffects(inner)) {
-      if ("what" in y) refs.add((y.what as ObjRef).ref);
+      if ("what" in y) {
+        refs.add((y.what as ObjRef).ref);
+        whats.add(JSON.stringify(y.what));
+      }
       if ("who" in y && (y.who as PlayerRef).ref !== "you") players = false;
       if (y.type === "delayed") players = false;
     }
+    const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
+    // "Discard three cards at the beginning of the next end step" (Ideas Unbound), "create a 4/4 red Bird creature token
+    // with flying at the beginning of the next end step" (Rukh Egg): about no object, only its controller.
+    if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife"].includes(y.type)))
+      return [{ type: "delayed", when, effects: inner, text: m[1]! }];
     if (!players || refs.size !== 1) return null;
     const [ref] = refs;
-    const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : "nextEndStep";
+    // "Target creature you control gets +2/+2 until end of turn. Return it to its owner's hand at the beginning of the next
+    // end step" (Dragon Mask), "Sacrifice those creatures ..." (Tears of Rage, Wake the Dead), "Exile that token ..."
+    // (Manaform Hellkite): about each of those objects as it is now; if one leaves the battlefield first, it's a new
+    // object the delayed trigger doesn't know (CR 603.7c, 400.7). One delayed trigger for each object.
+    if ((ref === "target" || ref === "created" || ref === "affected" || ref === "attached") && whats.size === 1 && when !== "nextCleanup") {
+      const of = JSON.parse([...whats][0]!) as ObjRef;
+      const effects = JSON.parse(JSON.stringify(inner).split(JSON.stringify(of)).join('{"ref":"subject"}')) as Effect[];
+      return [{ type: "delayed", when, of, effects, text: m[1]! }];
+    }
     if (ref === "subject") return [{ type: "delayed", when, each: "subject", effects: inner, text: m[1]! }];
     // The Locust God: "When ~ dies, return it to its owner's hand at the beginning of the next end step": about the card
     // in the graveyard now; if it leaves there first, it stays where it went (rulings).
     // Seraph: "put that card onto the battlefield under your control at the beginning of the next end step": the card in
     // the graveyard now, if it's still there then (rulings).
     if (ref === "subjectCard" && when === "nextEndStep" && inner.length === 1 && inner[0]!.type === "putOntoBattlefield") return [{ ...inner[0]!, atNextEndStep: true }];
+    // Liesa: "Whenever another nontoken creature you control dies, return that card to its owner's hand at the beginning of
+    // the next end step": the card in the graveyard now, if it's still there then (rulings; CR 400.7).
+    if (ref === "subjectCard" && when === "nextEndStep") return [{ type: "delayed", when, each: "subjectCard", effects: inner, text: m[1]! }];
     if (ref === "selfCard") return [{ type: "delayed", when, each: "selfCard", effects: JSON.parse(JSON.stringify(inner).replace(/\{"ref":"selfCard"\}/g, '{"ref":"subjectCard"}')) as Effect[], text: m[1]! }];
     if (ref !== "self") return null;
     // The delayed trigger is about the source as it is now: if it leaves, it's a new object (CR 400.7).

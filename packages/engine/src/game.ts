@@ -1779,6 +1779,13 @@ function beginStep(s: GameState, step: Step): void {
       fireEvent(s, { type: "step", step: "draw", active: ap }); // "at the beginning of the draw step" triggers after it (CR 504.2)
       break;
     case "end":
+      // "Until your next end step, you may play that card" (Yasmin Khan): over as that player's next end step begins; one
+      // granted during an end step lasts until their following one.
+      for (const q of s.players)
+        for (const id of q.exile) {
+          const m = obj(s, id).mayPlay;
+          if (m?.until === "yourNextEndStep" && m.player === ap) obj(s, id).mayPlay = undefined;
+        }
       fireEvent(s, { type: "step", step: "end", active: ap });
       // "At the beginning of that turn's end step, you lose the game" (Final Fortune): a delayed trigger (CR 603.7).
       if (s.extraTurn?.loseAtEnd) {

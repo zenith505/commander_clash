@@ -1128,11 +1128,13 @@ export type Effect =
   | { type: "amass"; subtype: string; n: Amount }
   /**
    * "Exile target creature you control, then return it to the battlefield under its owner's control"
-   * (blink); with `at`, it comes back at the beginning of the next end step (a delayed trigger, CR 603.7).
+   * (blink); with `at`, it comes back at the beginning of the next end step (a delayed trigger, CR 603.7), all the cards
+   * exiled together by one delayed trigger. `tapped`: "return it to the battlefield tapped".
    */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
-  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind }
+  /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[] }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -1143,6 +1145,8 @@ export type Effect =
   /** "If that creature would die this turn, exile it instead": a replacement effect for the rest of the turn (CR 614.1a). */
   /** `ifCreature`: "If it's a creature, ... if it would die this turn, exile it instead" (Carbonize, any target). */
   | { type: "exileIfDies"; what: ObjRef; ifCreature?: true }
+  /** "If it would leave the battlefield, exile it instead of putting it anywhere else" (CR 614.1a): while it's that permanent. */
+  | { type: "exileIfLeaves"; what: ObjRef }
   /** "It can't be regenerated this turn" (CR 701.19c): its regeneration shields don't apply this turn. */
   | { type: "noRegen"; what: ObjRef; ifCreature?: true }
   /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
@@ -1219,7 +1223,7 @@ export type Effect =
    */
   /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
   /** `thisTurn`: "When you lose control of that Equipment this turn" (Stolen Uniform): only until the turn ends. */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard"; of?: ObjRef; thisTurn?: true }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1240,7 +1244,7 @@ export type Effect =
   /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
   | { type: "warpExile" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /** CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player). */
@@ -1707,6 +1711,11 @@ export type SpellCondition =
   | { kind: "xAtLeast"; n: number }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /**
+   * "If you controlled that permanent, draw a card" about target `index` (Geistwave, Kellan): you control it now, or did
+   * as it last existed on the battlefield if this spell or ability moved it (CR 608.2h; rulings on Geistwave and Kellan).
+   */
+  | { kind: "targetWasYours"; index: number }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true };
 

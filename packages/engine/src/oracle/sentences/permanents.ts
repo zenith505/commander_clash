@@ -129,6 +129,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what: ObjRef | null = / this way$/.test(m[1]!) ? { ref: "damagedThisWay" } : parseObject(m[1]!.startsWith("that creature") ? "that creature" : "that permanent", ctx);
     return what ? [{ type: "exileIfDies", what }] : null;
   }
+  // "Return target creature card from your graveyard to the battlefield. ... If it would leave the battlefield, exile it
+  // instead of putting it anywhere else." (Whip of Erebos): a replacement effect for as long as it's that permanent (CR
+  // 614.1a, 400.7), from the resolved ability, so it doesn't go away if the permanent loses its abilities.
+  if ((m = /^If (it|that creature) would leave the battlefield, exile it instead of putting it anywhere else$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && (what.ref === "created" || (what.ref === "target" && !what.n)) ? [{ type: "exileIfLeaves", what }] : null;
+  }
   // "Target creature can't be regenerated this turn", "It can't be regenerated this turn", "A creature dealt damage this
   // way can't be regenerated this turn" (CR 701.19c).
   if ((m = /^(.+?) can't be regenerated this turn$/i.exec(s))) {
@@ -339,6 +346,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
     return what && mods ? [{ type: "continuous", what, mods, duration: m[3] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
+  // "Gain control of target artifact. Untap it. It gains haste." (Momo's Heist), "Create a token that's a copy of target
+  // artifact. That token gains haste." (Cogwork Assembler): keywords with no duration last for as long as it stays on
+  // the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
+  if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what && (what.ref === "target" || what.ref === "created") ? parseChanges(m[2]!) : null;
+    if (what && mods?.length && mods.every((x) => x.kind === "addKeywords")) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // "Target land you control becomes a 3/3 Elemental creature with haste that's still a land" (Brave the Wilds): with no
   // duration, for as long as it stays on the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).

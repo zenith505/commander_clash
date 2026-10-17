@@ -147,6 +147,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Untap target creature and gain control of it ... the creature gains ..." (Flash Conscription): the one creature it
   // targets.
   if (/^the creature$/i.test(x) && ctx.lastObjectTarget !== undefined && ctx.targets.filter((t) => t.kind === "object").length === 1 && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget };
+  // "Create a token that's a copy of target artifact. That token gains haste" (Cogwork Assembler), "put an artifact card
+  // from your hand onto the battlefield. That artifact gains haste" (Arms Race): the one just created or put there.
+  if (ctx.lastCreated && (/^(?:that|the) token$/i.test(x) || (ctx.lastPut && /^that (?:artifact|enchantment|land|[A-Z][a-z]+)$/.test(x)))) return { ref: "created" };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
@@ -591,6 +594,8 @@ export function parseTargetPhrase(
   }
   // "Angel, Demon, or Dragon creature card" (Kaalia of the Vast): a creature that's one of those creature types; only the
   // last one has the card type, so it's for all of them.
+  // "Nonland, nontoken permanent" (Mistmeadow Vanisher): one object that's neither, like "nonland nontoken permanent".
+  if (/^(?:non[a-z-]+, )+non[a-z-]+ (?:permanent|creature|card)s?$/.test(p)) p = p.replace(/, /g, " ");
   const sharedType = /^((?:[a-z]+, )*[a-z]+,? or )([a-z]+ (?:creature|creatures))$/.exec(p);
   const typeAlts = sharedType ? [...sharedType[1]!.replace(/,? or $/, "").split(", "), sharedType[2]!.split(" ")[0]!] : [];
   const sharedSubtypes = typeAlts.length > 1 && typeAlts.every((w) => CREATURE_TYPES.has(capital(w))) ? typeAlts.map(capital) : null;

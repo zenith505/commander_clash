@@ -550,6 +550,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "flicker":
     case "returnExiled":
     case "exileIfDies":
+    case "exileIfLeaves":
     case "noRegen":
     case "noCombatDamage":
     case "lookAtHand":

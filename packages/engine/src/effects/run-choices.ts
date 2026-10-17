@@ -4,7 +4,7 @@ import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, collectEvidence, draw, evidenceProblem, log, moveObject, obj, opponents, payableLife, player } from "../game";
 import { cardIdOf, defOf } from "../cards";
-import { staticConditionNow } from "../layers";
+import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
 import { bindBound, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected } from "./resolve";
@@ -172,6 +172,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? revealedIs(s, e.cond.filter) !== !!e.cond.not
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "targetWasYours"
+            ? targetWasYours(s, ctx, e.cond.index)
             : e.cond.kind === "teamwork"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.teamwork
             : e.cond.kind === "gift"
@@ -210,6 +212,19 @@ function targetIs(s: GameState, ctx: ResolveCtx, index: number, filter0: TargetS
   if (o?.zone === "battlefield") return objectMatches(s, filter, o, ctx.controller, false);
   const card = s.objects[t.id];
   return !!card && card.zone === "graveyard" && (t.zc === undefined || (card.zoneChanges ?? 0) === t.zc) && printedMatches(filter, defOf(s, card));
+}
+
+/**
+ * "If you controlled that permanent" (SpellCondition "targetWasYours"): a legal target still on the battlefield is checked
+ * as it is now; one this resolution moved, by its controller as it last existed on the battlefield (CR 608.2h).
+ */
+function targetWasYours(s: GameState, ctx: ResolveCtx, index: number): boolean {
+  const t = ctx.targets[index];
+  if (!ctx.legal[index] || t?.kind !== "object") return false;
+  const o = s.objects[t.id];
+  if (o?.zone === "battlefield" && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc)) return controllerOf(s, o) === ctx.controller;
+  const lk = s.lastKnown?.[t.id];
+  return !!lk && (t.zc === undefined || lk.zc === t.zc) && lk.controller === ctx.controller;
 }
 
 /** A results table's row (CR 706.3a): no roll, no row. */
@@ -309,6 +324,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "discard" && e.who.ref === "you" && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).length) return false;
+    if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
     // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.
     if ((e.type === "exile" || e.type === "putOntoBattlefield") && e.what.ref === "graveyardEnd" && !objects(s, e.what, ctx).length) return false;

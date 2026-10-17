@@ -247,6 +247,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "damagedThisWay") return [...new Set(s.resolving?.damagedThisWay ?? [])].map((id) => obj(s, id)).filter((o) => o.zone === "battlefield" && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)));
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
+  if (ref.ref === "amassed") {
+    const a = s.resolving?.amassed ?? s.resolving?.item.amassed;
+    const o = a && s.objects[a.id];
+    return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === a.zc ? [o] : [];
+  }
   if (ref.ref === "revealed") {
     const rv = s.resolving?.revealed;
     const o = rv && s.objects[rv.id];
@@ -747,5 +752,6 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const item = s.resolving?.item;
   const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
   const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;
-  return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell ? { spell: true as const } : {}) };
+  // A spell's reflexive trigger: its source is the spell, gone from the stack, so as it last existed there (CR 113.7a).
+  return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell || item?.fromSpell ? { spell: true as const } : {}) };
 }

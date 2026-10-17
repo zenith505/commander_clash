@@ -408,6 +408,8 @@ export type ObjRef =
   | { ref: "selfCard" }
   /** "Create a 0/0 Fractal creature token. Put X +1/+1 counters on it": the token(s) this ability just created. */
   | { ref: "created" }
+  /** "The amassed Army" (CR 701.47c): the Army chosen by this ability's amass, or by the one whose reflexive trigger this is. */
+  | { ref: "amassed" }
   /** "The sacrificed creature": what was sacrificed to cast the spell, as it last existed (CR 608.2h). */
   | { ref: "sacrificed" }
   /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
@@ -1500,7 +1502,12 @@ export type Effect =
    * It's put on the stack the next time a player would receive priority, its targets chosen then (603.3d).
    */
   /** `sacrificed`: "the sacrificed creature" / "that creature" in it is what the ability sacrificed (Heart-Piercer Manticore). */
-  | { type: "reflexive"; body: AbilityBody; sacrificed?: true }
+  /**
+   * `about`: "it" / "that creature" in it is an object the ability acted on, the reflexive trigger's subject: `created`, the
+   * permanent a card put onto the battlefield became (Back for More); `target`, that target, and with `attached` only if
+   * the token just created was attached to it (Curse of the Werefox). With no such object, it doesn't trigger (rulings).
+   */
+  | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true } }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
@@ -1683,6 +1690,8 @@ export type SpellCondition =
   | { kind: "wonFlip"; lost?: true }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
   | { kind: "destroyedThisWay" }
+  /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
+  | { kind: "sacrificedThisWay" }
   /**
    * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
@@ -2693,6 +2702,15 @@ export interface CompiledCard {
    * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).
    */
   enterLock?: { types?: string[]; opponents?: true };
+  /**
+   * "If an artifact or creature entering causes a triggered ability of a permanent you control to trigger, that ability
+   * triggers an additional time" (Panharmonicon), "if a triggered ability of a legendary creature you control triggers,
+   * ..." (Annie Joins Up): CR 603.2d, one more time for each such effect. `by`: the event (a permanent entering, a creature
+   * dying, a creature attacking, a creature dealing combat damage to a player) and what must cause it (any of `filter`,
+   * judged by its controller as the static's); `of`: only abilities of permanents you control matching one of these.
+   * Never delayed or reflexive triggers (603.2d).
+   */
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[] }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /**

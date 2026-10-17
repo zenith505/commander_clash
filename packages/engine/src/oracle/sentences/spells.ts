@@ -9,6 +9,7 @@ import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } fro
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
 import { PREDEFINED_TOKENS } from "../tokens";
+import { parseSearchFilter } from "../search";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -68,6 +69,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^Exile the top (card|${NUMX} cards) of your library$`).exec(s))) return [{ type: "exileTop", who: { ref: "you" }, n: m[1] === "card" ? 1 : amt(m[2]!) }];
   // Discarding (CR 701.9): "Target player discards two cards", "Each opponent discards a card at random", "Discard a card"
   if ((m = new RegExp(`^Discard ${NUMX} cards?( at random)?$`, "i").exec(s))) return [{ type: "discard", who: { ref: "you" }, n: amt(m[1]!), random: !!m[2] }];
+  // "Then you may discard a nonland card" (Hypothesizzle): only a card of that kind can be discarded (CR 701.9a).
+  if ((m = /^Discard an? ((?:(?!\bcards?\b).)+ card)$/i.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? [{ type: "discard", who: { ref: "you" }, n: 1, filter }] : null;
+  }
   // "Look at target opponent's hand", "target player reveals their hand" (CR 402.3, 701.20).
   if ((m = /^Look at (.+?)'s? hand$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

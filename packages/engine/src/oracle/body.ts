@@ -25,6 +25,8 @@ export interface Ctx {
   selfCard?: boolean;
   /** A reflexive trigger after "you may sacrifice another creature": "that creature's power" is the sacrificed one's. */
   sacrificedIt?: boolean;
+  /** An amass instruction came before, here or in the ability whose reflexive trigger this is: "the amassed Army" (CR 701.47c). */
+  amassed?: boolean;
   /** Index of the most recent object target, for "it" / "its controller". */
   lastObjectTarget?: number;
   /** An earlier sentence acted on "enchanted creature" (or equipped): a later "it" means that creature. */
@@ -309,7 +311,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -339,6 +341,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; subject?
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
     ...(opts.ownX ? { ownX: true } : {}),
     ...(opts.sacrificedIt ? { sacrificedIt: true } : {}),
+    ...(opts.amassed ? { amassed: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -1123,14 +1126,33 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; subject?
       const milled = prev?.type === "mill" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0;
       // "Create a Food token. When you do, ..." (Eastfarthing Farmer): the token is created, so it triggers.
       const created = prev?.type === "createToken" && prev.who.ref === "you" && typeof prev.n === "number" && prev.n > 0 && !prev.attachTo;
-      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !created) return null;
+      // "Create a Monster Role token attached to target creature you control. When you do, that creature fights ..." (Curse
+      // of the Werefox): only if the Role was created attached to it, which "that creature" then is (rulings).
+      const roleOn = prev?.type === "createToken" && prev.who.ref === "you" && prev.n === 1 && prev.attachTo?.ref === "target" && !prev.attachTo.n && effects.length === 1 ? prev.attachTo.index : undefined;
+      // "Return target creature card from your graveyard to the battlefield. When you do, it fights ..." (Back for More):
+      // only if it was returned, and "it" is the permanent it became (CR 400.7).
+      const returned = prev?.type === "putOntoBattlefield" && ctx.lastPut && effects.length === 1;
+      // "Sacrifice a creature. When you do, ..." (Tip the Scales): only if one was sacrificed, which "the sacrificed creature" is.
+      const sacrificing = prev?.type === "pick" && prev.action === "sacrifice" && prev.who.ref === "you" && prev.n === 1 && !prev.unless;
+      // "Amass Orcs 2. When you do, ..." (Foray of Orcs), "Earthbend 2. When you do, ..." (Earth Rumble): a player amassed
+      // even if it did nothing (CR 701.47b); earthbending is done whenever the spell resolves, its land the only target.
+      const always = (prev?.type === "amass" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
+      if (!rolled && !counted && !mayDo && !sacSelf && !milled && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
       // Its own "where X is ..." goes with it.
       const whenText = [where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
       si = sentences.length;
       // What the "you may" sacrificed, if the reflexive trigger is about it.
       const sacPick = mayDo && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice";
-      const reflexive = reflexiveBody(whenText, ctx, sacPick);
+      const reflexive = reflexiveBody(whenText, ctx, sacPick || sacrificing, roleOn !== undefined || returned);
       if (!reflexive) return null;
+      if (sacrificing) {
+        effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: reflexive, sacrificed: true }] });
+        continue;
+      }
+      if (roleOn !== undefined || returned) {
+        effects.push({ type: "reflexive", body: reflexive, about: returned ? "created" : { target: roleOn!, attached: true } });
+        continue;
+      }
       const aboutSacrificed = sacPick && JSON.stringify(reflexive).includes('"ref":"sacrificed"');
       if (aboutSacrificed) {
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive, sacrificed: true }] });
@@ -1146,7 +1168,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; subject?
         effects.push({ type: "if", cond: { kind: "libraryHas", n: prev.n as number }, effects: [prev, { type: "reflexive", body: reflexive }], otherwise: [prev] });
         continue;
       }
-      if (created) {
+      if (created || always) {
         effects.push({ type: "reflexive", body: reflexive });
         continue;
       }
@@ -1668,9 +1690,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
  * The body of a reflexive trigger, "When you do, [text]" (CR 603.12): its own targets, chosen as it's put on the stack,
  * and the same meaning of ~, "it" and the trigger's subject as the ability that creates it.
  */
-function reflexiveBody(text: string, ctx: Ctx, sacrificed = false): AbilityBody | null {
-  // A spell's reflexive trigger has the spell as its source, gone from the stack by then (not modeled).
-  if (ctx.spell) return null;
+function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false): AbilityBody | null {
   // After "you may sacrifice another creature", "that creature" is only ever its power or toughness (Heart-Piercer
   // Manticore, Ziatora): the sacrificed creature as it last existed (CR 608.2h; rulings).
   const sac = sacrificed && /\b(?:that|the sacrificed) creature's (?:power|toughness)\b/.test(text);
@@ -1678,9 +1698,12 @@ function reflexiveBody(text: string, ctx: Ctx, sacrificed = false): AbilityBody 
   // "When ~ enters, you may pay {2}{R}. When you do, it deals 3 damage to any target." (Sparktongue Dragon): "it" is ~,
   // the source of both abilities (CR 603.12, 113.7a).
   if (ctx.selfIt && !ctx.subjectIt) text = text.replace(/^(?:it|he|she) deals /, "~ deals ");
+  // About an object the ability acted on (Back for More's "it", Curse of the Werefox's "that creature"): its subject.
+  if (about && (ctx.subject || ctx.subjectIt)) return null;
   const body = parseBody(`${text.charAt(0).toUpperCase()}${text.slice(1)}.`, {
     ...(sac ? { sacrificedIt: true } : {}),
-    ...(ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
+    ...(ctx.amassed ? { amassed: true } : {}),
+    ...(about || ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
     ...(ctx.selfIt ? { selfIt: true } : {}),
     ...(ctx.selfCard ? { selfCard: true } : {}),
     ...(ctx.activated ? { activated: true } : {}),
@@ -1708,6 +1731,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
+    if (last?.type === "amass") ctx.amassed = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.

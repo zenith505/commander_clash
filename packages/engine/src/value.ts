@@ -80,7 +80,8 @@ export function groupValue(s: GameState, pid: PlayerId, body: AbilityBody, chose
   const add = (objs: GameObject[], harmful: boolean, scale = (_: GameObject) => 1) => {
     for (const o of objs) v = (v ?? 0) + (controllerOf(s, o) === pid ? -1 : 1) * (harmful ? 1 : -1) * worth(s, pid, o) * scale(o);
   };
-  for (const e of allEffects(body.effects)) {
+  // A reflexive trigger's instructions too: "Sacrifice a creature. When you do, all creatures get -X/-X" (Tip the Scales).
+  for (const e of allEffects(body.effects).flatMap((x) => (x.type === "reflexive" && !x.body.modal ? [x, ...allEffects(x.body.effects)] : [x]))) {
     // "Each player chooses ..., then sacrifices the rest": each keeps their best (with Mythos of Snapdax's choice made by
     // us, the opponents keep their worst), and loses the rest.
     if (e.type === "keepRest") {

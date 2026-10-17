@@ -1,6 +1,6 @@
 # Roadmap
 
-19,349 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+19,379 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -17,7 +17,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the Roles/modified/can't be regenerated/equip round:
-   - Role cards still out on other lines: Curse of the Werefox ("fights up to one target creature"), Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
+   - Role cards still out on other lines: Not Dead After All, Faunsbane Troll ("sacrifice an Aura attached to ~"), Kestia ("an
      enchanted creature or enchantment creature"), Seeds of Innocence-style "the controller of each of those".
    - "Can't be regenerated" still out: Purge ("artifact
      creature or black creature"), Mageta ("except for ~"), The Abyss ("of their choice"), Scorching Lava (kicked
@@ -302,14 +302,24 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      (CR 603.7 has one for all; no supported card can tell); a flicker's return is one trigger for all the cards.
    Left from the reflexive triggers round ("When you do" after a payment, a sacrifice, a may, a mill, a roll, a count
    or a token, CR 603.12; named tokens; "that artifact gains haste" after putting it onto the battlefield):
-   - Reflexive triggers still out: on instants and sorceries (Hypothesizzle, Faebloom Trick, Earth Rumble,
-     Lithobraking, Tip the Scales; the spell is gone by the time the ability resolves); "pay {X}. When you do" (Electro,
+   - Reflexive triggers still out: "pay {X}. When you do" (Electro,
      Isareth, Halo Forager, Numa, Wildborn Preserver, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
      Walker); "exile N cards from your graveyard. When you do" (Kroxa, Young Necromancer, Kishla Trawlers); Wick's
-     Patrol ("the greatest mana value among cards in your graveyard"); Curse of the Werefox (fight "up to one target");
+     Patrol ("the greatest mana value among cards in your graveyard");
      Red Hulk, Hylda, Ziatora, Tiger-Tribe Hunter, Surtland Flinger, Bolg, Edgar's Awakening, Leyline Tyrant ("any
      amount"), Rubble Rouser, Novel Nunchaku, Old Man Willow ("or a token"), Greasefang, Kher Keep ("~" in a token's
      name), Murmuration, Mordor Trebuchet, The Great Unclean One. The Balrog is out on its cost reduction.
+   Left from the reflexive spells and "triggers an additional time" round (CR 603.12 on instants and sorceries,
+   amass's "when you do" and "the amassed Army", 603.2d):
+   - Reflexive spells still out: Ill-Timed Explosion ("the greatest mana value among cards discarded this way" carried
+     into the trigger), Grishnákh ("power less than or equal to the amassed Army's power"), Goblin Plate Mail ("attach
+     ~ to the amassed Army"), Espers to Magicite, Edgar's Awakening, Ugin's Binding, Plumb the Forbidden.
+   - "Triggers an additional time" still out: Bifur, Clara Oswald, Cloud, Dr. Beverly Crusher, Dungeon Delver, Echoes
+     of Eternity, Gandalf the White, Hama Pashar, Jabs, Krang, Panoptic Projektor, Roaming Throne, Sanctum of All, The
+     Masamune, Valiant Emberkin, Veyran, Virtue of Knowledge, Wayta, Windcrag Siege, Wizard's Staff.
+   - Simplifications: amass with several Armies uses the one with the most +1/+1 counters (CR 701.47a lets you
+     choose); a source leaving at the same time as the dying creature is matched against its current card, not its
+     last known characteristics, for "a triggered ability of a [kind]" (only matters if its types were changed).
    Left from the modes round (repeated modes, pawprints, escalate, unchosen and random modes, tokens for others):
    - Mode lines still out: the Confluences of Cabaretti, Cosmium, Eldrazi, Maestros, Obscura and Riveteers
      (monocolored groups, goad, flicker tapped, "target player returns a creature card", a land from hand or
@@ -439,8 +449,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    in any order (Arjun, Mindmoil), granting cascade, and the owner's order when several target spells or permanents
    go to the bottom at once (CR 401.4). Left from the
    earthbend/foretell round: {X} foretell and freerunning costs (Starnheim Unleashed, Monastery Raid),
-   "if this spell was cast from exile" conditions on foretell cards (Haunting Voyage, Cosmos Charger), Earth
-   Rumble's reflexive earthbend trigger and Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
+   "if this spell was cast from exile" conditions on foretell cards (Haunting Voyage, Cosmos Charger), Avatar Kyoshi's "then untap that land", Feral Contest and Mark for
    Death's lures with extra clauses, Kingpin of Crime.
 
 ## Known gaps (from earlier rounds)
@@ -481,8 +490,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   each of them is worth clearly more than the best single target). The game remembers only some of what happened in a turn
   (`GameState.turnLog`: searches, permanents entering, destructions by an opponent, creatures dealing damage to a
   player, life gained, cards put into a graveyard); more "this turn" conditions need more of it.
-- Elesh Norn, Mother of Machines' "triggers an additional time" (its other ability, Torpor Orb's for opponents, works).
-  With Torpor Orb, "whenever counters are put on" still triggers for counters a creature enters with.
+- With Torpor Orb, "whenever counters are put on" still triggers for counters a creature enters with.
 - "Becomes the target": "deals 2 damage to that spell's controller", "an ability that targets only it" (Agrus Kos),
   "becomes the target of an Aura spell". A player who can't win (Abyssal Persecutor) still wins as the last player left
   (CR 104.2a).

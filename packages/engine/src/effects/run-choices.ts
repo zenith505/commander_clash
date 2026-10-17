@@ -92,14 +92,29 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sourceId = ctx.sourceId ?? item.objectId ?? "";
       const cardId = item.sourceCardId ?? (sourceId && s.objects[sourceId] ? cardIdOf(s.objects[sourceId]!) : undefined);
       if (!cardId) return;
+      // A spell's: the spell is its source (CR 113.7a), that object on the stack.
+      const spell = item.kind === "spell" ? s.objects[sourceId] : undefined;
+      const sourceZc = item.sourceZc ?? (spell ? (spell.zoneChanges ?? 0) : undefined);
+      // "Return target creature card ... to the battlefield. When you do, it fights ..." (Back for More): about the object
+      // acted on, which must be there for it to trigger (rulings on Curse of the Werefox).
+      let about: { id: string; zc: number } | undefined;
+      if (e.about) {
+        const o = e.about === "created" ? objects(s, { ref: "created" }, ctx)[0] : objects(s, { ref: "target", index: e.about.target }, ctx).find((x) => x.zone === "battlefield");
+        if (!o) return;
+        if (typeof e.about === "object" && e.about.attached && !(s.resolving!.created ?? []).some((id) => s.objects[id]?.attachedTo === o.id)) return;
+        about = { id: o.id, zc: o.zoneChanges ?? 0 };
+      }
+      const subject = about ?? item.subject;
       s.triggerQueue.push({
         sourceId,
         sourceCardId: cardId,
         controller: ctx.controller,
         index: -1,
         body: e.body,
-        ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}),
-        ...(item.subject ? { subject: item.subject } : {}),
+        ...(sourceZc !== undefined ? { sourceZc } : {}),
+        ...(subject ? { subject } : {}),
+        ...(spell ? { fromSpell: true as const } : {}),
+        ...(s.resolving!.amassed ? { amassed: s.resolving!.amassed } : {}),
         // "When ~ dies, you may pay {E}{E}{E}. When you do, ~ deals damage equal to its power" (Cyclops Superconductor):
         // ~ as it last existed on the battlefield, like the ability that created it (CR 608.2h, 113.7a).
         ...(item.lki ? { lki: item.lki } : {}),
@@ -164,6 +179,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.flipped && s.resolving!.flipped.won !== !!e.cond.lost
             : e.cond.kind === "destroyedThisWay"
             ? !!s.resolving!.destroyed?.length
+            : e.cond.kind === "sacrificedThisWay"
+            ? !!s.resolving!.sacrificedThisWay?.length
             : e.cond.kind === "rollIn"
             ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"

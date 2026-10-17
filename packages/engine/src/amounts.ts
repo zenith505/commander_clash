@@ -225,6 +225,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         // Gone: as it last existed on the battlefield (CR 608.2h).
         // A trigger's subject that died ("whenever another creature dies, ... its power") too.
         if ((c.of.ref === "self" || c.of.ref === "subject") && c.kind !== "manaValue") return Math.max(0, ctx.lki?.[c.kind] ?? 0);
+        // The amassed Army that has left: as it last existed (CR 608.2h).
+        const a = c.of.ref === "amassed" ? (s.resolving?.amassed ?? s.resolving?.item.amassed) : undefined;
+        const lk = a && s.lastKnown?.[a.id];
+        if (lk && lk.zc === a.zc && c.kind !== "manaValue") return Math.max(0, lk[c.kind] ?? 0);
         return 0;
       }
       if (c.kind === "manaValue") {

@@ -493,6 +493,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":
+    case "damageMod":
     case "pumpPerBlocker":
     case "draw":
     case "getEnergy":

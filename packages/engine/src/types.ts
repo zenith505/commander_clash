@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -964,6 +964,8 @@ export interface GameState {
   entersTappedUntil?: { controller: PlayerId; filter: TargetSpec; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
+  /** Damage amount replacements of resolved spells and abilities (Effect damageMod): made in `turn`, by `you`. */
+  damageMods?: { id: string; mod: DamageMod; you: PlayerId; name: string; turn: number; until?: "yourNextTurn" }[];
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
   lostLifeThisTurn?: PlayerId[];
   /** Revolt: the players a permanent left the battlefield under the control of this turn, tokens too (rulings). */

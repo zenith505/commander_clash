@@ -378,3 +378,68 @@ describe("damage amount replacements", () => {
     expect(life(s, opp) + s.objects[b]!.damage).toBe(40 + 3);
   });
 });
+
+const isengard = card("Isengard Unleashed", "Sorcery", "{2}{R}{R}{R}", { keywords: ["Flashback"], oracleText: "Damage can't be prevented this turn. If a source you control would deal damage this turn to an opponent or a permanent an opponent controls, it deals triple that damage instead.\nFlashback {4}{R}{R}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)" });
+const blindFury = card("Blind Fury", "Instant", "{2}{R}{R}", { oracleText: "All creatures lose trample until end of turn. If a creature would deal combat damage to a creature this turn, it deals double that damage to that creature instead." });
+const overblaze = card("Overblaze", "Instant — Arcane", "{3}{R}", { keywords: ["Splice"], oracleText: "Each time target permanent would deal damage to a permanent or player this turn, it deals double that damage to that permanent or player instead.\nSplice onto Arcane {2}{R}{R} (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)" });
+const lightning = card("Lightning, Army of One", "Legendary Creature — Human Soldier", "{1}{R}{W}", { power: "3", toughness: "2", keywords: ["First strike", "Trample", "Lifelink", "Stagger"], oracleText: "First strike, trample, lifelink\nStagger — Whenever Lightning deals combat damage to a player, until your next turn, if a source would deal damage to that player or a permanent that player controls, it deals double that damage instead." });
+
+describe("damage amount replacements of resolved spells and abilities", () => {
+  it("are supported", () => {
+    for (const d of [isengard, blindFury, overblaze, lightning]) expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("Isengard Unleashed triples your sources' damage to opponents this turn, and damage can't be prevented", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, opp, urzasArmor);
+    let s = castAndResolve(s0, ap, isengard, []);
+    s = castAndResolve(s, ap, shock, [player(opp)]);
+    expect(life(s, opp)).toBe(34);
+    s = castAndResolve(s, ap, shock, [player(ap)]);
+    expect(life(s, ap)).toBe(38);
+  });
+
+  it("... only this turn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = castAndResolve(s0, ap, isengard, []);
+    s = passUntil(s, "main1", opp);
+    s = castAndResolve(s, ap, shock, [player(opp)]);
+    expect(life(s, opp)).toBe(38);
+  });
+
+  it("Blind Fury doubles combat damage to creatures only", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, ogre);
+    const wall = putOnBattlefield(s0, opp, card("Four Test", "Creature — Wall", "{2}{W}", { power: "0", toughness: "4" }));
+    let s = castAndResolve(s0, ap, blindFury, []);
+    s = toEndOfCombat(fight(s, ap, opp, [g], [{ blocker: wall, attacker: g }]));
+    expect(s.objects[wall]!.zone).toBe("graveyard");
+  });
+
+  it("Overblaze doubles the target permanent's damage this turn, not other sources'", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const p = putOnBattlefield(s0, ap, sparkmage);
+    let s = castAndResolve(s0, ap, overblaze, [obj(p)]);
+    s = resolveAll(run(s, planActivate(s, ap, p, 0, [player(opp)])));
+    expect(life(s, opp)).toBe(38);
+    s = castAndResolve(s, ap, shock, [player(opp)]);
+    expect(life(s, opp)).toBe(36);
+  });
+
+  it("Lightning: after its first-strike damage, the regular damage to that player is doubled, until its controller's next turn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const l = putOnBattlefield(s0, ap, lightning);
+    const g = putOnBattlefield(s0, ap, ogre);
+    let s = toEndOfCombat(fight(s0, ap, opp, [l, g]));
+    expect(life(s, opp)).toBe(40 - 3 - 4);
+    // Still in effect on the next player's turn, for anyone's source.
+    s = passUntil(s, "main1", opp);
+    const third = s.turnOrder[(s.turnOrder.indexOf(ap) + 2) % 4]!;
+    s = castAndResolve(s, third, shock, [player(opp)]);
+    expect(life(s, opp)).toBe(40 - 7 - 4);
+    // Over at the start of its controller's next turn.
+    s = passUntil(s, "main1", ap);
+    s = castAndResolve(s, ap, shock, [player(opp)]);
+    expect(life(s, opp)).toBe(40 - 11 - 2);
+  });
+});

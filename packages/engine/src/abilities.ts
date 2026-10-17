@@ -575,13 +575,13 @@ export interface DamageMod {
    * an Aura or Equipment, the permanent it's attached to); `other`: not that permanent; `spell`: a spell, not a permanent.
    * Missing: any source.
    */
-  by?: { self?: true; other?: true; filters?: { spec: TargetSpec; spell?: true }[] };
+  by?: { self?: true; other?: true; filters?: { spec: TargetSpec; spell?: true }[]; /** A resolved effect's target, as the object it was. */ chosen?: { id: ObjectId; zc: number } };
   /**
    * What it would be dealt to: `players` ("enchanted": the player enchanted by the permanent with the ability; "chosen":
    * its chosen player), `objects` (a permanent matching it, "you" being the ability's controller), `self` (the permanent
    * with the ability), `chosenPermanents` (a permanent the chosen player controls). Missing: any permanent or player.
    */
-  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true };
+  to?: { players?: "all" | "you" | "opponents" | "enchanted" | "chosen"; objects?: TargetSpec; self?: true; chosenPermanents?: true; /** "another permanent you control": not the permanent with the ability. */ other?: true; /** A resolved effect's "that player" and the permanents they control. */ player?: PlayerId; permanentsOf?: PlayerId };
   combat?: "only" | "non";
   /** The Rollercrusher Ride: "while there are four or more card types among cards in your graveyard". */
   while?: StaticCondition;
@@ -1549,6 +1549,13 @@ export type Effect =
   | { type: "cantPlayLands"; who: PlayerRef }
   /** "Damage can't be prevented this turn" (CR 615.12). */
   | { type: "noPrevention" }
+  /**
+   * A damage amount replacement for the rest of the turn, or `until` its controller's next turn (CR 611.2a): "If a source
+   * you control would deal damage this turn, it deals double that damage instead" (Insult), "Each time target permanent
+   * would deal damage ... this turn" (Overblaze: `byTarget`), "until your next turn, if a source would deal damage to that
+   * player or a permanent that player controls" (Lightning, Army of One: `toPlayer`). Its amounts are counted as it resolves.
+   */
+  | { type: "damageMod"; mod: DamageMod; until?: "yourNextTurn"; byTarget?: number; toPlayer?: PlayerRef }
   /** "If ~ was kicked, ...", with "... instead" as `otherwise` being what it does when it wasn't. */
   | { type: "if"; cond: SpellCondition; effects: Effect[]; otherwise?: Effect[] }
   /**

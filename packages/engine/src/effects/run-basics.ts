@@ -169,6 +169,24 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       s.noPreventionTurn = s.turn;
       log(s, `${src}: damage can't be prevented this turn.`);
       return;
+    case "damageMod": {
+      const mod = { ...e.mod, ...(e.mod.amount !== undefined ? { amount: amountNow(s, e.mod.amount, ctx) } : {}) };
+      if (e.byTarget !== undefined) {
+        const t = ctx.targets[e.byTarget];
+        const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+        if (!o || o.zone !== "battlefield") return;
+        mod.by = { ...mod.by, chosen: { id: o.id, zc: o.zoneChanges ?? 0 } };
+      }
+      if (e.toPlayer) {
+        const [p] = players(s, e.toPlayer, ctx);
+        if (p === undefined) return;
+        mod.to = { player: p, permanentsOf: p };
+      }
+      const live = (s.damageMods ?? []).filter((r) => r.turn === s.turn || (r.until === "yourNextTurn" && !(s.activePlayer === r.you && s.turn > r.turn)));
+      s.damageMods = [...live, { id: `dm${s.nextId++}`, mod, you: ctx.controller, name: ctx.sourceDef.name, turn: s.turn, ...(e.until ? { until: e.until } : {}) }];
+      log(s, `${src}: ${e.mod.text.replace(/\.$/, "")}.`);
+      return;
+    }
     case "pumpPerBlocker":
       for (const o of objects(s, e.what, ctx)) {
         // Counted as it resolves (CR 702.23b).

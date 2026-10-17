@@ -8,6 +8,7 @@ import type { DamageRecipient, DamageRuleSpec, Effect, TargetSpec } from "../../
 import type { Color } from "../../types";
 import type { Ctx } from "../body";
 import { addTarget } from "../body";
+import { parseDamageModSentence } from "../damage-mods";
 import { parseDamageRecipient, parseGroup, parseTargetPhrase } from "../targets";
 import { COLOR_WORDS, NUMX, amt } from "../words";
 
@@ -82,6 +83,8 @@ const rule = (r: DamageRuleSpec): Effect[] => [{ type: "damageRule", rule: r }];
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePreventionSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
+  const mod = parseDamageModSentence(s, ctx);
+  if (mod !== undefined) return mod;
   let m: RegExpExecArray | null;
   const QUAL = "(?:an? )((?:(?:white|blue|black|red|green)(?:,? or (?:white|blue|black|red|green))*|artifact|land|creature) )?source of your choice( of the chosen color)?";
   const choose = (q: string | undefined, chosenColor: string | undefined): TargetSpec | null => {

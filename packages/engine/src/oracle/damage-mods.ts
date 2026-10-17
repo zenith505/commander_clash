@@ -2,7 +2,8 @@
 // double that damage to that permanent or player instead", "... that much damage plus 2 instead", "... half that damage,
 // rounded down ...". See DamageMod in abilities.ts; damage.ts applies them.
 
-import type { DamageMod, StaticAbility, TargetSpec } from "../abilities";
+import type { DamageMod, Effect, StaticAbility, TargetSpec } from "../abilities";
+import { addTarget, type Ctx } from "./body";
 import type { Color } from "../types";
 import { parseCount } from "./counts";
 import { parseStaticCondition } from "./statics";
@@ -72,6 +73,7 @@ function parseTo(t: string | undefined, attached: boolean): DamageMod["to"] | nu
   if (t === "you") return { players: "you" };
   if (t === "an opponent") return { players: "opponents" };
   if (t === "a player") return { players: "all" };
+  if (t === "a player or battle permanent") return { players: "all", objects: { kind: "object", types: ["Battle"], text: "battle" } };
   if (t === "enchanted player") return { players: "enchanted" };
   if (t === "~" || t === "this creature") return attached ? null : { self: true };
   if (t === "equipped creature" || t === "enchanted creature") return attached ? { self: true } : null;
@@ -174,4 +176,45 @@ function parsePreventionMod(text: string, line: string): StaticAbility | null {
   if (byP.by) mod.by = byP.by;
   if (to) mod.to = to;
   return { affects: { kind: byP.attached ? "attached" : "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+}
+
+/**
+ * A spell's or ability's damage amount replacement for the turn (Effect damageMod): "If a source you control would deal
+ * damage this turn, it deals double that damage instead" (Insult), "If a source you control would deal damage this turn
+ * to an opponent or a permanent an opponent controls, it deals triple that damage instead" (Isengard Unleashed), "Each
+ * time target permanent would deal damage to a permanent or player this turn, ..." (Overblaze), "until your next turn,
+ * if a source would deal damage to that player or a permanent that player controls, ..." (Lightning, Army of One).
+ * Undefined when the sentence isn't one.
+ */
+export function parseDamageModSentence(text: string, ctx: Ctx): Effect[] | null | undefined {
+  let t = text.replace(/\.$/, "");
+  let until: "yourNextTurn" | undefined;
+  const u = /^[Uu]ntil your next turn, (if .+)$/.exec(t);
+  if (u) [until, t] = ["yourNextTurn", u[1]!];
+  if (!/would deal (?:combat |noncombat )?damage\b.*, (?:it|that source) deals |would deal .*, instead it deals /.test(t)) return undefined;
+  if (!until) {
+    if (!/ this turn(?=,| to )/.test(t)) return undefined;
+    t = t.replace(/ this turn(?=,| to )/, "");
+  } else if (/ this turn\b/.test(t)) return null;
+  let byTarget: number | undefined;
+  const each = /^Each time target (permanent|creature) would deal (.+)$/.exec(t);
+  if (each) {
+    const spec = parseTargetPhrase(each[1]!);
+    if (spec?.kind !== "object") return null;
+    byTarget = addTarget(ctx, spec);
+    t = `If a source would deal ${each[2]}`;
+  }
+  let toPlayer = false;
+  if (/ to that player or a permanent that player controls,/.test(t)) {
+    if (!ctx.eventPlayer) return null;
+    toPlayer = true;
+    t = t.replace(/ to that player or a permanent that player controls,/, ",");
+  }
+  // "a player or battle" (Rankle and Torbran): battles are permanents too.
+  t = t.replace(/ to a player or battle,/, " to a player or battle permanent,");
+  const st = parseDamageMod(t.replace(/^if /, "If "));
+  const m = st?.mods[0];
+  if (!st || st.affects.kind !== "self" || m?.kind !== "damageMod" || m.mod.by?.self || m.mod.to?.self || m.mod.while || ["enchanted", "chosen"].includes(m.mod.to?.players ?? "")) return null;
+  const mod: DamageMod = { ...m.mod, text };
+  return [{ type: "damageMod", mod, ...(until ? { until } : {}), ...(byTarget !== undefined ? { byTarget } : {}), ...(toPlayer ? { toPlayer: { ref: "eventPlayer" } } : {}) }];
 }

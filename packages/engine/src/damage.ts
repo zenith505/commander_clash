@@ -334,8 +334,9 @@ function redirectDestination(s: GameState, r: RedirectShield): Rec | null {
 /** One permanent's damage amount replacement, as the planner sees it. `holder` has the ability (for an Equipment's, the creature it's attached to). */
 interface LiveMod {
   key: string;
-  mod: DamageMod & { you: PlayerId; from: ObjectId };
-  holder: GameObject;
+  mod: DamageMod & { you: PlayerId; from?: ObjectId };
+  /** None for a resolved spell's or ability's (GameState.damageMods). */
+  holder?: GameObject;
   card: string;
 }
 
@@ -348,6 +349,9 @@ function liveMods(s: GameState): LiveMod[] {
       out.push({ key: `mod:${id}:${i}`, mod, holder: o, card: from ? characteristics(s, from).name : characteristics(s, o).name });
     }
   }
+  // A resolved one lasts the turn, or until its controller's next turn begins (CR 611.2a).
+  for (const r of s.damageMods ?? [])
+    if (r.turn === s.turn || (r.until === "yourNextTurn" && !(s.activePlayer === r.you && s.turn > r.turn))) out.push({ key: `mod:${r.id}`, mod: { ...r.mod, you: r.you }, card: r.name });
   return out;
 }
 
@@ -359,8 +363,9 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
   if (d.combat && (d.combat === "only") !== !!e.combat) return false;
   if (d.atMost !== undefined && e.n > d.atMost) return false;
   const ref = e.src.ref;
-  const isHolder = !!ref && ref.object === h.id && ref.zc === (h.zoneChanges ?? 0);
+  const isHolder = !!ref && !!h && ref.object === h.id && ref.zc === (h.zoneChanges ?? 0);
   if (d.by?.self && !isHolder) return false;
+  if (d.by?.chosen && !(ref && ref.object === d.by.chosen.id && ref.zc === d.by.chosen.zc)) return false;
   if (d.by?.other && isHolder) return false;
   if (d.by?.filters && !d.by.filters.some((f) => (!f.spell || e.src.spell) && sourceMatches(s, f.spec, e.src, d.you))) return false;
   const t = d.to;
@@ -368,18 +373,22 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
     let ok = false;
     if ("player" in e.to) {
       const p = e.to.player;
-      ok = t.players === "all" || (t.players === "you" && p === d.you) || (t.players === "opponents" && p !== d.you) || (t.players === "enchanted" && h.attachedToPlayer === p) || (t.players === "chosen" && h.chosen?.player === p);
+      ok = t.players === "all" || (t.players === "you" && p === d.you) || (t.players === "opponents" && p !== d.you) || (t.players === "enchanted" && h?.attachedToPlayer === p) || (t.players === "chosen" && h?.chosen?.player === p) || t.player === p;
     } else {
       const o = s.objects[e.to.object];
-      if (o && o.zone === "battlefield" && !(t.other && o.id === h.id))
-        ok = (!!t.self && o.id === h.id) || (!!t.objects && objectMatches(s, t.objects, o, d.you, false)) || (!!t.chosenPermanents && h.chosen?.player !== undefined && controllerOf(s, o) === h.chosen.player);
+      if (o && o.zone === "battlefield" && !(t.other && o.id === h?.id))
+        ok =
+          (!!t.self && o.id === h?.id) ||
+          (!!t.objects && objectMatches(s, t.objects, o, d.you, false)) ||
+          (!!t.chosenPermanents && h?.chosen?.player !== undefined && controllerOf(s, o) === h.chosen.player) ||
+          (t.permanentsOf !== undefined && controllerOf(s, o) === t.permanentsOf);
     }
     if (!ok) return false;
   }
-  return !d.while || staticConditionNow(s, d.while, d.from, d.you);
+  return !d.while || (!!d.from && staticConditionNow(s, d.while, d.from, d.you));
 }
 
-const modExtra = (s: GameState, m: LiveMod) => (m.mod.amount === undefined ? 0 : Math.max(0, evalAmount(s, m.mod.amount, { controller: m.mod.you, sourceId: m.mod.from })));
+const modExtra = (s: GameState, m: LiveMod) => (m.mod.amount === undefined ? 0 : Math.max(0, evalAmount(s, m.mod.amount, { controller: m.mod.you, ...(m.mod.from ? { sourceId: m.mod.from } : {}) })));
 
 /** The damage after the replacement: double, triple, half, plus or minus (not below 0), or prevented. */
 function modAmount(s: GameState, m: LiveMod, n: number): number {

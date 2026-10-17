@@ -1723,7 +1723,7 @@ function linkExile(out: CompiledCard) {
   if (!returns.length) return;
   const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]
     .flatMap((b) => allEffects(b.effects))
-    .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway") && !("until" in e && e.until));
+    .filter((e): e is Extract<Effect, { type: "exile" | "takeFromHand" | "hideaway" | "discard" }> => (e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || (e.type === "discard" && !!e.exile)) && !("until" in e && e.until));
   if (exiles.length !== 1 || returns.length !== 1 || returns[0]!.event !== "selfLeaves") {
     out.unsupported.push("(returns exiled cards it can't link to one exile ability)");
     return;

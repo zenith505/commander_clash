@@ -4076,13 +4076,13 @@ function Controls({
         <span>
           {pending.kind === "discard" ? <strong>{pending.source}: </strong> : "Hand size: "}
           click {pending.count} {pending.kind === "discard" && pending.filter ? pending.filter.text.replace(/^(?:an? )/, "") : "card"}
-          {pending.count === 1 ? "" : "s"} in your hand to discard.
+          {pending.count === 1 ? "" : "s"} in your hand to {pending.kind === "discard" && pending.exile ? "exile" : "discard"}.
         </span>
         <button
           disabled={discards.length !== pending.count || (pending.kind === "discard" && !!pending.filter && discards.some((id) => !printedMatches(pending.filter!, cardOf(s, id))))}
           onClick={() => dispatch([{ type: "discard", player: HUMAN, objectIds: discards }])}
         >
-          Discard
+          {pending.kind === "discard" && pending.exile ? "Exile" : "Discard"}
         </button>
       </div>
     );

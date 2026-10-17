@@ -2282,7 +2282,7 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
  * order. A target is chosen once; the second verb is about the same player ("that player").
  */
 function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
-  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?|sacrifices?)`;
+  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?|sacrifices?|exiles)`;
   const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+|scry \\d+|surveil \\d+)$`).exec(s);
   if (!m) return null;
   const subject = m[1]!;

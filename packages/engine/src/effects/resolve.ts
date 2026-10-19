@@ -666,6 +666,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "monstrosity":
     case "evolve":
     case "explore":
+    case "doublePT":
     case "continuous":
     case "playerGains":
     case "attach":

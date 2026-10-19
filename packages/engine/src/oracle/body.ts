@@ -2253,6 +2253,8 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
+    // "Double the power of each other creature you control until end of turn. Those creatures gain vigilance" (Rhonas).
+    if (last?.type === "doublePT" && last.what.ref === "each") ctx.lastGroup = last.what;
   }
 }
 

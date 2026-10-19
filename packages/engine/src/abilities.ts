@@ -1762,6 +1762,11 @@ export type Effect =
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
   | { type: "loseAllCounters"; who: PlayerRef }
   /**
+   * Doubling the power and/or toughness of each of a group until end of turn (CR 701.10b-c): each gets +X/+0, +0/+Y or
+   * +X/+Y, X its power and Y its toughness as this resolves (negative ones make it -X or -Y).
+   */
+  | { type: "doublePT"; what: ObjRef; power: boolean; toughness: boolean }
+  /**
    * "You get an emblem with "..."", "each opponent gets an emblem with ..." (CR 114.2): each of those players puts an
    * emblem with these abilities into the command zone. "This emblem" in them is "~".
    */

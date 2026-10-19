@@ -621,6 +621,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
       return;
     }
+    case "doublePT": {
+      // Each one's own power and toughness as this resolves (CR 701.10b-c), so one effect for each, locked onto it.
+      // All worked out before any of them changes (the effect is one event).
+      const list = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield" && objIsType(s, o, "Creature")).map((o) => ({ o, p: e.power ? power(s, o) : 0, t: e.toughness ? toughness(s, o) : 0 }));
+      for (const { o, p, t } of list) {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "modifyPT", power: p, toughness: t }] });
+        log(s, `${defOf(s, o).name} gets ${p < 0 ? "" : "+"}${p}/${t < 0 ? "" : "+"}${t} until end of turn.`);
+      }
+      if (list.length) invalidateCharacteristics(s);
+      return;
+    }
     case "continuous": {
       // The affected set is locked in now (CR 611.2c).
       // Backup: "If that's another creature, it gains ..." (CR 702.165a).

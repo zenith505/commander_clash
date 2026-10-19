@@ -306,7 +306,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
-      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount))) {
+      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
         const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),

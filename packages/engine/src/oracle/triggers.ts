@@ -1026,7 +1026,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if ((/^~ /.test(intervening[2]!) || / counters on ~$/.test(intervening[2]!)) && /^At /.test(intervening[1]!))
       rest = /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.") : rest.replace(/\bit\b/g, "~");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
-    return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
+    if (!t || t === "fail" || t.ifCond) return "fail";
+    // "Whenever a Mountain you control enters, if you control at least five other Mountains" (Valakut, the Molten
+    // Pinnacle): Mountains other than that new one, as it triggers and as it resolves (rulings, CR 603.4).
+    const kinds = (f: TargetSpec) => JSON.stringify([f.types, f.subtypes, f.supertypes]);
+    if (ifCond.kind === "control" && ifCond.other && t.event === "permanentEnters" && t.enters && kinds(t.enters.filter) === kinds(ifCond.filter)) {
+      const { other: _, ...rest } = ifCond;
+      return { ...t, ifCond: { ...rest, otherThanSubject: true } };
+    }
+    return { ...t, ifCond };
   }
   // "At the beginning of your second main phase": the turn's second main phase, a postcombat one (CR 505.1a-b).
   const second = /^At the beginning of your second main phase, (.+)$/.exec(line);

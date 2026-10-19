@@ -404,7 +404,7 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
   }
 }
 
-function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number): boolean {
+function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
@@ -687,6 +687,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         let n = 0;
         for (const [id, c] of chars) {
           if (cond.other && id === sourceId) continue;
+          if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
           if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
         }
@@ -694,14 +695,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       });
     }
     case "allOf":
-      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc));
+      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId));
   }
 }
 
 /** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
-export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number): boolean {
+export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId): boolean {
   const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
-  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
+  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId);
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {

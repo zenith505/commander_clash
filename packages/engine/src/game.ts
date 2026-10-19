@@ -2212,7 +2212,7 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc)) {
+    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id)) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }

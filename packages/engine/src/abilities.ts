@@ -1211,6 +1211,8 @@ export type Effect =
       tapped?: boolean;
       /** "Return it to the battlefield transformed": with its back face up, if it's a double-faced card (CR 712.14a). */
       transformed?: true;
+      /** "Return it to the battlefield flipped" (Homura): a flip card enters flipped (CR 710.1b). */
+      flipped?: true;
       /** "Under its owner's control" rather than yours. */
       owner?: boolean;
       /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
@@ -1359,7 +1361,7 @@ export type Effect =
    */
   /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
   /** `thisTurn`: "When you lose control of that Equipment this turn" (Stolen Uniform): only until the turn ends. */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1718,6 +1720,8 @@ export type Effect =
   | { type: "solve" }
   /** "Transform ~" (CR 701.27a): turn a double-faced permanent over. */
   | { type: "transform"; what: ObjRef }
+  /** "Flip ~", "you may flip it" (CR 710): a flip card's permanent turns to its flipped half, for good (710.4). */
+  | { type: "flip"; what: ObjRef }
   /** "~ becomes prepared" (CR 722.3a): a permanent with a prepare spell gets the prepared designation. */
   | { type: "becomePrepared"; what: ObjRef }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
@@ -1940,6 +1944,11 @@ export type SpellCondition =
   | { kind: "state"; cond: StaticCondition }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
   | { kind: "xAtLeast"; n: number }
+  /**
+   * "Then if that player has no cards in hand" (Nezumi Shortfang), "if no cards are in that graveyard" (Nezumi
+   * Graverobber): a number counted as it resolves, which may name its targets (CR 608.2c).
+   */
+  | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /**

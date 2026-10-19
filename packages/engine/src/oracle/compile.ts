@@ -170,7 +170,7 @@ export function isFullySupported(d: CardDef): boolean {
  * fuse or aftermath have those lines reported by their faces. Transforming, flip and preparation cards aren't yet.
  */
 function facesSupported(card: CardDef): boolean {
-  if (!["modal_dfc", "adventure", "split", "transform", "prepare"].includes(card.layout ?? "")) return false;
+  if (!["modal_dfc", "adventure", "split", "transform", "prepare", "flip"].includes(card.layout ?? "")) return false;
   const d = restingDef(card);
   // Rooms: doors that are unlocked, not halves cast on their own (CR 709.5).
   if (d.subtypes.includes("Room")) return false;

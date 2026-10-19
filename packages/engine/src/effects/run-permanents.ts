@@ -38,6 +38,21 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
 }
 
 /**
+ * Flip a permanent (CR 710): a flip card's, unflipped, turns so its flipped half's name, text, type line, power and
+ * toughness apply; its color and mana cost don't change (710.1c). Nothing else can flip, and it can't flip back (710.4).
+ * It's the same object: counters, damage and effects on it stay.
+ */
+export function flipPermanent(s: GameState, o: GameObject): boolean {
+  const d = s.cards[o.cardId];
+  if (o.zone !== "battlefield" || o.faceDown || o.face === 1 || d?.layout !== "flip" || d.faces?.length !== 2) return false;
+  const was = defOf(s, o).name;
+  setFace(s, o, 1);
+  invalidateCharacteristics(s);
+  log(s, `${was} flips into ${defOf(s, o).name}.`);
+  return true;
+}
+
+/**
  * Proliferate (CR 701.27a): choose any number of permanents and players with counters; each gets another of
  * each kind it has. Chosen for the player: their own permanents' helpful counters, opponents' permanents'
  * -1/-1 and stun counters, their own energy and experience, and opponents' poison.
@@ -164,6 +179,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     case "becomePrepared":
       for (const o of objects(s, e.what, ctx)) becomePrepared(s, o);
+      return;
+    case "flip":
+      for (const o of objects(s, e.what, ctx)) flipPermanent(s, o);
       return;
     case "solve": {
       // "This Case becomes solved" (CR 719.3a-b): the same object only (CR 400.7); it stays solved until it leaves.

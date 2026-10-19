@@ -622,6 +622,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "solve":
     case "transform":
     case "becomePrepared":
+    case "flip":
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":

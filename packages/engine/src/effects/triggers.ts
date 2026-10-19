@@ -472,7 +472,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const d of [...(s.delayed ?? [])]) {
       if (d.when !== "leaves" || d.subject.id !== ev.id || d.subject.zc !== was) continue;
       s.delayed = s.delayed!.filter((x) => x !== d);
-      if (d.to?.includes(ev.to)) s.triggerQueue.push({ sourceId: ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body });
+      // "When that creature dies this turn": only this turn, and only if it dies (CR 700.4).
+      if (d.thisTurn !== undefined && d.thisTurn !== s.turn) continue;
+      if (d.dies && !ev.wasCreature) continue;
+      if (d.to?.includes(ev.to))
+        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.

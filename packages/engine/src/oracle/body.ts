@@ -1519,6 +1519,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });
       continue;
     }
+    // "Then if that player has no cards in hand, flip ~" (Nezumi Shortfang), after its target opponent discarded; "If no
+    // cards are in that graveyard, flip ~" (Nezumi Graverobber): the graveyard its target card was in, its owner's (CR
+    // 404.1). Counted as it resolves (CR 608.2c).
+    const noCards = /^(?:Then )?[Ii]f (that player has no cards in hand|no cards are in that graveyard), (.+)$/.exec(s);
+    if (noCards) {
+      const cards = ctx.targets.flatMap((x, i) => (x.kind === "card" ? [i] : []));
+      const t = cards.length === 1 ? cards[0] : undefined;
+      const amount: Amount | null = noCards[1]!.startsWith("that player")
+        ? parseCount("cards in that player's hand", ctx)
+        : t !== undefined
+          ? { count: { kind: "cardsInGraveyard", who: { ref: "targetOwner", index: t } } }
+          : null;
+      const inner = amount && parseOne(noCards[2]!.charAt(0).toUpperCase() + noCards[2]!.slice(1), ctx);
+      if (!amount || !inner) return null;
+      effects.push({ type: "if", cond: { kind: "amountNow", amount, max: 0 }, effects: inner });
+      continue;
+    }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the

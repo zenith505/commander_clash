@@ -1079,7 +1079,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Auras: their controller chooses what each enchants as it enters (CR 303.4f), all before any card moves; one with
       // nothing to enchant stays where it is (303.4g).
       // "Transformed": a double-faced card with its back face up; anything else stays where it is (CR 712.14a).
-      const faceOf = (o: GameObject) => (e.transformed ? transformedFace(s, o) : undefined);
+      // "Flipped": a flip card enters flipped (CR 710.1b); any other card enters as it is, the flip being impossible.
+      const faceOf = (o: GameObject) => (e.transformed ? transformedFace(s, o) : e.flipped && s.cards[o.cardId]?.layout === "flip" && s.cards[o.cardId]!.faces?.length === 2 ? 1 : undefined);
       const entering = list.filter((o) => (e.transformed ? faceOf(o) !== undefined : isPermanentCard(defOf(s, o))));
       const hosts = e.attachToSubject || e.attachToTarget !== undefined ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
       if (hosts === "paused") return "paused";
@@ -1123,7 +1124,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             log(s, `${d.name} has nothing to enchant, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
             continue;
           }
-          log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? " and transformed" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? (e.flipped ? " flipped" : " and transformed") : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
           moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
           // the permanent it became, while it's still that object (CR 400.7, rulings).

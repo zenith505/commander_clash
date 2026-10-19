@@ -678,8 +678,18 @@ export interface DelayedTrigger {
   about?: { id: ObjectId; zc: number };
   /** `lostControl` with `about`: `controller` has controlled the watched object since this was made (Seraph rulings). */
   held?: true;
-  /** `lostControl`: it lasts only until the end of this turn ("When you lose control of that Equipment this turn"). */
+  /**
+   * `lostControl` and `leaves`: it lasts only until the end of this turn ("When you lose control of that Equipment this
+   * turn", "When that creature dies this turn").
+   */
   thisTurn?: number;
+  /** `leaves`: only when it dies, a creature put into a graveyard from the battlefield (CR 700.4). */
+  dies?: true;
+  /**
+   * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
+   * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7).
+   */
+  source?: { id: ObjectId; zc: number };
   body: AbilityBody;
   /** Made during an end step, "the next end step" is the following turn's (CR 603.7c doesn't fire it in the same step). */
   turn: number;

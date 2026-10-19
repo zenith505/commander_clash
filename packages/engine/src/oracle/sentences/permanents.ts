@@ -34,6 +34,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "~ becomes solved") return [{ type: "solve" }];
   // "Transform ~" (CR 701.27a).
   if (/^[Tt]ransform ~$/.test(s)) return [{ type: "transform", what: { ref: "self" } }];
+  // "Flip ~" (CR 710); "flip it" in a trigger about itself.
+  if (/^[Ff]lip ~$/.test(s) || (ctx.selfIt && /^[Ff]lip it$/.test(s))) return [{ type: "flip", what: { ref: "self" } }];
   // "~ becomes prepared" (CR 722.3a); "it" in a trigger about itself.
   if (/^~ becomes prepared$/.test(s) || (ctx.selfIt && /^[Ii]t becomes prepared$/.test(s))) return [{ type: "becomePrepared", what: { ref: "self" } }];
   // "Tap that creature and it doesn't untap during its controller's next untap step" (Kashi-Tribe Warriors).
@@ -83,6 +85,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return of?.ref === "target"
       ? [{ type: "delayed", when: "lostControl", of, effects: [tap ? { type: "tap", what: { ref: "subject" } } : { type: "unattach", what: { ref: "subject" }, ...(m[3] ? { ifAttachedToYours: true as const } : {}) }], text: `${m[3] ?? ""}${m[4]!.toLowerCase()} it`, ...(m[2] ? { thisTurn: true as const } : {}) }]
       : null;
+  }
+  // Initiate of Blood: "When that creature dies this turn, flip ~." A delayed trigger about the creature it targeted
+  // (CR 603.7), for the rest of this turn.
+  if ((m = /^When that creature dies this turn, flip ~$/.exec(s))) {
+    const of = ctx.lastObjectTarget !== undefined ? ({ ref: "target", index: ctx.lastObjectTarget } as const) : null;
+    return of && !ctx.spell ? [{ type: "delayed", when: "dies", of, effects: [{ type: "flip", what: { ref: "self" } }], text: "flip ~", thisTurn: true }] : null;
   }
   // Removal and tapping
   if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {

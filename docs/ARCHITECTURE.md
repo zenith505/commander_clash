@@ -19,7 +19,12 @@ build script uses it by default. all-cards only adds other languages and extra
 printings; the script can stream it when we want printing choice.
 
 After filtering out tokens, art cards, planes, schemes and vanguards we get **33,076
-English playable cards**.
+English playable cards**. A card with several faces keeps them all in `faces` (split, flip, double-faced,
+adventurer and preparation cards); its own fields are its front face's.
+
+`tools/scryfall-extract.mjs` (plain Node) writes the chosen printing of each card as a 15 MB extract
+(`scryfall-oracle-cards.jsonl.gz`, plus the rulings), kept in the project's shared folder, so
+`npm run build:cards` can rebuild `cards.json` without the bulk files.
 
 ## Platform
 

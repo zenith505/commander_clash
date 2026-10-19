@@ -849,7 +849,10 @@ function facePlan(s: GameState, pid: PlayerId, id: string, free: boolean, when: 
     // Not as an Adventure again from exile (CR 715.3d).
     .filter((f) => !(layout === "adventure" && o.zone === "exile"))
     .sort((a, b) => defMv(s.cards[registerFace(s, o, b)]!) - defMv(s.cards[registerFace(s, o, a)]!));
+  const halves = s.cards[o.cardId]!.faces!.length;
   for (const face of faces) {
+    // Fused (CR 702.102): only when we'd cast each half on its own too, so neither half is wasted or hurts us.
+    if (layout === "split" && face === halves && !Array.from({ length: halves }, (_, i) => i).every((i) => asFace(s, o, i, () => castPlan(s, pid, id, free)))) continue;
     const plan = asFace(s, o, face, () => castPlan(s, pid, id, free));
     if (plan) return plan.map((a) => (a.type === "castSpell" && a.objectId === id ? { ...a, face } : a));
   }

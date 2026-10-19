@@ -51,18 +51,22 @@ export function copyKey(s: GameState, base: CardDef, except?: CopyExcept): strin
   }
   const key = `${base.oracleId}|copy:${JSON.stringify(except)}`;
   if (s.cards[key]) return key;
+  s.cards[key] = { ...base, ...excepted(base, except), oracleId: key };
+  return key;
+}
+
+/** A card's or face's characteristics with a copy's exceptions applied (CR 707.9b). */
+function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "subtypes" | "typeLine" | "oracleText" | "colors" | "manaCost"> & { keywords?: string[] }>(base: T, except: CopyExcept): Partial<T> & { cmc?: number } {
   const supertypes = base.supertypes.filter((t) => !(except.notLegendary && t === "Legendary"));
   if (except.legendary && !supertypes.includes("Legendary")) supertypes.push("Legendary");
   const types = [...base.types, ...(except.addTypes ?? []).filter((t) => !base.types.includes(t))];
   const subtypes = [...base.subtypes, ...(except.addSubtypes ?? []).filter((t) => !base.subtypes.includes(t))];
-  const keywords = [...base.keywords, ...(except.keywords ?? []).filter((k) => !base.keywords.includes(k))];
+  const keywords = [...(base.keywords ?? []), ...(except.keywords ?? []).filter((k) => !base.keywords?.includes(k))];
   const name = except.name ?? base.name;
   // "~" in an added ability is the copy itself (CR 707.9a).
   const text = [base.oracleText, ...(except.keywords?.length ? [except.keywords.join(", ")] : []), ...(except.text ?? []).map((x) => x.replace(/~/g, name))].filter(Boolean).join("\n");
   const typeLine = `${[...supertypes, ...types].join(" ")}${subtypes.length ? ` — ${subtypes.join(" ")}` : ""}`;
-  const def: CardDef = {
-    ...base,
-    oracleId: key,
+  return {
     name,
     supertypes,
     types,
@@ -73,9 +77,29 @@ export function copyKey(s: GameState, base: CardDef, except?: CopyExcept): strin
     ...(except.pt ? { power: String(except.pt[0]), toughness: String(except.pt[1]) } : {}),
     ...(except.colors ? { colors: except.colors } : {}),
     ...(except.noManaCost ? { manaCost: "", cmc: 0 } : {}),
-  };
-  s.cards[key] = def;
-  return key;
+  } as Partial<T> & { cmc?: number };
+}
+
+/** A transforming or modal double-faced card (CR 712.1): a copy of one made as a token has both faces (707.8a). */
+const isDfc = (d: CardDef | undefined): d is CardDef => !!d?.faces && d.faces.length === 2 && (d.layout === "transform" || d.layout === "modal_dfc");
+
+/**
+ * The card a token copy of `base` is (CR 707.8a): a copy of a double-faced permanent or card is a double-faced token,
+ * each face a copy of that face with the exceptions applied to both (rulings on Soul Separator), entering with the
+ * same face up. Its back face, a copy of a back face, has mana value 0 (CR 202.3b). Anything else: copyKey.
+ */
+export function tokenCopyKey(s: GameState, base: CardDef, except?: CopyExcept): { key: string; face?: number } {
+  const whole = base.faceOf ? s.cards[base.faceOf.oracleId] : base;
+  if (!isDfc(whole) || (base.faceOf && !isDfc(s.cards[base.faceOf.oracleId]))) return { key: copyKey(s, base, except) };
+  const face = base.faceOf?.face;
+  const key = `${whole.oracleId}|dfcCopy:${JSON.stringify(except ?? {})}`;
+  if (!s.cards[key]) {
+    const ex = except && Object.keys(except).length ? except : undefined;
+    const faces = whole.faces!.map((f) => (ex ? { ...f, ...excepted({ ...f, keywords: f.keywords ?? [] }, ex), ...(ex.noManaCost ? { manaCost: "" } : {}) } : { ...f }));
+    for (const f of faces) delete (f as { cmc?: number }).cmc;
+    s.cards[key] = { ...whole, ...(ex ? excepted(whole, ex) : {}), oracleId: key, faces, dfcCopy: true };
+  }
+  return { key, ...(face ? { face } : {}) };
 }
 
 /**

@@ -16,7 +16,7 @@ import { foundWith, newObjects } from "../mutate";
 import { addDelayed, paidUnless } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
-import { defMv, transformedFace } from "../faces";
+import { asFace, defMv, transformedFace } from "../faces";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
 export function isSuspended(s: GameState, o: GameObject): boolean {
@@ -30,11 +30,12 @@ export function isSuspended(s: GameState, o: GameObject): boolean {
 function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind, tapped?: boolean, transformed?: boolean): "paused" | void {
   // Returned transformed: only a double-faced card, with its back face up (CR 712.14a); anything else stays in exile.
   const back = cards.filter((c) => (transformed ? transformedFace(s, c) !== undefined : isPermanentCard(defOf(s, c))));
-  const hosts = chooseAuraHosts(s, back.map((o) => ({ o, under: under(o) })), src);
+  const faceOf = (c: GameObject) => (transformed ? transformedFace(s, c) : undefined);
+  const hosts = chooseAuraHosts(s, back.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
   if (hosts === "paused") return "paused";
   enterTogether(s, () => {
     for (const c of back) {
-      const d = defOf(s, c);
+      const d = asFace(s, c, faceOf(c), () => defOf(s, c));
       const host = hosts.get(c.id);
       if (d.subtypes.includes("Aura") && !host) {
         log(s, `${d.name} has nothing to enchant, so it stays in exile.`);
@@ -53,18 +54,20 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
  * thing is legal. Returns "paused" while a player chooses, else the host of each Aura that can enter; an Aura missing
  * from it stays put. Cards that aren't Auras are skipped.
  */
-export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId }[], src: string): "paused" | Map<ObjectId, AuraHost> {
+export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string): "paused" | Map<ObjectId, AuraHost> {
   const sc = (s.resolving!.scratch ??= {});
   const hosts = (sc.auraHosts ??= {});
-  for (const { o, under } of cards) {
-    if (!defOf(s, o).subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
-    const options = auraHostOptions(s, o, under);
+  for (const { o, under, face } of cards) {
+    // A card entering transformed is an Aura, and enchants, as its back face (CR 712.14a, 303.4f).
+    const d = asFace(s, o, face, () => defOf(s, o));
+    if (!d.subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
+    const options = asFace(s, o, face, () => auraHostOptions(s, o, under));
     if (options.length <= 1) {
       hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
       continue;
     }
     sc.auraAsking = o.id;
-    s.pending = { kind: "chooseOption", player: under, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose what ${defOf(s, o).name} enchants as it enters` };
+    s.pending = { kind: "chooseOption", player: under, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose what ${d.name} enchants as it enters` };
     return "paused";
   }
   const out = new Map<ObjectId, AuraHost>();
@@ -1075,13 +1078,31 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);
       // Auras: their controller chooses what each enchants as it enters (CR 303.4f), all before any card moves; one with
       // nothing to enchant stays where it is (303.4g).
-      const hosts = e.attachToSubject ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, list.filter((o) => isPermanentCard(defOf(s, o))).map((o) => ({ o, under: under(o) })), src);
+      // "Transformed": a double-faced card with its back face up; anything else stays where it is (CR 712.14a).
+      const faceOf = (o: GameObject) => (e.transformed ? transformedFace(s, o) : undefined);
+      const entering = list.filter((o) => (e.transformed ? faceOf(o) !== undefined : isPermanentCard(defOf(s, o))));
+      const hosts = e.attachToSubject || e.attachToTarget !== undefined ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
         for (const o of list) {
-          const d = defOf(s, o);
+          const face = faceOf(o);
+          const d = asFace(s, o, face, () => defOf(s, o));
+          if (e.attachToTarget !== undefined) {
+            // "Attached to target opponent": the target, if the Aura could enchant it as it enters (CR 303.4f); else it
+            // stays where it is (303.4g).
+            if (e.transformed && face === undefined) continue;
+            const t = ctx.targets[e.attachToTarget];
+            const host = d.subtypes.includes("Aura") ? asFace(s, o, face, () => auraHostOptions(s, o, under(o))).find((h) => ("attachTo" in h ? t?.kind === "object" && t.id === h.attachTo : t?.kind === "player" && t.id === h.attachToPlayer)) : undefined;
+            if (!host) {
+              log(s, `${d.name} can't be attached to that, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
+              continue;
+            }
+            log(s, `${src} returns ${d.name} to the battlefield${face ? " transformed" : ""} attached to ${auraHostName(s, host)}.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), ...(face ? { face } : {}), ...host });
+            continue;
+          }
           if (e.attachToSubject) {
             // An Aura returned "attached to that creature" (CR 303.4f): only to one it could enchant, protection
             // included (CR 303.4d); otherwise it stays where it is (CR 303.4g). Being attached isn't targeting.
@@ -1096,8 +1117,6 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host.id });
             continue;
           }
-          // "Transformed": a double-faced card with its back face up; anything else stays where it is (CR 712.14a).
-          const face = e.transformed ? transformedFace(s, o) : undefined;
           if (e.transformed ? face === undefined : !isPermanentCard(d)) continue;
           const host = hosts.get(o.id);
           if (d.subtypes.includes("Aura") && !host) {

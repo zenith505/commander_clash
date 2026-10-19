@@ -429,9 +429,14 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
   if (hadKw) bodyText = hadKw[3]!;
-  const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true });
+  const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
   if (!body) return "fail";
-  if (attached) return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
+  if (attached) {
+    // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
+    // died or just after (CR 704.5m), not the Aura on the battlefield it no longer is (CR 400.7).
+    if (attached[1] === "enchanted") for (const e of allEffects(body.effects)) if ((e.type === "bounce" || e.type === "putOntoBattlefield") && e.what.ref === "self") e.what = { ref: "selfCard", moved: true };
+    return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
+  }
   let phrase = m![2]!;
   const damaged = / dealt damage by ~ this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
@@ -922,7 +927,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
   const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to that creature)?))\.$/.exec(line);
-  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!)) {
+  // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger.
+  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
     if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
     if (!YARD_EVENTS.includes(t.event) || t.host) return "fail";

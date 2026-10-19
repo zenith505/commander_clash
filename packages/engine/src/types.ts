@@ -102,6 +102,8 @@ export interface CardDef {
   faces?: CardFace[];
   /** A face's own definition (faces.ts faceDef): the card it's a face of, and which face. */
   faceOf?: { oracleId: string; face: number };
+  /** A double-faced token's card, made as a copy of a double-faced object (CR 707.8a): its back face has mana value 0 (202.3b). */
+  dfcCopy?: true;
   /**
    * A meld pair (CR 712.4, 712.5): the two cards that meld and the melded permanent they become. A melded permanent's
    * card exists only as the back faces of the pair (712.4b), so the card named `result` can't be in a deck.

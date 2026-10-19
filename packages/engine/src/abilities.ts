@@ -451,8 +451,13 @@ export type ObjRef =
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
   | { ref: "subjectCard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
-  /** After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your hand"). */
-  | { ref: "selfCard" }
+  /**
+   * After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your
+   * hand"). `moved`: an Aura's "when enchanted creature dies, return this card ..." (Angelic Destiny), the Aura card in a
+   * graveyard it went to from the battlefield then or since, while it's still there (rulings); `yours`: "from your
+   * graveyard", only if that's its controller's (rulings on Screams from Within).
+   */
+  | { ref: "selfCard"; moved?: true; yours?: true }
   /** "Create a 0/0 Fractal creature token. Put X +1/+1 counters on it": the token(s) this ability just created. */
   | { ref: "created" }
   /** "The amassed Army" (CR 701.47c): the Army chosen by this ability's amass, or by the one whose reflexive trigger this is. */
@@ -1210,6 +1215,8 @@ export type Effect =
       owner?: boolean;
       /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
       attachToSubject?: boolean;
+      /** An Aura "attached to target opponent" (Accursed Witch): this target, if the Aura could enchant it (CR 303.4f). */
+      attachToTarget?: number;
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[] };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */

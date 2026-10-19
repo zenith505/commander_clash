@@ -17,9 +17,10 @@ const mv = (cost: string) => manaValue(parseManaCost(cost));
 
 /**
  * A card's or permanent's mana value (CR 202.3): from its mana cost, except a nonmodal double-faced card's back face,
- * whose is its front face's (712.8c, 712.8e). A copy of a back face isn't that face (copyKey drops `faceOf`): 0.
+ * whose is its front face's (712.8c, 712.8e). A copy of a back face isn't that face (copyKey drops `faceOf`), and a
+ * double-faced token's back face is a copy of one: 0 (202.3b).
  */
-export const defMv = (d: CardDef): number => (d.faceOf && d.layout === "transform" ? d.cmc : mv(d.manaCost));
+export const defMv = (d: CardDef): number => (d.faceOf && d.faceOf.face > 0 && d.layout === "transform" ? (d.dfcCopy ? 0 : d.cmc) : mv(d.manaCost));
 
 const faceDefs = new Map<string, CardDef>();
 
@@ -62,6 +63,7 @@ export function faceDef(d: CardDef, i: number): CardDef {
     ...(f.imageUrl ?? d.imageUrl ? { imageUrl: f.imageUrl ?? d.imageUrl } : {}),
     ...(f.artUrl ?? d.artUrl ? { artUrl: f.artUrl ?? d.artUrl } : {}),
     ...(d.layout ? { layout: d.layout } : {}),
+    ...(d.dfcCopy ? { dfcCopy: true as const } : {}),
     faceOf: { oracleId: d.oracleId, face: i },
   };
   faceDefs.set(key, out);
@@ -162,6 +164,9 @@ export function asFace<T>(s: GameState, o: GameObject, face: number | undefined,
 
 /** Does an object named `name` have the chosen name? A split card has either of its names (CR 709.4a, 709.4d). */
 export const hasName = (name: string | undefined, chosen: string) => name !== undefined && (name === chosen || name.split(" // ").includes(chosen));
+
+/** Do objects with these names have the same name: one of each's names, a split card having two (CR 709.4a)? */
+export const sameName = (a: string | undefined, b: string | undefined) => a !== undefined && b !== undefined && (a === b || a.split(" // ").some((n) => b.split(" // ").includes(n)));
 
 /**
  * The face a card put onto the battlefield "transformed" enters with (CR 712.14a): a double-faced card's back face, if

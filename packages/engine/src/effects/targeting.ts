@@ -11,7 +11,7 @@ import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
-import { defMv, hasName } from "../faces";
+import { defMv, hasName, sameName } from "../faces";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
 const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : n === 0);
@@ -36,7 +36,7 @@ export function sameNamed(s: GameState, t: GameObject, group: NonNullable<Extrac
   const whose = controllerOf(s, t);
   return s.battlefield
     .map((id) => obj(s, id))
-    .filter((o) => o.id !== t.id && !o.faceDown && characteristics(s, o).name === name && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
+    .filter((o) => o.id !== t.id && !o.faceDown && sameName(characteristics(s, o).name, name) && (!group.of || controllerOf(s, o) === whose) && objectMatches(s, group.filter, o, controller, false));
 }
 
 export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, controller: PlayerId, targeting = true, src?: SourceQuality, chars?: Characteristics, view?: (o: GameObject) => Characteristics | undefined): boolean {
@@ -282,7 +282,7 @@ export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId 
   const holder = { controller: pid };
   if (src && protectedFrom(gained, src.controller === undefined && from !== undefined ? { ...src, controller: from } : src, holder)) return true;
   // "You have protection from the chosen card name" (Runed Halo): anything with that name, its own sources too.
-  if (src?.name !== undefined && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && s.objects[id]!.chosen?.name === src.name && !!abilitiesOf(s, s.objects[id]!).protectionFromChosenName)) return true;
+  if (src?.name !== undefined && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && hasName(src.name, s.objects[id]!.chosen?.name ?? "\u0000") && !!abilitiesOf(s, s.objects[id]!).protectionFromChosenName)) return true;
   if (from === undefined || from === pid) return false;
   if (protectedFromPlayer(gained, from, holder)) return true;
   return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youHave === "protection");

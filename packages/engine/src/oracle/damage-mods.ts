@@ -26,6 +26,8 @@ function sourceKind(t: string): { spec: TargetSpec; spell?: true } | null {
   }
   const extra = { ...(colors.length ? { colors } : {}), ...(you ? { controller: "you" as const } : {}) };
   if (rest === "source") return { spec: { kind: "object", ...extra, text: t } };
+  // "A noncreature source you control" (Disciples of the Inferno): a spell, or a permanent that isn't a creature.
+  if (rest === "noncreature source") return { spec: { kind: "object", notTypes: ["Creature"], ...extra, text: t } };
   // "Sources with the chosen name" (Gideon's Intervention): the name chosen as the permanent entered (CR 201.4).
   if (rest === "source with the chosen name" && !colors.length) return { spec: { kind: "object", chosen: "name", ...extra, text: t } };
   if (rest === "source an opponent controls" && !colors.length) return { spec: { kind: "object", controller: "opponent", text: t } };
@@ -75,6 +77,8 @@ function parseTo(t: string | undefined, attached: boolean): DamageMod["to"] | nu
   if (t === "you") return { players: "you" };
   if (t === "an opponent") return { players: "opponents" };
   if (t === "a player") return { players: "all" };
+  // Disciples of the Inferno: a creature or battle permanent, or an opponent.
+  if (t === "a creature, battle, or opponent") return { players: "opponents", objects: { kind: "object", types: ["Creature", "Battle"], text: "creature or battle" } };
   if (t === "a player or battle permanent") return { players: "all", objects: { kind: "object", types: ["Battle"], text: "battle" } };
   if (t === "enchanted player") return { players: "enchanted" };
   if (t === "~" || t === "this creature") return attached ? null : { self: true };

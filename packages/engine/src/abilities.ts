@@ -78,6 +78,8 @@ export interface AmountExpr {
   plus?: number;
   negate?: boolean;
   half?: "up" | "down";
+  /** It may be below 0: doubling a creature's power gives it +X/+0 for a negative X too (CR 107.1b, 701.10c). */
+  signed?: true;
 }
 
 /** What an amount counts. */
@@ -1427,6 +1429,8 @@ export type Effect =
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
+  | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }
   /** "Move all counters from target creature onto another target creature" (CR 122.5): only if both are still legal targets (rulings on Fate Transfer). */
@@ -2352,6 +2356,8 @@ export interface TriggeredAbility {
   attacksMostLife?: boolean;
   /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
   attacksPlayer?: boolean;
+  /** "Whenever ~ attacks a battle" (Thrashing Frontliner, CR 310.5). */
+  attacksBattle?: boolean;
   /** "Whenever ~ attacks for the first time each turn": only on its first attack this turn, as this object (Aurelia). */
   firstAttack?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */

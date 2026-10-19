@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
+import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
@@ -455,6 +455,26 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} loses ${n} ${e.counter} counter${n > 1 ? "s" : ""}.`);
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
+      }
+      return;
+    case "battleDefense":
+      // Its protector is "who protects it" (CR 310.9e): an opponent's protection, defense counters off; else on.
+      for (const o of objects(s, e.what, ctx)) {
+        if (!objIsType(s, o, "Battle")) continue;
+        const name = characteristics(s, o).name;
+        if (o.protector !== undefined && opponents(s, ctx.controller).includes(o.protector)) {
+          const had = o.counters.defense ?? 0;
+          const n = Math.min(had, e.n);
+          if (n <= 0) continue;
+          o.counters.defense = had - n;
+          invalidateCharacteristics(s);
+          log(s, `${name} loses ${n} defense counter${n > 1 ? "s" : ""}.`);
+          if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "defense" });
+        } else {
+          const put = putCounters(s, o, "defense", e.n);
+          invalidateCharacteristics(s);
+          log(s, `${name} gets ${put} defense counter${put === 1 ? "" : "s"}.`);
+        }
       }
       return;
     case "removeAllCounters":

@@ -59,7 +59,7 @@ export const isFixed = (a: Amount): a is number => typeof a === "number";
 export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
   const v = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
-  const n = Math.max(0, a.half ? halve(v, a.half) : v);
+  const n = a.signed ? v : Math.max(0, a.half ? halve(v, a.half) : v);
   return a.negate ? -n : n;
 }
 

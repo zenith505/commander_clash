@@ -20,6 +20,13 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
+  // "Target player or battle", "target opponent or battle" (Ayara), "another target battle or opponent" (Invasion of
+  // Regatha: not itself, CR 115.4): a player, or a battle permanent.
+  const battle = /^(another )?target (?:(player|opponent) or battle|battle or (player|opponent))$/i.exec(p);
+  if (battle) {
+    const who = (battle[2] ?? battle[3])!.toLowerCase();
+    return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Battle"], ...(who === "opponent" ? { opponent: true } : {}), ...(battle[1] ? { notSource: true } : {}), text: p.toLowerCase() }) };
+  }
   // Bonfire of the Damned: "... to target player or planeswalker and each creature that player or that planeswalker's
   // controller controls": the creatures of the player it targets, or of the planeswalker's controller.
   if (/^each creature that player or that planeswalker's controller controls$/i.test(p)) {

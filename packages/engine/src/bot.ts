@@ -633,7 +633,11 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const copies = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "becomeCopy" }> => e.type === "becomeCopy");
     const copied = copies.some((e) => e.of.ref === "target" && e.of.index === i);
     const copying = copies.some((e) => e.what.ref === "target" && e.what.index === i);
-    const preferred = copied
+    // Portent Tracker: our own battle an opponent protects, a step closer to defeating it.
+    const defenseOf = allEffects(body.effects).some((e) => e.type === "battleDefense" && e.what.ref === "target" && e.what.index === i);
+    const preferred = defenseOf
+      ? all.filter((t) => t.kind === "object" && controllerOf(s, obj(s, t.id)) === pid && obj(s, t.id).protector !== undefined && obj(s, t.id).protector !== pid)
+      : copied
       ? all.filter((t) => t.kind !== "object" || (t.id !== sourceId && !(isMine(s, pid, t) && objIsLegendary(s, t.id))))
       : reanimate
         ? all

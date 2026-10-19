@@ -823,6 +823,7 @@ export function moveObject(
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
+  o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
@@ -1920,6 +1921,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
   s.cantAttackThisTurn = undefined;
+  s.costModsThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
   s.lastKnown = undefined;
@@ -2998,6 +3000,15 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       else less -= m.n;
     }
   }
+  // "Spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): from resolved spells and abilities (CR 611.2a).
+  for (const { player: who, mod: m } of s.costModsThisTurn ?? []) {
+    if (who !== pid) continue;
+    const { manaValue: range, ...rest } = m.filter;
+    if (!printedMatches(rest, d)) continue;
+    if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
+    if (m.n > 0) more += m.n;
+    else less -= m.n;
+  }
   return { more, less };
 }
 
@@ -3987,7 +3998,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
     if (!canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
     // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
-    if (o.activatedThisTurn?.includes(LOYALTY_USED)) return `a loyalty ability of ${d.name} was already activated this turn`;
+    const used = o.activatedThisTurn?.filter((n) => n === LOYALTY_USED).length ?? 0;
+    if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : "two loyalty abilities"} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
     const remove = ab.loyaltyX ? (x ?? 0) : -(ab.loyalty ?? 0);
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
@@ -4468,6 +4480,16 @@ function arrangeTop(s: GameState, p: Player, top: ObjectId[], away: ObjectId[]) 
 
 /** Marks, in `activatedThisTurn`, that a loyalty ability of the permanent was activated this turn (CR 606.3). */
 const LOYALTY_USED = -1;
+
+/**
+ * How many loyalty abilities of this permanent its controller may activate each turn: one (CR 606.3), or two with its
+ * own "twice each turn" (Urza, Planeswalker) or its controller's Oath of Teferi.
+ */
+function loyaltyPerTurn(s: GameState, o: GameObject): number {
+  if (abilitiesOf(s, o).loyaltyTwice) return 2;
+  const pid = controllerOf(s, o);
+  return s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).loyaltyTwice === "yours" && controllerOf(s, obj(s, id)) === pid) ? 2 : 1;
+}
 
 /** The cards a library search found (CR 701.23). */
 function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {

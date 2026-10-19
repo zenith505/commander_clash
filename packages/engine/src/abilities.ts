@@ -337,7 +337,7 @@ export interface TargetSpec {
    * creature" (CR 700.9: a counter on it, equipped, or enchanted by an Aura its controller controls); "unenchanted":
    * "creatures that aren't enchanted".
    */
-  status?: "enchanted" | "equipped" | "modified" | "unenchanted";
+  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted";
   /** "Target Aura attached to a creature", "Aura or Equipment attached to a creature you control": what it's attached to. */
   attachedTo?: TargetSpec;
   /** "Suspected creature" (CR 701.60). */
@@ -1781,6 +1781,8 @@ export type Effect =
   | { type: "noLifeGain"; players: "all" | "opponents" }
   /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
   | { type: "turnRules"; rules: TurnRule["rule"][] }
+  /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
+  | { type: "costModThisTurn"; mod: CostMod }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
@@ -2382,6 +2384,8 @@ export interface TriggeredAbility {
   ifSpent?: SpentReq;
   /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
   ifCastFromHand?: boolean;
+  /** "When ~ enters from a graveyard" / "from your graveyard" (its owner is its controller): part of the trigger event. */
+  ifFromGraveyard?: "any" | "yours";
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
   ifCast?: true;
   /**
@@ -3007,6 +3011,17 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
   noMaxHandSize?: boolean | "all";
+  /**
+   * "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker), "... of
+   * planeswalkers you control ..." (Oath of Teferi): two loyalty abilities of that permanent each turn, the same one
+   * twice or two different ones (CR 606.3, rulings on Urza).
+   */
+  loyaltyTwice?: "self" | "yours";
+  /**
+   * "~ is all colors" (Transguild Courier, Awaken the Maelstrom): a characteristic-defining ability (CR 604.3), applied in
+   * layer 5 before any other effect (613.3). The card data's colors already have it everywhere else (CR 604.3a).
+   */
+  allColors?: true;
   /**
    * Unspent mana not lost as steps and phases end (CR 500.4): kept by `who` (only mana of `color`, if given: Leyline
    * Tyrant's red), or with `becomes`, a replacement effect: it becomes that type of mana instead and is kept (Kruphix's

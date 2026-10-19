@@ -1225,6 +1225,22 @@ export function compile(d: CardDef): CompiledCard {
       out.creatureAbilitiesHaste = true;
       continue;
     }
+    // "~ is all colors" (CR 604.3), and Fallaji Wayfarer's "This ability doesn't affect its color identity" (its color
+    // identity in the card data is green, CR 903.4). Only when the card data has all five colors for it, as Scryfall does.
+    if (/^~ is all colors\.(?: This ability doesn't affect its color identity\.)?$/.test(line.replace(/ \(It can be in any deck whose commander's color identity includes \w+\.\)$/, ""))) {
+      if (d.colors.length !== 5) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.allColors = true;
+      continue;
+    }
+    // "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker; CR 606.3).
+    const loyaltyTwice = /^You may activate the loyalty abilities of (~|planeswalkers you control) twice each turn rather than only once\.$/.exec(line);
+    if (loyaltyTwice) {
+      out.loyaltyTwice = loyaltyTwice[1] === "~" ? "self" : "yours";
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = out.noMaxHandSize || true;
       continue;

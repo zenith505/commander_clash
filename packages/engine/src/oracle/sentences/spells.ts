@@ -10,6 +10,7 @@ import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
 import { PREDEFINED_TOKENS } from "../tokens";
 import { parseSearchFilter } from "../search";
+import { parseCostChange } from "../statics";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -20,6 +21,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     // "It" in a trigger about another permanent (Grafted Wargear's "sacrifice that permanent"): only if you control it (CR 701.21a).
     return what?.ref === "self" || what?.ref === "subject" ? [{ type: "sacrifice", what }] : null;
+  }
+  // "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): a cost change
+  // for the spells its controller casts later this turn (CR 601.2f, 611.2a). Only generic mana comes off (CR 118.7a).
+  if ((m = /^(.+? spells) you cast this turn cost (\{\d+\}) less to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {
+    const change = parseCostChange(`${m[1]} you cast cost ${m[2]} less to cast`);
+    if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard) return null;
+    return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` } }];
   }
   // Extra turns (CR 500.7): "Take an extra turn after this one", "Target player takes two extra turns after this one".
   if ((m = /^(?:(.+?) )?(?:take|takes) (an|two|three) extra turns? after this one$/i.exec(s))) {

@@ -187,7 +187,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     types: [...d.types],
     subtypes: [...d.subtypes],
     allCreatureTypes: d.keywords.includes("Changeling"),
-    colors: [...d.colors],
+    // "~ is all colors" (CR 604.3) applies first in layer 5 (613.3). A copy whose colors an exception set doesn't have it (707.9d).
+    colors: compileCard(d).allColors ? ["W", "U", "B", "R", "G"] : [...d.colors],
     keywords: printedKeywords(d),
     hasPrintedAbilities: true,
     grantedAbilities: [],

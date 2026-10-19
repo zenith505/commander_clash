@@ -125,7 +125,7 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
     const ac = view && a.zone === "battlefield" ? view(a) : characteristics(s, a);
     if (!ac) continue;
     if (status !== "enchanted" && ac.subtypes.includes("Equipment")) return true;
-    if (status === "enchanted" && ac.subtypes.includes("Aura")) return true;
+    if ((status === "enchanted" || status === "enchantedOrEquipped") && ac.subtypes.includes("Aura")) return true;
     if (status === "modified" && ac.subtypes.includes("Aura") && ac.controller === c.controller) return true;
   }
   return false;

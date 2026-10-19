@@ -1139,6 +1139,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(crime[1]!, { selfIt: true });
     return body ? { event: "youCommitCrime", body, activeIf: { kind: "yourTurn" } } : "fail";
   }
+  // "When ~ enters from a graveyard" / "from your graveyard" (Phyrexian Dragon Engine, Oscorp Industries): where it came
+  // from is part of the trigger event (CR 603.6a); a card is only ever in its owner's graveyard (CR 404.2), so "your" is
+  // its owner, who must be its controller now.
+  const fromYard = /^When(?:ever)? ~ enters from (a|your) graveyard, (.+)$/.exec(line);
+  if (fromYard) {
+    const t = parseTrigger(`When ~ enters, ${fromYard[2]}`);
+    return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifFromGraveyard: fromYard[1] === "a" ? "any" : "yours" };
+  }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);
     if (m) {

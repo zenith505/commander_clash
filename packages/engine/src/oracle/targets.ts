@@ -426,6 +426,8 @@ const PLURAL_TYPES: Record<string, string> = {
 export function parseGroup(phrase: string, bare = false, count?: (text: string) => AmountExpr | null): { filter: TargetSpec; other: boolean } | null {
   // "Each nonland, nontoken permanent": the same as "each nonland nontoken permanent".
   let p = phrase.trim().replace(/\b(non[a-z]+), (?=non[a-z]+ )/gi, "$1 ");
+  // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
+  p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);
@@ -690,6 +692,9 @@ export function parseTargetPhrase(
       } else if (w === "token" || w === "nontoken") {
         if (alts.length > 1) return null;
         extra.token = w === "token";
+      } else if (w === "enchanted-or-equipped" && !extra.status) {
+        if (alts.length > 1) return null;
+        extra.status = "enchantedOrEquipped";
       } else if ((w === "enchanted" || w === "equipped" || w === "modified") && !extra.status) {
         // "Enchanted creatures you control", "an equipped creature", "modified creature" (CR 700.9).
         if (alts.length > 1) return null;

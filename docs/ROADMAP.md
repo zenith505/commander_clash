@@ -1,6 +1,6 @@
 # Roadmap
 
-20,558 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,606 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,21 +15,29 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-0. Cards with faces (CR 709, 710, 712, 715, 722): 437 of the 846 legal ones play now (`npm run faces` lists each
-   layout's support and the lines blocking it): 141 of 388 transforming double-faced, 105 of 151 adventurer, 77 of 123
-   split (13 of 28 Rooms), 46 of 98 modal double-faced, 50 of 67 preparation, 18 of 19 flip. 12 of the 14 meld cards
-   play (CR 701.42). Still out:
+0. Cards with faces (CR 709, 710, 712, 715, 722): 458 of the 846 legal ones play now (`npm run faces` lists each
+   layout's support and the lines blocking it): 160 of 388 transforming double-faced (17 of the 36 Invasion Sieges),
+   106 of 151 adventurer, 77 of 123 split (13 of 28 Rooms), 47 of 98 modal double-faced, 50 of 67 preparation, 18 of
+   19 flip. All 14 meld cards play (CR 701.42). Still out:
    - Transformers: only Goldbug of the 13 plays; the others each have a line of their own (`npm run faces`).
-   - Transform: craft (702.167), "~ is all colors" (a characteristic-defining ability, CR 604.3: it has to reach every
-     place that reads a card's colors, in every zone), "As ~ transforms into ~" (712.20: Curse of Leeches, Ludevic,
-     Sephiroth, Zenos each need their own work), and the single lines `npm run faces` lists.
+   - Transform: craft (702.167), "As ~ transforms into ~" (712.20: Curse of Leeches, Ludevic, Sephiroth, Zenos each
+     need their own work), and the single lines `npm run faces` lists.
+   - Sieges (CR 310) still out on their own lines: Invasion of Alara, Amonkhet, Arcavios, Azgol (Ashen Reaper), Fiora
+     (Marchesa), Gobakhan, Ikoria (Zilortha), Innistrad (Deluge: "if it was a creature card"), Kaldheim, Kylem, New
+     Capenna, New Phyrexia (Teferi Akosa), Pyrulea, Ravnica, Segovia (granting convoke), Tarkir (revealing Dragons),
+     Theros (Ephara), Zendikar (Awakened Skyclave's land type).
+   - Other battle cards: War Historian ("attacked a battle this turn"), Rampaging Geoderm and Rampaging Raptor, Zurgo
+     and Ojutai ("each player or battle"), Joyful Stormsculptor, Final Act, Begin the Invasion, Into the Fire, Death
+     Kiss; doubling "power and toughness" (Double Trouble, Dragonclaw Strike, Grunn). Bots don't aim spells at
+     battles (except Portent Tracker's counters) and attack only their own Sieges.
    - Rooms: 15 still out on their doors' own lines.
    - Flip: Sasaya's back face.
-   - Meld: Urza, Lord Protector (Urza, Planeswalker has no loyalty in the card data, and its "activate loyalty
-     abilities twice" and "+2: ... cost {2} less" lines aren't supported) and Phyrexian Dragon Engine ("when ~ enters
-     from your graveyard"). Bots don't save Hanweir Battlements' mana for its meld ability (they use it for haste).
-   - Halvar, God of Battle's "enchanted or equipped" and the other lines of Preston, God-Pharaoh's Gift, Ardyn, Hour of
-     Eternity, Dino DNA and Hashaton (copies that are a creature type instead now work; these are blocked elsewhere).
+   - Meld: bots don't save Hanweir Battlements' mana for its meld ability (they use it for haste). "Twice this turn"
+     for loyalty abilities of other permanents (Kaito, Urza Assembles the Titans) isn't supported.
+   - Preston, God-Pharaoh's Gift, Ardyn, Hour of Eternity, Dino DNA and Hashaton are blocked on other lines.
+   - Still out from the last round: Treacherous Pit-Dweller ("enters from a graveyard, target opponent gains control
+     of it"), Leyline of the Guildpact ("each nonland permanent you control is all colors"), Sphinx of the Guildpact
+     ("hexproof from monocolored"), the Fallaji convoke grant.
    - Bots don't plan around day and night (casting two spells to make it day).
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:

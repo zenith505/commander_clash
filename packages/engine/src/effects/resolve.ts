@@ -754,6 +754,16 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     addDelayed(s, "yourNextUpkeep", controller, o, { targets: [], effects: [{ type: "castFromExileFree" }], text: "Rebound: you may cast ~ from exile without paying its mana cost." });
     return;
   }
+  // An Adventure that resolves is exiled instead of going to the graveyard, and its controller may cast the creature
+  // later for as long as it stays exiled (CR 715.3d). A copy of one isn't a card (CR 707.10a).
+  if (o.face === 1 && s.cards[o.cardId]?.layout === "adventure" && !o.spellCopy) {
+    moveObject(s, id, "exile");
+    if (o.zone === "exile") {
+      o.mayPlay = { player: controller, zc: o.zoneChanges ?? 0, until: "adventure", turn: s.turn };
+      log(s, `${d.name} is exiled: ${player(s, controller).name} may cast ${defOf(s, o).name} from exile (on an adventure).`);
+    }
+    return;
+  }
   if (o.buyback) {
     moveObject(s, id, "hand");
     if (o.zone === "hand") log(s, `${d.name} returns to ${player(s, o.owner).name}'s hand (buyback).`);

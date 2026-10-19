@@ -1,3 +1,4 @@
+import { faceDef, restingDef } from "../faces";
 import { allEffects } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
@@ -30,7 +31,9 @@ export const overloadedText = (text: string): string =>
     .map((l) => (/^Overload\b/.test(l) ? l : l.replace(/\btarget\b/g, "each").replace(/\bTarget\b/g, "Each")))
     .join("\n");
 
-export function compileCard(d: CardDef): CompiledCard {
+export function compileCard(card: CardDef): CompiledCard {
+  // A card with faces as it is in the card data: its resting characteristics, the ones it has in a game (CR 709.4, 712.8a).
+  const d = restingDef(card);
   const hit = cache.get(d.oracleId);
   if (hit) return hit;
   const out = compile(d);
@@ -140,11 +143,10 @@ const UNSUPPORTED_SUBTYPES = ["Room", "Siege"];
  * played, but some of their text does nothing yet, so decks and the UI flag them.
  */
 export function isFullySupported(d: CardDef): boolean {
-  // Split, adventure, flip and double-faced cards (CR 709-712) need their faces modeled: today
-  // only the first face's text is compiled and the mana costs of both halves run together.
-  if (d.name.includes(" // ")) return false;
   // A melded permanent isn't a card: it exists only as the back faces of its meld pair (CR 712.4b).
   if (d.meld?.result === d.name) return false;
+  if (d.faces?.length) return facesSupported(d);
+  if (d.name.includes(" // ")) return false;
   const cost = parseManaCost(d.manaCost);
   if (!cost.supported) return false;
   if (d.types.some((t) => UNSUPPORTED_TYPES.includes(t)) || d.subtypes.some((t) => UNSUPPORTED_SUBTYPES.includes(t))) return false;
@@ -160,6 +162,19 @@ export function isFullySupported(d: CardDef): boolean {
   if ((d.types.includes("Instant") || d.types.includes("Sorcery")) && !c.spell) return false;
   if (d.subtypes.includes("Aura") && !c.enchant) return false;
   return true;
+}
+
+/**
+ * A card with several faces: each face it can be cast as, played as or turned up to has to be supported. Modal
+ * double-faced cards (CR 712.3, 712.11b, 712.12), adventurer cards (715) and split cards (709) are; split cards with
+ * fuse or aftermath have those lines reported by their faces. Transforming, flip and preparation cards aren't yet.
+ */
+function facesSupported(card: CardDef): boolean {
+  if (!["modal_dfc", "adventure", "split"].includes(card.layout ?? "")) return false;
+  const d = restingDef(card);
+  // Rooms: doors that are unlocked, not halves cast on their own (CR 709.5).
+  if (d.subtypes.includes("Room")) return false;
+  return d.faces!.every((_, i) => isFullySupported(faceDef(d, i)));
 }
 
 /**

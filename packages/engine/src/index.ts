@@ -2,6 +2,7 @@ export * from "./types";
 export * from "./mana";
 export * from "./manaabilities";
 export * from "./cards";
+export * from "./faces";
 export * from "./game";
 export * from "./autopay";
 export * from "./deck";

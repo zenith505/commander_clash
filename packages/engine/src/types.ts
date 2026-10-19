@@ -95,11 +95,13 @@ export interface CardDef {
   /**
    * Every face of a card with more than one, in printed order: the halves of a split card (CR 709), a flip card's two
    * halves (710), the front and back of a double-faced card (712), an adventurer card's creature and Adventure (715),
-   * a preparation card's creature and prepare spell (722). The card's own fields above are its first face's, except
-   * `name` ("A // B"), `cmc`, `colorIdentity`, `keywords` and `producedMana`, which are the whole card's. Nothing in
-   * the engine reads the other faces yet, and `isFullySupported` turns such cards away.
+   * a preparation card's creature and prepare spell (722). In the card data the fields above are its first face's,
+   * except `name` ("A // B"), `cmc`, `colorIdentity`, `keywords` and `producedMana`, which are the whole card's; in a
+   * game the card has its resting characteristics (faces.ts restingDef) and each face a definition of its own (faceDef).
    */
   faces?: CardFace[];
+  /** A face's own definition (faces.ts faceDef): the card it's a face of, and which face. */
+  faceOf?: { oracleId: string; face: number };
   /**
    * A meld pair (CR 712.4, 712.5): the two cards that meld and the melded permanent they become. A melded permanent's
    * card exists only as the back faces of the pair (712.4b), so the card named `result` can't be in a deck.
@@ -125,6 +127,8 @@ export interface CardFace {
   colors: Color[];
   /** A color indicator: the colors of a face with no mana cost, usually a back face (CR 204). */
   colorIndicator?: Color[];
+  /** Its keywords (the card's list is the whole card's): set on a game's resting definition (restingDef). */
+  keywords?: string[];
   /** Only a face printed on its own side has its own image (a double-faced card's back); the others share the card's. */
   imageUrl?: string;
   artUrl?: string;
@@ -144,6 +148,13 @@ export type ZoneName = "library" | "hand" | "battlefield" | "graveyard" | "exile
 export interface GameObject {
   id: ObjectId;
   cardId: string; // key into GameState.cards
+  /**
+   * The face of its card that's up, an index into CardDef.faces (faces.ts): the half of a split card or the face of a
+   * modal double-faced card cast (CR 709.3, 712.11b), an Adventure (715.3), a transformed permanent's back face
+   * (712.8e), a flipped permanent (710.1b). Unset, it has its card's resting characteristics. Only on the stack and the
+   * battlefield (a new object anywhere else, CR 400.7).
+   */
+  face?: number;
   /** A copy effect's values (CR 707.2), a key into GameState.cards: Clone as it entered, until it leaves. */
   copyOf?: string;
   /**
@@ -266,12 +277,13 @@ export interface GameObject {
    * (CR 702.185a) and a plotted card (CR 702.170d) may only be cast, by their owner, on a later turn than `turn`,
    * for as long as they stay exiled; a plotted one without paying its mana cost, as a sorcery. "yourNextTurn": until
    * that player's next turn begins (Three Wishes); "source": while `source` stays on the battlefield (Intet);
-   * "yourNextEndStep": until that player's next end step begins (Yasmin Khan).
+   * "yourNextEndStep": until that player's next end step begins (Yasmin Khan). "adventure": a card that went on an
+   * adventure (CR 715.3d), for as long as it stays exiled, but not cast as an Adventure again this way.
    */
   mayPlay?: {
     player: PlayerId;
     zc: number;
-    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep";
+    until: "thisTurn" | "nextTurn" | "exiled" | "warp" | "plot" | "foretell" | "yourNextTurn" | "source" | "yourNextEndStep" | "adventure";
     turn: number;
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
@@ -740,6 +752,11 @@ export interface CostChoices {
   delve?: ObjectId[];
   /** Cast it face down for {3} with its morph or disguise ability (CR 702.37c, 702.168b). */
   faceDown?: boolean;
+  /**
+   * Which face of a card with several to cast (CardDef.faces): a split card's half (CR 709.3), a modal double-faced
+   * card's face (712.11b), the Adventure (715.3). Unset: the card as it is.
+   */
+  face?: number;
   /** Permanents to sacrifice, cards to discard, cards to exile from your graveyard. */
   sacrifice?: ObjectId[];
   discard?: ObjectId[];
@@ -1459,7 +1476,8 @@ export interface Resolving {
 export type Action =
   | { type: "passPriority"; player: PlayerId }
   /** `untapped`: for a land that may enter untapped by paying life or revealing a card (CR 614.12), do that. */
-  | { type: "playLand"; player: PlayerId; objectId: ObjectId; untapped?: boolean }
+  /** `face`: for a modal double-faced card, the land face it's played as (CR 712.12). */
+  | { type: "playLand"; player: PlayerId; objectId: ObjectId; untapped?: boolean; face?: number }
   /**
    * Activate a mana ability (CR 605.3): `ability` indexes manaAbilitiesOn (unset: the cheapest
    * one that makes `mana`), `mana` is the choice for one that offers several.

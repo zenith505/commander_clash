@@ -1,6 +1,7 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
+import { asFace, castableFaces, landFaces, layoutOf, restingDef, setFace } from "./faces";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
@@ -240,7 +241,7 @@ function bottomCards(s: GameState, p: Player, ids: ObjectId[]) {
 }
 
 export function newObject(s: GameState, card: CardDef, owner: PlayerId, zone: ZoneName): GameObject {
-  s.cards[card.oracleId] ??= card;
+  s.cards[card.oracleId] ??= restingDef(card);
   const o: GameObject = {
     id: `o${s.nextId++}`,
     cardId: card.oracleId,
@@ -306,7 +307,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "playLand":
       requireNoPending(s);
-      playLand(s, p, action.objectId, action.untapped);
+      playLand(s, p, action.objectId, action.untapped, action.face);
       s.passedInSuccession = [];
       break;
     case "activateMana":
@@ -576,6 +577,8 @@ export function moveObject(
     becomes?: { types: string[]; subtypes: string[] };
     /** Manifested or cloaked: turned face down, then put onto the battlefield (CR 701.40a, 701.58a). */
     faceDown?: FaceDownKind;
+    /** The face it enters with up: a modal double-faced land's (CR 712.12), "transformed" (712.14a). */
+    face?: number;
   } = {},
 ) {
   const o = obj(s, id);
@@ -718,6 +721,8 @@ export function moveObject(
     o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
     o.overloaded = undefined; // the text change lasts while it's a spell (CR 702.96a)
     o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
+    // The face up on the stack stays up as it resolves into a permanent (CR 712.13); anywhere else it's a new object.
+    o.face = undefined;
     // A face-down spell becomes a face-down permanent (CR 708.4); anywhere else, it's revealed (CR 708.9).
     if (o.faceDown) {
       o.faceDown = undefined;
@@ -725,6 +730,7 @@ export function moveObject(
     }
   }
   o.zone = to;
+  if (opts.face !== undefined && to === "battlefield") setFace(s, o, opts.face);
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
   o.copyEffects = undefined;
@@ -2469,8 +2475,13 @@ export function landsAllowed(s: GameState, pid: PlayerId): number {
   return n;
 }
 
-function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
+function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, face?: number): void {
   const o = obj(s, id);
+  // A modal double-faced card is played as one of its land faces, chosen first (CR 712.12).
+  if (face !== undefined && o.face !== face) {
+    if (!landFaces(s, o).includes(face)) throw new RulesError(`${defOf(s, o).name} has no land face to play that way`);
+    return asFace(s, o, face, () => playLand(s, p, id, untapped, face));
+  }
   const d = defOf(s, o);
   if (!((o.zone === "hand" && o.owner === p.id) || mayPlayFromExile(s, o, p.id) || mayPlayLandFromGraveyard(s, o, p.id) || mayPlayFromTop(s, o, p.id))) throw new RulesError("land must be in your hand");
   if (!isType(d, "Land")) throw new RulesError(`${d.name} is not a land`);
@@ -2490,7 +2501,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean) {
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
-  moveObject(s, id, "battlefield", { untapped });
+  moveObject(s, id, "battlefield", { untapped, ...(face !== undefined ? { face } : {}) });
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
 }
 
@@ -2616,6 +2627,15 @@ export function castProblem(
   const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
+  if (choices?.face !== undefined && o.face !== choices.face) {
+    // A split card's half, a modal double-faced card's face, an Adventure: only that face is looked at (CR 709.3a,
+    // 712.11c, 715.3a).
+    const fp = faceProblem(s, pid, o, choices);
+    if (fp) return fp;
+    return asFace(s, o, choices.face, () => castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices));
+  }
+  // A split card is cast as one of its halves (CR 709.3).
+  if (layoutOf(s, o) === "split" && o.face === undefined && o.zone !== "stack") return `choose which half of ${defOf(s, o).name} to cast`;
   if (choices?.faceDown && !o.faceDown) {
     // Cast face down (CR 702.37c, 708.4): it's turned face down first, so the checks see a 2/2 creature spell.
     const fd = compileCard(defOf(s, o)).faceDownCast;
@@ -2798,11 +2818,25 @@ export function castProblem(
   return null;
 }
 
+/** Why this card can't be cast with the face `choices.face` (CR 709.3, 712.11b, 715.3), or null. */
+function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostChoices): string | null {
+  const face = choices.face!;
+  if (choices.faceDown || o.faceDown) return "a face-down spell has no face to choose";
+  if (!castableFaces(s, o).includes(face)) return `${defOf(s, o).name} can't be cast as that face`;
+  // A card that went on an adventure may be cast from exile, but not as an Adventure again (CR 715.3d), unless
+  // something else lets it be cast from there.
+  if (layoutOf(s, o) === "adventure" && face === 1 && o.zone === "exile" && o.mayPlay?.until === "adventure" && ownExilePermission(s, o, pid) && !linkedPlayPermission(s, o, pid))
+    return `${defOf(s, o).name} can't go on an adventure again from exile`;
+  return null;
+}
+
 /**
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice" | "harmonize"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice" | "harmonize"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+  // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
+  if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
   const d = how.faceDown ? FACE_DOWN : defOf(s, o);
   // Kicker and buyback costs are additional costs, added to the total (CR 702.33a, 702.27a, 601.2f).
@@ -3045,11 +3079,12 @@ function harmonizeProblem(s: GameState, pid: PlayerId, choices?: CostChoices, co
 }
 
 /** Target specs a card needs when cast (empty for most permanents). For a modal spell, those of the chosen modes. */
-export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => spellTargetSpecs(castDef(s, id, alt), modes, how);
+export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?: AltCostKind, how?: CastHow) => asFace(s, obj(s, id), how?.face, () => spellTargetSpecs(castDef(s, id, alt), modes, how));
 
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
-export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt">): CastHow => ({
+export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face">): CastHow => ({
   ...(choices?.alt ? { alt: choices.alt } : {}),
+  ...(choices?.face !== undefined ? { face: choices.face } : {}),
   ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
   ...(choices?.bargain ? { bargained: true } : {}),
   ...(choices?.evidence ? { evidence: true } : {}),
@@ -3087,6 +3122,11 @@ export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, o
 
 function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice[], modes?: number[], convoke?: ObjectId[], improvise?: ObjectId[], x?: number, choices: CostChoices = {}) {
   const o = obj(s, id);
+  if (choices.face !== undefined && o.face !== choices.face) {
+    const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
+    if (problem) throw new RulesError(problem);
+    setFace(s, o, choices.face); // the face cast is the one up on the stack (CR 709.3b, 712.11, 715.3b)
+  }
   if (choices.faceDown && !o.faceDown) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
@@ -5874,9 +5914,15 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
   const out: Action[] = [{ type: "passPriority", player: pid }];
   for (const id of [...p.hand, ...exilePlayable(s, pid), ...topPlayable(s, pid)]) {
     const d = defOf(s, obj(s, id));
+    const o = obj(s, id);
     if (isType(d, "Land")) {
       if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !nameLandBan(s, pid, d)) out.push({ type: "playLand", player: pid, objectId: id });
     } else if (canCast(s, pid, id) && !spellTargets(s, id).length && !spellModes(s, id)) out.push({ type: "castSpell", player: pid, objectId: id });
+    // A modal double-faced card's other land face (CR 712.12), and the faces it can be cast as (709.3, 712.11b, 715.3).
+    for (const face of landFaces(s, o))
+      if (face !== 0 && canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid) && !asFace(s, o, face, () => nameLandBan(s, pid, defOf(s, o)))) out.push({ type: "playLand", player: pid, objectId: id, face });
+    for (const face of castableFaces(s, o))
+      if (castProblem(s, pid, id, undefined, undefined, undefined, undefined, undefined, { face }) === null && asFace(s, o, face, () => !spellTargets(s, id).length && !spellModes(s, id))) out.push({ type: "castSpell", player: pid, objectId: id, face });
     if (suspendProblem(s, pid, id) === null) out.push({ type: "suspend", player: pid, objectId: id });
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
     if (foretellProblem(s, pid, id) === null) out.push({ type: "foretell", player: pid, objectId: id });

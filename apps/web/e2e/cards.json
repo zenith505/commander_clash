@@ -1765,6 +1765,67 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6ec2a242-9068-4ee2-8ac8-8341cc570f56",
+  "name": "Emeria's Call // Emeria, Shattered Skyclave",
+  "manaCost": "{4}{W}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Sorcery // Land",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Create two 4/4 white Angel Warrior creature tokens with flying. Non-Angel creatures you control gain indestructible until your next turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "mythic",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Emeria's Call",
+    "manaCost": "{4}{W}{W}{W}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Create two 4/4 white Angel Warrior creature tokens with flying. Non-Angel creatures you control gain indestructible until your next turn.",
+    "colors": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/c/4/c470539a-9cc7-4175-8f7c-c982b6072b6d.jpg?1783929425",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/c/4/c470539a-9cc7-4175-8f7c-c982b6072b6d.jpg?1783929425"
+   },
+   {
+    "name": "Emeria, Shattered Skyclave",
+    "manaCost": "",
+    "typeLine": "Land",
+    "supertypes": [],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "As this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {W}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/c/4/c470539a-9cc7-4175-8f7c-c982b6072b6d.jpg?1783929425",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/c/4/c470539a-9cc7-4175-8f7c-c982b6072b6d.jpg?1783929425"
+   }
+  ]
+ },
+ {
   "oracleId": "c62a9e10-cfc6-48cc-a3f7-68d624182a5a",
   "name": "Endless Swarm",
   "manaCost": "{5}{G}{G}{G}",
@@ -2057,6 +2118,64 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "ae92942b-919c-4ea9-b693-85fcef765d5a",
+  "name": "Fire // Ice",
+  "manaCost": "{1}{R} // {1}{U}",
+  "cmc": 4,
+  "typeLine": "Instant // Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Fire deals 2 damage divided as you choose among one or two targets.",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ddj",
+  "releasedAt": "2012-09-07",
+  "rarity": "uncommon",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Fire",
+    "manaCost": "{1}{R}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Fire deals 2 damage divided as you choose among one or two targets.",
+    "colors": [
+     "R"
+    ]
+   },
+   {
+    "name": "Ice",
+    "manaCost": "{1}{U}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Tap target permanent.\nDraw a card.",
+    "colors": [
+     "U"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "6fd5e591-fae8-4128-a4d3-a848c8a8ffda",
@@ -3239,6 +3358,77 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2ac1c95c-2a9d-40bc-9cad-9cadfa3f19f7",
+  "name": "Kazandu Mammoth // Kazandu Valley",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elephant // Land",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elephant"
+  ],
+  "oracleText": "Landfall — Whenever a land you control enters, this creature gets +2/+2 until end of turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Landfall"
+  ],
+  "producedMana": [
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "rare",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Kazandu Mammoth",
+    "manaCost": "{1}{G}{G}",
+    "typeLine": "Creature — Elephant",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Elephant"
+    ],
+    "oracleText": "Landfall — Whenever a land you control enters, this creature gets +2/+2 until end of turn.",
+    "power": "3",
+    "toughness": "3",
+    "colors": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/0/9/09c8c150-a0d8-4254-9169-7697e9c540da.jpg?1783929291",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/0/9/09c8c150-a0d8-4254-9169-7697e9c540da.jpg?1783929291"
+   },
+   {
+    "name": "Kazandu Valley",
+    "manaCost": "",
+    "typeLine": "Land",
+    "supertypes": [],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "This land enters tapped.\n{T}: Add {G}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/0/9/09c8c150-a0d8-4254-9169-7697e9c540da.jpg?1783929291",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/0/9/09c8c150-a0d8-4254-9169-7697e9c540da.jpg?1783929291"
+   }
+  ]
+ },
+ {
   "oracleId": "b96b1341-0c15-4816-be2d-5cc98b2afb63",
   "name": "Khorvath Brightflame",
   "manaCost": "{5}{R}",
@@ -4129,6 +4319,76 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "1080c5b5-6651-4c6a-93e6-099fbe389e26",
+  "name": "Murderous Rider // Swift End",
+  "manaCost": "{1}{B}{B} // {1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Creature — Zombie Knight // Instant — Adventure",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Knight"
+  ],
+  "oracleText": "Lifelink\nWhen this creature dies, put it on the bottom of its owner's library.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
+  "layout": "adventure",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Murderous Rider",
+    "manaCost": "{1}{B}{B}",
+    "typeLine": "Creature — Zombie Knight",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Zombie",
+     "Knight"
+    ],
+    "oracleText": "Lifelink\nWhen this creature dies, put it on the bottom of its owner's library.",
+    "power": "2",
+    "toughness": "3",
+    "colors": [
+     "B"
+    ]
+   },
+   {
+    "name": "Swift End",
+    "manaCost": "{1}{B}{B}",
+    "typeLine": "Instant — Adventure",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [
+     "Adventure"
+    ],
+    "oracleText": "Destroy target creature or planeswalker. You lose 2 life. (Then exile this card. You may cast the creature later from exile.)",
+    "colors": [
+     "B"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "933afaa3-3b23-454c-9465-8f2ba9652b4f",

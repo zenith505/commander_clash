@@ -280,7 +280,8 @@ describe("card faces from Scryfall", () => {
     ]);
     expect(d.faces!.some((f) => f.imageUrl)).toBe(false);
     expect(d.imageUrl).toBe(img("fire-ice").normal);
-    expect(isFullySupported(d)).toBe(false);
+    // Each half is cast on its own (CR 709.3), and both halves compile.
+    expect(isFullySupported(d)).toBe(true);
   });
 
   it("an adventurer card's Adventure (CR 715.2) and a modal double-faced card's back (712.3)", () => {

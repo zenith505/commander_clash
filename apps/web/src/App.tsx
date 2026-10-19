@@ -1,6 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  asFace,
+  castableFaces,
+  isType,
+  landFaces,
+  registerFace,
   abilityProblem,
   altCost,
   altCostsFor,
@@ -260,15 +265,15 @@ function evenDivision(specs: TargetSpec[], chosen: TargetChoice[]): TargetChoice
 }
 
 /** The human is choosing modes for a modal spell or activated ability they're casting (CR 700.2a). */
-type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[]; teamwork?: string[]; /** Kicker already announced (Inscriptions): the cast goes on from here. */ draft?: CastDraft } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
+type ModePick = { mode: "cast"; objectId: string; label: string; body: AbilityBody; convoke?: string[]; teamwork?: string[]; /** Kicker already announced (Inscriptions): the cast goes on from here. */ draft?: CastDraft; /** The face it's cast as. */ face?: number } | { mode: "activate"; objectId: string; index: number; label: string; body: AbilityBody };
 
 /** Picking creatures to tap: to crew a Vehicle (CR 702.122a), to station (CR 702.184a, one creature) or to convoke a spell (CR 702.51a). */
 type TapPick =
   | { kind: "crew"; objectId: string; index: number; n: number; chosen: string[]; saddle?: boolean }
   | { kind: "station"; objectId: string; index: number; chosen: string[] }
-  | { kind: "convoke"; objectId: string; chosen: string[] }
+  | { kind: "convoke"; objectId: string; chosen: string[]; face?: number }
   /** Teamwork N: tap creatures with total power N or more as you cast it, or none. */
-  | { kind: "teamwork"; objectId: string; n: number; chosen: string[]; convoke?: string[] }
+  | { kind: "teamwork"; objectId: string; n: number; chosen: string[]; convoke?: string[]; face?: number }
   /** Harmonize (CR 702.180a-b): tap up to one untapped creature you control, its power off the cost. */
   | { kind: "harmonize"; objectId: string; chosen: string[]; draft: CastDraft };
 
@@ -278,6 +283,8 @@ type TapPick =
  */
 type CastDraft = {
   objectId: string;
+  /** The face of a card with several it's cast as: a split card's half, an Adventure, a modal double-faced card's back. */
+  face?: number;
   convoke?: string[];
   modes?: number[];
   kicks?: number[];
@@ -688,12 +695,20 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
    * The next step of casting a spell, after modes: kicker and X are announced, then targets
    * chosen (CR 601.2b-c), then additional costs paid along with the mana (601.2h).
    */
-  function continueCast(d: CastDraft) {
+  /** Go on casting, with the face it's cast as up while its cost, modes and targets are worked out (CR 709.3, 715.3). */
+  function continueCast(d: CastDraft): void {
+    if (!s) return;
+    const o = s.objects[d.objectId];
+    if (o && d.face !== undefined) return asFace(s, o, d.face, () => continueCastAs(d));
+    continueCastAs(d);
+  }
+
+  function continueCastAs(d: CastDraft): void {
     if (!s) return;
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}) };
+    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     // Harmonize: which creature to tap is chosen as the cost is (CR 702.180b), first of all.
     if (d.via === "harmonize" && d.harmonize === undefined) {
@@ -855,46 +870,49 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
    * Start casting a card from your hand or command zone. A convoke spell first asks which
    * creatures to tap (suggesting some only when your mana can't pay), then modes, then targets.
    */
-  function startCast(id: string, convoke?: string[], via?: CastFromGraveyardKind, alt?: AltCostKind, teamwork?: string[]) {
+  function startCast(id: string, convoke?: string[], via?: CastFromGraveyardKind, alt?: AltCostKind, teamwork?: string[], face?: number): void {
     if (!s) return;
+    // Cast as one of its faces: that face is looked at from the start (CR 709.3a, 712.11c, 715.3a).
+    if (face !== undefined && s.objects[id] && s.objects[id]!.face !== face) return asFace(s, s.objects[id]!, face, () => startCast(id, convoke, via, alt, teamwork, face));
+    const f = face !== undefined ? { face } : {};
     const d = cardOf(s, id);
     if (via) return continueCast({ objectId: id, via }); // from a graveyard: the usual steps, without convoke
     if (alt) return continueCast({ objectId: id, alt }); // evoke or dash
     if (convoke === undefined && compileCard(d).convoke && convokers(s).length && freeCastOf(s, HUMAN) !== id) {
-      const fromMana = planCast(s, HUMAN, id) !== null;
-      const total = spellCost(s, HUMAN, s.objects[id]!);
+      const fromMana = planCast(s, HUMAN, id, undefined, undefined, undefined, undefined, f) !== null;
+      const total = spellCost(s, HUMAN, s.objects[id]!, 0, [], f);
       const auto = fromMana ? null : autoConvoke(s, HUMAN, total.cost, total.extra);
-      return setTapPick({ kind: "convoke", objectId: id, chosen: auto?.creatures ?? [] });
+      return setTapPick({ kind: "convoke", objectId: id, chosen: auto?.creatures ?? [], ...f });
     }
     // Teamwork N: you may tap creatures with total power N or more as you cast it, when you have enough.
     const tw = compileCard(d).teamwork;
     if (teamwork === undefined && tw !== undefined) {
       const candidates = teamworkCandidates(s, HUMAN).filter((c) => !convoke?.includes(c));
-      if (candidates.reduce((n, c) => n + teamworkPower(s, c), 0) >= tw) return setTapPick({ kind: "teamwork", objectId: id, n: tw, chosen: [], ...(convoke ? { convoke } : {}) });
+      if (candidates.reduce((n, c) => n + teamworkPower(s, c), 0) >= tw) return setTapPick({ kind: "teamwork", objectId: id, n: tw, chosen: [], ...(convoke ? { convoke } : {}), ...f });
     }
     const modal = spellModes(s, id);
     const specs = spellTargets(s, id);
     if (modal || specs.length || parseManaCost(d.manaCost).hasX || compileCard(d).kicker || compileCard(d).additionalCosts) {
-      if (!canCastWithTaps(s, id, convoke, teamwork)) return dispatch([{ type: "castSpell", player: HUMAN, objectId: id, ...(convoke?.length ? { convoke } : {}), ...(teamwork?.length ? { teamwork } : {}) }]); // shows why not
+      if (!canCastWithTaps(s, id, convoke, teamwork)) return dispatch([{ type: "castSpell", player: HUMAN, objectId: id, ...(convoke?.length ? { convoke } : {}), ...(teamwork?.length ? { teamwork } : {}), ...f }]); // shows why not
       if (modal) {
         const body = { targets: [], effects: [], text: d.oracleText, modal };
         const both = bothModes(s, HUMAN, body, { ...(teamwork?.length ? { teamwork } : {}) });
         // "If this spell was cast using teamwork, choose both instead": no choice left to make.
-        if (both && modal.both === "teamwork") return continueCast({ objectId: id, convoke, teamwork, modes: [0, 1] });
+        if (both && modal.both === "teamwork") return continueCast({ objectId: id, convoke, teamwork, modes: [0, 1], ...f });
         // "If this spell was kicked, choose any number instead": kicker is announced first, then the modes.
-        if (modal.both === "kicked") return continueCast({ objectId: id, convoke, teamwork });
+        if (modal.both === "kicked") return continueCast({ objectId: id, convoke, teamwork, ...f });
         // "If you control a commander as you cast this spell, you may choose both instead."
-        return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: 2 } } : body, convoke, teamwork });
+        return setModePick({ mode: "cast", objectId: id, label: d.name, body: both ? { ...body, modal: { ...modal, max: 2 } } : body, convoke, teamwork, ...f });
       }
     }
-    return continueCast({ objectId: id, convoke, teamwork });
+    return continueCast({ objectId: id, convoke, teamwork, ...f });
   }
 
   function finishTapPick() {
     if (!s || !tapPick) return;
     setTapPick(null);
-    if (tapPick.kind === "convoke") return startCast(tapPick.objectId, tapPick.chosen);
-    if (tapPick.kind === "teamwork") return startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, tapPick.chosen);
+    if (tapPick.kind === "convoke") return startCast(tapPick.objectId, tapPick.chosen, undefined, undefined, undefined, tapPick.face);
+    if (tapPick.kind === "teamwork") return startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, tapPick.chosen, tapPick.face);
     if (tapPick.kind === "harmonize") return continueCast({ ...tapPick.draft, harmonize: tapPick.chosen[0] ?? null });
     const { objectId, index, chosen } = tapPick;
     dispatch(planActivate(s, HUMAN, objectId, index, undefined, undefined, chosen) ?? [{ type: "activateAbility", player: HUMAN, objectId, index, tapCreatures: chosen }]);
@@ -906,7 +924,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (pending?.kind === "chooseModes") return dispatch([{ type: "chooseModes", player: HUMAN, modes }]);
     if (!pick) return;
     if (pick.mode === "cast" && pick.draft) continueCast({ ...pick.draft, modes });
-    else if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke, teamwork: pick.teamwork });
+    else if (pick.mode === "cast") continueCast({ objectId: pick.objectId, modes, convoke: pick.convoke, teamwork: pick.teamwork, ...(pick.face !== undefined ? { face: pick.face } : {}) });
     else useAbility(pick.objectId, pick.index, modes);
   }
 
@@ -991,6 +1009,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (controllerOf(s, o) !== HUMAN && o.owner !== HUMAN) return;
     // A card with cycling, evoke or dash: choose between casting (or playing) it and the other way.
     if (o.zone === "hand" && (handAbilities(s, o.id).length || altCostsFor(s, HUMAN, o).length || compileCard(cardOf(s, o.id)).faceDownCast || compileCard(cardOf(s, o.id)).suspend || compileCard(cardOf(s, o.id)).plot || compileCard(cardOf(s, o.id)).foretell || compileCard(cardOf(s, o.id)).assist)) return setMenu(o.id);
+    // A card with several faces to cast or play it as (a split card's halves, an Adventure, a modal double-faced card's
+    // back): choose which.
+    if ((o.zone === "hand" || o.zone === "command" || (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) || (o.zone === "exile" && mayPlayFromExile(s, o, HUMAN) && o.mayPlay?.until !== "adventure")) && (castableFaces(s, o).length || landFaces(s, o).some((f) => f !== 0))) return setMenu(o.id);
     // A land that may enter untapped by paying life or revealing a card: ask which.
     if (o.zone === "hand" && isLand(s, o.id) && entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
@@ -1267,6 +1288,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 startCast(menu, undefined, via);
               }}
+              onCastFace={(face) => {
+                setMenu(null);
+                startCast(menu, undefined, undefined, undefined, undefined, face);
+              }}
+              onPlayFace={(face, untapped) => {
+                setMenu(null);
+                dispatch([{ type: "playLand", player: HUMAN, objectId: menu, face, ...(untapped ? { untapped } : {}) }]);
+              }}
               onCastAlt={(alt) => {
                 setMenu(null);
                 startCast(menu, undefined, undefined, alt);
@@ -1307,7 +1336,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 tapPick.kind === "teamwork"
                   ? () => {
                       setTapPick(null);
-                      startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, []);
+                      startCast(tapPick.objectId, tapPick.convoke, undefined, undefined, [], tapPick.face);
                     }
                   : tapPick.kind === "harmonize"
                     ? () => {
@@ -1485,7 +1514,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setCostPick(null)}
             />
           )}
-          {!targeting && !modePick && !tapPick && !picking && pending?.kind !== "chooseModes" && <Controls s={s} pending={pending} attacks={attacks} aim={aim} blocks={blocks} blocker={blocker} discards={discards} dispatch={dispatch} onCastFree={(id) => startCast(id)} onHover={setHover} />}
+          {!targeting && !modePick && !tapPick && !picking && pending?.kind !== "chooseModes" && <Controls s={s} pending={pending} attacks={attacks} aim={aim} blocks={blocks} blocker={blocker} discards={discards} dispatch={dispatch} onCastFree={(id, face) => startCast(id, undefined, undefined, undefined, undefined, face)} onHover={setHover} />}
           <PriorityToggle mode={priorityMode} onChange={setPriorityMode} />
           {!s.over && <LoopBar s={s} loop={loop} note={shortcutNote} onStart={startLoop} onCancel={cancelLoop} onRepeat={repeatLoop} />}
           {error && <div className="error">{error}</div>}
@@ -1523,8 +1552,21 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
 
 const PHASES: Step[] = ["untap", "upkeep", "draw", "main1", "beginCombat", "declareAttackers", "declareBlockers", "combatDamage", "endCombat", "main2", "end"];
 
-function canPlayLand(s: GameState, id: string) {
-  return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id);
+function canPlayLand(s: GameState, id: string, face?: number) {
+  return legalActions(s, HUMAN).some((a) => a.type === "playLand" && a.objectId === id && a.face === face);
+}
+
+/** Could you cast this card as this face now, tapping mana as needed (CR 709.3, 712.11b, 715.3)? */
+function canCastFace(s: GameState, id: string, face: number) {
+  const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { face });
+  if (problem && !/not enough mana/.test(problem)) return false;
+  return asFace(s, s.objects[id]!, face, () => canCastWithTaps(s, id));
+}
+
+/** Could you cast or play this card as one of its other faces now? */
+function canUseFace(s: GameState, id: string) {
+  const o = s.objects[id]!;
+  return castableFaces(s, o).some((f) => canCastFace(s, id, f)) || landFaces(s, o).some((f) => f !== 0 && canPlayLand(s, id, f));
 }
 
 const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate" };
@@ -1583,7 +1625,7 @@ function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKi
 function exileOptions(s: GameState, id: string): boolean {
   if (!mayPlayFromExile(s, s.objects[id]!, HUMAN)) return false;
   if (foretoldCast(s, HUMAN, s.objects[id]!)) return canCastAlt(s, id, "foretell");
-  return isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id);
+  return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canUseFace(s, id);
 }
 
 /** Does this card in your graveyard have something you could do with it now (flashback, unearth, ...)? */
@@ -2605,6 +2647,11 @@ function ZoneViewer({
                     {hidden.label ? hidden.label.toLowerCase() : "hideaway"}
                   </span>
                 )}
+                {view.zone === "exile" && s.objects[id]!.mayPlay?.until === "adventure" && s.objects[id]!.mayPlay?.player === HUMAN && (
+                  <span className="zone-tag" title="It went on an adventure: you may cast it from exile (not as an Adventure again).">
+                    on an adventure
+                  </span>
+                )}
                 {view.zone === "exile" && !!s.objects[id]!.counters.time && (
                   <span className="zone-tag" title="Suspended: one time counter comes off in each of its owner's upkeeps">
                     {s.objects[id]!.counters.time} time counter{s.objects[id]!.counters.time === 1 ? "" : "s"}
@@ -3225,6 +3272,8 @@ function AbilityMenu({
   onMana,
   onPlay,
   onCastVia,
+  onCastFace,
+  onPlayFace,
   onCastAlt,
   onCastAssist,
   onCastFaceDown,
@@ -3242,6 +3291,10 @@ function AbilityMenu({
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
   onCastVia: (via: CastFromGraveyardKind) => void;
+  /** For a card with several faces: cast it as this one (a split card's half, an Adventure, a modal double-faced card's back). */
+  onCastFace: (face: number) => void;
+  /** For a modal double-faced card: play it as this land face (`untapped`: pay life or reveal so it enters untapped). */
+  onPlayFace: (face: number, untapped?: boolean) => void;
   /** For a card in hand: cast it for its evoke or dash cost. */
   onCastAlt: (alt: AltCostKind) => void;
   /** For a card with assist: cast it, asking this player to help pay (CR 702.132a). */
@@ -3274,6 +3327,10 @@ function AbilityMenu({
   const inYard = o.zone === "graveyard";
   const land = isLand(s, objectId);
   const playable = inHand && (land ? canPlayLand(s, objectId) : canCastWithTaps(s, objectId));
+  // The faces of a card with several that it can be cast as or played as (CR 709.3, 712.11b, 712.12, 715.3).
+  const faces = inHand && !foretold ? castableFaces(s, o) : [];
+  const split = s.cards[o.cardId]?.layout === "split";
+  const lands = inHand ? landFaces(s, o).filter((f) => f !== 0) : [];
   const choice = inHand && land ? entersRulesOf(s, HUMAN, objectId).entersTappedChoice : undefined;
   // Airbend's "{2} rather than its mana cost", "without paying its mana cost" (Release to the Wind).
   const exiledFor = o.zone === "exile" && o.mayPlay?.player === HUMAN ? o.mayPlay : undefined;
@@ -3310,11 +3367,40 @@ function AbilityMenu({
           Cast it for its foretell cost <ManaCost cost={foretold} size="sm" />
         </button>
       )}
-      {inHand && !foretold && (
+      {inHand && !foretold && !split && (
         <button disabled={!playable} onClick={() => onPlay()}>
           {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : exiledFor?.cost ? <>Cast it for <ManaCost cost={exiledFor.cost} size="sm" /></> : exiledFor?.free ? "Cast it without paying its mana cost" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
       )}
+      {faces.map((face) => {
+        const fd = s.cards[registerFace(s, o, face)]!;
+        if (isType(fd, "Land")) return null;
+        const problem = castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { face });
+        return (
+          <button key={`face${face}`} className="face-cast" disabled={!canCastFace(s, objectId, face)} title={problem && !/not enough mana/.test(problem) ? problem : fd.oracleText} onClick={() => onCastFace(face)}>
+            Cast {fd.name}
+            {fd.subtypes.includes("Adventure") ? " (Adventure)" : ""} <ManaCost cost={fd.manaCost} size="sm" />
+          </button>
+        );
+      })}
+      {lands.map((face) => {
+        const fd = s.cards[registerFace(s, o, face)]!;
+        const ok = canPlayLand(s, objectId, face);
+        const untap = asFace(s, o, face, () => entersRulesOf(s, HUMAN, objectId).entersTappedChoice);
+        return (
+          <span key={`land${face}`} className="face-play">
+            {untap && (
+              <button disabled={!ok || !asFace(s, o, face, () => canEnterUntapped(s, HUMAN, objectId))} onClick={() => onPlayFace(face, true)}>
+                Play {fd.name} untapped ({untap.kind === "payLife" ? `pay ${untap.n} life` : `reveal ${/^[AEIOU]/.test(untap.filter.text) ? "an" : "a"} ${untap.filter.text}`})
+              </button>
+            )}
+            <button disabled={!ok} title={fd.oracleText} onClick={() => onPlayFace(face)}>
+              Play {fd.name}
+              {untap ? " tapped" : ""}
+            </button>
+          </span>
+        );
+      })}
       {inHand &&
         !foretold &&
         altCostsFor(s, HUMAN, o).map((a) => {
@@ -3452,12 +3538,15 @@ function Controls({
   discards: string[];
   dispatch: ReturnType<typeof useGame>["dispatch"];
   /** Cascade's free cast: go through modes and targets as usual. */
-  onCastFree: (id: string) => void;
+  onCastFree: (id: string, face?: number) => void;
   onHover: (d: CardDef | null) => void;
 }) {
   if (s.over) return null;
   if (pending?.kind === "castFree") {
     const d = cardOf(s, pending.objectId);
+    const o = s.objects[pending.objectId]!;
+    // A card with several faces may be cast as one of them: a split card only as a half (CR 709.3).
+    const faces = castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land"));
     return (
       <div className="controls">
         <span onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
@@ -3483,13 +3572,20 @@ function Controls({
             </>
           )}
         </span>
-        <button
-          disabled={(pending.how === "madness" || pending.how === "miracle") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
-          title={pending.how === "madness" || pending.how === "miracle" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
-          onClick={() => onCastFree(pending.objectId)}
-        >
-          Cast it
-        </button>
+        {s.cards[o.cardId]?.layout !== "split" && (
+          <button
+            disabled={(pending.how === "madness" || pending.how === "miracle") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
+            title={pending.how === "madness" || pending.how === "miracle" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
+            onClick={() => onCastFree(pending.objectId)}
+          >
+            Cast it
+          </button>
+        )}
+        {faces.map((face) => (
+          <button key={face} className="face-cast" disabled={/^(?!not enough mana)/.test(castProblem(s, HUMAN, pending.objectId, undefined, undefined, undefined, undefined, undefined, { face }) ?? "not enough mana")} onClick={() => onCastFree(pending.objectId, face)}>
+            Cast {s.cards[registerFace(s, o, face)]!.name}
+          </button>
+        ))}
         <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>
           Don't
         </button>
@@ -4449,7 +4545,7 @@ function Hand({ s, ids, cardProps, tucked, onToggle }: { s: GameState; ids: stri
                 className="fan-slot"
                 style={{ ["--rot" as string]: `${off * step}deg`, ["--drop" as string]: (off / Math.max(1, mid)) ** 2 * 0.06 }}
               >
-                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canCycle(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).plot && planPlot(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).foretell && planForetell(s, HUMAN, id) !== null)} />
+                <CardView o={s.objects[id]!} {...cardProps} playable={(isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canUseFace(s, id) || canCycle(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind)) || (!!compileCard(cardOf(s, id)).faceDownCast && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { faceDown: true }) !== null) || (!!compileCard(cardOf(s, id)).suspend && planSuspend(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).plot && planPlot(s, HUMAN, id) !== null) || (!!compileCard(cardOf(s, id)).foretell && planForetell(s, HUMAN, id) !== null)} />
               </div>
             );
           })}

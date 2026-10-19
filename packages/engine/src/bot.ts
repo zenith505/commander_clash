@@ -67,6 +67,7 @@ import {
   hasNoMaxHandSize,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
+import { asFace, castableFaces, layoutOf, registerFace } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
@@ -104,7 +105,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "changeTarget") return [{ type: "changeTarget", player: pid, target: newTargetFor(s, pid, pend) }];
     if (pend.kind === "castFree") {
-      const plan = castPlan(s, pid, pend.objectId, true);
+      const plan = facePlan(s, pid, pend.objectId, true, "first") ?? castPlan(s, pid, pend.objectId, true) ?? facePlan(s, pid, pend.objectId, true, "after");
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "drawLook") {
@@ -390,11 +391,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const fromYard = p.graveyard.filter((id) => graveyardWays(s, obj(s, id)).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
-      .filter((id) => !isType(defOf(s, obj(s, id)), "Land"))
+      // A land with an Adventure can still go on its adventure (CR 715.3).
+      .filter((id) => !isType(defOf(s, obj(s, id)), "Land") || castableFaces(s, obj(s, id)).length)
       // Damage prevention waits for damage coming (chooseDamageShield).
       .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (facePlan(s, pid, id, false, "first") ?? freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id) ?? facePlan(s, pid, id, false, "after"));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -478,14 +480,21 @@ function chooseUnblocked(s: GameState, pid: PlayerId, ids: ObjectId[]): ObjectId
 function chooseLand(s: GameState, pid: PlayerId): Action | null {
   const lands = legalActions(s, pid).filter((a): a is Extract<Action, { type: "playLand" }> => a.type === "playLand");
   const p = player(s, pid);
-  const options = lands.map((a) => {
-    const c = entersRulesOf(s, pid, a.objectId); // under Blood Moon a nonbasic land has none of its abilities (CR 614.12)
-    const untapped = c.entersTappedChoice ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind === "reveal" || p.life >= 16) : undefined;
-    const tapped = c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false);
-    return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };
-  });
-  // A land from the graveyard (Crucible of Worlds) first: it keeps a card in hand.
-  options.sort((a, b) => Number(obj(s, b.action.objectId).zone === "graveyard") - Number(obj(s, a.action.objectId).zone === "graveyard"));
+  const options = lands.map((a) =>
+    // A modal double-faced card's land face, as it would enter (CR 712.12).
+    asFace(s, obj(s, a.objectId), a.face, () => {
+      const c = entersRulesOf(s, pid, a.objectId); // under Blood Moon a nonbasic land has none of its abilities (CR 614.12)
+      const untapped = c.entersTappedChoice ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind === "reveal" || p.life >= 16) : undefined;
+      const tapped = c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false);
+      return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };
+    }),
+  );
+  // A land from the graveyard (Crucible of Worlds) first: it keeps a card in hand. A modal double-faced card's land face
+  // last: its other face is a spell we may want.
+  const spellFace = (id: ObjectId) => !!s.cards[obj(s, id).cardId]?.faces?.some((f) => !f.types.includes("Land"));
+  const rank = (a: Extract<Action, { type: "playLand" }>) => (obj(s, a.objectId).zone === "graveyard" ? 0 : spellFace(a.objectId) ? 2 : 1);
+  options.sort((a, b) => rank(a.action) - rank(b.action));
+  if (options.some((x) => rank(x.action) < 2)) return (options.find((x) => !x.tapped && rank(x.action) < 2) ?? options.find((x) => rank(x.action) < 2))!.action;
   return (options.find((x) => !x.tapped) ?? options[0])?.action ?? null;
 }
 
@@ -821,6 +830,28 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
     if (plan) return plan;
+  }
+  return null;
+}
+
+/**
+ * Casting one of a card's other faces (faces.ts castableFaces). "first", before the card as it is: an Adventure, so the
+ * creature can be cast from exile afterwards (CR 715.3d), and a split card's halves, the costlier one first (it's
+ * cast only as a half, CR 709.3). "after": a modal double-faced card's back face when its front can't be cast
+ * (CR 712.11b).
+ */
+function facePlan(s: GameState, pid: PlayerId, id: string, free: boolean, when: "first" | "after"): Action[] | null {
+  const o = obj(s, id);
+  const layout = layoutOf(s, o);
+  if (!layout || (when === "first") !== (layout === "adventure" || layout === "split")) return null;
+  const faces = castableFaces(s, o)
+    .filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land"))
+    // Not as an Adventure again from exile (CR 715.3d).
+    .filter((f) => !(layout === "adventure" && o.zone === "exile"))
+    .sort((a, b) => manaValue(parseManaCost(s.cards[registerFace(s, o, b)]!.manaCost)) - manaValue(parseManaCost(s.cards[registerFace(s, o, a)]!.manaCost)));
+  for (const face of faces) {
+    const plan = asFace(s, o, face, () => castPlan(s, pid, id, free));
+    if (plan) return plan.map((a) => (a.type === "castSpell" && a.objectId === id ? { ...a, face } : a));
   }
   return null;
 }

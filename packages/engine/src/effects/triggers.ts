@@ -135,6 +135,8 @@ export type TriggerSourceEvent =
   /** A mutating spell merged with this permanent (CR 702.140d). */
   | { type: "mutates"; id: ObjectId }
   | { type: "becameLevel"; id: ObjectId; level: number }
+  /** A Room's door became unlocked (CR 709.5h). */
+  | { type: "doorUnlocked"; id: ObjectId; door: number }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
   /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
@@ -718,6 +720,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       if (controllerOf(s, w) === you) add(w, you, (e) => e === "youExert", undefined, undefined, o);
     }
+  } else if (ev.type === "doorUnlocked") {
+    // "When you unlock this door": an ability of that door, which the Room has now that it's unlocked (CR 709.5h).
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e, t) => e === "selfDoorUnlocked" && t.door === ev.door);
   } else if (ev.type === "becameLevel") {
     // "When this Class becomes level 2": an ability it has from that level on (CR 716.2a), so it has it now.
     const o = obj(s, ev.id);

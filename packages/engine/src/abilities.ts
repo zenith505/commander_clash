@@ -2062,6 +2062,7 @@ export type TriggerEvent =
   /** "Whenever a permanent you control becomes the target of a spell or ability an opponent controls": see `subjectFilter`. */
   | "permanentBecomesTarget"
   | "selfAttacks" // Whenever this attacks
+  | "selfDoorUnlocked" // "When you unlock this door" (CR 709.5h), see TriggeredAbility.door
   /** Enlist's trigger (CR 702.154a), "Whenever ~ enlists a creature": the subject is the enlisted creature. */
   | "selfEnlists"
   | "selfDealsCombatDamageToPlayer"
@@ -2332,6 +2333,8 @@ export interface TriggeredAbility {
   withOthers?: number;
   /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
   withOthersType?: string;
+  /** For "selfDoorUnlocked": which door (0 left, 1 right). */
+  door?: number;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */

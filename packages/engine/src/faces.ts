@@ -201,3 +201,54 @@ export function landFaces(s: GameState, o: GameObject): number[] {
   if (!d?.faces || d.layout !== "modal_dfc" || o.faceDown) return [];
   return d.faces.flatMap((f, i) => (f.types.includes("Land") ? [i] : []));
 }
+
+/** A split card with a shared type line whose halves are doors (CR 709.5, 709.5j): a Room. */
+export const isRoom = (d: CardDef | undefined): boolean => !!d && d.layout === "split" && d.faces?.length === 2 && d.subtypes.includes("Room");
+
+/** The key a Room permanent's definition has with these doors unlocked: its card's (or copy's) key and the doors. */
+export const roomKey = (base: string, doors: number[]) => `${base}|doors:${doors.join("")}`;
+
+const rooms = new Map<string, { def: CardDef; doors: CardDef[] }>();
+
+/**
+ * A Room on the battlefield (CR 709.5): it has the name, mana cost and rules text of its unlocked doors only, so its
+ * colors and mana value are theirs too, and with none unlocked it has no name and no abilities (rulings). Its types
+ * are the shared type line's (709.5a). Anything that isn't a Room is just itself.
+ */
+export function roomDef(card: CardDef, key: string, doors: number[]): CardDef {
+  const hit = rooms.get(key);
+  if (hit) return hit.def;
+  const d = restingDef(card);
+  if (!isRoom(d)) {
+    rooms.set(key, { def: { ...d, oracleId: key }, doors: [] });
+    return rooms.get(key)!.def;
+  }
+  const open = [0, 1].filter((i) => doors.includes(i));
+  const faces = open.map((i) => d.faces![i]!);
+  const manaCost = faces.map((f) => f.manaCost).join("");
+  const { faces: _f, ...rest } = d;
+  const def: CardDef = {
+    ...rest,
+    oracleId: key,
+    name: faces.map((f) => f.name).join(" // "),
+    manaCost,
+    cmc: mv(manaCost),
+    colors: COLORS.filter((c) => faces.some((f) => f.colors.includes(c))),
+    oracleText: "",
+    keywords: [...new Set(faces.flatMap((f) => f.keywords ?? []))],
+    roomDoors: open,
+  };
+  rooms.set(key, { def, doors: open.map((i) => faceDef(d, i)) });
+  return def;
+}
+
+/** The doors' own definitions, for a Room permanent's abilities: each unlocked door's (see compileCard). */
+export const roomDoorDefs = (d: CardDef): CardDef[] | undefined => rooms.get(d.oracleId)?.doors;
+
+/** Register the definition `o` has with its doors as they are now, so its key (cardIdOf) finds it in GameState.cards. */
+export function registerRoom(s: GameState, key: string): void {
+  if (s.cards[key]) return;
+  const m = /^(.*)\|doors:(\d*)$/.exec(key);
+  const base = m && s.cards[m[1]!];
+  if (base) s.cards[key] = roomDef(base, key, [...m[2]!].map(Number));
+}

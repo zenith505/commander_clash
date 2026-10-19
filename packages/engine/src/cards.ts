@@ -3,7 +3,7 @@ import { characteristics, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
-import { faceKey, registerFace, restingDef } from "./faces";
+import { faceKey, registerFace, registerRoom, restingDef, roomKey } from "./faces";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
 export function pairedWith(s: GameState, o: GameObject): GameObject | undefined {
@@ -46,7 +46,10 @@ export const FACE_DOWN_WARD = faceDownCard("face-down-ward", true);
  * Its copiable values before face-down status (CR 613.2a): the latest copy effect that began after it entered
  * (CR 707.4), or what it entered as a copy of (CR 707.5), or its own card.
  */
-const copiedId = (o: GameObject): string => o.copyEffects?.[o.copyEffects.length - 1]?.key ?? o.copyOf ?? ownId(o);
+const copiedId = (o: GameObject): string => withDoors(o, o.copyEffects?.[o.copyEffects.length - 1]?.key ?? o.copyOf ?? ownId(o));
+
+/** A Room permanent's: what it is with its unlocked doors (CR 709.5), copied or not (the designations aren't copied). */
+const withDoors = (o: GameObject, key: string): string => (o.unlocked !== undefined ? roomKey(key, o.unlocked) : key);
 
 /** Its own card, or the face of it that's up (faces.ts, CR 709.3b, 710.1b, 712.8). */
 const ownId = (o: GameObject): string => (o.face !== undefined ? faceKey(o.cardId, o.face) : o.cardId);
@@ -62,6 +65,7 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   const key = copiedId(o);
   // A face's definition is registered as the face is turned up (setFace); a game built by hand may not have done that.
   if (!s.cards[key] && key === ownId(o) && o.face !== undefined) registerFace(s, o, o.face);
+  if (!s.cards[key] && o.unlocked !== undefined) registerRoom(s, key);
   const found = s.cards[key];
   if (!found) throw new Error(`missing card def ${key}`);
   // A card with faces has its resting characteristics unless a face is up (CR 709.4, 712.8a, 715.4).

@@ -1,4 +1,4 @@
-import { applyAction, cardFromScryfall, createGame, invalidateCharacteristics, parseTypeLine, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type Color, type GameState, type Modification, type PlayerId, type Step, type TargetChoice } from "../src";
+import { applyAction, cardFromScryfall, isRoom, createGame, invalidateCharacteristics, parseTypeLine, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type Color, type GameState, type Modification, type PlayerId, type Step, type TargetChoice } from "../src";
 
 let n = 0;
 export function card(name: string, typeLine: string, manaCost = "", extra: Partial<CardDef> = {}): CardDef {
@@ -70,6 +70,8 @@ export function putOnBattlefield(s: GameState, pid: PlayerId, def: CardDef, opts
     counters: {},
     isCommander: !!opts.commander,
     isToken: false,
+    // A Room put onto the battlefield, not cast, has both doors locked (CR 709.5d).
+    ...(isRoom(def) ? { unlocked: [] } : {}),
   };
   s.battlefield.unshift(id);
   invalidateCharacteristics(s);

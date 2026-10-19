@@ -109,6 +109,8 @@ export interface CardDef {
    * the card converted (CR 702.162a), with this face up on the stack.
    */
   convertCost?: string;
+  /** A Room permanent's definition (faces.ts roomDef): the doors it has unlocked (CR 709.5c), whose text it has. */
+  roomDoors?: number[];
   /**
    * A meld pair (CR 712.4, 712.5): the two cards that meld and the melded permanent they become. A melded permanent's
    * card exists only as the back faces of the pair (712.4b), so the card named `result` can't be in a deck.
@@ -268,6 +270,11 @@ export interface GameObject {
    * (rulings). `copy`: the copy of its prepare spell in exile (722.3c), none while it's phased out.
    */
   prepared?: { copy?: ObjectId };
+  /**
+   * A Room permanent's unlocked designations (CR 709.5c): the doors (0 left, 1 right) that are unlocked. Set as it
+   * enters (709.5d), for as long as it's on the battlefield; not a copiable value.
+   */
+  unlocked?: number[];
   /** A copy of a prepare spell in exile (CR 722.3c): the prepared permanent it was created for, as that object. */
   preparedFrom?: { id: ObjectId; zc: number };
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
@@ -1566,6 +1573,8 @@ export type Action =
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
   /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
   | { type: "plot"; player: PlayerId; objectId: ObjectId }
+  /** Pay a locked door's mana cost to unlock it: a special action (CR 116.2m, 709.5e). `door`: 0 left, 1 right. */
+  | { type: "unlockDoor"; player: PlayerId; objectId: ObjectId; door: number }
   /** Foretell a card from your hand: pay {2} and exile it face down, a special action (CR 116.2h, 702.143a). */
   | { type: "foretell"; player: PlayerId; objectId: ObjectId }
   /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */

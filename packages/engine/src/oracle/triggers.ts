@@ -889,6 +889,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
   }
   // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
+  // "When you unlock this door, ..." (CR 709.5h): as the door becomes unlocked, on the battlefield or as the Room enters
+  // because that half was cast (see normalizeSelf for the door's index).
+  const door = /^When you unlock door ([01]), (.+)$/.exec(line);
+  if (door) {
+    const body = parseBody(door[2]!, {});
+    return body ? { event: "selfDoorUnlocked", door: Number(door[1]), body } : "fail";
+  }
   // "Whenever ~ and at least one Human attack, ..." (Goldbug, Scrappy Scout): others of that creature type.
   const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|[A-Z][a-z]+) attack, (.+)$/.exec(line);
   if (battalion) {

@@ -2,7 +2,7 @@ import { playerProtectedFrom } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
-import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp } from "./autopay";
+import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -50,6 +50,7 @@ import {
   autoEvidence,
   evidenceProblem,
   altCostsFor,
+  unlockCost,
   castExtraCosts,
   costsHaveX,
   bothModes,
@@ -410,6 +411,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Suspend what we can't cast now (CR 702.62a).
     const sus = chooseSuspend(s, pid);
     if (sus) return sus;
+    // Unlock a door of a Room we control, the dearest we can pay for (CR 709.5e), once spells are cast.
+    const unlock = chooseUnlock(s, pid);
+    if (unlock) return unlock;
     // Plot what we can't cast now with the mana left at the end of our turn (CR 702.170a).
     if (s.step === "main2") {
       const plot = choosePlot(s, pid);
@@ -953,6 +957,19 @@ function chooseSuspend(s: GameState, pid: PlayerId): Action[] | null {
     .sort((a, b) => a.sus.n - b.sus.n);
   for (const x of options) {
     const plan = planSuspend(s, pid, x.id);
+    if (plan) return plan;
+  }
+  return null;
+}
+
+/** A locked door of a Room we control to unlock (CR 709.5e): the dearest one we can pay for. */
+function chooseUnlock(s: GameState, pid: PlayerId): Action[] | null {
+  const doors = s.battlefield
+    .flatMap((id) => [0, 1].map((door) => ({ id, door, cost: unlockCost(s, obj(s, id), door) })))
+    .filter((x) => x.cost !== undefined && controllerOf(s, obj(s, x.id)) === pid)
+    .sort((a, b) => manaValue(parseManaCost(b.cost!)) - manaValue(parseManaCost(a.cost!)));
+  for (const x of doors) {
+    const plan = planUnlock(s, pid, x.id, x.door);
     if (plan) return plan;
   }
   return null;

@@ -472,6 +472,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const m = /^If /.test(x) ? null : /^([Yy]ou draw [^,]+?) and (~ deals .+)$/.exec(x);
       return m ? [m[1]!, m[2]!] : [x];
     })
+    // "~ gets +2/+0 until end of turn and deals 1 damage to you" (Electric Eel): two instructions, both about ~.
+    .flatMap((x) => {
+      const m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn) and (deals \d+ damage to you)$/.exec(x);
+      return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+    })
     .filter(Boolean);
   let prevStart = 0;
   let curStart = 0;

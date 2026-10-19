@@ -83,13 +83,19 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      hands they help.
    Left from the round after Living Death (last-known power for intervening-if checks, last-known "can't be
    prevented", life swaps that use the difference, ward costs with life or a sacrifice, Kosei, Human Torch, Parapet
-   Thrasher, "target opponent exiles a card from their hand"):
+   Thrasher, "target opponent exiles a card from their hand", "Cowards can't block Warriors", "target creature can't
+   block ~ this turn", Electric Eel):
    - Exiling from hand still out: "you may play that card" or face down (Fiend of the Shadows, Kheru Mind-Eater,
      Lightstall Inquisitor), "until ~ leaves the battlefield" (Intellect Devourer), Arcane Artisan, Ashiok's -3, Muse
      Vessel's second ability, Karn Liberated's -14, Ruthless Negotiation ("if ~ was cast from a graveyard"). Bots
      exile the cards they'd discard, without weighing that exile loses graveyard value they don't have anyway.
    - Bots decide Human Torch's and The Thing's "you may pay {R}{G}{W}{U}" with the usual "may pay" check, not by
      what it would do.
+   - "{T}, Mill a card: Add {C}" (Deranged Assistant, Millikin, Rot Farm Skeleton, Charmed Pendant): mill as a cost,
+     and an ability that adds mana but uses the stack because it moves a card from a library (CR 605.1a, Millikin
+     rulings), are both still out.
+   - Bots don't use "target creature can't block ~ this turn" (Duct Crawler, Spin Engine) or the Intimidators'
+     "becomes a Coward" on purpose: they value them by the usual rough check.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):

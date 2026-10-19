@@ -315,6 +315,8 @@ export interface GameObject {
    * with `turn`, any combat of that turn ("target creature blocks ~ this turn if able").
    */
   provokedBy?: { id: ObjectId; zc: number; turn?: number };
+  /** "Target creature can't block ~ this turn" (Duct Crawler): the attackers it can't block that turn, while it's still the object at `selfZc` (CR 400.7). */
+  cantBlockThis?: { id: ObjectId; zc: number; turn: number; selfZc: number }[];
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
   blocking?: ObjectId[];
   blockedBy?: ObjectId[];

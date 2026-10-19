@@ -5285,6 +5285,7 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b
   for (const f of b.cantBlockCreatures) if (objectMatches(s, f, attacker, a.controller, false)) return `${b.name} can't block ${f.text}`; // CR 509.1b
+  if (blocker.cantBlockThis?.some((x) => x.turn === s.turn && x.selfZc === (blocker.zoneChanges ?? 0) && x.id === attacker.id && x.zc === (attacker.zoneChanges ?? 0))) return `${b.name} can't block ${a.name} this turn`; // CR 509.1b
   if (defender !== undefined)
     for (const [kw, land] of Object.entries(LANDWALK))
       if (has(a, kw) && s.battlefield.some((id) => { const l = obj(s, id); return controllerOf(s, l) === defender && characteristics(s, l).subtypes.includes(land); }))

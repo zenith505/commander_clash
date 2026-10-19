@@ -651,6 +651,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
+  // "Cowards can't block Warriors" (Boldwyr Intimidator): a creature type (CR 509.1b, 205.3m).
+  if ((m = /^can't block ([A-Z][a-z]+)$/.exec(rest))) {
+    const one = singular(m[1]!);
+    return one !== m[1] && CREATURE_TYPES.has(one) ? [{ kind: "cantBlockCreatures", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [one], text: m[1]! } }] : null;
+  }
   // "Can't block creatures with power 2 or greater" (CR 509.1b).
   if ((m = /^can't block creatures with power (\d+) or (greater|less)$/.exec(rest))) {
     const filter = parseTargetPhrase(`creature with power ${m[1]} or ${m[2]}`);

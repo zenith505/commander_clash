@@ -1287,6 +1287,8 @@ export type Effect =
   /** Provoke and "target creature blocks ~ this turn if able": for this combat, or the rest of the turn (CR 509.1c). */
   /** Provoke-like: `what` blocks the source (or `attacker`, "blocks target creature") this combat or turn if able. */
   | { type: "mustBlockSource"; what: ObjRef; attacker?: ObjRef; thisTurn?: true }
+  /** "Target creature can't block ~ this turn" (Duct Crawler): a blocking restriction for the rest of the turn (CR 509.1b). */
+  | { type: "cantBlockSource"; what: ObjRef }
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */

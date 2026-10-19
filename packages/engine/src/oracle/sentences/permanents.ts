@@ -34,6 +34,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "~ becomes solved") return [{ type: "solve" }];
   // "Transform ~" (CR 701.27a).
   if (/^[Tt]ransform ~$/.test(s)) return [{ type: "transform", what: { ref: "self" } }];
+  // "Convert ~" (CR 701.28a): turned so its other face is up, just as transforming does (701.28a, rulings); "convert it"
+  // in a trigger about itself.
+  if (/^[Cc]onvert ~$/.test(s) || (ctx.selfIt && /^[Cc]onvert it$/.test(s))) return [{ type: "transform", what: { ref: "self" }, convert: true }];
   // "Flip ~" (CR 710); "flip it" in a trigger about itself.
   if (/^[Ff]lip ~$/.test(s) || (ctx.selfIt && /^[Ff]lip it$/.test(s))) return [{ type: "flip", what: { ref: "self" } }];
   // "~ becomes prepared" (CR 722.3a); "it" in a trigger about itself.

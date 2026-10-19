@@ -2287,7 +2287,7 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|after this phase)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

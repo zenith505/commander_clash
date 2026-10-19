@@ -295,9 +295,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Return it to the battlefield transformed under your control attached to target opponent" (Accursed Witch): an Aura
   // back face, attached as it enters to what the ability targets, if it could enchant that (CR 303.4f, 712.14a).
   // An Aura's "when enchanted creature dies, return ~ to the battlefield transformed" (Skin Invasion): the Aura card.
+  // "When ~ dies, return it to the battlefield converted under its owner's control" (Optimus Prime): its back face up,
+  // converting working as transforming does (CR 701.28a).
   // "When Homura dies, return it to the battlefield flipped": under the ability's controller's control (CR 110.2a), as
   // Homura's Essence (710.1b).
-  if ((ctx.selfCard || (ctx.auraCard && /^[Rr]eturn ~ /.test(s))) && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)?((?: and)? transformed| flipped)?(?: under (your|its owner's) control)?(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?(?: attached to (target .+))?$`).exec(s))) {
+  if ((ctx.selfCard || (ctx.auraCard && /^[Rr]eturn ~ /.test(s))) && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)?((?: and)? (?:transformed|converted)| flipped)?(?: under (your|its owner's) control)?(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?(?: attached to (target .+))?$`).exec(s))) {
     const flipped = m[2] === " flipped";
     if (m[2] && !flipped && !m[1] !== !/ and/.test(m[2])) return null; // "tapped and transformed", or "transformed" alone
     if (flipped && (m[1] || m[3] || m[4] || m[6] || m[7])) return null; // only Homura's "return it to the battlefield flipped"

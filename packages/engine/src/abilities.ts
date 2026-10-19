@@ -1719,7 +1719,8 @@ export type Effect =
   /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
   | { type: "solve" }
   /** "Transform ~" (CR 701.27a): turn a double-faced permanent over. */
-  | { type: "transform"; what: ObjRef }
+  /** `convert`: "convert ~" (CR 701.28a), which works just as transforming does. */
+  | { type: "transform"; what: ObjRef; convert?: true }
   /** "Flip ~", "you may flip it" (CR 710): a flip card's permanent turns to its flipped half, for good (710.4). */
   | { type: "flip"; what: ObjRef }
   /** "~ becomes prepared" (CR 722.3a): a permanent with a prepare spell gets the prepared designation. */
@@ -2329,6 +2330,8 @@ export interface TriggeredAbility {
   firstAttack?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
   withOthers?: number;
+  /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
+  withOthersType?: string;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
@@ -2727,7 +2730,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */

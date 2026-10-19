@@ -2644,6 +2644,8 @@ export function castProblem(
   const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
+  choices = convertChoices(o, choices);
+  if (choices?.alt === "convert" && (choices.face ?? o.face) !== 1) return `${defOf(s, o).name} is cast converted with its back face up`;
   if (choices?.face !== undefined && o.face !== choices.face) {
     // A split card's half, a modal double-faced card's face, an Adventure: only that face is looked at (CR 709.3a,
     // 712.11c, 715.3a).
@@ -2837,12 +2839,25 @@ export function castProblem(
   return null;
 }
 
+/**
+ * More Than Meets the Eye (CR 702.162a): a card cast converted is put on the stack with its back face up (rulings), so
+ * casting it for that cost casts its back face.
+ */
+export function convertChoices<C extends Pick<CostChoices, "alt" | "face">>(o: GameObject, choices: C): C;
+export function convertChoices<C extends Pick<CostChoices, "alt" | "face">>(o: GameObject, choices: C | undefined): C | undefined;
+export function convertChoices<C extends Pick<CostChoices, "alt" | "face">>(o: GameObject, choices: C | undefined): C | undefined {
+  return choices?.alt === "convert" && choices.face === undefined && o.face === undefined ? { ...choices, face: 1 } : choices;
+}
+
 /** Why this card can't be cast with the face `choices.face` (CR 709.3, 712.11b, 715.3), or null. */
 function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostChoices): string | null {
   const face = choices.face!;
   if (choices.faceDown || o.faceDown) return "a face-down spell has no face to choose";
   // A double-faced card is cast transformed only by an ability that says so (CR 712.11a, 712.11d): disturb.
-  const transformedWay = choices.via !== undefined && layoutOf(s, o) === "transform" && graveyardWays(s, o).some((g) => g.kind === choices.via && g.face === face);
+  const transformedWay =
+    (choices.via !== undefined && layoutOf(s, o) === "transform" && graveyardWays(s, o).some((g) => g.kind === choices.via && g.face === face)) ||
+    // Cast converted for its More Than Meets the Eye cost (CR 702.162a).
+    (choices.alt === "convert" && layoutOf(s, o) === "transform" && face === 1 && !!altCost(defOf(s, o), "convert"));
   if (!castableFaces(s, o).includes(face) && !transformedWay) return `${defOf(s, o).name} can't be cast as that face`;
   // A card that went on an adventure may be cast from exile, but not as an Adventure again (CR 715.3d), unless
   // something else lets it be cast from there.
@@ -2856,6 +2871,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
 export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice" | "harmonize"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+  how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
@@ -3105,7 +3121,7 @@ export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?:
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
 export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face">): CastHow => ({
   ...(choices?.alt ? { alt: choices.alt } : {}),
-  ...(choices?.face !== undefined ? { face: choices.face } : {}),
+  ...(choices?.face !== undefined ? { face: choices.face } : choices?.alt === "convert" ? { face: 1 } : {}),
   ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
   ...(choices?.bargain ? { bargained: true } : {}),
   ...(choices?.evidence ? { evidence: true } : {}),
@@ -3143,6 +3159,7 @@ export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, o
 
 function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice[], modes?: number[], convoke?: ObjectId[], improvise?: ObjectId[], x?: number, choices: CostChoices = {}) {
   const o = obj(s, id);
+  choices = convertChoices(o, choices);
   if (choices.face !== undefined && o.face !== choices.face) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
@@ -3298,7 +3315,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +

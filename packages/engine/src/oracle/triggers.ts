@@ -3,6 +3,7 @@ import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./word
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
+import { CREATURE_TYPES } from "../keywords";
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
@@ -888,10 +889,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
   }
   // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
-  const battalion = /^Whenever ~ and at least (one|two|three) other creatures attack, (.+)$/.exec(line);
+  // "Whenever ~ and at least one Human attack, ..." (Goldbug, Scrappy Scout): others of that creature type.
+  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|[A-Z][a-z]+) attack, (.+)$/.exec(line);
   if (battalion) {
-    const t = parseTrigger(`Whenever ~ attacks, ${battalion[2]}`);
-    return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!) } : "fail";
+    const type = battalion[2] === "other creatures" ? undefined : battalion[2]!;
+    if (type && !CREATURE_TYPES.has(type)) return "fail";
+    const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);
+    return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), ...(type ? { withOthersType: type } : {}) } : "fail";
   }
   // "Whenever a creature you control attacks alone" (exalted's event, CR 702.83a, 506.5): that creature is the subject.
   const alone = /^Whenever an? (.+?) you control attacks alone, (?!if )(.+)$/.exec(line);

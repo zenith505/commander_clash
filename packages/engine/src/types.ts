@@ -105,6 +105,11 @@ export interface CardDef {
   /** A double-faced token's card, made as a copy of a double-faced object (CR 707.8a): its back face has mana value 0 (202.3b). */
   dfcCopy?: true;
   /**
+   * A transforming double-faced card's back face, when its front face has More Than Meets the Eye: that cost, to cast
+   * the card converted (CR 702.162a), with this face up on the stack.
+   */
+  convertCost?: string;
+  /**
    * A meld pair (CR 712.4, 712.5): the two cards that meld and the melded permanent they become. A melded permanent's
    * card exists only as the back faces of the pair (712.4b), so the card named `result` can't be in a deck.
    */

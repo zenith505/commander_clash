@@ -331,6 +331,8 @@ const FLASH_IF: StaticCondition["kind"][] = ["committedCrime", "control", "monar
 
 export function compile(d: CardDef): CompiledCard {
   const out: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
+  // A back face cast converted (CR 702.162a): the front face's More Than Meets the Eye cost is what's paid for it.
+  if (d.convertCost && plainMana(d.convertCost)) out.altCosts = [{ kind: "convert", mana: d.convertCost }];
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;

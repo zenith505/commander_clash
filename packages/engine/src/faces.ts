@@ -64,6 +64,7 @@ export function faceDef(d: CardDef, i: number): CardDef {
     ...(f.artUrl ?? d.artUrl ? { artUrl: f.artUrl ?? d.artUrl } : {}),
     ...(d.layout ? { layout: d.layout } : {}),
     ...(d.dfcCopy ? { dfcCopy: true as const } : {}),
+    ...(i === 1 && d.layout === "transform" && /^More Than Meets the Eye (?:\{[^}]+\})+/m.test(faces[0]!.oracleText) ? { convertCost: /^More Than Meets the Eye ((?:\{[^}]+\})+)/m.exec(faces[0]!.oracleText)![1]! } : {}),
     faceOf: { oracleId: d.oracleId, face: i },
   };
   faceDefs.set(key, out);

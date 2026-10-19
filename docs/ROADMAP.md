@@ -1,6 +1,6 @@
 # Roadmap
 
-20,419 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,520 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,21 +15,21 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-0. Cards with faces (CR 709, 710, 712, 715, 722): 336 of the 846 legal ones play now (`npm run faces` lists each
-   layout's support and the lines blocking it): 123 of 388 transforming double-faced, 104 of 151 adventurer, 63 of 123
-   split (aftermath and fuse included), 46 of 98 modal double-faced. Still out:
-   - Prepare cards (67, CR 722) and flip cards (19, CR 710): not modeled yet.
-   - Transform: living metal (13 cards, CR 702.161), More Than Meets the Eye and convert (701.28, 702.162), craft
-     (702.167), "transforms into" triggers (701.27e), a delayed "transform ~ at the beginning of the next upkeep"
-     (701.27f's rule for delayed triggers isn't modeled), "~ is all colors", "return it to the battlefield transformed
-     ... attached to target opponent", and the single lines `npm run faces` lists.
-   - Rooms (split enchantments with doors, CR 709.5) and the meld pairs (CR 701.42); melded permanents stay
-     unsupported on purpose (712.4b).
-   - Known gaps: a token copy of a double-faced permanent is single-faced (CR 707.8a gives it both faces, so it could
-     transform); a copy of a disturbed spell has its front face's mana value, not 0 (712.8e); an Aura back face
-     entering transformed doesn't choose what it enchants from the back face; ripple and "with the same name" compare
-     a split card's whole name, not each half's (709.4a); bots don't plan around day and night (casting two spells to
-     make it day), and cast a fuse card fused whenever they can pay for both halves.
+0. Cards with faces (CR 709, 710, 712, 715, 722): 430 of the 846 legal ones play now (`npm run faces` lists each
+   layout's support and the lines blocking it): 138 of 388 transforming double-faced, 104 of 151 adventurer, 76 of 123
+   split (13 of 28 Rooms), 46 of 98 modal double-faced, 49 of 67 preparation, 17 of 19 flip. Still out:
+   - Transformers: only Goldbug of the 13 plays; the others each have a line of their own (`npm run faces`).
+   - Transform: craft (702.167), a delayed "transform ~ at the beginning of the next upkeep" (701.27f's rule for
+     delayed triggers isn't modeled), "~ is all colors", "As ~ transforms into ~" (712.20), and the single lines
+     `npm run faces` lists.
+   - Rooms: 15 still out on their doors' own lines. A token copy of a Room, or a Room turned face up, has no
+     locked or unlocked doors (it's both halves); a Room's door abilities are numbered by which doors are unlocked,
+     so a "once each turn" door ability could trigger again after the other door unlocks.
+   - Flip: Autumn-Tail's "attach an Aura to it" needs a choice prompt; Sasaya's back face.
+   - Prepare: a prepare spell's copy is in its creator's exile, shown there. Croaking Counterpart's copy isn't
+     a Frog exception yet.
+   - The meld pairs (CR 701.42); melded permanents stay unsupported on purpose (712.4b).
+   - Bots don't plan around day and night (casting two spells to make it day).
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:
    Gemrazer, Huntmaster Liger, Snapdax, Nethroi, Mindleecher):

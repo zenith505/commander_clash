@@ -105,11 +105,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return who && token ? [{ type: "createToken", who, n: amt(m[2]!), token, ...(m[3] ? { tapped: true } : {}) }] : null;
   }
   // "Draw a card at the beginning of the next turn's upkeep" (a delayed trigger, CR 603.7).
-  if ((m = /^(.+) at the beginning of the next turn's upkeep$/.exec(s))) {
+  // "Transform ~ at the beginning of the next upkeep" (Archangel Avacyn): it transforms then only if it hasn't transformed
+  // since the delayed trigger was made (CR 701.27f).
+  if ((m = /^(.+) at the beginning of the next (?:turn's )?upkeep$/.exec(s))) {
     // Only what needs no targets or objects: the delayed ability has none of its own.
     const before = ctx.targets.length;
     const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
-    if (!inner || ctx.targets.length !== before || allEffects(inner).some((y) => "what" in y || ("who" in y && (y.who as { ref: string }).ref !== "you"))) return null;
+    const selfTransform = (y: Effect) => y.type === "transform" && y.what.ref === "self" && !ctx.spell;
+    if (!inner || ctx.targets.length !== before || allEffects(inner).some((y) => ("what" in y && !selfTransform(y)) || ("who" in y && (y.who as { ref: string }).ref !== "you"))) return null;
     return [{ type: "delayed", when: "nextTurnUpkeep", effects: inner, text: m[1]! }];
   }
   // Proliferate (CR 701.27), amass (CR 701.47).

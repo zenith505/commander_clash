@@ -1119,7 +1119,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
-      s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, body: d.body });
+      s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0 });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);
@@ -1335,8 +1335,8 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
     ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
     ...(t.chapter ? { chapter: true as const } : {}),
-    // Whether its source transforms before it resolves (CR 701.27f).
-    ...(s.objects[t.sourceId]?.transforms ? { sourceTransforms: s.objects[t.sourceId]!.transforms } : {}),
+    // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).
+    ...((t.transformsAt ?? s.objects[t.sourceId]?.transforms) ? { sourceTransforms: t.transformsAt ?? s.objects[t.sourceId]!.transforms } : {}),
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });

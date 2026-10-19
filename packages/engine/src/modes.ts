@@ -111,6 +111,8 @@ export interface CastHow {
   evidence?: boolean;
   /** The alternative cost it's cast for: awaken's target is chosen only then (CR 702.113b). */
   alt?: AltCostKind;
+  /** The face of a card with several it's cast as (CR 709.3, 712.11b, 715.3): spellTargets looks at that face. */
+  face?: number;
 }
 
 /** Whether a spell cast this way meets a condition on how it was cast ("if ~ was kicked", "if the gift was promised"). */

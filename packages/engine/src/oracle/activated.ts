@@ -37,7 +37,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast|Power-up)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast" | "Power-up") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   // "Pay half your life, rounded up" (Murderous Betrayal) has a comma of its own: read it apart from the other costs.
@@ -72,6 +72,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = c[2] ? parseSearchFilter(`${c[2]} card`) : undefined;
       if (filter === null || (filter && c[3])) return "fail";
       extra.push({ kind: "discard", n: num(c[1]!), ...(filter ? { filter } : {}), ...(c[3] ? { random: true as const } : {}) });
+    } else if ((c = new RegExp(`^Mill ${NUM} cards?$`).exec(part))) {
+      // CR 701.17b: the top cards of your library, as many as it says or none.
+      extra.push({ kind: "mill", n: num(c[1]!) });
     } else if ((c = /^Collect evidence (\d+)$/.exec(part))) {
       // CR 701.59a: exile cards from your graveyard with total mana value N or more.
       extra.push({ kind: "collectEvidence", n: Number(c[1]) });
@@ -184,7 +187,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
   // libraries isn't compiled.
-  const mana = manaAbilityKind(body);
+  // A cost that mills moves a card from a library: it uses the stack (CR 605.1a; Millikin rulings).
+  const mana = extra.some((c) => c.kind === "mill") ? "stack" : manaAbilityKind(body);
   if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || keyword || halfLife))) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";

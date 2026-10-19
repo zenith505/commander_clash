@@ -1181,11 +1181,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const UNDER = "(its owner's|their owner's|their owners'|your)";
     const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of the next end step)(?: with an? ${COUNTER} counter on it)?$`);
     const later = laterRe.exec(s);
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/.exec(s);
+    // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
-      if (prev.until || prev.linked || isGroup(prev.what)) return null;
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[1] === "your" ? "you" : "owner" };
+      if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self")) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}) };
       continue;
     }
     // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the
@@ -2054,7 +2055,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // Gathering): the one creature picked (kept in `created` too).
     const picked = last?.type === "pick" && (last.action === "counters" || last.action === "choose") && last.n === 1 && last.who.ref === "you" && !last.among;
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
-    ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || faceDown;
+    ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown;
     if (last?.type === "amass") ctx.amassed = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };

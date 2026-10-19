@@ -288,11 +288,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // became (CR 701.60a).
   // "Return it to the battlefield tapped under its owner's control" (Supernatural Stamina, Fungal Fortitude), "... with a
   // +1/+1 counter on it" (Undying Malice; it enters with it, CR 614.1c).
-  if (ctx.selfCard && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)? under (your|its owner's) control(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?$`).exec(s)))
+  // "Return it to the battlefield tapped and transformed" (Hanweir Garrison's kin): its back face up (CR 712.14a).
+  if (ctx.selfCard && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)?((?: and)? transformed)? under (your|its owner's) control(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?$`).exec(s))) {
+    if (m[2] && !m[1] !== !/ and/.test(m[2])) return null; // "tapped and transformed", or "transformed" alone
     return [
-      { type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] ? { tapped: true } : {}), ...(m[2] === "its owner's" ? { owner: true } : {}), ...(m[3] ? { counters: { [counterKind(m[4]!)]: num(m[3]) } } : {}) },
-      ...(m[5] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : []),
+      { type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] ? { tapped: true } : {}), ...(m[2] ? { transformed: true as const } : {}), ...(m[3] === "its owner's" ? { owner: true } : {}), ...(m[4] ? { counters: { [counterKind(m[5]!)]: num(m[4]) } } : {}) },
+      ...(m[6] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : []),
     ];
+  }
   // "When enchanted creature dies, return that card to the battlefield under your control" (False Demise): the card
   // that went to the graveyard, if it's still there (CR 400.7); a token is gone (CR 111.7).
   // "Put that card onto the battlefield under your control" (Seraph) is the same instruction.

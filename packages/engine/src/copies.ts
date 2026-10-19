@@ -39,6 +39,12 @@ export function copiableDef(s: GameState, o: GameObject): CardDef {
 
 /** Register the definition a copy of `base` with these exceptions has, and return its key in GameState.cards. */
 export function copyKey(s: GameState, base: CardDef, except?: CopyExcept): string {
+  // A copy of a face isn't that card's face: a copy of a nonmodal double-faced card's back face has mana value 0 (CR
+  // 712.8e).
+  if (base.faceOf) {
+    const { faceOf: _, ...plain } = base;
+    base = { ...plain, oracleId: `${base.oracleId}|copied` };
+  }
   if (!except || !Object.keys(except).length) {
     s.cards[base.oracleId] ??= base;
     return base.oracleId;

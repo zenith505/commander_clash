@@ -66,6 +66,12 @@ export const SUPPORTED_KEYWORDS = [
   // CR 702.147a: "This creature can't block" (see cantBlockNow) and "When this creature attacks, sacrifice it at end of
   // combat" (see abilitiesOf). It can be a keyword counter (CR 122.1b).
   "Decayed",
+  // CR 702.102a: a split card with fuse may be cast from hand as both halves, a fused split spell. See castableFaces and
+  // faceDef's fused face.
+  "Fuse",
+  // CR 702.145: day and night transform these (see daynight.ts); nothing else can.
+  "Daybound",
+  "Nightbound",
 ] as const;
 export type SupportedKeyword = (typeof SUPPORTED_KEYWORDS)[number];
 

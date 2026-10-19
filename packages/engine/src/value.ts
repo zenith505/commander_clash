@@ -6,11 +6,11 @@ import { power, toughness, defOf } from "./cards";
 import { bindChosen, estimate, harmfulCounter, harmfulTargets, legalTargets, lethalDamage, modsAreHarmful, objectMatches } from "./effects";
 import { livingPlayers, obj, opponents } from "./game";
 import { characteristics, controllerOf } from "./layers";
-import { manaValue, parseManaCost } from "./mana";
 import { compileCard } from "./oracle";
 import { COLORS, type CardDef, type Chosen, type Color, type GameObject, type GameState, type PlayerId } from "./types";
+import { defMv } from "./faces";
 
-const mv = (s: GameState, id: string) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+const mv = (s: GameState, id: string) => defMv(defOf(s, obj(s, id)));
 
 /** What a permanent is worth to whoever controls it: a creature by its size, a commander most. */
 export function worth(s: GameState, pid: PlayerId, o: GameObject): number {

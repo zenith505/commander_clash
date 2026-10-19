@@ -55,6 +55,15 @@ export function parseGraveyardKeyword(
     }
     return { fromGraveyard: { kind: "permission", costs, exile: false, ...(cond ? { if: cond } : {}) } };
   }
+  // Aftermath (CR 702.127a): "You may cast this half of this split card from your graveyard", "This half can't be cast
+  // from any zone other than a graveyard", and exiled if it would leave the stack after being cast from a graveyard.
+  if (/^Aftermath$/.test(line)) return isSpell && d.layout === "split" ? { fromGraveyard: { kind: "aftermath", costs: [], exile: true } } : "fail";
+  // Disturb (CR 702.146a): "You may cast this card transformed from your graveyard by paying [cost] rather than its mana
+  // cost", on a double-faced card's front face.
+  if ((m = /^Disturb ((?:\{[^}]+\})+)$/.exec(line))) {
+    if (d.layout !== "transform" || (d.faceOf && d.faceOf.face !== 0) || !parseManaCost(m[1]!).supported || parseManaCost(m[1]!).hasX) return "fail";
+    return { fromGraveyard: { kind: "disturb", mana: m[1]!, costs: [], exile: false, face: 1 } };
+  }
   if (/^Jump-start$/.test(line)) return isSpell ? { fromGraveyard: { kind: "jumpStart", costs: [{ kind: "discard", n: 1 }], exile: true } } : "fail";
   if (/^Retrace$/.test(line)) return { fromGraveyard: { kind: "retrace", costs: [{ kind: "discard", n: 1, filter: { kind: "card", types: ["Land"], text: "land card" } }], exile: false } };
   // Mayhem (CR 702.187b): "As long as you discarded this card this turn, you may cast it from your graveyard by paying

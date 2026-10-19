@@ -171,6 +171,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 }
 .turn-info { display: flex; align-items: baseline; gap: 10px; font-size: 16px; flex-wrap: wrap; }
 .turn-info .thinking { margin-left: auto; }
+.turn-info .day-night { font-size: 14px; color: var(--muted); }
 .control-pane .controls { flex-wrap: wrap; margin-left: 0; }
 .control-pane .controls > span { flex: 1 1 100%; }
 .control-pane .controls > button { flex: 1 1 0; }

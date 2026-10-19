@@ -57,6 +57,7 @@ export interface ResolveCtx {
   /** A station ability's tapped creature (CR 702.184a). */
   stationed?: StackItem["stationed"];
   sourceUntaps?: number;
+  sourceTransforms?: number;
   /** The creature type or color chosen as it resolves, or else as its source entered. */
   chosen?: Chosen;
   /** The player an instruction for each player is being done to now (PlayerRef "eachOne"). */
@@ -146,6 +147,7 @@ export function continueResolution(s: GameState): Resolution {
     sacrificed: item.sacrificed,
     stationed: item.stationed,
     sourceUntaps: item.sourceUntaps,
+    sourceTransforms: item.sourceTransforms,
   };
   Object.defineProperty(ctx, "chosen", { get: () => r.chosen ?? sourceChosen(s, ctx), enumerable: true });
   for (;;) {
@@ -615,6 +617,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomeSaddled":
     case "classLevel":
     case "solve":
+    case "transform":
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":
@@ -752,6 +755,16 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     moveObject(s, id, "exile");
     log(s, `${d.name} is exiled (rebound).`);
     addDelayed(s, "yourNextUpkeep", controller, o, { targets: [], effects: [{ type: "castFromExileFree" }], text: "Rebound: you may cast ~ from exile without paying its mana cost." });
+    return;
+  }
+  // An Adventure that resolves is exiled instead of going to the graveyard, and its controller may cast the creature
+  // later for as long as it stays exiled (CR 715.3d). A copy of one isn't a card (CR 707.10a).
+  if (o.face === 1 && s.cards[o.cardId]?.layout === "adventure" && !o.spellCopy) {
+    moveObject(s, id, "exile");
+    if (o.zone === "exile") {
+      o.mayPlay = { player: controller, zc: o.zoneChanges ?? 0, until: "adventure", turn: s.turn };
+      log(s, `${d.name} is exiled: ${player(s, controller).name} may cast ${defOf(s, o).name} from exile (on an adventure).`);
+    }
     return;
   }
   if (o.buyback) {

@@ -52,6 +52,8 @@ for play. When we add search-based AI we'll switch to structural sharing.
 | `layers.ts` | Characteristics after continuous effects, in layer order (CR 613), cached. |
 | `cards.ts` | Card definitions and characteristic helpers (`power`, `objIsType`, `objHasKeyword`, ...). |
 | `copies.ts` | Copiable values (CR 707). |
+| `faces.ts` | Cards with several faces (CR 709, 710, 712, 715, 722): each face's own definition, used while that face is up (`GameObject.face`), the card's resting characteristics anywhere else, the faces a card can be cast or played as. |
+| `daynight.ts` | Day and night (CR 731) and the daybound and nightbound permanents that transform with it (702.145). |
 | `graveyard.ts` | Graveyard order (CR 404): cards put into a graveyard at the same time, arranged by their owner when a card in the game reads the order; the top/bottom card of a graveyard. |
 | `damage.ts`, `counters.ts` | Dealing damage (CR 120): damage dealt at the same time goes through one planner for protection, shield counters, prevention and redirection shields (CR 615, 616), which can pause combat damage to ask; counter/token replacement effects (CR 614, 616). |
 | `mana.ts`, `manaabilities.ts`, `autopay.ts` | Mana costs, mana abilities, automatic payment. |

@@ -1,4 +1,4 @@
-import { applyAction, createGame, invalidateCharacteristics, parseTypeLine, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type Color, type GameState, type Modification, type PlayerId, type Step, type TargetChoice } from "../src";
+import { applyAction, cardFromScryfall, createGame, invalidateCharacteristics, parseTypeLine, planActivate, planCast, power, toughness, waitingOn, type Action, type CardDef, type Color, type GameState, type Modification, type PlayerId, type Step, type TargetChoice } from "../src";
 
 let n = 0;
 export function card(name: string, typeLine: string, manaCost = "", extra: Partial<CardDef> = {}): CardDef {
@@ -133,3 +133,21 @@ export function addEffect(s: GameState, controller: PlayerId, ids: string[], mod
 export const pt = (s: GameState, id: string) => `${power(s, s.objects[id]!)}/${toughness(s, s.objects[id]!)}`;
 export const target = (id: string): TargetChoice => ({ kind: "object", id });
 
+type Face = { name: string; mana_cost?: string; type_line: string; oracle_text?: string; power?: string; toughness?: string };
+/** A card as Scryfall has it, read the way the card database is built (tools/build-cards.ts). */
+export function scry(layout: string, faces: Face[], extra: { keywords?: string[]; color_identity?: string[] } = {}): CardDef {
+  const top = layout === "split" || layout === "adventure" ? { mana_cost: faces.map((f) => f.mana_cost ?? "").join(" // ") } : {};
+  const colors = [...new Set(faces.flatMap((f) => [...(f.mana_cost ?? "").matchAll(/[WUBRG]/g)].map((m) => m[0])))];
+  return cardFromScryfall({
+    oracle_id: `faces-${n++}`,
+    name: faces.map((f) => f.name).join(" // "),
+    layout,
+    cmc: 0,
+    type_line: faces.map((f) => f.type_line).join(" // "),
+    color_identity: extra.color_identity ?? colors,
+    keywords: extra.keywords ?? [],
+    legalities: { commander: "legal" },
+    ...top,
+    card_faces: faces.map((f) => ({ object: "card_face", mana_cost: "", oracle_text: "", ...f })),
+  });
+}

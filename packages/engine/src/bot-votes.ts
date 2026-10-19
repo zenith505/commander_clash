@@ -5,9 +5,9 @@ import { defOf } from "./cards";
 import { livingPlayers, obj, opponents, player } from "./game";
 import { controllerOf } from "./layers";
 import { objectMatches } from "./effects";
-import { manaValue, parseManaCost } from "./mana";
 import { groupValue, worth } from "./value";
 import type { GameState, PlayerId } from "./types";
+import { defMv } from "./faces";
 
 /** The vote for `pid` to make (or to choose for another player, with Illusion of Choice): one of `options`. */
 export function chooseVote(s: GameState, pid: PlayerId, options: string[]): string {
@@ -35,7 +35,7 @@ function objectScore(s: GameState, pid: PlayerId, controller: PlayerId, effects:
     return harmful ? (mine ? -v : v) : mine ? v : -v;
   }
   // A card returned to its owner's hand (Custodi Squire): the best one for us, the worst for anyone else.
-  const v = manaValue(parseManaCost(defOf(s, o).manaCost));
+  const v = defMv(defOf(s, o));
   return (harmful ? -1 : 1) * (o.owner === pid ? v : -v);
 }
 

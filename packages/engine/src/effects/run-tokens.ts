@@ -47,6 +47,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const base = me ? defOf(s, me) : ctx.sourceDef; // as it last existed if it's gone (CR 707.2, 608.2h)
       while (sc.queue.length) {
         const pid = sc.queue[0]!;
+        if (sc.may === undefined && e.must) sc.may = true;
         if (sc.may === undefined) {
           s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `create a token copy of ${base.name} attacking ${player(s, pid).name}`, source: src };
           return "paused";
@@ -59,7 +60,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!inCombat(s)) return;
       enterTogether(s, () => {
         for (const pid of Object.keys(sc.chosen!).map(Number) as PlayerId[])
-          if (livingPlayers(s).includes(pid)) tokenCopies(s, ctx.controller, base, 1, ctx, { tapped: true, defender: pid });
+          if (livingPlayers(s).includes(pid)) tokenCopies(s, ctx.controller, base, 1, ctx, { tapped: true, defender: pid, ...(e.except ? { except: e.except } : {}) });
       });
       return;
     }

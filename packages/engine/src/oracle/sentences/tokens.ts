@@ -61,6 +61,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };
     return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(except ? { except } : {}), ...state }];
   }
+  // "Whenever ~ attacks a player, for each other opponent, create a token that's a copy of ~ tapped and attacking that
+  // player, except it isn't legendary" (Shredder): myriad's tokens (CR 702.116a), each opponent but the defending player,
+  // with no "may".
+  if (ctx.defending && (m = /^[Ff]or each other opponent, create a token that's a copy of ~ (?:that's )?tapped and attacking that player(?:, except (.+))?$/.exec(s))) {
+    const except = m[1] ? parseCopyExcept(m[1]) : undefined;
+    return except === null ? null : [{ type: "myriad", must: true, ...(except ? { except } : {}) }];
+  }
   // "Sacrifice them at the beginning of the next end step" / "Exile it ...": about the tokens just created.
   if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens) at (the beginning of (?:the|your) next end step|end of combat|the beginning of the next cleanup step)$/i.exec(s))) {
     const verb = m[1]!.toLowerCase();
@@ -108,9 +115,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Populate$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
   // Blink: "Exile target creature you control, then return it to the battlefield under its owner's control".
-  if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/i.exec(s))) {
+  // "Exile ~, then return it to the battlefield transformed under your control" (a Saga's last chapter): with its back
+  // face up if it's a double-faced card (CR 712.14a).
+  if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what && !isGroup(what) ? [{ type: "flicker", what, under: m[2] === "your" ? "you" : "owner" }] : null;
+    if (m[2] && what?.ref !== "self") return null;
+    return what && !isGroup(what) ? [{ type: "flicker", what, under: m[3] === "your" ? "you" : "owner", ...(m[2] ? { transformed: true as const } : {}) }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
   if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];

@@ -16,6 +16,7 @@ import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
 import type { DamageMod, TargetSpec } from "./abilities";
+import { hasName } from "./faces";
 
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
@@ -294,7 +295,7 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
   const o = src.ref ? s.objects[src.ref.object] : undefined;
   if (o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === src.ref!.zc) return objectMatches(s, spec, o, controller, false);
   if (spec.combat || spec.counter || spec.tapped !== undefined || spec.token !== undefined || spec.power || spec.toughness || spec.manaValue || spec.supertypes || spec.notSupertypes || spec.anyOf || spec.chosen) return false;
-  if (spec.named !== undefined && src.name !== spec.named) return false;
+  if (spec.named !== undefined && !hasName(src.name, spec.named)) return false;
   const kw = (k: string) => src.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.types?.length && !spec.types.some((t) => src.types.includes(t)) && !spec.orSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.allTypes?.some((t) => !src.types.includes(t)) || spec.notTypes?.some((t) => src.types.includes(t))) return false;

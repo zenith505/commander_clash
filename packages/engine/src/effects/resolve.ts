@@ -547,6 +547,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "addMana":
     case "cantBlockRule":
     case "cantAttackRule":
+    case "costModThisTurn":
     case "fight":
     case "bite":
     case "extraTurn":
@@ -609,6 +610,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "castFromAmong":
     case "suspendTick":
     case "suspendCast":
+    case "siegeDefeated":
     case "exileSelfWithTime":
     case "exileSpell":
     case "warpExile":
@@ -642,6 +644,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "endure":
     case "moveCounter":
     case "removeCounters":
+    case "battleDefense":
     case "removeAllCounters":
     case "moveAllCounters":
     case "removeSelfCounter":

@@ -151,6 +151,9 @@ const checkableMay = (e: Effect) =>
   // exiling or discarding your hand, Herigast).
   (e.type === "exileFaceDown" && e.from === "hand") ||
   (e.type === "discard" && e.who.ref === "you" && e.n === 1 && !e.random) ||
+  // "You may discard your hand. If you do, draw three cards." (Phyrexian Dragon Engine): even an empty one (rulings on
+  // Moonveil Regent).
+  (e.type === "discard" && e.who.ref === "you" && e.hand && !e.filter) ||
   (e.type === "draw" && e.who.ref === "you") ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
   // "Whenever a Goblin or Orc you control deals combat damage to a player, you may sacrifice it." (Gorbag): the subject.
@@ -429,6 +432,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
+  // on it." (Portent Tracker) is one instruction about one battle.
+  text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
@@ -1138,6 +1144,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       else effects.push({ type: "if", cond, effects: fx.effects });
       continue;
     }
+    // Doubling a creature's power (CR 701.10b-c): it gets +X/+0, where X is its power as this resolves (for a negative
+    // power, -X/-0 for X below 0 comes to the same).
+    const double = /^[Dd]ouble (?:(its|target creature's) power|the power of (target creature)) until end of turn$/.exec(s);
+    if (double) s = `${double[1] === "its" ? "It" : "Target creature"} gets +X/+0 until end of turn, where X is its power`;
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     const where = /^(.+), where X is (.+)$/.exec(s);
@@ -1155,8 +1165,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (asCast && !dividedOnly) return false;
       // "~ deals X damage ..., where X is the number of age counters on it" (Magmatic Core): "it" is ~.
       const what = /^~ /.test(s) ? where[2]!.replace(/ counters on it$/, " counters on ~") : where[2]!;
-      const def = parseCount(asCast ? what.slice(0, asCast.index) : what, ctx);
-      if (!def) return false;
+      const counted = parseCount(asCast ? what.slice(0, asCast.index) : what, ctx);
+      if (!counted) return false;
+      const def = double ? { ...counted, signed: true as const } : counted;
       effects.splice(before, effects.length - before, ...replaceX(added, def));
       for (let k = targetsBefore; k < ctx.targets.length; k++) {
         const t = ctx.targets[k]!;

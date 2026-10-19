@@ -58,6 +58,7 @@ export function faceDef(d: CardDef, i: number): CardDef {
     ...(f.power !== undefined ? { power: f.power } : {}),
     ...(f.toughness !== undefined ? { toughness: f.toughness } : {}),
     ...(f.loyalty !== undefined ? { loyalty: f.loyalty } : {}),
+    ...(f.defense !== undefined ? { defense: f.defense } : {}),
     colors: flip ? [...faces[0]!.colors] : [...f.colors],
     colorIdentity: d.colorIdentity,
     keywords: faceKeywords(d, f),
@@ -106,14 +107,14 @@ export function restingDef(d: CardDef): CardDef {
   if (d.layout === "split") {
     const union = (k: "supertypes" | "types" | "subtypes") => [...new Set(faces.flatMap((f) => f[k]))];
     const manaCost = faces.map((f) => f.manaCost).join("");
-    const { power: _p, toughness: _t, loyalty: _l, ...rest } = d;
+    const { power: _p, toughness: _t, loyalty: _l, defense: _d, ...rest } = d;
     // Its colors are its combined mana cost's (CR 709.4b).
     const colors = COLORS.filter((c) => faces.some((f) => f.colors.includes(c)));
     out = { ...rest, manaCost, cmc: mv(manaCost), colors, supertypes: union("supertypes"), types: union("types"), subtypes: union("subtypes"), oracleText: "", keywords: [], faces };
   } else {
     // The front face's characteristics, whatever the card's own fields say.
     const f = faces[0]!;
-    const { power: _p, toughness: _t, loyalty: _l, ...rest } = d;
+    const { power: _p, toughness: _t, loyalty: _l, defense: _d, ...rest } = d;
     out = {
       ...rest,
       name: f.name,
@@ -127,6 +128,7 @@ export function restingDef(d: CardDef): CardDef {
       ...(f.power !== undefined ? { power: f.power } : {}),
       ...(f.toughness !== undefined ? { toughness: f.toughness } : {}),
       ...(f.loyalty !== undefined ? { loyalty: f.loyalty } : {}),
+      ...(f.defense !== undefined ? { defense: f.defense } : {}),
       colors: [...f.colors],
       keywords: f.keywords,
       faces,

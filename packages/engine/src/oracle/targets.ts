@@ -20,6 +20,13 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
+  // "Target player or battle", "target opponent or battle" (Ayara), "another target battle or opponent" (Invasion of
+  // Regatha: not itself, CR 115.4): a player, or a battle permanent.
+  const battle = /^(another )?target (?:(player|opponent) or battle|battle or (player|opponent))$/i.exec(p);
+  if (battle) {
+    const who = (battle[2] ?? battle[3])!.toLowerCase();
+    return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Battle"], ...(who === "opponent" ? { opponent: true } : {}), ...(battle[1] ? { notSource: true } : {}), text: p.toLowerCase() }) };
+  }
   // Bonfire of the Damned: "... to target player or planeswalker and each creature that player or that planeswalker's
   // controller controls": the creatures of the player it targets, or of the planeswalker's controller.
   if (/^each creature that player or that planeswalker's controller controls$/i.test(p)) {
@@ -426,6 +433,8 @@ const PLURAL_TYPES: Record<string, string> = {
 export function parseGroup(phrase: string, bare = false, count?: (text: string) => AmountExpr | null): { filter: TargetSpec; other: boolean } | null {
   // "Each nonland, nontoken permanent": the same as "each nonland nontoken permanent".
   let p = phrase.trim().replace(/\b(non[a-z]+), (?=non[a-z]+ )/gi, "$1 ");
+  // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
+  p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);
@@ -690,6 +699,9 @@ export function parseTargetPhrase(
       } else if (w === "token" || w === "nontoken") {
         if (alts.length > 1) return null;
         extra.token = w === "token";
+      } else if (w === "enchanted-or-equipped" && !extra.status) {
+        if (alts.length > 1) return null;
+        extra.status = "enchantedOrEquipped";
       } else if ((w === "enchanted" || w === "equipped" || w === "modified") && !extra.status) {
         // "Enchanted creatures you control", "an equipped creature", "modified creature" (CR 700.9).
         if (alts.length > 1) return null;

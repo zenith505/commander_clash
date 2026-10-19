@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TriggeredAbility, TriggerDuration } from "./abilities";
+import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TriggeredAbility, TriggerDuration } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -77,6 +77,8 @@ export interface CardDef {
   power?: string;
   toughness?: string;
   loyalty?: string;
+  /** A battle's printed defense (CR 310.4a). */
+  defense?: string;
   colors: Color[];
   colorIdentity: Color[];
   keywords: string[];
@@ -349,7 +351,7 @@ export interface GameObject {
    * defending player (CR 506.2, 802.2a). Once the planeswalker is removed from combat, the creature attacks nothing
    * but is still attacking (CR 506.4c).
    */
-  attackingPermanent?: { id: ObjectId; zc: number };
+  attackingPermanent?: { id: ObjectId; zc: number; /** A battle it attacks: the battle's controller then, which mustn't change (CR 506.4). */ battleController?: PlayerId };
   /**
    * Provoked: it must block this attacking creature this combat if able (CR 702.39a), cleared at end of combat; or,
    * with `turn`, any combat of that turn ("target creature blocks ~ this turn if able").
@@ -396,6 +398,8 @@ export interface GameObject {
   castFromHand?: true;
   /** It entered from the stack as a resolving permanent spell (not a copy), for "when ~ enters, if you cast it". */
   wasCast?: true;
+  /** On the battlefield: it entered from a graveyard, its owner's, for "when ~ enters from a graveyard" (CR 603.6a). */
+  enteredFromGraveyard?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
@@ -454,6 +458,8 @@ export interface GameObject {
   exileIfToGraveyard?: true;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
+  /** A battle's protector (CR 310.9), chosen as it enters (310.9a) and again when that player can't be (704.5x-y). */
+  protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
   devoured?: number;
   /**
@@ -766,7 +772,7 @@ export interface LastKnown {
   manaValue?: number;
   /** The player a creature returned for ninjutsu was attacking (CR 702.49c), and the planeswalker if it was one. */
   attacking?: PlayerId;
-  attackingPermanent?: { id: ObjectId; zc: number };
+  attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId };
   /** Its copiable values as it last existed (CR 707.2, 608.2h), a key into GameState.cards: "becomes a copy of that creature". */
   copyKey?: string;
   /** Who controlled it as it last existed: "that creature's controller" after it died (CR 608.2h). */
@@ -913,7 +919,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed" }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1112,6 +1118,8 @@ export interface GameState {
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
   castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true }[];
+  /** "Instant and sorcery spells you cast this turn cost {1} less to cast": cost changes for one player this turn (CR 601.2f). */
+  costModsThisTurn?: { player: PlayerId; mod: CostMod }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */

@@ -125,7 +125,7 @@ function hasStatus(s: GameState, o: GameObject, c: Characteristics, status: NonN
     const ac = view && a.zone === "battlefield" ? view(a) : characteristics(s, a);
     if (!ac) continue;
     if (status !== "enchanted" && ac.subtypes.includes("Equipment")) return true;
-    if (status === "enchanted" && ac.subtypes.includes("Aura")) return true;
+    if ((status === "enchanted" || status === "enchantedOrEquipped") && ac.subtypes.includes("Aura")) return true;
     if (status === "modified" && ac.subtypes.includes("Aura") && ac.controller === c.controller) return true;
   }
   return false;
@@ -334,8 +334,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     return printedMatches(spec, defOf(s, o));
   }
   if (spec.kind === "any") {
-    // Any target is a creature, planeswalker or player (CR 115.4); "player or planeswalker" narrows the objects.
-    const kinds = spec.types?.length ? spec.types : ["Creature", "Planeswalker"];
+    // Any target is a creature, planeswalker, battle or player (CR 115.4); "player or planeswalker" narrows the objects.
+    const kinds = spec.types?.length ? spec.types : ["Creature", "Planeswalker", "Battle"];
     return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
   // A mutating creature spell's target has the same owner as the spell (CR 702.140a).

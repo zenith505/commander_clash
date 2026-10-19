@@ -60,6 +60,7 @@ import {
   planManaAbility,
   type ManaOption,
   doesNothingNow,
+  attackablePermanentProblem,
   attackProblem,
   attackTax,
   attackTaxPer,
@@ -483,12 +484,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" ? pending.stackId : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
-  // Opponents' planeswalkers, which can be attacked (CR 506.2).
+  // Who defends a permanent that can be attacked: a planeswalker's controller, a battle's protector (CR 506.2, 310.9b).
+  const defenderOf = (id: string) => (s?.objects[id]?.protector !== undefined && characteristics(s, s.objects[id]!).types.includes("Battle") ? s.objects[id]!.protector! : controllerOf(s!, s!.objects[id]!));
+  // Opponents' planeswalkers and the battles opponents protect, our own Sieges too, which can be attacked.
   const opponentWalkers = useMemo(
-    () => (s ? s.battlefield.filter((id) => opps.includes(controllerOf(s, s.objects[id]!)) && characteristics(s, s.objects[id]!).types.includes("Planeswalker")) : []),
+    () => (s ? s.battlefield.filter((id) => opps.includes(defenderOf(id)) && attackablePermanentProblem(s, HUMAN, defenderOf(id), id) === null) : []),
     [s, opps],
   );
-  const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, controllerOf(s, s.objects[id]!), true);
+  const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
   const picking = !!(xPick || kickPick || costPick || costOrPick || delvePick || dividing || giftPick || buybackPick);
@@ -964,7 +967,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (pending?.kind === "declareAttackers") {
       // An opponent's planeswalker can be attacked instead of the player (CR 506.2, 508.1b).
       if (aim && attackablePlaneswalker(o.id)) {
-        setAttacks({ ...attacks, [aim]: { defender: controllerOf(s, o), planeswalker: o.id } });
+        setAttacks({ ...attacks, [aim]: { defender: defenderOf(o.id), planeswalker: o.id } });
         setAim(null);
         return;
       }
@@ -2260,7 +2263,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             {signed(m.effectPower)}/{signed(m.effectToughness)}
           </span>
         )}
-        {Object.entries(m.otherCounters).filter(([k]) => !(k === "loyalty" && c.types.includes("Planeswalker"))).map(([k, n]) => (
+        {Object.entries(m.otherCounters).filter(([k]) => !(k === "loyalty" && c.types.includes("Planeswalker")) && !(k === "defense" && c.types.includes("Battle"))).map(([k, n]) => (
           <span key={k} className="chip other" title={`${n} ${k} counter(s)`}>
             {n} {k}
           </span>
@@ -2339,6 +2342,16 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
           </span>
         )}
       </span>
+      {c.types.includes("Battle") && o.protector !== undefined && s.players[o.protector] && (
+        <span className="chip other protector" title={`${s.players[o.protector]!.name} protects it: they can block creatures attacking it, and everyone else can attack it (CR 310.9).`}>
+          Protected by {s.players[o.protector]!.name}
+        </span>
+      )}
+      {c.types.includes("Battle") && (
+        <span className={`pt defense ${creature ? "with-pt" : ""}`} title={`Defense ${o.counters.defense ?? 0} (printed ${cardOf(s, o.id).defense ?? "?"})`}>
+          {o.counters.defense ?? 0}
+        </span>
+      )}
       {c.types.includes("Planeswalker") && (
         <span className={`pt loyalty ${creature ? "with-pt" : ""}`} title={`Loyalty ${o.counters.loyalty ?? 0} (printed ${cardOf(s, o.id).loyalty ?? "?"})`}>
           {o.counters.loyalty ?? 0}
@@ -3625,7 +3638,9 @@ function Controls({
     const d = cardOf(s, pending.objectId);
     const o = s.objects[pending.objectId]!;
     // A card with several faces may be cast as one of them: a split card only as a half (CR 709.3).
-    const faces = castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land"));
+    // A defeated Siege is cast transformed only (CR 310.12b).
+    const transformed = pending.how === "transformed";
+    const faces = transformed ? [1] : castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land"));
     return (
       <div className="controls">
         <span onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
@@ -3641,6 +3656,10 @@ function Controls({
             <>
               <strong>{pending.source}:</strong> discover. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it goes to your hand.
             </>
+          ) : transformed ? (
+            <>
+              <strong>{pending.source}:</strong> it&apos;s defeated. Cast <strong>{s.cards[registerFace(s, o, 1)]!.name}</strong> transformed without paying its mana cost? If you don&apos;t, it stays in exile.
+            </>
           ) : pending.how === "suspend" ? (
             <>
               <strong>Suspend:</strong> the last time counter is gone. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it stays in exile.
@@ -3651,7 +3670,7 @@ function Controls({
             </>
           )}
         </span>
-        {s.cards[o.cardId]?.layout !== "split" && (
+        {s.cards[o.cardId]?.layout !== "split" && !transformed && (
           <button
             disabled={(pending.how === "madness" || pending.how === "miracle") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
             title={pending.how === "madness" || pending.how === "miracle" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
@@ -3820,7 +3839,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

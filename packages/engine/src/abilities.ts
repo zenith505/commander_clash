@@ -78,6 +78,8 @@ export interface AmountExpr {
   plus?: number;
   negate?: boolean;
   half?: "up" | "down";
+  /** It may be below 0: doubling a creature's power gives it +X/+0 for a negative X too (CR 107.1b, 701.10c). */
+  signed?: true;
 }
 
 /** What an amount counts. */
@@ -337,7 +339,7 @@ export interface TargetSpec {
    * creature" (CR 700.9: a counter on it, equipped, or enchanted by an Aura its controller controls); "unenchanted":
    * "creatures that aren't enchanted".
    */
-  status?: "enchanted" | "equipped" | "modified" | "unenchanted";
+  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted";
   /** "Target Aura attached to a creature", "Aura or Equipment attached to a creature you control": what it's attached to. */
   attachedTo?: TargetSpec;
   /** "Suspected creature" (CR 701.60). */
@@ -1389,6 +1391,8 @@ export type Effect =
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
   | { type: "suspendCast" }
+  /** A Siege's intrinsic trigger (CR 310.12b): exile it (the subject), then its controller may cast it transformed for free. */
+  | { type: "siegeDefeated" }
   /** "Exile ~ with three time counters on it": the resolving spell suspends itself again (Arc Blade). */
   | { type: "exileSelfWithTime"; n: number }
   /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
@@ -1425,6 +1429,8 @@ export type Effect =
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   | { type: "copySpell"; spell: "cause" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
+  | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
   | { type: "removeAllCounters"; what: ObjRef }
   /** "Move all counters from target creature onto another target creature" (CR 122.5): only if both are still legal targets (rulings on Fate Transfer). */
@@ -1781,6 +1787,8 @@ export type Effect =
   | { type: "noLifeGain"; players: "all" | "opponents" }
   /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
   | { type: "turnRules"; rules: TurnRule["rule"][] }
+  /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
+  | { type: "costModThisTurn"; mod: CostMod }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
@@ -1887,7 +1895,7 @@ export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -2348,6 +2356,8 @@ export interface TriggeredAbility {
   attacksMostLife?: boolean;
   /** "Whenever ~ attacks a player": not when it attacks a planeswalker (rulings). */
   attacksPlayer?: boolean;
+  /** "Whenever ~ attacks a battle" (Thrashing Frontliner, CR 310.5). */
+  attacksBattle?: boolean;
   /** "Whenever ~ attacks for the first time each turn": only on its first attack this turn, as this object (Aurelia). */
   firstAttack?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
@@ -2362,6 +2372,8 @@ export interface TriggeredAbility {
   ifNotRenowned?: boolean;
   /** "Whenever ~ deals combat damage to a player or planeswalker" (Psychic Frog): also to a planeswalker, once each. */
   orPlaneswalker?: true;
+  /** "Whenever ~ deals combat damage to a player or battle" (CR 310): also to a battle, once each. */
+  orBattle?: true;
   /** "When ~ enters, if it was kicked, ..." (an intervening if, CR 603.4). */
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */
@@ -2382,6 +2394,8 @@ export interface TriggeredAbility {
   ifSpent?: SpentReq;
   /** "When ~ enters, if you cast it from your hand, ..." (true), "if you didn't cast it from your hand" (false). */
   ifCastFromHand?: boolean;
+  /** "When ~ enters from a graveyard" / "from your graveyard" (its owner is its controller): part of the trigger event. */
+  ifFromGraveyard?: "any" | "yours";
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
   ifCast?: true;
   /**
@@ -3007,6 +3021,17 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
   noMaxHandSize?: boolean | "all";
+  /**
+   * "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker), "... of
+   * planeswalkers you control ..." (Oath of Teferi): two loyalty abilities of that permanent each turn, the same one
+   * twice or two different ones (CR 606.3, rulings on Urza).
+   */
+  loyaltyTwice?: "self" | "yours";
+  /**
+   * "~ is all colors" (Transguild Courier, Awaken the Maelstrom): a characteristic-defining ability (CR 604.3), applied in
+   * layer 5 before any other effect (613.3). The card data's colors already have it everywhere else (CR 604.3a).
+   */
+  allColors?: true;
   /**
    * Unspent mana not lost as steps and phases end (CR 500.4): kept by `who` (only mana of `color`, if given: Leyline
    * Tyrant's red), or with `becomes`, a replacement effect: it becomes that type of mana instead and is kept (Kruphix's

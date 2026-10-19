@@ -154,8 +154,8 @@ const RING_TRIGGERS: TriggeredAbility[] = [
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
-const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Siege"];
+const UNSUPPORTED_TYPES = ["Kindred", "Tribal", "Dungeon"];
+const UNSUPPORTED_SUBTYPES: string[] = [];
 
 const meldResults = new Map<string, boolean>();
 
@@ -312,7 +312,7 @@ export function normalizeSelf(d: CardDef): string {
   if (d.supertypes?.includes("Legendary")) t = t.split(/("[^"]*")/).map((part, i) => (i % 2 ? part : selfPronouns(part))).join("");
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case|Room)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case|Room|Siege|battle)\b/g, "~");
   // A Room's door (CR 709.5j): "When you unlock this door" is about that half, by its index.
   if (d.faceOf && d.subtypes.includes("Room")) t = t.replace(/\bWhen you unlock this door\b/g, `When you unlock door ${d.faceOf.face}`);
   // "Your team" means the same as "you" in a game that isn't between teams (CR 102.4): "Warriors your team controls",
@@ -1223,6 +1223,22 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (/^You may activate abilities of creatures you control as though those creatures had haste\.$/.test(line)) {
       out.creatureAbilitiesHaste = true;
+      continue;
+    }
+    // "~ is all colors" (CR 604.3), and Fallaji Wayfarer's "This ability doesn't affect its color identity" (its color
+    // identity in the card data is green, CR 903.4). Only when the card data has all five colors for it, as Scryfall does.
+    if (/^~ is all colors\.(?: This ability doesn't affect its color identity\.)?$/.test(line.replace(/ \(It can be in any deck whose commander's color identity includes \w+\.\)$/, ""))) {
+      if (d.colors.length !== 5) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.allColors = true;
+      continue;
+    }
+    // "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker; CR 606.3).
+    const loyaltyTwice = /^You may activate the loyalty abilities of (~|planeswalkers you control) twice each turn rather than only once\.$/.exec(line);
+    if (loyaltyTwice) {
+      out.loyaltyTwice = loyaltyTwice[1] === "~" ? "self" : "yours";
       continue;
     }
     if (/^You have no maximum hand size\.$/.test(line)) {

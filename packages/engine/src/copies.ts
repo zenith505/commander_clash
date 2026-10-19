@@ -93,7 +93,9 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
   const keywords = [...(base.keywords ?? []), ...(except.keywords ?? []).filter((k) => !base.keywords?.includes(k))];
   const name = except.name ?? base.name;
   // "~" in an added ability is the copy itself (CR 707.9a).
-  const text = [base.oracleText, ...(except.keywords?.length ? [except.keywords.join(", ")] : []), ...(except.text ?? []).map((x) => x.replace(/~/g, name))].filter(Boolean).join("\n");
+  // A copy whose exception sets its colors doesn't copy a characteristic-defining ability for them (CR 707.9d): "~ is all colors".
+  const own = except.colors ? base.oracleText.split("\n").filter((l) => !/ is all colors\./.test(l)).join("\n") : base.oracleText;
+  const text = [own, ...(except.keywords?.length ? [except.keywords.join(", ")] : []), ...(except.text ?? []).map((x) => x.replace(/~/g, name))].filter(Boolean).join("\n");
   const typeLine = `${[...supertypes, ...types].join(" ")}${subtypes.length ? ` — ${subtypes.join(" ")}` : ""}`;
   return {
     name,

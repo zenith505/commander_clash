@@ -117,6 +117,7 @@ export function dealDamage(
     const o = to.object;
     const c = characteristics(s, o);
     const walker = c.types.includes("Planeswalker");
+    const battle = c.types.includes("Battle");
     // Damage to a planeswalker removes that many loyalty counters (CR 120.3c, 306.8); one that's also a creature is
     // dealt damage as a creature too (CR 120.3d-e).
     if (walker) {
@@ -125,7 +126,17 @@ export function dealDamage(
       invalidateCharacteristics(s);
       log(s, `${src.name} deals ${n} damage to ${c.name} (${removed} loyalty removed).`);
     }
-    if (!walker || c.types.includes("Creature")) {
+    // Damage to a battle removes that many defense counters (CR 120.3h, 310.6), infect and wither too (they're about
+    // creatures, CR 120.3d).
+    if (battle) {
+      const had = o.counters.defense ?? 0;
+      const removed = Math.min(n, had);
+      if (removed) o.counters.defense = had - removed;
+      invalidateCharacteristics(s);
+      log(s, `${src.name} deals ${n} damage to ${c.name} (${removed} defense removed).`);
+      if (removed && removed === had) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "defense" });
+    }
+    if ((!walker && !battle) || c.types.includes("Creature")) {
       if (has(src, "Infect") || has(src, "Wither")) {
         // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt. They're put on with
         // the rest of the damage dealt at the same time, as one event for replacement effects (Vizier of Remedies rulings).

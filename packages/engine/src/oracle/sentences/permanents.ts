@@ -257,6 +257,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
   }
+  // Portent Tracker (see parseBody): an opponent's battle loses defense, anyone else's gains it.
+  if ((m = /^Remove (a|\w+) defense counters? from (target battle) if an opponent protects it, otherwise put that many on it$/.exec(s))) {
+    const n = m[1] === "a" ? 1 : num(m[1]!);
+    const what = Number.isInteger(n) && n > 0 ? parseObject(m[2]!, ctx) : null;
+    return what && !isGroup(what) ? [{ type: "battleDefense", what, n }] : null;
+  }
   if ((m = new RegExp(`^Remove (all|${NUMX.slice(1, -1)}) ${COUNTER} counters? from (~|it|target .+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;

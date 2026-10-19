@@ -2,7 +2,7 @@ import { asFace } from "./faces";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
@@ -331,7 +331,7 @@ export function planCast(
   // Tap artifacts for improvise, or creatures for convoke, only when mana alone can't pay.
   const imp = improvise ? autoImprovise(s, pid, cost, extra, [], use) : null;
   if (imp) return cast(imp.taps, undefined, imp.artifacts);
-  if (!compileCard(d).convoke) return null;
+  if (!hasConvoke(s, pid, o)) return null;
   const auto = autoConvoke(s, pid, cost, extra, use);
   return auto ? cast(auto.taps, auto.creatures) : null;
 }

@@ -115,6 +115,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each unspent green mana you have" (Omnath, Locus of Mana): in your mana pool (CR 106.4).
   if (each && (m = /^unspent (?:(white|blue|black|red|green) )?mana you have$/i.exec(p))) return count({ kind: "unspentMana", ...(m[1] ? { color: COLOR_WORDS[m[1].toLowerCase()]! } : {}) });
   if (each && /^player$/i.test(p)) return count({ kind: "players" });
+  // "For each card revealed this way", "the number of cards revealed this way" after "reveal any number of red cards in
+  // your hand" (Scent of Cinder), or in its reflexive trigger (Invasion of Tarkir).
+  if (ctx?.revealedFromHand && /^(?:the number of )?cards? revealed this way$/i.test(p)) return { count: { kind: "revealedFromHand" } };
   // "For each card exiled from their hand this way" (Lost Legacy), after its exileNamed instruction.
   if (each && /^card exiled from (?:their|your) hand this way$/i.test(p)) return count({ kind: "exiledFromHandThisWay" });
   // "For each player being attacked", "the number of opponents being attacked" (Pack Attack, Dimir Strandcatcher).

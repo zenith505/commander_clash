@@ -6,7 +6,7 @@ import { characteristics, controllerOf, invalidateCharacteristics } from "../lay
 import { putCounters } from "../counters";
 import { manaValue } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
-import { bindBound, objectMatches, pickOptions, printedMatches } from "./targeting";
+import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
@@ -1050,6 +1050,39 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
         moveObject(s, o.id, "hand");
       }
+      return;
+    }
+    case "revealFromHand": {
+      // You choose which of them to reveal as it resolves (CR 608.2d); revealing none is revealing "any number".
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (!sc.found) {
+        const filter = e.filter && bindChosen(e.filter, ctx.chosen);
+        const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
+        s.resolving!.revealedFromHand = 0;
+        if (!cards.length) {
+          log(s, `${p.name} reveals no cards.`);
+          return;
+        }
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `any number of ${e.filter?.text ?? "card"}s`, cards, min: 0, max: cards.length, fromHand: true, reveal: true };
+        return "paused";
+      }
+      const shown = sc.found.filter((id) => p.hand.includes(id));
+      sc.found = undefined;
+      s.resolving!.revealedFromHand = shown.length;
+      log(s, shown.length ? `${p.name} reveals ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} reveals no cards.`);
+      return;
+    }
+    case "exileHand": {
+      const p = player(s, ctx.controller);
+      const ids = [...p.hand];
+      for (const id of ids) {
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+      }
+      s.resolving!.exiledFromHand = ids.length;
+      log(s, ids.length ? `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand and may play them until the end of their next turn.` : `${p.name} has no cards in hand to exile.`);
       return;
     }
     case "putFromHand": {

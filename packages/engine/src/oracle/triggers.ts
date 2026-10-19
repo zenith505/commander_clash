@@ -4,6 +4,7 @@ import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
+import { parseSearchFilter } from "./search";
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
@@ -756,11 +757,11 @@ function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
  * discard a creature card". "One or more cards" (once per batch) isn't modeled.
  */
 function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[a-z]+ )?card), (.+)$/.exec(line);
+  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card), (.+)$/.exec(line);
   if (!m) return null;
   let filter: TargetSpec | undefined;
   if (m[4] !== "card") {
-    const f = parseTargetPhrase(m[4]!);
+    const f = parseSearchFilter(m[4]!);
     if (!f || f.kind !== "card") return "fail";
     filter = f;
   }
@@ -909,8 +910,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return body ? { event: "selfDoorUnlocked", door: Number(door[1]), body } : "fail";
   }
   // "Whenever ~ and at least one Human attack, ..." (Goldbug, Scrappy Scout): others of that creature type.
-  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|[A-Z][a-z]+) attack, (.+)$/.exec(line);
+  // "Whenever this token and at least one other creature token attack" (Valor's Reach Tag Team): other tokens.
+  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|other creature tokens?|[A-Z][a-z]+) attack, (.+)$/.exec(line);
   if (battalion) {
+    const tokens = /^other creature tokens?$/.test(battalion[2]!);
+    if (tokens) return ((t) => (t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), withOthersToken: true as const } : "fail"))(parseTrigger(`Whenever ~ attacks, ${battalion[3]}`));
     const type = battalion[2] === "other creatures" ? undefined : battalion[2]!;
     if (type && !CREATURE_TYPES.has(type)) return "fail";
     const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);

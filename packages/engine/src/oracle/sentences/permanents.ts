@@ -247,7 +247,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1]!) }, least: "toughness" }];
   }
   // "Remove all counters from target permanent" (every kind), "Remove all counters from that creature".
-  if ((m = /^Remove all counters from (~|it|that creature|target .+)$/i.exec(s))) {
+  if ((m = /^Remove all counters from (~|it|that creature|target .+|up to one target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }

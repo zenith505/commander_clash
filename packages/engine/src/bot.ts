@@ -242,8 +242,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "copy") {
       // Clone the best permanent, but not a legendary one we already control (the legend rule, CR 704.5j).
       const ids = pend.options.filter((x) => x !== "none" && s.objects[x]);
-      const ok = ids.filter((x) => !(characteristics(s, obj(s, x)).supertypes.includes("Legendary") && controllerOf(s, obj(s, x)) === pid));
-      const best = ok.sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - worth(s, pid, obj(s, a)) - mv(s, a))[0];
+      // A card in a graveyard (Lazotep Convert): the one with the highest mana value, not a legend we already have.
+      const mine = (name: string) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && characteristics(s, obj(s, b)).name === name);
+      const ok = ids.filter((x) => (obj(s, x).zone === "graveyard" ? !(defOf(s, obj(s, x)).supertypes.includes("Legendary") && mine(defOf(s, obj(s, x)).name)) : !(characteristics(s, obj(s, x)).supertypes.includes("Legendary") && controllerOf(s, obj(s, x)) === pid)));
+      const value = (x: string) => (obj(s, x).zone === "graveyard" ? 0 : worth(s, pid, obj(s, x))) + mv(s, x);
+      const best = ok.sort((a, b) => value(b) - value(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
     // Assist (CR 702.132a): everyone else is an opponent, so we don't help pay for their spells.

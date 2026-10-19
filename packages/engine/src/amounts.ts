@@ -156,6 +156,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
+    case "revealedFromHand":
+      return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "cardsInGraveyard": {
       // "Cards named ~" (Kindle, Accumulated Knowledge): the source's name, a permanent's as it is now (a copy's is what it
       // copies, CR 707.2).
@@ -417,6 +419,8 @@ function describeCount(c: Count): string {
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "exiledFromHandThisWay":
       return "#cards exiled from hand";
+    case "revealedFromHand":
+      return "#cards revealed";
     case "greatestPowerExiled":
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":

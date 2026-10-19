@@ -1045,6 +1045,16 @@ export function compile(d: CardDef): CompiledCard {
     // Cursed Mirror: "As ~ enters, you may have it become a copy of any creature on the battlefield until end of
     // turn, except it has haste" also becomes the copy as it enters (rulings), for the rest of the turn.
     const clone = /^(?:You may have ~ enter as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
+    // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert): a
+    // card in any graveyard, by its printed characteristics.
+    const fromYard = clone && !clone[2] && /^creature card in a graveyard$/.exec(clone[1]!);
+    if (clone && fromYard) {
+      const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
+      if (except !== null && !except?.thisAbility) {
+        out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: clone[1]! }, ...(except ? { except } : {}) };
+        continue;
+      }
+    }
     if (clone && !/graveyard|\bcard\b/.test(clone[1]!) && !(clone[2] && line.startsWith("You may"))) {
       const filter = parseTargetPhrase(clone[1]!.replace(/ on the battlefield$/, ""));
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
@@ -1173,6 +1183,15 @@ export function compile(d: CardDef): CompiledCard {
     if (lockEnd && lockEnd[1] !== lockEnd[2]) {
       if (lockEnd[1] === "lose") [out.cantLose, out.cantWin] = ["you", "opponents"];
       else [out.cantWin, out.cantLose] = ["you", "opponents"];
+      continue;
+    }
+    // "Noncreature spells you cast have convoke" (Caetus, Sea Tyrant of Segovia), "Multicolored spells you cast have
+    // convoke" (Fallaji Wayfarer): the spell has it while it's being cast and paid for (CR 702.51a, 601.2g-h).
+    const giveConvoke = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast have convoke\.$/.exec(line);
+    if (giveConvoke) {
+      const f = parseTargetPhrase(`${giveConvoke[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveConvoke ??= []).push({ filter: f, text: line });
       continue;
     }
     // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you

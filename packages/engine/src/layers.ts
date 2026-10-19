@@ -547,6 +547,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "opponentLostLife":
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "noCombatDamageSinceLastTurn": {
+      const p = s.players[you];
+      return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);
+    }
     case "opponentSearched":
       return (s.turnLog?.searched ?? []).some((p) => p !== you);
     case "opponentEntered": {

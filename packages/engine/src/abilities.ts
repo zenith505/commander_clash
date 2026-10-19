@@ -98,6 +98,8 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true }
   /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
   | { kind: "exiledFromHandThisWay" }
+  /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
+  | { kind: "revealedFromHand" }
   /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
@@ -237,6 +239,10 @@ export interface TargetSpec {
   types?: string[];
   /** All of these card types: "artifact creature" (as opposed to "artifact or creature"). */
   allTypes?: string[];
+  /** "Double-faced card" (CR 712.1): a nonmodal or modal double-faced card or a meld card, whichever face is up. */
+  doubleFaced?: true;
+  /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
+  transformed?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
   /** Excluded colors, e.g. "nonblack creature" -> ["B"]. */
@@ -244,7 +250,7 @@ export interface TargetSpec {
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
-  colorCount?: "multicolored" | "monocolored" | "colorless";
+  colorCount?: "multicolored" | "monocolored" | "colorless" | /** exactly two colors, or not exactly two */ "two" | "notTwo";
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
@@ -493,7 +499,7 @@ export type ObjRef =
    * `of`: "each creature target player controls", "all lands that player controls": only that player's permanents (if
    * it's still a legal target, CR 608.2b).
    */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true }
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true }
   /**
    * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
@@ -898,6 +904,11 @@ export type StaticCondition =
   | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number }
   /** "If an opponent lost life this turn". */
   | { kind: "opponentLostLife" }
+  /**
+   * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
+   * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
+   */
+  | { kind: "noCombatDamageSinceLastTurn" }
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
@@ -1198,6 +1209,14 @@ export type Effect =
    * (Show and Tell, Iwamori, Tempting Wurm): each of them chooses in APNAP order without revealing the card (CR 101.4a),
    * then all the chosen cards enter at the same time; those who put one are choseThisWay afterwards.
    */
+  /**
+   * "Reveal any number of red cards in your hand" (Scent of Cinder, Cinder Seer), "reveal any number of Dragon cards from
+   * your hand" (Invasion of Tarkir): you choose which (CR 701.20a), and "for each card revealed this way" counts them
+   * (Count "revealedFromHand").
+   */
+  | { type: "revealFromHand"; filter?: TargetSpec }
+  /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
+  | { type: "exileHand"; until: "nextTurn" }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -1562,7 +1581,18 @@ export type Effect =
    * CR 610.3: it returns to its owner's hand). `linked`: Tidehollow Sculler's "When ~ leaves the battlefield, return the
    * exiled card to its owner's hand" returns it (CR 607.2a).
    */
-  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile" | /** Lost Hours */ "libraryThird"; until?: "sourceLeaves"; linked?: boolean }
+  | {
+      type: "takeFromHand";
+      who: PlayerRef;
+      filter?: TargetSpec;
+      action: "discard" | "exile" | /** Lost Hours */ "libraryThird";
+      until?: "sourceLeaves";
+      linked?: boolean;
+      /** "You may exile a nonland card from it" (Elite Spellbinder): or none. */
+      optional?: true;
+      /** "For as long as that card remains exiled, its owner may play it. A spell cast this way costs {2} more to cast." */
+      ownerMay?: { play?: true; more?: number };
+    }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
@@ -1985,6 +2015,11 @@ export type SpellCondition =
    * as it last existed on the battlefield if this spell or ability moved it (CR 608.2h; rulings on Geistwave and Kellan).
    */
   | { kind: "targetWasYours"; index: number }
+  /**
+   * "Exile target card from a graveyard. If it was a creature card, ..." (Scavenging Ooze): the target card `index`, by its
+   * printed characteristics, which are the ones it had in the graveyard (CR 608.2h).
+   */
+  | { kind: "targetCardWas"; index: number; filter: TargetSpec }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
   /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */
@@ -2364,6 +2399,8 @@ export interface TriggeredAbility {
   withOthers?: number;
   /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
   withOthersType?: string;
+  /** "Whenever this token and at least one other creature token attack": only tokens count among the others. */
+  withOthersToken?: true;
   /** For "selfDoorUnlocked": which door (0 left, 1 right). */
   door?: number;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
@@ -3051,6 +3088,8 @@ export interface CompiledCard {
    * `yourTurn` and `maxMv`: "During your turn, spells you cast from your hand with mana value X or less have cascade,
    * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
    */
+  /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
+  spellsHaveConvoke?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;

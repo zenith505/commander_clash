@@ -83,6 +83,7 @@ import {
   parseManaCost,
   manaValue,
   autoConvoke,
+  hasConvoke,
   autoCrew,
   casualtyCandidates,
   spliceCandidates,
@@ -889,7 +890,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const d = cardOf(s, id);
     if (via) return continueCast({ objectId: id, via, ...f }); // from a graveyard: the usual steps, without convoke
     if (alt) return continueCast({ objectId: id, alt, ...f }); // evoke or dash
-    if (convoke === undefined && compileCard(d).convoke && convokers(s).length && freeCastOf(s, HUMAN) !== id) {
+    if (convoke === undefined && hasConvoke(s, HUMAN, s.objects[id]!) && convokers(s).length && freeCastOf(s, HUMAN) !== id) {
       const fromMana = planCast(s, HUMAN, id, undefined, undefined, undefined, undefined, f) !== null;
       const total = spellCost(s, HUMAN, s.objects[id]!, 0, [], f);
       const auto = fromMana ? null : autoConvoke(s, HUMAN, total.cost, total.extra);
@@ -3137,7 +3138,9 @@ function LibrarySearch({
               ? `${pending.source}: choose ${pending.what} ${dig.to}`
               : dig
               ? `${pending.source}: put ${pending.what} ${dig.to}`
-              : pending.fromHand
+              : pending.reveal
+                ? `${pending.source}: you may reveal ${pending.what} from your hand`
+                : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile"
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from your graveyard`
@@ -3155,6 +3158,8 @@ function LibrarySearch({
               ? `The rest go ${dig.rest}.`
               : pending.firstTo
                 ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
+                : pending.reveal
+                ? `Revealing ${found.length}.`
                 : pending.distinctManaValues
                   ? `Chosen ${found.length}. Each must have a different mana value.`
                   : pending.also?.length
@@ -3162,7 +3167,7 @@ function LibrarySearch({
                     : `Found ${found.length} of ${pending.max}.`}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
+            {pending.reveal ? (found.length ? "Reveal" : "Reveal none") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">

@@ -308,6 +308,15 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
   }
+  if (ref.ref === "each" && ref.andSubject) {
+    const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
+    const subj = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    const here = subj?.zone === "battlefield" && (subj.zoneChanges ?? 0) === ctx.subject!.zc;
+    const lk = !here && ctx.subject ? s.lastKnown?.[ctx.subject.id] : undefined;
+    const types = here ? creatureTypesOf(s, subj!) : lk?.zc === ctx.subject?.zc && lk?.creatureTypes ? (lk.creatureTypes === "all" ? "all" : new Set(lk.creatureTypes)) : undefined;
+    const others = !types ? [] : s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== ctx.subject!.id && objectMatches(s, filter, o, ctx.controller, false) && shareCreatureType(types, creatureTypesOf(s, o)));
+    return here ? [subj!, ...others] : others;
+  }
   if (ref.ref === "each") {
     const filter = bindBound(s, bindChosen(ref.filter, ctx.chosen), amountCtx(s, ctx));
     const t = ref.otherThan !== undefined ? ctx.targets[ref.otherThan] : undefined;
@@ -584,6 +593,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "reorderGraveyard":
     case "returnAllFromGraveyard":
     case "putFromHand":
+    case "revealFromHand":
+    case "exileHand":
     case "putInLibrary":
     case "putInGraveyard":
     case "exileGraveyard":

@@ -29,6 +29,14 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // "Reveal any number of red cards in your hand" (Scent of Cinder), "Reveal any number of Dragon cards from your hand"
+  // (Invasion of Tarkir): which ones is chosen as it resolves (Effect revealFromHand).
+  if ((m = /^[Rr]eveal any number of (?:(.+?) )?cards (?:in|from) your hand$/.exec(s))) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (m[1] && !filter)) return null;
+    ctx.revealedFromHand = true;
+    return [{ type: "revealFromHand", ...(filter ? { filter } : {}) }];
+  }
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);

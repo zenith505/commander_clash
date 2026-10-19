@@ -109,10 +109,12 @@ export function parseCopyExcept(text: string): CopyExcept | null {
     else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're|he's|she's) legendary$/.test(p)) out.legendary = true;
     // "It doesn't copy that creature's color": it keeps its own (CR 707.9c).
     else if (/^(?:doesn't|does not) copy that creature's colou?r$/.test(p)) out.keepColors = true;
-    else if ((m = /^(?:is|are|it's|they're|he's|she's) (?:an? )?(?:(\d+)\/(\d+) )?((?:(?:white|blue|black|red|green|colorless) )*(?:and (?:white|blue|black|red|green) )?)(.+?) in addition to (?:its|their|his|her) other (?:creature )?types$/.exec(p))) {
+    else if ((m = /^(?:is|are|it's|they're|he's|she's) (?:an? )?(?:(\d+)\/(\d+) )?((?:(?:white|blue|black|red|green|colorless) )*(?:and (?:white|blue|black|red|green) )?)(.+?) in addition to (?:its|their|his|her) other (colors and )?(?:creature )?types$/.exec(p))) {
       if (m[1]) out.pt = [Number(m[1]), Number(m[2])];
       const colors = (m[3] ?? "").trim().split(" ").filter((c) => c && c !== "colorless" && c !== "and");
-      if (colors.length) out.colors = colors.map((c) => ({ white: "W", blue: "U", black: "B", red: "R", green: "G" })[c]) as Color[];
+      // "In addition to its other colors and types" (Lazotep Convert): it keeps its colors too; otherwise these are its colors.
+      if (m[5] && (!colors.length || /colorless/.test(m[3] ?? ""))) return null;
+      if (colors.length) out[m[5] ? "addColors" : "colors"] = colors.map((c) => ({ white: "W", blue: "U", black: "B", red: "R", green: "G" })[c]) as Color[];
       const words = m[4]!.split(" ").map((w) => w.replace(/s$/, "")).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
       if (words.some((w) => !/^[A-Z][a-z]+$/.test(w))) return null;
       // "It's legendary in addition to its other types": a supertype (CR 205.4). Other supertypes aren't modeled here.

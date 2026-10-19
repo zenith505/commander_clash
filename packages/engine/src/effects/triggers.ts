@@ -720,6 +720,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       if (controllerOf(s, w) === you) add(w, you, (e) => e === "youExert", undefined, undefined, o);
     }
+  } else if (ev.type === "transformed") {
+    // "When this creature transforms into [this face]" (CR 701.27e): an ability of the face now up.
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfTransformsInto");
   } else if (ev.type === "doorUnlocked") {
     // "When you unlock this door": an ability of that door, which the Room has now that it's unlocked (CR 709.5h).
     const o = obj(s, ev.id);

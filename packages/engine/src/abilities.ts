@@ -2105,6 +2105,7 @@ export type TriggerEvent =
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
   | "yourDrawStep" // At the beginning of your draw step (after the draw, CR 504.2)
   | "eachDrawStep" // At the beginning of each player's draw step
+  | "selfTransformsInto" // "When ~ transforms into ~" (CR 701.27e): it transformed or converted into this face
   | "selfTurnedFaceUp" // "When ~ is turned face up" (CR 708.8: it doesn't enter again)
   | "selfCast" // "When you cast this spell": cascade (CR 702.85a), triggering from the stack
   | "castSpell" // Whenever you cast a noncreature spell (see `cast`), prowess (CR 702.108a)

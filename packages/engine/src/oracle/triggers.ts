@@ -8,6 +8,9 @@ import { CREATURE_TYPES } from "../keywords";
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
   [/^When(?:ever)? ~ dies, (.+)$/, "selfDies"],
+  // "When this creature transforms into [this face]" (CR 701.27e): it transformed or converted and now has this face up,
+  // so this face's abilities are the ones it has. Entering transformed isn't transforming (712.14a).
+  [/^When(?:ever)? ~ transforms into ~, (.+)$/, "selfTransformsInto"],
   // Coin flips (CR 705.2): each one won or lost.
   [/^Whenever you win a coin flip, (.+)$/, "youWinFlip"],
   [/^Whenever you lose a coin flip, (.+)$/, "youLoseFlip"],
@@ -88,7 +91,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
+  "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous", "selfMutates",

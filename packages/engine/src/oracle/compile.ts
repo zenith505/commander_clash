@@ -1563,14 +1563,15 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "When you cast or cycle ~, ...", "When you cycle ~ and when ~ dies, ...", "Whenever ~ enters or attacks, ...",
-    // "When ~ enters or dies, ...", "When ~ enters and at the beginning of your upkeep, ...": one ability that triggers on
+    // "When ~ enters or dies, ...", "When ~ transforms into ~ or dies, ...", "When ~ enters and at the beginning of your upkeep, ...": one ability that triggers on
     // either event, which works like two with the same effect (CR 702.29c). The text is read for each event ("it" after it
     // died is the card).
     const twice =
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
-      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
+      /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
@@ -1582,6 +1583,8 @@ export function compile(d: CardDef): CompiledCard {
             ? [`When ~ enters, ${effect}`, `When the creature ~ haunts dies, ${effect}`]
             : /^at the beginning/.test(twice[1]!)
               ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
+            : /^When ~ transforms into ~ or dies/.test(line)
+              ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);

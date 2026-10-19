@@ -9,7 +9,7 @@ import { card, controls, menu, resolveUntil } from "./ui";
 test("Hanweir Battlements: click which Hanweir Garrison melds with it into Hanweir, the Writhing Township", async ({ page }) => {
   const s = scene({ board: [...LANDS, "Hanweir Battlements", "Hanweir Garrison", "Hanweir Garrison"] });
   const land = one(s, "Hanweir Battlements");
-  const [first, second] = idsOf(s, "Hanweir Garrison");
+  const [first, second] = idsOf(s, "Hanweir Garrison") as [string, string];
   await open(page, s);
   await card(page, "Hanweir Battlements", s).click();
   await menu(page).locator("button", { hasText: "meld" }).click();

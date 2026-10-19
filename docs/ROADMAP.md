@@ -1,6 +1,6 @@
 # Roadmap
 
-20,701 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,766 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,19 +15,20 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-0. Cards with faces (CR 709, 710, 712, 715, 722): 480 of the 846 legal ones play now (`npm run faces` lists each
-   layout's support and the lines blocking it): 179 of 388 transforming double-faced (35 of the 36 Invasion Sieges),
+0. Cards with faces (CR 709, 710, 712, 715, 722): 481 of the 846 legal ones play now (`npm run faces` lists each
+   layout's support and the lines blocking it): 180 of 388 transforming double-faced (all 36 Invasion Sieges),
    107 of 151 adventurer, 78 of 123 split (15 of 28 Rooms), 48 of 98 modal double-faced, 50 of 67 preparation, 18 of
    19 flip. All 14 meld cards play (CR 701.42). No line blocks two faced cards any more: each one left is out on a
    line of its own (`npm run faces`). Still out:
-   - Invasion of New Phyrexia (Teferi Akosa's emblem: emblems, CR 114, are item 1's work).
    - Transformers: only Goldbug of the 15 plays; the others each have a line of their own (Starscream needs "whenever
      you become the monarch" and "if there is no monarch", Cyclonus an additional beginning phase).
    - Transform: craft (702.167), "As ~ transforms into ~" (712.20: Curse of Leeches, Ludevic, Sephiroth, Zenos each
      need their own work).
-   - Other battle cards still out: Tandem Takedown, Nahiri's Warcrafting, Begin the Invasion, Bloodfeather Phoenix,
-     Bilbo, Unexpected Adventurer ("onto the battlefield under its owner's control" from a graveyard), Rankle and
-     Torbran, Zurgo and Ojutai ("each player or battle"), Double Trouble (each creature), Death Kiss. Bots don't aim
+   - Other battle cards still out: Nahiri's Warcrafting ("look at the top X ..., you may exile one of those cards"),
+     Bloodfeather Phoenix (a graveyard trigger on spell damage), Bilbo, Unexpected Adventurer ("onto the battlefield
+     under its owner's control" from a graveyard), Rankle and Torbran (modes with a damage replacement), Zurgo and
+     Ojutai ("one or more Dragons ... return one of those Dragons"), Death Kiss ("whenever a creature an opponent
+     controls attacks one of your opponents", "becomes monstrous, goad up to X"). Bots don't aim
      spells at battles (except Portent Tracker's counters and "each battle they protect") and attack only their own
      Sieges.
    - Cast triggers left out: "a spell that has flash" (Slitherwisp: flash given by another effect isn't tracked on
@@ -46,6 +47,19 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Bots don't plan around day and night (casting two spells to make it day). Bots put lands on the bottom with
      Valakut Awakening only when they have five or more lands out, and spells that cost more than their lands plus two.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
+   Left from round 87 (emblems, tap any number, excess damage, different names):
+   - Excess damage (CR 120.4a, 120.10) works for "excess damage dealt this way", "if excess damage was dealt this way"
+     and "is dealt to that creature's controller instead"; still out: "is dealt excess damage" triggers and "was dealt
+     excess damage this turn" (Aegar, Fall of Cair Andros, Maarika, Overclocked Electromancer, Rith), excess from a
+     fight (Rhino's Rampage, The Last Agni Kai), "When it deals excess damage this way" (Unleash the Inferno), "to a
+     creature this way" after any target (Vikya), and other lines (Archaic's Agony, Torch the Witness).
+   - Tap any number still out: as an additional cost (Burn at the Stake, Explosive Singularity), "each player may tap"
+     (Raiding Party), "If you do, ... each of those Vampires" (Urge to Feed). Bots tap every creature offered except,
+     on their own turn before combat, ones that could still attack.
+   - "With different names" works for searches put into one zone; still out: an opponent choosing among them (Gifts
+     Ungiven, Realms Uncharted, Elemental Teachings, Emergent Ultimatum, Ecological Appreciation), returning from the
+     graveyard (Eerie Ultimatum, Behold the Sinister Six!), discard costs (Ormos), "and/or" kinds (Reach the
+     Horizon), "that each have mana value X" (Uncage the Menagerie).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:
    Gemrazer, Huntmaster Liger, Snapdax, Nethroi, Mindleecher):
    - Power-up still out: Kang (extra turn), Loki (short name), Quicksilver ("in your opening hand"), Stature and Viv
@@ -739,7 +753,11 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   the card data for "source of your choice" or "prevented this way"). a shield that redirects to
   the creature it protects, and chains of redirection, are untested. Hazduhr (named by its short name), Captain's
   Maneuver ("creature, planeswalker, or player"), Personal Incarnation.
-- Planeswalkers: emblems (CR 114), "+X" loyalty abilities, compleated, "X" loyalty, "add mana" loyalty abilities,
+- Planeswalkers: emblems (CR 114) work with static abilities, triggered abilities on the common events
+  (EMBLEM_EVENTS in oracle/grants.ts), cost changes and "no maximum hand size"; still out: emblems with activated
+  abilities (Karn, Ob Nixilis of the Black Oath), damage replacements (Ajani Steadfast), "can't cast" (Narset
+  Transcendent), extra draws (Sarkhan), granted keywords on spells (Ral's storm), Teferi, Temporal Archmage and Tyvar.
+  Emblems show as a chip in their owner's seat header. "+X" loyalty abilities, compleated, "X" loyalty, "add mana" loyalty abilities,
   "activate loyalty abilities any time you could cast an instant" (Jace's Machinations), "aren't put into graveyards
   for having 0 loyalty" (Sanctum Lurker), "whenever you activate a loyalty ability", "whenever you put loyalty
   counters on a planeswalker"; copying planeswalkers; myriad and tokens "entering attacking" always attack the

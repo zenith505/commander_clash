@@ -206,6 +206,8 @@ export interface GameObject {
   counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
+  /** A double-faced token (an Incubator) with its back face up (CR 111.10i, 701.27a): a transformed permanent. */
+  tokenBackUp?: true;
   /** A spell cast for its mutate cost: a mutating creature spell (CR 702.140a). */
   mutating?: true;
   /**

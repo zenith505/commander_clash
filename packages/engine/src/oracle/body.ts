@@ -442,6 +442,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
   // learn), so it's the library and/or the graveyard, where every card is one you own.
   text = text.replace(/\b([Ss])earch your library, graveyard, and\/or outside the game for (an? [a-z ]+? card) you own, /, "$1earch your library and/or graveyard for $2, ");
+  // "Look at that many cards from the top of your library" (Doomskar Warrior), with "that many" made X by the trigger:
+  // the same as "the top X cards".
+  text = text.replace(/\b([Ll]ook at|[Rr]eveal) X cards from the top of your library\b/g, "$1 the top X cards of your library");
   // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
   // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
   text = text.replace(/(^|\. )Create a token that's a copy of an? (permanent|creature|artifact) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");

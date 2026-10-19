@@ -189,7 +189,7 @@ export const isDoubleFacedDef = (d: CardDef): boolean => d.layout === "transform
  * A transformed permanent (CR 701.27g): a nonmodal double-faced permanent with its back face up. A modal double-faced or a
  * melded or merged permanent never is (rulings on Gargantuan Slabhorn).
  */
-export const isTransformed = (s: GameState, o: GameObject): boolean => o.zone === "battlefield" && (o.face ?? 0) > 0 && layoutOf(s, o) === "transform" && !o.melded && !o.merged;
+export const isTransformed = (s: GameState, o: GameObject): boolean => o.zone === "battlefield" && ((o.face ?? 0) > 0 ? layoutOf(s, o) === "transform" && !o.melded && !o.merged : !!o.tokenBackUp);
 
 /** The card's layout if it has faces: "split", "flip", "transform", "modal_dfc", "adventure", "prepare". */
 export const layoutOf = (s: GameState, o: GameObject): string | undefined => (s.cards[o.cardId]?.faces ? s.cards[o.cardId]!.layout : undefined);

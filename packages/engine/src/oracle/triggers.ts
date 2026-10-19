@@ -4,6 +4,8 @@ import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
+import { parseSearchFilter } from "./search";
+const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
@@ -264,7 +266,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
  * "Whenever you cast a noncreature spell", "Whenever an opponent casts a creature spell",
  * "Whenever a player casts a spell", magecraft's "whenever you cast or copy an instant or sorcery spell".
  */
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
+// "Whenever you cast another spell that has convoke" (Kasla): the spell is on the stack, never the permanent or card
+// whose ability this is, so "another" changes nothing.
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
 const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
 
@@ -302,7 +306,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
-  let what = m[3]!.replace(/^an? /, "");
+  let what = m[3]!.replace(/^(?:an?|another) /, "");
   // "Whenever you cast a spell from exile", "... from anywhere other than your hand", "... from your graveyard": the zone
   // it was cast from (CR 601.2a); "your graveyard" and "your library" are its caster's own.
   const fromM = / from (anywhere other than (?:your|their) hand|(?:your|their) hand|exile|your graveyard|a graveyard|your library)$/.exec(what);
@@ -337,12 +341,16 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "A creature spell with power 5 or greater" (Monstrous Vortex): the spell's power on the stack (spellMatches).
   const pw = / with (power|toughness) (\d+) or (greater|less)$/.exec(what);
   if (pw) what = what.slice(0, pw.index);
+  // "A spell that has convoke" (Joyful Stormsculptor), "a creature spell with flying", "with infect": the spell as it
+  // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
+  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect)$/.exec(what) : null;
+  if (kwM) what = what.slice(0, kwM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
-  if (pw) what = m[3]!.replace(/^an? /, "").replace(/ that targets .+$/, "");
+  if (pw) what = m[3]!.replace(/^(?:an?|another) /, "").replace(/ that targets .+$/, "");
   // "Whenever you cast a spell, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR
   // 603.4) that can't change once it's cast. A copy wasn't cast, so no mana was spent on it.
   const treasure = /^if mana from a Treasure was spent to cast it, (.+)$/.exec(m[4]!);
@@ -360,7 +368,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
 }
 
 /**
@@ -756,11 +764,11 @@ function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
  * discard a creature card". "One or more cards" (once per batch) isn't modeled.
  */
 function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[a-z]+ )?card), (.+)$/.exec(line);
+  const m = /^Whenever (you|an opponent|a player) (cycles?|discards?|cycles? or discards?) (a|another|an?) ((?:[A-Za-z]+,? )*?card), (.+)$/.exec(line);
   if (!m) return null;
   let filter: TargetSpec | undefined;
   if (m[4] !== "card") {
-    const f = parseTargetPhrase(m[4]!);
+    const f = parseSearchFilter(m[4]!);
     if (!f || f.kind !== "card") return "fail";
     filter = f;
   }
@@ -909,8 +917,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return body ? { event: "selfDoorUnlocked", door: Number(door[1]), body } : "fail";
   }
   // "Whenever ~ and at least one Human attack, ..." (Goldbug, Scrappy Scout): others of that creature type.
-  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|[A-Z][a-z]+) attack, (.+)$/.exec(line);
+  // "Whenever this token and at least one other creature token attack" (Valor's Reach Tag Team): other tokens.
+  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|other creature tokens?|[A-Z][a-z]+) attack, (.+)$/.exec(line);
   if (battalion) {
+    const tokens = /^other creature tokens?$/.test(battalion[2]!);
+    if (tokens) return ((t) => (t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), withOthersToken: true as const } : "fail"))(parseTrigger(`Whenever ~ attacks, ${battalion[3]}`));
     const type = battalion[2] === "other creatures" ? undefined : battalion[2]!;
     if (type && !CREATURE_TYPES.has(type)) return "fail";
     const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);
@@ -1015,7 +1026,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if ((/^~ /.test(intervening[2]!) || / counters on ~$/.test(intervening[2]!)) && /^At /.test(intervening[1]!))
       rest = /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.") : rest.replace(/\bit\b/g, "~");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
-    return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
+    if (!t || t === "fail" || t.ifCond) return "fail";
+    // "Whenever a Mountain you control enters, if you control at least five other Mountains" (Valakut, the Molten
+    // Pinnacle): Mountains other than that new one, as it triggers and as it resolves (rulings, CR 603.4).
+    const kinds = (f: TargetSpec) => JSON.stringify([f.types, f.subtypes, f.supertypes]);
+    if (ifCond.kind === "control" && ifCond.other && t.event === "permanentEnters" && t.enters && kinds(t.enters.filter) === kinds(ifCond.filter)) {
+      const { other: _, ...rest } = ifCond;
+      return { ...t, ifCond: { ...rest, otherThanSubject: true } };
+    }
+    return { ...t, ifCond };
   }
   // "At the beginning of your second main phase": the turn's second main phase, a postcombat one (CR 505.1a-b).
   const second = /^At the beginning of your second main phase, (.+)$/.exec(line);

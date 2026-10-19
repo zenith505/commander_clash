@@ -34,6 +34,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "~ becomes solved") return [{ type: "solve" }];
   // "Transform ~" (CR 701.27a).
   if (/^[Tt]ransform ~$/.test(s)) return [{ type: "transform", what: { ref: "self" } }];
+  // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
+  // control": a permanent that isn't a transforming one doesn't (CR 701.27c).
+  if ((m = /^[Tt]ransform ((?:up to one )?target .+)$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "transform", what }] : null;
+  }
   // "Convert ~" (CR 701.28a): turned so its other face is up, just as transforming does (701.28a, rulings); "convert it"
   // in a trigger about itself.
   if (/^[Cc]onvert ~$/.test(s) || (ctx.selfIt && /^[Cc]onvert it$/.test(s))) return [{ type: "transform", what: { ref: "self" }, convert: true }];
@@ -247,7 +253,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: "+1/+1", n: amt(m[1]!) }, least: "toughness" }];
   }
   // "Remove all counters from target permanent" (every kind), "Remove all counters from that creature".
-  if ((m = /^Remove all counters from (~|it|that creature|target .+)$/i.exec(s))) {
+  if ((m = /^Remove all counters from (~|it|that creature|target .+|up to one target .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }
@@ -293,8 +299,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
   // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it
   // resolves (CR 608.2d).
-  if ((m = new RegExp(`^Distribute (?:${NUMX}|a number of) ${COUNTER} counters (?:equal to (.+?) )?among any number of (.+?) you control$`, "i").exec(s))) {
+  // "Among one, two, or three creatures you control" with three counters (Awaken the Maelstrom) is the same: each chosen
+  // one gets at least one.
+  if ((m = new RegExp(`^Distribute (?:${NUMX}|a number of) ${COUNTER} counters (?:equal to (.+?) )?among (any number of|one or two|one, two, or three) (.+?) you control$`, "i").exec(s))) {
     if (!m[1] === !m[3]) return null;
+    if (m[4] !== "any number of" && m[1] !== (m[4] === "one or two" ? "two" : "three")) return null;
+    m.splice(4, 1);
     const filter = pickFilter(m[4]!);
     const n = m[3] ? parseCount(m[3], ctx) : amt(m[1]!);
     return filter && n ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[4]!} you control` } }] : null;

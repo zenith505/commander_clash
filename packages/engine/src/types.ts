@@ -206,6 +206,8 @@ export interface GameObject {
   counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
+  /** A double-faced token (an Incubator) with its back face up (CR 111.10i, 701.27a): a transformed permanent. */
+  tokenBackUp?: true;
   /** A spell cast for its mutate cost: a mutating creature spell (CR 702.140a). */
   mutating?: true;
   /**
@@ -337,7 +339,7 @@ export interface GameObject {
   /** The turn it was last exerted (CR 701.43), for "if ~ hasn't been exerted this turn". */
   exertedTurn?: number;
   /** How many times it has attacked in turn `turn` ("creatures that attacked this turn", Moraug), as this object (CR 400.7). */
-  attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[] };
+  attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[]; /** It attacked a battle this turn (War Historian). */ battle?: true };
   /**
    * The turn it last could have been declared as an attacker, as this object (CR 508.1a): it was one of the active
    * player's creatures able to attack as a declare attackers step began. Season of the Witch spares "creatures that
@@ -568,6 +570,10 @@ export interface Player {
   firstDrawStepDraw?: number;
   /** The turn this player last would have drawn a card: "the first time you would draw a card each turn" (Scion of Halaster). */
   firstWouldDraw?: number;
+  /** The turn this player was last dealt combat damage, and the turns their current and previous turns began (s.turn), for "if you haven't been dealt combat damage since your last turn". */
+  combatDamagedTurn?: number;
+  turnBegan?: number;
+  lastTurnBegan?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
   /** The turn this player last committed a crime (CR 700.13), for "if you've committed a crime this turn". */
@@ -641,6 +647,8 @@ export interface StackItem {
   x?: number;
   /** See PendingTrigger.rolled. */
   rolled?: number;
+  /** See PendingTrigger.revealed. */
+  revealed?: number;
   /**
    * In `castItems` only: the spell's mana value as it was put on the stack, X included (CR 202.3e), for when it has left
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
@@ -747,6 +755,8 @@ export interface PendingTrigger {
   x?: number;
   /** A reflexive trigger after a roll ("roll a d20. When you do, ... where X is the result"): that result. */
   rolled?: number;
+  /** A reflexive trigger after "reveal any number of Dragon cards from your hand": how many were revealed. */
+  revealed?: number;
   /** A reflexive trigger after "you may sacrifice another creature": that creature as it last existed (CR 608.2h). */
   sacrificed?: LastKnown[];
   /** A reflexive trigger after amassing: the amassed Army (CR 701.47c). */
@@ -891,7 +901,7 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -968,7 +978,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield. */ fromHand?: boolean; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[] }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[] }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -1394,6 +1404,12 @@ export interface Resolving {
   milled?: { id: ObjectId; zc: number }[];
   /** How many cards its exileNamed instruction exiled from the hand ("for each card exiled from their hand this way"). */
   exiledFromHand?: number;
+  /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
+  revealedFromHand?: number;
+  /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
+  unlessPaid?: boolean;
+  /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
+  tookFromHand?: number;
   /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
@@ -1506,7 +1522,7 @@ export interface Resolving {
     faceDownPick?: true;
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

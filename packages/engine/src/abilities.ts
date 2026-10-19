@@ -98,6 +98,11 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true }
   /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
   | { kind: "exiledFromHandThisWay" }
+  /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
+  | { kind: "revealedFromHand" }
+  | { kind: "bottomedFromHand" }
+  /** How many cards "you may choose a nonland card from it" chose (0 or 1): for "If you do" and "If you don't". */
+  | { kind: "tookFromHand" }
   /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
@@ -237,6 +242,10 @@ export interface TargetSpec {
   types?: string[];
   /** All of these card types: "artifact creature" (as opposed to "artifact or creature"). */
   allTypes?: string[];
+  /** "Double-faced card" (CR 712.1): a nonmodal or modal double-faced card or a meld card, whichever face is up. */
+  doubleFaced?: true;
+  /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
+  transformed?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
   /** Excluded colors, e.g. "nonblack creature" -> ["B"]. */
@@ -244,7 +253,7 @@ export interface TargetSpec {
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
-  colorCount?: "multicolored" | "monocolored" | "colorless";
+  colorCount?: "multicolored" | "monocolored" | "colorless" | /** exactly two colors, or not exactly two */ "two" | "notTwo";
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
@@ -276,7 +285,7 @@ export interface TargetSpec {
    * `couldButDidntAttack`: "creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
-  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack";
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
   /**
@@ -285,6 +294,9 @@ export interface TargetSpec {
    */
   controller?: "you" | "opponent" | "eventPlayer" | "enchanted";
   controlledBy?: PlayerId;
+  /** A battle's protector (CR 310.9): "each battle they protect" after "each opponent", "battle that player protects". */
+  protector?: "opponent" | "eventPlayer";
+  protectedBy?: PlayerId;
   /** For players: only opponents. */
   opponent?: boolean;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
@@ -493,7 +505,7 @@ export type ObjRef =
    * `of`: "each creature target player controls", "all lands that player controls": only that player's permanents (if
    * it's still a legal target, CR 608.2b).
    */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true }
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true }
   /**
    * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
@@ -833,7 +845,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared"; not?: true }
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -898,6 +910,11 @@ export type StaticCondition =
   | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number }
   /** "If an opponent lost life this turn". */
   | { kind: "opponentLostLife" }
+  /**
+   * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
+   * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
+   */
+  | { kind: "noCombatDamageSinceLastTurn" }
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
@@ -998,7 +1015,7 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean }
+  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
   | { kind: "allOf"; conds: StaticCondition[] }
   /**
@@ -1198,6 +1215,15 @@ export type Effect =
    * (Show and Tell, Iwamori, Tempting Wurm): each of them chooses in APNAP order without revealing the card (CR 101.4a),
    * then all the chosen cards enter at the same time; those who put one are choseThisWay afterwards.
    */
+  /**
+   * "Reveal any number of red cards in your hand" (Scent of Cinder, Cinder Seer), "reveal any number of Dragon cards from
+   * your hand" (Invasion of Tarkir): you choose which (CR 701.20a), and "for each card revealed this way" counts them
+   * (Count "revealedFromHand"). With `bottom`, "put any number of cards from your hand on the bottom of your library"
+   * (Valakut Awakening), the first pick lowest, and "that many" counts them (Count "bottomedFromHand").
+   */
+  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true }
+  /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
+  | { type: "exileHand"; until: "nextTurn" }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -1216,7 +1242,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), or put onto the battlefield under your control. */ dest?: "exile" | "battlefield"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1562,7 +1588,18 @@ export type Effect =
    * CR 610.3: it returns to its owner's hand). `linked`: Tidehollow Sculler's "When ~ leaves the battlefield, return the
    * exiled card to its owner's hand" returns it (CR 607.2a).
    */
-  | { type: "takeFromHand"; who: PlayerRef; filter?: TargetSpec; action: "discard" | "exile" | /** Lost Hours */ "libraryThird"; until?: "sourceLeaves"; linked?: boolean }
+  | {
+      type: "takeFromHand";
+      who: PlayerRef;
+      filter?: TargetSpec;
+      action: "discard" | "exile" | /** Lost Hours */ "libraryThird";
+      until?: "sourceLeaves";
+      linked?: boolean;
+      /** "You may exile a nonland card from it" (Elite Spellbinder): or none. */
+      optional?: true;
+      /** "For as long as that card remains exiled, its owner may play it. A spell cast this way costs {2} more to cast." */
+      ownerMay?: { play?: true; more?: number };
+    }
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
@@ -1593,7 +1630,8 @@ export type Effect =
    */
   | { type: "earthbend"; what: ObjRef; n: Amount }
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
-  | { type: "handToTop"; n: Amount }
+  /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
+  | { type: "handToTop"; n: Amount; bottom?: true }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
   | { type: "addCombatMana"; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
@@ -1721,6 +1759,8 @@ export type Effect =
   | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true } }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
+  /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
+  | { type: "loseAllCounters"; who: PlayerRef }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */
@@ -1861,7 +1901,12 @@ export type Effect =
    * `rest`: where the exiled cards not cast go once it's done (they stay exiled without it): `toHand` those of the
    * filter's types, the others to `dest` (Muse Vortex, Epic Experiment, Collected Conjuring).
    */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
+  /**
+   * `untilHits`: "exile cards from the top of your library until you exile two nonland cards with mana value 4 or less"
+   * (Invasion of Alara), instead of `n` cards; only those can be cast, and with `hitToHand`, "put one of them into your
+   * hand": the one not cast, or your pick of the two (the other stays exiled), and only the others go to `rest`.
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -1985,6 +2030,13 @@ export type SpellCondition =
    * as it last existed on the battlefield if this spell or ability moved it (CR 608.2h; rulings on Geistwave and Kellan).
    */
   | { kind: "targetWasYours"; index: number }
+  /**
+   * "Exile target card from a graveyard. If it was a creature card, ..." (Scavenging Ooze): the target card `index`, by its
+   * printed characteristics, which are the ones it had in the graveyard (CR 608.2h).
+   */
+  | { kind: "targetCardWas"; index: number; filter: TargetSpec }
+  /** "Counter target spell unless its controller pays {4}. If they do, you incubate 2." (Assimilate Essence): it was paid. */
+  | { kind: "unlessPaid" }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
   /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */
@@ -2277,7 +2329,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /**
@@ -2364,6 +2416,8 @@ export interface TriggeredAbility {
   withOthers?: number;
   /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
   withOthersType?: string;
+  /** "Whenever this token and at least one other creature token attack": only tokens count among the others. */
+  withOthersToken?: true;
   /** For "selfDoorUnlocked": which door (0 left, 1 right). */
   door?: number;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
@@ -3051,6 +3105,8 @@ export interface CompiledCard {
    * `yourTurn` and `maxMv`: "During your turn, spells you cast from your hand with mana value X or less have cascade,
    * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
    */
+  /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
+  spellsHaveConvoke?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;

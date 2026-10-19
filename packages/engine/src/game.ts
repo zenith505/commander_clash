@@ -126,6 +126,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
     shuffleLibrary(s, player);
   });
+  s.players[s.activePlayer]!.turnBegan = s.turn;
   // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.
   for (const r of meldResultsFor(setup.flatMap((p) => [p.commander, ...(p.secondCommander ? [p.secondCommander] : []), ...p.deck]))) s.cards[r.oracleId] ??= r;
   // CR 103.1: randomly determine the starting player.
@@ -1013,6 +1014,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
 
 /** What a permanent entering "as a copy of" something could copy: other permanents on the battlefield (not targeted). */
 export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec): ObjectId[] {
+  // A card in a graveyard (Lazotep Convert): by its printed characteristics there.
+  if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id)))));
   return s.battlefield.filter((id) => id !== o.id && objectMatches(s, filter, obj(s, id), controllerOf(s, o), false));
 }
 
@@ -1894,6 +1897,9 @@ function startNextTurn(s: GameState, skipping = false) {
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
+  const ap = player(s, s.activePlayer);
+  ap.lastTurnBegan = ap.turnBegan;
+  ap.turnBegan = s.turn;
   for (const p of s.players) {
     p.landsPlayedThisTurn = 0;
     // "Skips their next combat phase this turn" with that turn over.
@@ -2206,7 +2212,7 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc)) {
+    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id)) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -3027,6 +3033,19 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
 }
 
 /**
+ * Does `o`, cast by `pid` as it is now (its face being cast), have convoke (CR 702.51)? Its own, or from a permanent
+ * `pid` controls ("noncreature spells you cast have convoke"), checked by its printed characteristics as a spell.
+ */
+export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const d = defOf(s, o);
+  if (compileCard(d).convoke) return true;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d));
+  });
+}
+
+/**
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
  */
@@ -3034,7 +3053,7 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
   const d = defOf(s, o);
   let { cost, extra } = spellCost(s, pid, o, x, kicks, how);
   if (convoke?.length) {
-    if (!compileCard(d).convoke) return `${d.name} doesn't have convoke`;
+    if (!hasConvoke(s, pid, o)) return `${d.name} doesn't have convoke`;
     const problem = convokeProblem(s, pid, convoke);
     if (problem) return problem;
     const reduced = convokeReduce(cost, extra, convoke.map((c) => characteristics(s, obj(s, c)).colors));
@@ -4836,7 +4855,7 @@ function askEntersChoice(s: GameState): boolean {
       // "You may have ~ enter as a copy of ...": any of them, or none (CR 707.5).
       // Not one that entered at the same time (CR 614.12, rulings on Clone).
       const ids = copyCandidates(s, o, compileCard(defOf(s, o)).entersAsCopy!.filter).filter((id) => !c.together?.includes(id));
-      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
+      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name}${obj(s, id).zone === "graveyard" ? "'s graveyard" : ""})`);
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "copy", options: [...ids, "none"], labels: [...labels, "Don't copy"], objectId: o.id };
       return true;
     }
@@ -5202,7 +5221,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o); // CR 508.1f
     const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
     const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
-    o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}) };
+    const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
+    o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid

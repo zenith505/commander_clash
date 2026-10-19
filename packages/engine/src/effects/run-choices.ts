@@ -134,6 +134,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         ...(item.event ? { event: item.event } : {}),
         ...(item.x ? { x: item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
+        ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(e.sacrificed && s.resolving!.sacrificedThisWay ? { sacrificed: s.resolving!.sacrificedThisWay } : {}),
       });
       return;
@@ -237,6 +238,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "targetCardWas"
+            ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "unlessPaid"
+            ? !!s.resolving!.unlessPaid
             : e.cond.kind === "targetWasYours"
             ? targetWasYours(s, ctx, e.cond.index)
             : e.cond.kind === "teamwork"
@@ -281,6 +286,13 @@ function targetIs(s: GameState, ctx: ResolveCtx, index: number, filter0: TargetS
   if (o?.zone === "battlefield") return objectMatches(s, filter, o, ctx.controller, false);
   const card = s.objects[t.id];
   return !!card && card.zone === "graveyard" && (t.zc === undefined || (card.zoneChanges ?? 0) === t.zc) && printedMatches(filter, defOf(s, card));
+}
+
+/** "If it was a creature card" (SpellCondition "targetCardWas"): the target card, wherever it went, by its printed characteristics. */
+function targetCardWas(s: GameState, ctx: ResolveCtx, index: number, filter: TargetSpec): boolean {
+  const t = ctx.targets[index];
+  const card = t?.kind === "object" ? s.objects[t.id] : undefined;
+  return !!ctx.legal[index] && !!card && printedMatches(bindChosen(filter, ctx.chosen), defOf(s, card));
 }
 
 /**
@@ -405,6 +417,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     // Discarding your hand can be done with an empty hand (rulings on Moonveil Regent).
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
+    if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
     if (e.type === "exile" && e.what.ref === "selfCard" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;

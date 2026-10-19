@@ -404,7 +404,7 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
   }
 }
 
-function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number): boolean {
+function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
@@ -547,6 +547,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "opponentLostLife":
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
+    case "noCombatDamageSinceLastTurn": {
+      const p = s.players[you];
+      return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);
+    }
     case "opponentSearched":
       return (s.turnLog?.searched ?? []).some((p) => p !== you);
     case "opponentEntered": {
@@ -659,6 +663,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
+      if (cond.is === "attackedBattleThisTurn") return src.attacked?.turn === s.turn && !!src.attacked.battle;
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
       if (cond.is === "hasCounter") return Object.values(src.counters).some((n) => (n ?? 0) > 0);
@@ -682,6 +687,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         let n = 0;
         for (const [id, c] of chars) {
           if (cond.other && id === sourceId) continue;
+          if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
           if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
         }
@@ -689,14 +695,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       });
     }
     case "allOf":
-      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc));
+      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId));
   }
 }
 
 /** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
-export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number): boolean {
+export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId): boolean {
   const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
-  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc);
+  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId);
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {

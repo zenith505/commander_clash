@@ -27,6 +27,8 @@ export interface CopyExcept {
   /** "Except it's 1/1", "it's a 4/4 black Zombie": base power and toughness (CDAs for them aren't copied, 707.9d). */
   pt?: [number, number];
   colors?: Color[];
+  /** "Except it's a 4/4 black Zombie in addition to its other colors and types" (Lazotep Convert): these colors too. */
+  addColors?: Color[];
   /** "Except its name is ~". */
   name?: string;
   /** Embalm and eternalize: "has no mana cost". */
@@ -106,7 +108,7 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
     keywords,
     oracleText: text,
     ...(except.pt ? { power: String(except.pt[0]), toughness: String(except.pt[1]) } : {}),
-    ...(except.colors ? { colors: except.colors } : {}),
+    ...(except.colors ? { colors: except.colors } : except.addColors ? { colors: [...base.colors, ...except.addColors.filter((c) => !base.colors.includes(c))] } : {}),
     ...(except.noManaCost ? { manaCost: "", cmc: 0 } : {}),
   } as Partial<T> & { cmc?: number };
 }

@@ -38,6 +38,26 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
 }
 
 /**
+ * A double-faced token turns its back face up (CR 701.27a, 111.10i): only a token that is one, not one copying it (CR
+ * 707.8a covers token copies). A Phyrexian has no other face to go back to, so transforming it again does nothing
+ * (CR 701.27f).
+ */
+function transformToken(s: GameState, me: GameObject): boolean {
+  if (me.zone !== "battlefield" || !me.isToken || me.copyOf || me.copyEffects?.length) return false;
+  const front = defOf(s, me);
+  const back = front.tokenBack;
+  if (!back) return false;
+  s.cards[back.oracleId] ??= back;
+  me.cardId = back.oracleId;
+  me.tokenBackUp = true;
+  me.transforms = (me.transforms ?? 0) + 1;
+  invalidateCharacteristics(s);
+  log(s, `${front.name} transforms into ${back.name}.`);
+  fireEvent(s, { type: "transformed", id: me.id, face: 1 });
+  return true;
+}
+
+/**
  * Flip a permanent (CR 710): a flip card's, unflipped, turns so its flipped half's name, text, type line, power and
  * toughness apply; its color and mana cost don't change (710.1c). Nothing else can flip, and it can't flip back (710.4).
  * It's the same object: counters, damage and effects on it stay.
@@ -174,7 +194,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         // An ability of the permanent transforms it only if it hasn't transformed since the ability was put on the stack
         // (CR 701.27f).
         if (o.id === ctx.sourceId && (o.transforms ?? 0) !== (ctx.sourceTransforms ?? 0)) continue;
-        transformPermanent(s, o, false, e.convert);
+        // "Transform target Incubator token you control" (Attentive Skywarden): a double-faced token turns over too.
+        if (o.isToken && defOf(s, o).tokenBack) transformToken(s, o);
+        else transformPermanent(s, o, false, e.convert);
       }
       return;
     case "becomePrepared":
@@ -688,17 +710,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "transformSelf": {
-      // Only a double-faced token (CR 701.27a, c): not a card copying one (CR 707.8a covers token copies). It turns its
-      // back face up; a Phyrexian has no other face to go back to, so a second activation does nothing (CR 701.27f).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc) || !me.isToken || me.copyOf || me.copyEffects?.length) return;
-      const front = defOf(s, me);
-      const back = front.tokenBack;
-      if (!back) return;
-      s.cards[back.oracleId] ??= back;
-      me.cardId = back.oracleId;
-      invalidateCharacteristics(s);
-      log(s, `${front.name} transforms into ${back.name}.`);
+      if (!me || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      transformToken(s, me);
       return;
     }
     case "unattach": {

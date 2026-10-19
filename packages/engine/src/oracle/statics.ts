@@ -376,6 +376,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
+  // "~ has indestructible as long as it attacked a battle this turn" (War Historian), "~ has hexproof as long as it
+  // entered this turn" (Zurgo and Ojutai): about ~ itself.
+  if (/^(?:~|it) attacked a battle this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "attackedBattleThisTurn" };
+  if (/^(?:~|it) entered (?:the battlefield )?this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "enteredThisTurn" };
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
   // under your control this turn" (Mad Dog: neither happened), "unless it came under your control this turn" (Erg Raiders).
   if (/^~ didn't attack this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn", not: true };
@@ -388,7 +392,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^it's the first combat phase of (the|your) turn$/.exec(text))) return { kind: "phase", phase: "combat", first: true, ...(m[1] === "your" ? { yours: true as const } : {}) };
   if ((m = new RegExp(`^(?:a creature|${NUM} or more creatures) died( under your control)? this turn$`).exec(text)))
     return { kind: "creatureDied", ...(m[1] ? { n: num(m[1]) } : {}), ...(m[2] ? { yours: true as const } : {}) };
+  // "If a permanent was put into a graveyard from the battlefield this turn" (Ashen Reaper): tokens too (CR 111.7).
+  if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
+  if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
   // The Traps' "this turn" conditions (see StaticCondition opponentSearched).
   if (/^an opponent searched their library this turn$/.test(text)) return { kind: "opponentSearched" };
   if ((m = new RegExp(`^an opponent had (?:an?|${NUM} or more) (?:(white|blue|black|red|green) )?(artifact|creature|land|enchantment|planeswalker)s? enter the battlefield under their control this turn$`).exec(text)))
@@ -439,6 +446,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
+    // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
+    m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
     const who = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "defending";
     // Each attacking creature has its own defending player (CR 506.2), so only the source's own is modeled.
     if (who === "defending" && st.affects.kind !== "self") return null;
@@ -914,6 +923,10 @@ function parseStaticLine(line: string): StaticAbility | null {
     const types = also[1]!.replace(/,? and /, ", ").split(", ");
     return types.every((t) => CREATURE_TYPES.has(t)) ? { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: types, supertypes: [] }], text: line } : null;
   }
+  // "As long as ~ is on the battlefield, it's a land in addition to its other types" (Awakened Skyclave): a permanent's
+  // static ability only works on the battlefield anyway (CR 113.6), so it's a card type it has there (layer 4).
+  const onField = /^As long as ~ is on the battlefield, it's an? (artifact|creature|enchantment|land)(?: in addition to its other types)$/.exec(text);
+  if (onField) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [capital(onField[1]!)], subtypes: [] }], text: line };
   // "~ is a 4/4 Gorgon creature with deathtouch and lifelink in addition to its other types" (Case of the Gorgon's Kiss,
   // solved): types (layer 4), abilities (6) and base power and toughness (7b), CR 613.1.
   const isA = /^~ is (an? \d+\/\d+ .+ in addition to its other types)$/.exec(text);
@@ -936,6 +949,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (/^Enchanted creature's controller may have it assign its combat damage as though it weren't blocked$/.test(text)) return { affects: { kind: "attached" }, mods: [...unblocked], text: line };
   if (/^As long as ~ is attacking, for each creature you control, you may have that creature assign its combat damage as though it weren't blocked$/.test(text))
     return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [...unblocked], text: line, condition: { kind: "self", is: "attacking" } };
+  // Zilortha, Apex of Ikoria: "For each non-Human creature you control, you may have that creature assign its combat
+  // damage as though it weren't blocked" (chosen for each one as it assigns its damage, rulings).
+  const forEachUnblocked = /^For each (.+?) you control, you may have that creature assign its combat damage as though it weren't blocked$/.exec(text);
+  if (forEachUnblocked) {
+    const affects = parseAffected(`${capital(forEachUnblocked[1]!)}s you control`);
+    return affects?.kind === "filter" ? { affects, mods: [...unblocked], text: line } : null;
+  }
   const grantsUnblocked = /^(.+) have "You may have ~ assign its combat damage as though it weren't blocked\."$/.exec(text);
   if (grantsUnblocked) {
     const affects = parseAffected(grantsUnblocked[1]!);

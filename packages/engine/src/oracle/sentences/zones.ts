@@ -29,6 +29,14 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // "Reveal any number of red cards in your hand" (Scent of Cinder), "Reveal any number of Dragon cards from your hand"
+  // (Invasion of Tarkir): which ones is chosen as it resolves (Effect revealFromHand).
+  if ((m = /^[Rr]eveal any number of (?:(.+?) )?cards (?:in|from) your hand$/.exec(s))) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (m[1] && !filter)) return null;
+    ctx.revealedFromHand = true;
+    return [{ type: "revealFromHand", ...(filter ? { filter } : {}) }];
+  }
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
@@ -161,6 +169,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
   }
+  // "You may put a land card from your graveyard on top of your library" (Halo-Charged Skaab, after milling): chosen as
+  // it resolves, not targeted.
+  if ((m = /^(?:[Yy]ou may )?[Pp]ut (an?|one) (.+?) from your graveyard on top of your library$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {
+    const filter = parseSearchFilter(m[2]!.replace(/ and\/or /g, " or "));
+    if (filter === null) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryTop", ...(filter ? { filter } : {}), ...(/^[Yy]ou may /.test(s) ? { upTo: true as const } : {}) }];
+  }
   // "Return any number of cards with different mana values from your graveyard to your hand" (Seasons Past): chosen as it
   // resolves (rulings), no two with the same mana value; X in a mana cost is 0 and a card with no mana cost has 0 (CR 202.3).
   if ((m = /^[Rr]eturn any number of (.+?) with different mana values from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
@@ -241,6 +256,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
+  // "Draw three cards, then put a card from your hand on the bottom of your library": in any order (CR 401.4).
+  if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on the bottom of your library( in any order)?$`, "i").exec(s)))
+    return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), bottom: true }];
   // "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield" (Show and
   // Tell), "each opponent may put a legendary creature card ..." (Iwamori), "any number of ... cards" (Tempting Wurm):
   // chosen in turn order without revealing them, then put there at the same time (see the putFromHand effect). "Then

@@ -62,6 +62,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return { ...(head ?? { kind: "card" }), bound: spec.bound, text: p };
   }
   if (/^card$/i.test(p)) return undefined;
+  // "If it's a land or double-faced card" (Invasion of Pyrulea, CR 712.1).
+  if (p === "double-faced card") return { kind: "card", doubleFaced: true, text: p };
+  const dfc = /^(.+) or double-faced card$/.exec(p);
+  if (dfc) {
+    const first = parseSearchFilter(`${dfc[1]} card`);
+    return first ? { kind: "card", anyOf: [first, { kind: "card", doubleFaced: true, text: "double-faced card" }], text: p } : null;
+  }
   if (/^card named ~$/.test(p)) return { kind: "card", named: "~", text: "card named ~" };
   // "A card named Ajani, Valiant Protector": that card's name, as printed.
   const named = /^card named ([A-Z][^~]*)$/.exec(phrase);
@@ -92,6 +99,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   // "A land card with a basic land type" (Boseiju, Who Endures): a Plains, Island, Swamp, Mountain or Forest card (CR 205.3i).
   if (/^land card with a basic land type$/.test(p)) return { kind: "card", types: ["Land"], subtypes: [...BASIC_TYPES], text: "land card with a basic land type" };
+  // "A card that's exactly two colors" (Guildpact Paragon, CR 105.2).
+  const two = /^(.*?)card that(?:'s| is| (isn't|is not)) exactly two colors$/.exec(p);
+  if (two) {
+    const head = parseSearchFilter(`${two[1]}card`);
+    return head === null ? null : { ...(head ?? { kind: "card" }), colorCount: two[2] ? "notTwo" : "two", text: p };
+  }
   // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled.
   if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater)| with an? (even|odd) mana value)?$/i.test(p)) return null;
   const spec = parseTargetPhrase(`${p} from your graveyard`);

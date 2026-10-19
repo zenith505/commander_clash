@@ -182,6 +182,15 @@ export function transformedFace(s: GameState, o: GameObject): number | undefined
   return ["Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"].some((t) => d.faces![1]!.types.includes(t)) ? 1 : undefined;
 }
 
+/** A double-faced card (CR 712.1): nonmodal, modal, or a meld card. */
+export const isDoubleFacedDef = (d: CardDef): boolean => d.layout === "transform" || d.layout === "modal_dfc" || d.layout === "meld";
+
+/**
+ * A transformed permanent (CR 701.27g): a nonmodal double-faced permanent with its back face up. A modal double-faced or a
+ * melded or merged permanent never is (rulings on Gargantuan Slabhorn).
+ */
+export const isTransformed = (s: GameState, o: GameObject): boolean => o.zone === "battlefield" && ((o.face ?? 0) > 0 ? layoutOf(s, o) === "transform" && !o.melded && !o.merged : !!o.tokenBackUp);
+
 /** The card's layout if it has faces: "split", "flip", "transform", "modal_dfc", "adventure", "prepare". */
 export const layoutOf = (s: GameState, o: GameObject): string | undefined => (s.cards[o.cardId]?.faces ? s.cards[o.cardId]!.layout : undefined);
 

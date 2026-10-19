@@ -3,7 +3,7 @@ import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification,
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
+import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, protectedFromPlayer, type SourceQuality } from "../keywords";
@@ -11,10 +11,10 @@ import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
-import { defMv, hasName, sameName } from "../faces";
+import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
-const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : n === 0);
+const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : n === 0);
 
 /**
  * Does this permanent fit `spec` from `controller`'s point of view, using its current
@@ -76,13 +76,17 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
+  if (spec.combat === "attackingBattle" && !(o.attacking !== undefined && attackedBattle(s, o))) return false;
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
   if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
+  if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
+  if (spec.transformed && !isTransformed(s, o)) return false;
+  if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
@@ -211,6 +215,8 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.toughness && (!creature || !inRange(Number.parseInt(d.toughness ?? "0", 10) || 0, spec.toughness))) return false;
   if (spec.manaValue && !inRange(defMv(d), spec.manaValue)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
+  if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
+  if (spec.transformed) return false;
   return true;
 }
 
@@ -653,4 +659,10 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
   // Bolster: the least toughness, or tied for it (CR 701.39a).
   const min = Math.min(...ids.map((id) => toughness(s, obj(s, id))));
   return ids.filter((id) => toughness(s, obj(s, id)) === min);
+}
+
+/** The battle this creature is attacking, while it's still that battle (CR 506.4). */
+function attackedBattle(s: GameState, o: GameObject): boolean {
+  const b = attackedPlaneswalker(s, o);
+  return !!b && objIsType(s, b, "Battle");
 }

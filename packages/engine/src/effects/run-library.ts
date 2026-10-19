@@ -156,14 +156,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (!sc.found) {
         const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        s.resolving!.tookFromHand = 0;
         if (!cards.length) return;
         const kind = e.filter?.text ?? "card";
         const what = `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
         const to = e.action === "discard" ? `for ${p.name} to discard` : e.action === "libraryThird" ? `for ${p.name} to put into their library third from the top` : "to exile";
-        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: 1, max: 1, dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
+        s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what, cards, min: e.optional ? 0 : 1, max: 1, dig: { looked: [...p.hand], to, rest: `stay in ${p.name}'s hand` }, hand: pid };
         return "paused";
       }
       const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
+      s.resolving!.tookFromHand = ids.length;
       if (e.action === "discard") discardCards(s, pid, ids, "", false, false, ctx.controller);
       else if (e.action === "libraryThird")
         for (const id of ids) {
@@ -179,6 +181,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const o = obj(s, id);
           if (o.zone !== "exile") continue;
           if (me) (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, hand: true });
+          // "For as long as that card remains exiled, its owner may play it" (Elite Spellbinder): with its usual timing.
+          if (e.ownerMay) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, ...(e.ownerMay.play ? {} : { castOnly: true as const }), ...(e.ownerMay.more ? { more: e.ownerMay.more } : {}) };
           // Linked to the source as it was when the ability triggered (CR 607.2a), like an exile ability's.
           if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         }
@@ -321,14 +325,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const n = Math.min(amountNow(s, e.n, ctx), p.hand.length);
         if (!n) return;
         if (p.hand.length > 1) {
-          s.pending = { kind: "handToTop", player: p.id, count: n, source: src };
+          s.pending = { kind: "handToTop", player: p.id, count: n, source: src, ...(e.bottom ? { bottom: true as const } : {}) };
           return "paused";
         }
         ids = [...p.hand];
       }
       const cards = ids.filter((id) => p.hand.includes(id));
-      for (const id of [...cards].reverse()) moveObject(s, id, "library", { top: true });
-      log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on top of their library.`);
+      // On the bottom the first pick goes lowest; on top it ends on top.
+      for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
+      log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
       return;
     }
     case "shuffleIntoLibrary":

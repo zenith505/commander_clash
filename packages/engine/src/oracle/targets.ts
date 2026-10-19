@@ -230,6 +230,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     if (!whose || (whose.ref === "target" && whose.n)) return null;
     return { ref: "each", filter: { ...ofGroup.filter, text: x.toLowerCase() }, of: whose };
   }
+  // "Put a +1/+1 counter on that creature and each other creature you control that shares a creature type with it"
+  // (Holy Frazzle-Cannon): the trigger's creature, and the others as this resolves.
+  const subjectAnd = ctx.subject && !ctx.spell ? /^that creature and (each other .+?) that shares a creature type with it$/i.exec(x) : null;
+  if (subjectAnd) {
+    const g = parseGroup(subjectAnd[1]!);
+    return g?.other && !/ (?:with|that|who|which) /i.test(subjectAnd[1]!) ? { ref: "each", filter: g.filter, andSubject: true } : null;
+  }
   // "It and other creatures you control that share a creature type with it each get +2/+0 ... until end of turn" (Haunted
   // One): the source while it's still there, and the others as this resolves (CR 611.2c).
   const andOthers = !ctx.spell ? /^~ and (other .+?)( that shares? a creature type with (?:~|it))?(?: each)?$/i.exec(x) : null;
@@ -248,6 +255,15 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (group) return { ref: "each", filter: group.filter, ...(group.other ? { other: true } : {}) };
   const m = /^target (.+)$/i.exec(x);
   if (!m) return null;
+  // "Target planeswalker that player controls or battle that player protects" (Rampaging Raptor), after "Whenever ~ deals
+  // combat damage to an opponent": either, about that player (CR 310.9).
+  if (!cards && ctx.eventPlayer && /^planeswalker that player controls or battle that player protects$/i.test(m[1]!)) {
+    const anyOf: TargetSpec[] = [
+      { kind: "object", types: ["Planeswalker"], controller: "eventPlayer", text: "planeswalker that player controls" },
+      { kind: "object", types: ["Battle"], protector: "eventPlayer", text: "battle that player protects" },
+    ];
+    return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Planeswalker", "Battle"], anyOf, text: `target ${m[1]!}` }) };
+  }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx) });
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
@@ -505,6 +521,13 @@ export function parseTargetPhrase(
     p = `${phrase.trim().slice(0, bound.index)}${from ? from[0] : ""}`.toLowerCase();
   }
   p = p.replace(/\btime lords?\b/g, "time-lord");
+  // "Nonland permanent an opponent controls that isn't exactly two colors", "a spell that's exactly two colors" (Invasion
+  // of Ravnica, Guildpact Paragon): how many colors it has (CR 105.2).
+  const two = / that(?:'s| is| (isn't|is not)) exactly two colors\b/.exec(p);
+  if (two) {
+    extra.colorCount = two[1] ? "notTwo" : "two";
+    p = p.slice(0, two.index) + p.slice(two.index + two[0].length);
+  }
   // "Target card in a graveyard other than a basic land card" (Surgical Extraction): every card but the basic lands, the
   // only cards with the basic supertype (CR 205.4c). Only for a card in a graveyard.
   const otherThanBasic = / other than a basic land card\b/.test(p);
@@ -621,6 +644,11 @@ export function parseTargetPhrase(
   }
   if (inGraveyard && (controller || / (?:you|an opponent) controls?$/.test(p))) return null;
   if (p === "player" || p === "opponent") return Object.keys(extra).length || inGraveyard ? null : { kind: "player", opponent: p === "opponent", text };
+  // "Other transformed permanents you control" (Gargantuan Slabhorn, CR 701.27g).
+  if ((m = /^transformed (?=permanent|creature)/.exec(p))) {
+    extra.transformed = true;
+    p = p.slice(m[0].length);
+  }
   let tapped: boolean | undefined;
   if ((m = /^(un)?tapped /.exec(p))) {
     tapped = !m[1];

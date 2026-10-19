@@ -470,6 +470,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (unless) {
     const paid = paidUnless(s, ctx, item.controller, unless, by, what);
     if (paid === "paused") return paid;
+    if (s.resolving) s.resolving.unlessPaid = paid;
     if (paid) return;
   }
   s.stack.splice(i, 1);

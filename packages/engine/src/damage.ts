@@ -182,6 +182,7 @@ export function dealDamage(
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
     if (opts.combat) {
+      p.combatDamagedTurn = s.turn;
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its
       // controller pay freerunning costs this turn.
@@ -312,7 +313,8 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
   if (spec.allTypes?.some((t) => !src.types.includes(t)) || spec.notTypes?.some((t) => src.types.includes(t))) return false;
   if (spec.colors?.length && !spec.colors.some((c) => src.colors.includes(c))) return false;
   if (spec.notColors?.some((c) => src.colors.includes(c))) return false;
-  if (spec.colorCount && (spec.colorCount === "colorless" ? src.colors.length !== 0 : spec.colorCount === "monocolored" ? src.colors.length !== 1 : src.colors.length < 2)) return false;
+  const n = src.colors.length;
+  if (spec.colorCount && (spec.colorCount === "colorless" ? n !== 0 : spec.colorCount === "monocolored" ? n !== 1 : spec.colorCount === "two" ? n !== 2 : spec.colorCount === "notTwo" ? n === 2 : n < 2)) return false;
   if (spec.subtypes?.length && !spec.subtypes.some((t) => src.subtypes.includes(t))) return false;
   if (spec.notSubtypes?.some((t) => src.subtypes.includes(t))) return false;
   if (spec.keywords?.some((k) => !kw(k)) || spec.notKeywords?.some(kw)) return false;

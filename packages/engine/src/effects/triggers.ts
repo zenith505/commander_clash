@@ -2,7 +2,7 @@ import { restingDef } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, creatureTypesOf, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType } from "../game";
+import { checkAscend, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
@@ -258,8 +258,8 @@ function trains(s: GameState, o: GameObject): boolean {
 }
 
 /** The other creatures attacking along with it (battalion): those just declared as attackers with it. */
-function othersAttacking(s: GameState, o: GameObject, type?: string): number {
-  return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature") && (!type || characteristics(s, s.objects[id]!).subtypes.includes(type))).length;
+function othersAttacking(s: GameState, o: GameObject, type?: string, tokens?: true): number {
+  return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature") && (!tokens || s.objects[id]!.isToken) && (!type || characteristics(s, s.objects[id]!).subtypes.includes(type))).length;
 }
 
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
@@ -306,7 +306,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
-      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount))) {
+      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
         const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
@@ -750,7 +750,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // planeswalker's controller)?
     const attackingYou = (a: GameObject, pid: PlayerId) => ({ player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid });
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
@@ -949,6 +949,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
+        // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
+        // whether or not any creatures were tapped for it).
+        if (t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindChosen(t.cast.spell, o.chosen);
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
@@ -1312,9 +1315,16 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
-  const isEvent = (x: TargetSpec) => x.controller === "eventPlayer";
+  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
-  const fix = (x: TargetSpec): TargetSpec => (x.controller === "eventPlayer" ? (({ controller: _, ...rest }) => ({ ...rest, ...(who !== undefined ? { controlledBy: who } : { controller: "eventPlayer" as const }) }))(x) : x);
+  const fix = (x0: TargetSpec): TargetSpec => {
+    const x = x0.anyOf ? { ...x0, anyOf: x0.anyOf.map(fix) } : x0;
+    if (x.protector === "eventPlayer" && who !== undefined) {
+      const { protector: _, ...rest } = x;
+      return fix({ ...rest, protectedBy: who });
+    }
+    return x.controller === "eventPlayer" ? (({ controller: _, ...rest }) => ({ ...rest, ...(who !== undefined ? { controlledBy: who } : { controller: "eventPlayer" as const }) }))(x) : x;
+  };
   return { ...body, targets: body.targets.map(fix), ...(body.modal ? { modal: { ...body.modal, modes: body.modal.modes.map((m) => ({ ...m, targets: m.targets?.map(fix) })) } } : {}) };
 }
 
@@ -1344,6 +1354,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.lki ? { lki: t.lki } : {}),
     ...(t.x ? { x: t.x } : {}),
     ...(t.rolled !== undefined ? { rolled: t.rolled } : {}),
+    ...(t.revealed !== undefined ? { revealed: t.revealed } : {}),
     ...(t.sacrificed ? { sacrificed: t.sacrificed } : {}),
     ...(t.amassed ? { amassed: t.amassed } : {}),
     ...(t.fromSpell ? { fromSpell: true as const } : {}),

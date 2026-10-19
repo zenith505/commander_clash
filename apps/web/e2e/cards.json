@@ -1671,6 +1671,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0b772ef2-b760-400b-8e5b-f4b98e6c935d",
+  "name": "Crown of the Ages",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{4}, {T}: Attach target Aura attached to a creature to another creature.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ice",
+  "releasedAt": "1995-06-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5480f855-80b7-45c7-94a9-071c7b5d5ccf",
   "name": "Curse of the Bloody Tome",
   "manaCost": "{2}{U}",
@@ -3245,6 +3267,121 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "0e735ba6-7fd1-4d12-b20c-21525dc1e2b5",
+  "name": "Hanweir Battlements",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{R}, {T}: Target creature gains haste until end of turn.\n{3}{R}{R}, {T}: If you both own and control this land and a creature named Hanweir Garrison, exile them, then meld them into Hanweir, the Writhing Township.",
+  "colors": [],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Meld"
+  ],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "emn",
+  "releasedAt": "2016-07-22",
+  "rarity": "rare",
+  "layout": "meld",
+  "gameChanger": false,
+  "meld": {
+   "parts": [
+    "Hanweir Battlements",
+    "Hanweir Garrison"
+   ],
+   "result": "Hanweir, the Writhing Township"
+  }
+ },
+ {
+  "oracleId": "7cb29569-48e1-4782-9906-fad155ebfafe",
+  "name": "Hanweir Garrison",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "Whenever this creature attacks, create two 1/1 red Human creature tokens that are tapped and attacking.\n(Melds with Hanweir Battlements.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "emn",
+  "releasedAt": "2016-07-22",
+  "rarity": "rare",
+  "layout": "meld",
+  "gameChanger": false,
+  "meld": {
+   "parts": [
+    "Hanweir Battlements",
+    "Hanweir Garrison"
+   ],
+   "result": "Hanweir, the Writhing Township"
+  }
+ },
+ {
+  "oracleId": "f4905c40-003e-4992-b8d7-3f07ba09c686",
+  "name": "Hanweir, the Writhing Township",
+  "manaCost": "",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Eldrazi Ooze",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi",
+   "Ooze"
+  ],
+  "oracleText": "Trample, haste\nWhenever Hanweir attacks, create two 3/2 colorless Eldrazi Horror creature tokens that are tapped and attacking.",
+  "power": "7",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Haste",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "emn",
+  "releasedAt": "2016-07-22",
+  "rarity": "rare",
+  "layout": "meld",
+  "gameChanger": false,
+  "meld": {
+   "parts": [
+    "Hanweir Battlements",
+    "Hanweir Garrison"
+   ],
+   "result": "Hanweir, the Writhing Township"
+  }
  },
  {
   "oracleId": "a1c7cd7a-0795-4135-b787-effeb981d95b",

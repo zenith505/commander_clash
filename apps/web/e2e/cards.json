@@ -3269,6 +3269,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d7dcd1a3-3163-4e26-94e8-f4072e477e6a",
+  "name": "Halo-Charged Skaab",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "When this creature enters, each player mills two cards. Then you may put an instant, sorcery, or battle card from your graveyard on top of your library. (To mill two cards, a player puts the top two cards of their library into their graveyard.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0e735ba6-7fd1-4d12-b20c-21525dc1e2b5",
   "name": "Hanweir Battlements",
   "manaCost": "",
@@ -3614,6 +3646,89 @@
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "8faa4330-07bb-4b65-810a-bbce29d3cd42",
+  "name": "Invasion of Alara // Awaken the Maelstrom",
+  "manaCost": "{W}{U}{B}{R}{G}",
+  "cmc": 5,
+  "typeLine": "Battle — Siege // Sorcery",
+  "supertypes": [],
+  "types": [
+   "Battle"
+  ],
+  "subtypes": [
+   "Siege"
+  ],
+  "oracleText": "When this Siege enters, exile cards from the top of your library until you exile two nonland cards with mana value 4 or less. You may cast one of those two cards without paying its mana cost. Put one of them into your hand. Then put the other cards exiled this way on the bottom of your library in a random order.",
+  "colors": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Invasion of Alara",
+    "manaCost": "{W}{U}{B}{R}{G}",
+    "typeLine": "Battle — Siege",
+    "supertypes": [],
+    "types": [
+     "Battle"
+    ],
+    "subtypes": [
+     "Siege"
+    ],
+    "oracleText": "When this Siege enters, exile cards from the top of your library until you exile two nonland cards with mana value 4 or less. You may cast one of those two cards without paying its mana cost. Put one of them into your hand. Then put the other cards exiled this way on the bottom of your library in a random order.",
+    "defense": "7",
+    "colors": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/3/1/318c363b-61cc-4e2f-8f86-a4287539ea07.jpg?1783951955",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/3/1/318c363b-61cc-4e2f-8f86-a4287539ea07.jpg?1783951955"
+   },
+   {
+    "name": "Awaken the Maelstrom",
+    "manaCost": "",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Awaken the Maelstrom is all colors.\nTarget player draws two cards. You may put an artifact card from your hand onto the battlefield. Create a token that's a copy of a permanent you control. Distribute three +1/+1 counters among one, two, or three creatures you control. Destroy target permanent an opponent controls.",
+    "colors": [
+     "B",
+     "G",
+     "R",
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/3/1/318c363b-61cc-4e2f-8f86-a4287539ea07.jpg?1783951955",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/3/1/318c363b-61cc-4e2f-8f86-a4287539ea07.jpg?1783951955"
+   }
+  ]
  },
  {
   "oracleId": "e462e78d-2d26-4a2d-8d8f-5f31abe5c924",
@@ -5812,6 +5927,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ff50d002-834e-4b5e-8db0-b0c8b4efb21f",
+  "name": "Scent of Cinder",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal any number of red cards in your hand. Scent of Cinder deals X damage to any target, where X is the number of cards revealed this way.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "uds",
+  "releasedAt": "1999-06-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "227ddf6c-d21a-48da-84fb-395c7e096914",
   "name": "Scion of Halaster",
   "manaCost": "{1}{B}",
@@ -7135,6 +7276,35 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e47253d1-9b12-4989-80c0-604906c88b5e",
+  "name": "Traumatic Revelation",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Target opponent reveals their hand. You may choose a creature or battle card from it. If you do, that player discards that card. If you don't, incubate 3. (Create an Incubator token with three +1/+1 counters on it and \"{2}: Transform this token.\" It transforms into a 0/0 Phyrexian artifact creature.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Incubate",
+   "Transform"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "112322ad-8f66-4cd4-98a1-f425d61a69ce",
   "name": "True-Name Nemesis",
   "manaCost": "{1}{U}{U}",
@@ -7246,6 +7416,67 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "ff0ab867-b710-4b1a-baed-95fc3cf68f79",
+  "name": "Valakut Awakening // Valakut Stoneforge",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Instant // Land",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Put any number of cards from your hand on the bottom of your library, then draw that many cards plus one.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "rare",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Valakut Awakening",
+    "manaCost": "{2}{R}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Put any number of cards from your hand on the bottom of your library, then draw that many cards plus one.",
+    "colors": [
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/2/2/228e551e-023a-4c9a-8f32-58dae6ffdf7f.jpg?1783929350",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/2/2/228e551e-023a-4c9a-8f32-58dae6ffdf7f.jpg?1783929350"
+   },
+   {
+    "name": "Valakut Stoneforge",
+    "manaCost": "",
+    "typeLine": "Land",
+    "supertypes": [],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "This land enters tapped.\n{T}: Add {R}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/2/2/228e551e-023a-4c9a-8f32-58dae6ffdf7f.jpg?1783929350",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/2/2/228e551e-023a-4c9a-8f32-58dae6ffdf7f.jpg?1783929350"
+   }
+  ]
  },
  {
   "oracleId": "f83a768c-162d-46f0-8ebd-d9c6b2c69322",
@@ -7408,6 +7639,32 @@
   "set": "ktk",
   "releasedAt": "2014-09-26",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "10426070-2e6f-47a5-bc8d-16dcfb058b26",
+  "name": "Volcanic Spite",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Volcanic Spite deals 3 damage to target creature, planeswalker, or battle. You may put a card from your hand on the bottom of your library. If you do, draw a card.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

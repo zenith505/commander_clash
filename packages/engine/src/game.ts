@@ -473,7 +473,7 @@ export const opponents = (s: GameState, pid: PlayerId) => livingPlayers(s).filte
 export const nameOf = (s: GameState, id: ObjectId) => defOf(s, obj(s, id)).name;
 
 export function log(s: GameState, text: string, to?: PlayerId) {
-  s.log.push({ seq: s.log.length, turn: s.turn, text, ...(to !== undefined ? { to } : {}) });
+  s.log.push({ seq: s.log.length, turn: s.turn, step: s.step, text, ...(to !== undefined ? { to } : {}) });
 }
 
 /** The card `pid` may cast for free right now, as cascade resolves (see PendingDecision "castFree"), or for its madness cost. */

@@ -165,7 +165,9 @@ export type TriggerSourceEvent =
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
   /** A permanent dealt damage to a creature (`id`). */
-  | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean }
+  | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
+  /** Damage dealt at the same time was excess damage to these permanents (CR 120.10), under `controller` then. */
+  | { type: "excessDamage"; hits: { id: ObjectId; amount: number; controller: PlayerId }[]; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
@@ -307,7 +309,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
-      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id))) {
+      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
         const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
@@ -872,8 +874,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = s.objects[ev.source];
     const hit = s.objects[ev.id];
     if (o?.zone === "battlefield" && hit) {
-      add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
-      addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, { amount: ev.amount });
+      const info = { amount: ev.amount, ...(ev.excess ? { excess: ev.excess } : {}) };
+      add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, info);
+      addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
+    }
+  } else if (ev.type === "excessDamage") {
+    // "Whenever a creature an opponent controls is dealt excess damage" (CR 120.10): once for each permanent, which is
+    // the subject and its excess "that excess damage"; "one or more creatures ... are dealt" once for all of them.
+    const fits = (t: TriggeredAbility, hit: GameObject, wc: PlayerId) => !!t.excess && !(t.excess.noncombat && ev.combat) && objectMatches(s, t.excess.filter, hit, wc, false);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      for (const h of ev.hits) add(w, wc, (e, t) => e === "permanentDealtExcess" && !t.excess?.oneOrMore && fits(t, obj(s, h.id), wc), undefined, undefined, obj(s, h.id), undefined, undefined, undefined, { amount: h.amount, player: h.controller });
+      add(w, wc, (e, t) => e === "permanentDealtExcess" && !!t.excess?.oneOrMore && ev.hits.some((h) => fits(t, obj(s, h.id), wc)));
     }
   } else if (ev.type === "wasDealtDamage") {
     // "Whenever ~ is dealt damage", "When enchanted creature is dealt damage": it's still on the battlefield as the

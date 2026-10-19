@@ -591,6 +591,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     [prevStart, curStart] = [curStart, effects.length];
     if (!thenParts.has(sentences[si]!)) [prevWhole, curWhole] = [curWhole, effects.length];
     [prevTargets, curTargets] = [curTargets, ctx.targets.length];
+    // "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4).
+    const keepMana = /^Until end of turn, you don't lose unspent (?:(white|blue|black|red|green) )?mana as steps and phases end$/.exec(s);
+    if (keepMana) {
+      const color = keepMana[1] ? (({ white: "W", blue: "U", black: "B", red: "R", green: "G" }) as const)[keepMana[1] as "red"] : undefined;
+      effects.push({ type: "keepManaThisTurn", ...(color ? { color } : {}) });
+      continue;
+    }
     // "Add {R}. Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4): the mana the sentence
     // before added, unless it can only be spent some ways.
     if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
@@ -701,7 +708,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Under a condition about how it was cast (Elemental Mascot's "If five or more mana was spent to cast that spell, exile
     // the top card of your library. You may play that card until the end of your next turn."), both sentences are.
     const impulseIf = /^If [^,]+, exile the top /.test(s) ? parseHowCast(s, ctx) : null;
-    const exTop = new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
+    // "Exile cards from the top of your library equal to the excess damage dealt to that creature this way" (Archaic's
+    // Agony): that many, counted as it resolves.
+    const exEqual = /^Exile cards from the top of your library equal to (.+)$/.exec(s);
+    const exEqualN = exEqual ? parseCount(exEqual[1]!, ctx) : null;
+    if (exEqual && !exEqualN) return null;
+    const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
     // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
     const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)$/;
@@ -719,7 +731,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (exTop && !exTop[1]) ctx.exiledTop = true;
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
-      const impulse: Effect = { type: "impulse", n: exTop[1] ? amt(exTop[1]) : 1, until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
+      const impulse: Effect = { type: "impulse", n: exEqualN ?? (exTop[1] ? amt(exTop[1]) : 1), until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
       effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
       si++;
       continue;
@@ -1917,12 +1929,54 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "If excess damage was dealt to that creature this way, investigate" (Torch the Witness), "If excess damage was
     // dealt to a permanent this way, create that many tapped Treasure tokens" (Bottle-Cap Blast): after its damage.
-    const ifExcess = ctx.excessDamage ? /^If excess damage was dealt (?:to (?:that creature|that permanent|a permanent) )?this way, (.+)$/.exec(s) : null;
-    if (ifExcess) {
-      const inner = parseOne(ifExcess[1]!.replace(/^create that many (.+) tokens$/, "create a number of $1 tokens equal to the excess damage dealt this way"), ctx);
+    // "If excess damage was dealt to a creature this way, draw a card" (Vikya): only a creature's counts.
+    const ifExcess = ctx.excessDamage ? /^If excess damage was dealt (?:to (that creature|that permanent|a permanent|a creature) )?this way, (.+)$/.exec(s) : null;
+    if (ifExcess && !(ifExcess[1] === "a creature" && /\bthat\b/.test(ifExcess[2]!))) {
+      const inner = parseOne(ifExcess[2]!.replace(/^create that many (.+) tokens$/, "create a number of $1 tokens equal to the excess damage dealt this way"), ctx);
       if (!inner || inner.some((x) => pauses(x))) return null;
-      effects.push({ type: "if", cond: { kind: "excessDealt" }, effects: inner });
+      effects.push({ type: "if", cond: { kind: "excessDealt", ...(ifExcess[1] === "a creature" ? { creature: true as const } : {}) }, effects: inner });
       if (!defineX()) return null;
+      continue;
+    }
+    // After a fight: "If the creature the opponent controls is dealt excess damage this way, add that much {R}" (The Last
+    // Agni Kai), "When excess damage is dealt to the creature an opponent controls this way, destroy ..." (Rhino's
+    // Rampage, a reflexive trigger, CR 603.12): the excess dealt to that target creature (CR 120.10).
+    const fought = effects[effects.length - 1];
+    const fightExcess = fought?.type === "fight" && fought.b.ref === "target" && !fought.b.n && ctx.targets[fought.b.index]?.controller === "opponent" ? /^(?:If the creature (?:the|an) opponent controls is dealt excess damage this way, (.+)|When excess damage is dealt to the creature an opponent controls this way, (.+))$/.exec(s) : null;
+    if (fightExcess && fought?.type === "fight" && fought.b.ref === "target") {
+      const index = fought.b.index;
+      if (fightExcess[1]) {
+        const add = /^add that much (\{[WUBRGC]\})$/.exec(fightExcess[1]);
+        if (!add) return null;
+        effects.push({ type: "if", cond: { kind: "excessDealt", target: index }, effects: [{ type: "addMana", mana: add[1]!, times: { count: { kind: "excessThisWay", target: index } } }] });
+        continue;
+      }
+      if (/\b(that|those|it|X)\b/.test(fightExcess[2]!)) return null;
+      const reflexive = reflexiveBody([fightExcess[2]!, ...sentences.slice(si + 1)].join(". "), ctx);
+      if (!reflexive) return null;
+      si = sentences.length;
+      effects.push({ type: "if", cond: { kind: "excessDealt", target: index }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
+    // "~ deals 7 damage to target creature or planeswalker. When it deals excess damage this way, destroy target artifact or
+    // enchantment an opponent controls with mana value less than or equal to that amount of excess damage" (Unleash the
+    // Inferno): a reflexive trigger (CR 603.12) whose X is the excess dealt.
+    const whenExcess = ctx.excessDamage && effects[effects.length - 1]?.type === "damage" ? /^When (?:it|~) deals excess damage this way, (.+)$/.exec(s) : null;
+    if (whenExcess) {
+      const text = [whenExcess[1]!, ...sentences.slice(si + 1)].join(". ");
+      const withX = text.replace(/\bwith mana value less than or equal to that amount of excess damage\b/g, "with mana value X or less");
+      if (/\b(that|those|it)\b/.test(withX.replace(/^destroy /, "")) || (/\bX\b/.test(text) && withX === text)) return null;
+      const reflexive = reflexiveBody(withX, ctx, false, false, withX !== text);
+      if (!reflexive) return null;
+      si = sentences.length;
+      effects.push({ type: "if", cond: { kind: "excessDealt" }, effects: [{ type: "reflexive", body: reflexive, ...(withX !== text ? { xExcess: true as const } : {}) }] });
+      continue;
+    }
+    // "You may play the exiled card this turn" after looking at the top cards and exiling one (Nahiri's Warcrafting).
+    if (/^You may play the exiled card this turn$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "dig" || prev.into !== "exile" || prev.play || prev.count !== 1) return null;
+      prev.play = "thisTurn";
       continue;
     }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."
@@ -2237,7 +2291,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
  * The body of a reflexive trigger, "When you do, [text]" (CR 603.12): its own targets, chosen as it's put on the stack,
  * and the same meaning of ~, "it" and the trigger's subject as the ability that creates it.
  */
-function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false): AbilityBody | null {
+function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false, ownX = false): AbilityBody | null {
   // After "you may sacrifice another creature", "that creature" is only ever its power or toughness (Heart-Piercer
   // Manticore, Ziatora): the sacrificed creature as it last existed (CR 608.2h; rulings).
   const sac = sacrificed && /\b(?:that|the sacrificed) creature's (?:power|toughness)\b/.test(text);
@@ -2258,6 +2312,7 @@ function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false
     ...(ctx.activated ? { activated: true } : {}),
     ...(ctx.eventPlayer ? { eventPlayer: true } : {}),
     ...(ctx.defending ? { defending: true } : {}),
+    ...(ownX ? { ownX: true } : {}),
   });
   return body;
 }
@@ -2287,7 +2342,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown;
     if (last?.type === "amass") ctx.amassed = true;
-    if (last?.type === "damage" || last?.type === "bite") ctx.excessDamage = true;
+    if (last?.type === "damage" || last?.type === "bite" || last?.type === "fight") ctx.excessDamage = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.
@@ -2352,6 +2407,8 @@ export function usesX(v: unknown): boolean {
   if (Array.isArray(v)) return v.some(usesX);
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
+    // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
+    if (o.type === "reflexive" && o.xExcess) return false;
     if (o.count && (o.count as Count).kind === "x") return true;
     if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
     if (o.xRange || (o.total as TargetSpec["total"])?.x || o.kind === "xAtLeast") return true; // "with mana value X or less", "if X is 5 or more"

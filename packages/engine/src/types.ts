@@ -1067,6 +1067,18 @@ export interface TurnLog {
   sourceDamage?: Record<number, Record<string, number>>;
   /** The card types of the cards put into each player's graveyard from anywhere (Cloakwood Hermit). */
   toOwnGraveyardTypes?: Record<number, string[]>;
+  /**
+   * Each time a permanent was dealt excess damage (CR 120.10): the permanent as it was then (`id`, `zc`), its
+   * controller and card types then, and how much (Rith's "if a creature an opponent controlled was dealt excess damage
+   * this turn", Maarika's "if that creature was dealt excess damage this turn").
+   */
+  excessDealt?: { id: ObjectId; zc: number; controller: PlayerId; types: string[]; amount: number; combat?: true }[];
+  /**
+   * What dealt damage to each creature and planeswalker this turn, keyed `id@zoneChanges` (the permanent as it was):
+   * each source's controller, whether it was a spell, and its subtypes then (Aegar's "if a Giant, Wizard, or spell you
+   * controlled dealt damage to it this turn").
+   */
+  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[] }[]>;
 }
 
 /**
@@ -1136,6 +1148,8 @@ export interface GameState {
   castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true }[];
   /** "Instant and sorcery spells you cast this turn cost {1} less to cast": cost changes for one player this turn (CR 601.2f). */
   costModsThisTurn?: { player: PlayerId; mod: CostMod }[];
+  /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
+  keepManaThisTurn?: { player: PlayerId; color?: ManaType }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
@@ -1355,6 +1369,8 @@ export interface TurnRule {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "Deals damage to a creature": the excess damage that creature has been dealt this turn (CR 120.10). */
+  excess?: number;
   player?: PlayerId;
   /** A permanent's enters trigger: the opponent its spell's gift was promised to (CR 702.174b). */
   gift?: PlayerId;
@@ -1416,6 +1432,10 @@ export interface Resolving {
   revealedFromHand?: number;
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
   excessDamage?: number;
+  /** That excess damage by the permanent dealt it (a fight's "the creature the opponent controls"). */
+  excessTo?: Record<ObjectId, number>;
+  /** The part of it dealt to creatures ("if excess damage was dealt to a creature this way", Vikya). */
+  excessToCreatures?: number;
   /** How many permanents its tapAnyNumber instruction tapped ("for each creature tapped this way"). */
   tappedThisWay?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */

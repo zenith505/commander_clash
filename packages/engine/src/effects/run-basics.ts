@@ -9,6 +9,7 @@ import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
+import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
 import { createEmblem } from "../emblems";
@@ -316,6 +317,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (added) log(s, `${p.name} adds ${added}.`);
       return;
     }
+    case "keepManaThisTurn":
+      (s.keepManaThisTurn ??= []).push({ player: ctx.controller, ...(e.color ? { color: e.color } : {}) });
+      log(s, `Until end of turn, ${player(s, ctx.controller).name} doesn't lose unspent ${e.color ? `${COLOR_NAMES[e.color].toLowerCase()} ` : ""}mana as steps and phases end.`);
+      return;
     case "cantAttackRule":
       (s.cantAttackThisTurn ??= []).push({ filter: e.filter, controller: ctx.controller });
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
@@ -430,8 +435,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const b = bs[0]!;
       const pa = power(s, a);
       const pb = power(s, b);
-      const byA = dealDamage(s, objectSource(s, a), { object: b }, pa);
-      const byB = dealDamage(s, objectSource(s, b), { object: a }, pb); // a creature fighting itself takes twice its power (CR 701.14c)
+      // The excess damage each is dealt (The Last Agni Kai, Rhino's Rampage), beyond what was lethal just before (CR 120.10).
+      const [srcA, srcB] = [objectSource(s, a), objectSource(s, b)];
+      const [lethalB, lethalA] = [lethalAmounts(s, srcA, b), lethalAmounts(s, srcB, a)];
+      const byA = dealDamage(s, srcA, { object: b }, pa);
+      const byB = dealDamage(s, srcB, { object: a }, pb); // a creature fighting itself takes twice its power (CR 701.14c)
+      if (a.id !== b.id) {
+        noteExcess(s, b.id, excessOver(lethalB, byA), true);
+        noteExcess(s, a.id, excessOver(lethalA, byB), true);
+      }
       if (byA) fireEvent(s, { type: "dealtDamage", id: a.id, amount: byA, combat: false });
       if (byB) fireEvent(s, { type: "dealtDamage", id: b.id, amount: byB, combat: false });
       return;
@@ -486,6 +498,7 @@ function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined 
  */
 function dealtWithExcess(s: GameState, from: DamageSource, events: DamageEvent[], deal: (events: DamageEvent[]) => (DamageEvent & { dealt: number })[]): number {
   const lethal = new Map(events.flatMap((ev) => ("object" in ev.to ? [[ev.to.object, lethalAmounts(s, ev.src ?? from, obj(s, ev.to.object))] as const] : [])));
+  const creatures = new Set(events.flatMap((ev) => ("object" in ev.to && objIsType(s, obj(s, ev.to.object), "Creature") ? [ev.to.object] : [])));
   const toObject = new Map<ObjectId, number>();
   let dealt = 0;
   for (const e of deal(events)) {
@@ -494,6 +507,15 @@ function dealtWithExcess(s: GameState, from: DamageSource, events: DamageEvent[]
     if (e.dealt > 0 && "object" in e.to && s.resolving) (s.resolving.damagedThisWay ??= []).push(e.to.object);
     if (e.dealt > 0 && "player" in e.to && s.resolving && !(s.resolving.playersDamagedThisWay ??= []).includes(e.to.player)) s.resolving.playersDamagedThisWay.push(e.to.player);
   }
-  if (s.resolving) for (const [id, n] of toObject) s.resolving.excessDamage = (s.resolving.excessDamage ?? 0) + excessOver(lethal.get(id) ?? [], n);
+  if (s.resolving) for (const [id, n] of toObject) noteExcess(s, id, excessOver(lethal.get(id) ?? [], n), creatures.has(id));
   return dealt;
+}
+
+/** "The excess damage dealt this way" (CR 120.10): in all, to `id`, and to creatures. */
+function noteExcess(s: GameState, id: ObjectId, excess: number, creature: boolean) {
+  const r = s.resolving;
+  if (!r || !excess) return;
+  r.excessDamage = (r.excessDamage ?? 0) + excess;
+  (r.excessTo ??= {})[id] = (r.excessTo[id] ?? 0) + excess;
+  if (creature) r.excessToCreatures = (r.excessToCreatures ?? 0) + excess;
 }

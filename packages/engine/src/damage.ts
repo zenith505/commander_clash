@@ -173,8 +173,15 @@ export function dealDamage(
     if (has(src, "Deathtouch")) o.deathtouchDamage = true;
     if (src.id && !o.damagedBy?.includes(src.id)) (o.damagedBy ??= []).push(src.id);
     o.wasDealtDamage = true;
-    // "Whenever ~ deals damage to a creature" (combat damage is all dealt before any of it triggers anything).
-    if (src.id && c.types.includes("Creature")) fireEvent(s, { type: "damagedCreature", source: src.id, id: o.id, amount: n, combat: !!opts.combat });
+    // Aegar: what dealt damage to it this turn, as the source was then.
+    (((s.turnLog ??= {}).damageDealtTo ??= {})[`${o.id}@${o.zoneChanges ?? 0}`] ??= []).push({ controller: src.controller, subtypes: [...src.subtypes], ...(src.spell ? { spell: true as const } : {}) });
+    // "Whenever ~ deals damage to a creature" (combat damage is all dealt before any of it triggers anything), once the
+    // excess damage dealt at the same time is known (see dealPlanned).
+    if (src.id && c.types.includes("Creature")) {
+      const ev = { type: "damagedCreature" as const, source: src.id, id: o.id, amount: n, combat: !!opts.combat };
+      if (creatureBatch) creatureBatch.push(ev);
+      else fireEvent(s, ev);
+    }
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {
@@ -966,6 +973,11 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
 
 /** The damage each player is being dealt by the damage dealtPlanned is dealing now, all at the same time. */
 let playerBatch: Map<PlayerId, number> | null = null;
+/** The "deals damage to a creature" events of the damage dealPlanned is dealing now, fired once it's all dealt. */
+let creatureBatch: Extract<Parameters<typeof fireEvent>[1], { type: "damagedCreature" }>[] | null = null;
+
+/** The excess damage `id`, as the object it is now, has been dealt this turn (CR 120.10). */
+export const excessThisTurn = (s: GameState, id: ObjectId, zc: number) => (s.turnLog?.excessDealt ?? []).reduce((a, e) => a + (e.id === id && e.zc === zc ? e.amount : 0), 0);
 
 /**
  * Deal damage that happens at the same time, after its shields (see planShields), choosing for the players the way
@@ -981,8 +993,20 @@ export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lif
 export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }) } = {}): (DamageEvent & { dealt: number })[] {
   const back = commitShields(s, plan);
   const witherCounters = new Map<ObjectId, number>();
+  // What would be lethal for each permanent just before (CR 120.10): from a source with deathtouch, any 1 damage is
+  // (CR 120.4a, rulings on Aegar).
+  const lethal = new Map<ObjectId, number[]>();
+  for (const e of plan.final) {
+    if (!("object" in e.to) || lethal.has(e.to.object)) continue;
+    const o = obj(s, e.to.object);
+    const id = o.id;
+    const dt = plan.final.find((x) => "object" in x.to && x.to.object === id && x.n > 0 && has(x.src, "Deathtouch"));
+    if (o.zone === "battlefield") lethal.set(id, lethalAmounts(s, dt?.src ?? e.src, o));
+  }
   const outer = playerBatch;
   playerBatch = new Map();
+  const outerCreatures = creatureBatch;
+  creatureBatch = [];
   const out = plan.final.map((e) => {
     const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
     const o = "object" in e.to ? obj(s, e.to.object) : undefined;
@@ -998,6 +1022,21 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   // "Whenever ~ is dealt damage": the damage dealt to a permanent at the same time is one event (rulings).
   const dealtTo = new Map<ObjectId, number>();
   for (const e of out) if ("object" in e.to && e.dealt > 0) dealtTo.set(e.to.object, (dealtTo.get(e.to.object) ?? 0) + e.dealt);
+  // Excess damage: what all the sources together dealt it beyond lethal (CR 120.10), as the permanent was then.
+  const combat = !!plan.final[0]?.combat;
+  const hits: { id: ObjectId; amount: number; controller: PlayerId }[] = [];
+  for (const [id, n] of dealtTo) {
+    const amount = excessOver(lethal.get(id) ?? [], n);
+    const o = obj(s, id);
+    if (!amount || !lethal.has(id) || o.zone !== "battlefield") continue;
+    const controller = controllerOf(s, o);
+    ((s.turnLog ??= {}).excessDealt ??= []).push({ id, zc: o.zoneChanges ?? 0, controller, types: [...characteristics(s, o).types], amount, ...(combat ? { combat: true as const } : {}) });
+    hits.push({ id, amount, controller });
+  }
+  if (hits.length) fireEvent(s, { type: "excessDamage", hits, combat });
+  const toCreatures = creatureBatch;
+  creatureBatch = outerCreatures;
+  for (const ev of toCreatures) fireEvent(s, { ...ev, excess: excessThisTurn(s, ev.id, s.objects[ev.id]?.zoneChanges ?? 0) });
   for (const [id, amount] of dealtTo) fireEvent(s, { type: "wasDealtDamage", id, amount });
   const toPlayers = playerBatch;
   playerBatch = outer;

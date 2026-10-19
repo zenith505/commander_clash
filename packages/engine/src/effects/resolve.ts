@@ -558,6 +558,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "addMana":
     case "cantBlockRule":
     case "cantAttackRule":
+    case "keepManaThisTurn":
     case "costModThisTurn":
     case "fight":
     case "bite":

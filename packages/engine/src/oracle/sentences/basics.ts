@@ -460,6 +460,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (d?.type !== "damage" || typeof d.amount === "number" || d.amount.count.kind !== "x" || d.amount.plus || d.amount.times) return null;
     return [{ ...d, amount: { ...d.amount, plus: Number(m[2]) } }];
   }
+  // "~ deals twice X damage to target creature" (Torch the Witness): X times 2.
+  if ((m = /^(~|it|that creature) deals twice X damage to (.+)$/i.exec(s))) {
+    const fx = parseSentence(`${m[1]} deals X damage to ${m[2]}`, ctx);
+    const d = fx?.length === 1 ? fx[0] : undefined;
+    if (d?.type !== "damage" || typeof d.amount === "number" || d.amount.count.kind !== "x" || d.amount.plus || d.amount.times) return null;
+    return [{ ...d, amount: { ...d.amount, times: 2 } }];
+  }
   // Damage: "~ deals 3 damage to any target"; "it deals that much damage to each other opponent" after "Whenever a
   // commander you control deals combat damage to an opponent" (Kediss): that creature deals it.
   const bySubject = ctx.subjectIt && !ctx.selfIt ? new RegExp(`^(?:it|that creature) deals ${NUMX} damage to (.+)$`, "i").exec(s) : null;

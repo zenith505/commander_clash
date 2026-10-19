@@ -186,6 +186,37 @@ const BLOCK_TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 /**
+ * "Whenever a creature an opponent controls is dealt excess noncombat damage, amass Orcs X, where X is that excess damage"
+ * (Fall of Cair Andros), "Whenever one or more creatures your opponents control are dealt excess noncombat damage"
+ * (Magmatic Galleon), Aegar's "if a Giant, Wizard, or spell you controlled dealt damage to it this turn" (an intervening
+ * if, CR 603.4): excess damage as CR 120.10 has it, the permanent the subject.
+ */
+function parseExcessTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (one or more|an?) (.+?) (?:is|are) dealt excess (noncombat )?damage, (.+)$/.exec(line);
+  if (!m) return null;
+  const oneOrMore = m[1] === "one or more";
+  const phrase = oneOrMore ? m[2]!.replace(/^creatures your opponents control$/, "creature an opponent controls") : m[2]!;
+  const filter = parseTargetPhrase(phrase);
+  if (!filter || filter.kind !== "object") return "fail";
+  let text = m[4]!;
+  let ifCond: StaticCondition | undefined;
+  const aegar = /^if a ((?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or )?spell you controlled dealt damage to it this turn, (.+)$/.exec(text);
+  if (aegar) {
+    const subtypes = (aegar[1] ?? "").replace(/,? or $/, "").split(", ").filter(Boolean);
+    if (!subtypes.every((st) => CREATURE_TYPES.has(st))) return "fail";
+    ifCond = { kind: "subjectDamagedBy", subtypes, spell: true };
+    text = aegar[2]!;
+  } else if (/^if /.test(text)) return "fail";
+  const where = /^(.+), where X is that excess damage\.$/.exec(text);
+  if (where) text = `${where[1]}.`;
+  if (oneOrMore && /\b(it|that|those)\b/.test(text)) return "fail";
+  let body = parseBody(text, { subjectIt: true });
+  if (!body) return "fail";
+  if (where) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: m[4]!.replace(/^if [^]+? this turn, /, "") };
+  return { event: "permanentDealtExcess", body, excess: { filter: { ...filter, text: m[2]! }, ...(m[3] ? { noncombat: true as const } : {}), ...(oneOrMore ? { oneOrMore: true as const } : {}) }, ...(ifCond ? { ifCond } : {}) };
+}
+
+/**
  * "Whenever ~ deals combat damage to a creature, tap that creature and it doesn't untap during its controller's next
  * untap step": once for each creature it dealt damage to (CR 603.2c), which "that creature" and "it" mean.
  */
@@ -193,6 +224,13 @@ function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | 
   const m = /^Whenever ~ deals (combat )?damage to a creature, (.+)$/.exec(line);
   if (!m) return null;
   let text = m[2]!;
+  // Overclocked Electromancer, after "if that creature was dealt excess damage this turn": the excess damage it has been
+  // dealt this turn (CR 120.10).
+  const excess = /^(.+), where X is that excess damage\.$/.exec(text);
+  if (excess) {
+    const body = parseBody(`${excess[1]}.`, { subjectIt: true });
+    return body ? { event: m[1] ? "selfDealsCombatDamageToCreature" : "selfDealsDamageToCreature", body: { ...replaceX(body, { count: { kind: "eventExcess" } }), text } } : "fail";
+  }
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
     if (/\bX\b/.test(text)) return "fail";
@@ -991,6 +1029,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`${meldIf[1]}, ${meldIf[5]}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond: also ? { kind: "allOf", conds: [also, meld] } : meld } : "fail";
   }
+  const excess = parseExcessTrigger(line);
+  if (excess) return excess;
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);

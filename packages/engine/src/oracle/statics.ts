@@ -308,6 +308,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   // "As long as you have six or more unspent mana" (Ozai, the Phoenix King): in your mana pool (CR 106.4).
   if ((m = new RegExp(`^you have ${NUM} or more unspent mana$`).exec(text))) return { kind: "amount", amount: { count: { kind: "unspentMana" } }, min: num(m[1]!) };
+  // Excess damage (CR 120.10): "if that creature was dealt excess damage this turn" (the trigger's subject), Rith's "if a
+  // creature or planeswalker an opponent controlled was dealt excess damage this turn".
+  if (/^that creature was dealt excess damage this turn$/.test(text)) return { kind: "subjectDealtExcess" };
+  if ((m = /^an? (creature|planeswalker)(?: or (planeswalker))? an opponent controlled was dealt excess damage this turn$/.exec(text)))
+    return { kind: "opponentsDealtExcess", types: [m[1], m[2]].filter(Boolean).map((x) => x!.charAt(0).toUpperCase() + x!.slice(1)) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"

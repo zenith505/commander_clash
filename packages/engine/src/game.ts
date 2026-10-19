@@ -1762,6 +1762,13 @@ function manaKeeping(s: GameState, pid: PlayerId): { all: boolean; colors: Set<M
     else if (k.color) out.colors.add(k.color);
     else out.all = true;
   }
+  // "Until end of turn, you don't lose unspent red mana" (The Last Agni Kai): not past the cleanup step (CR 514.2).
+  if (s.step !== "cleanup")
+    for (const k of s.keepManaThisTurn ?? []) {
+      if (k.player !== pid) continue;
+      if (k.color) out.colors.add(k.color);
+      else out.all = true;
+    }
   return out;
 }
 
@@ -1936,6 +1943,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.cantBlockThisTurn = undefined;
   s.cantAttackThisTurn = undefined;
   s.costModsThisTurn = undefined;
+  s.keepManaThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
   s.lastKnown = undefined;
@@ -2214,7 +2222,7 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id)) {
+    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc)) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }

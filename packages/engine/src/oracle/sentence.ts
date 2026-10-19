@@ -55,6 +55,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (mvX) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: `${filter.text} with mana value X or less` });
       Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
+    } else if ((m = new RegExp(`^(You may exile|Exile) one of (?:them|those cards)(?: and put the rest ${REST})?$`).exec(s))) {
+      // "You may exile one of those cards ... You may play the exiled card this turn" (Nahiri's Warcrafting, Florian): the
+      // permission is the sentence after (see parseBody).
+      Object.assign(dig, { count: 1, upTo: m[1] === "You may exile", into: "exile" });
+      if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else return null;

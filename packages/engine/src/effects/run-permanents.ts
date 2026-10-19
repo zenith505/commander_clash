@@ -153,6 +153,29 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (ids.length) log(s, `${player(s, ctx.controller).name} untaps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       return;
     }
+    case "tapAnyNumber": {
+      // Which untapped ones are chosen as it resolves (CR 608.2d), any number including none, then tapped together. Tapping
+      // none still counts as doing it: a "When you do" after it triggers with X = 0 (rulings on Teferi Akosa, Yotia
+      // Declares War). The number tapped stays what it was even if they untap or leave later (rulings on Siege Striker).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.chosen?.[ctx.controller]) {
+        r.tappedThisWay = 0;
+        const options = s.battlefield.filter((id) => !obj(s, id).tapped && objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+        if (!options.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "tap", what: `untapped ${e.filter.text}`, options, count: options.length, min: 0 };
+        return "paused";
+      }
+      const ids = sc.chosen[ctx.controller]!.filter((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped);
+      sc.chosen = undefined;
+      sc.queue = undefined;
+      for (const id of ids) tapPermanent(s, obj(s, id));
+      r.tappedThisWay = ids.length;
+      log(s, ids.length ? `${player(s, ctx.controller).name} taps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.` : `${player(s, ctx.controller).name} taps nothing.`);
+      return;
+    }
     case "tapOrUntap": {
       // Its controller chooses as it resolves (CR 608.2d); an illegal target isn't asked about (CR 608.2b).
       const o = objects(s, e.what, ctx).find((x) => x.zone === "battlefield");

@@ -217,6 +217,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Cipher: encode it on the creature most likely to deal combat damage to a player.
     if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
+    if (pend.kind === "pickPermanents" && pend.action === "tap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "tap") }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
@@ -1627,6 +1628,13 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   }
   // "Untap up to seven lands": ours, not an opponent's.
   if (action === "untap") return options.filter((id) => controllerOf(s, obj(s, id)) === pid).slice(0, count);
+  // "Tap any number of untapped creatures you control. ... for each creature tapped this way": all of them, but on our
+  // own turn before attackers are declared, not the creatures that could still attack.
+  if (action === "tap") {
+    const beforeAttacks = s.activePlayer === pid && ["untap", "upkeep", "draw", "main1", "beginCombat"].includes(s.step);
+    const attackers = beforeAttacks ? new Set(potentialAttackers(s, pid).map((o) => o.id)) : new Set<ObjectId>();
+    return options.filter((id) => !attackers.has(id)).slice(0, count);
+  }
   // Another player's permanents (Split the Party): theirs worth the most.
   const theirs = options.some((id) => controllerOf(s, obj(s, id)) !== pid);
   const cost = (id: ObjectId) => {

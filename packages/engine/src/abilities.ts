@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "choose" | "meld";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -116,6 +116,8 @@ export type Count =
   | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
+  /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
+  | { kind: "tappedThisWay" }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
   | { kind: "lifeLostThisWay" }
   /**
@@ -1335,6 +1337,11 @@ export type Effect =
    * (not targeted, rulings), from none up to `n`.
    */
   | { type: "untapUpTo"; n: Amount; filter: TargetSpec }
+  /**
+   * "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
+   * control": which ones are chosen as it resolves (CR 608.2d), none allowed; "for each creature tapped this way" counts them.
+   */
+  | { type: "tapAnyNumber"; filter: TargetSpec }
   /**
    * "Tap or untap target permanent": its controller chooses which as it resolves (CR 608.2d); `may`: "you may tap or
    * untap", where doing neither is a choice too (one question).

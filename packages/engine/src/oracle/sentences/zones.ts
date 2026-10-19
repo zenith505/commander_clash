@@ -109,6 +109,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // (it triggers only from its owner's graveyard); Bookwurm's "Put ~ from your graveyard into your library ...".
   if (ctx.selfCard && /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|your) library third from the top$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "third" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
+  // "Shuffle target nontoken permanent you control into its owner's library" (Rishadan Pawnshop): it's put into that
+  // library, then that library is shuffled (CR 701.24c).
+  if ((m = /^[Ss]huffle (target [^,]+?) into its owner's library$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what }] : null;
+  }
   // "The owner of target nonland permanent shuffles it into their library."
   if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

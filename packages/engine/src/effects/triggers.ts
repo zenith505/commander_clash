@@ -1322,7 +1322,7 @@ export function checkStateTriggers(s: GameState) {
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
-  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}) });
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || !!x.anyOf?.some(isEvent);
@@ -1365,6 +1365,7 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.x ? { x: t.x } : {}),
     ...(t.rolled !== undefined ? { rolled: t.rolled } : {}),
     ...(t.revealed !== undefined ? { revealed: t.revealed } : {}),
+    ...(t.tapped !== undefined ? { tapped: t.tapped } : {}),
     ...(t.sacrificed ? { sacrificed: t.sacrificed } : {}),
     ...(t.amassed ? { amassed: t.amassed } : {}),
     ...(t.fromSpell ? { fromSpell: true as const } : {}),

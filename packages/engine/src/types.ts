@@ -651,6 +651,8 @@ export interface StackItem {
   rolled?: number;
   /** See PendingTrigger.revealed. */
   revealed?: number;
+  /** See PendingTrigger.tapped. */
+  tapped?: number;
   /**
    * In `castItems` only: the spell's mana value as it was put on the stack, X included (CR 202.3e), for when it has left
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
@@ -759,6 +761,8 @@ export interface PendingTrigger {
   rolled?: number;
   /** A reflexive trigger after "reveal any number of Dragon cards from your hand": how many were revealed. */
   revealed?: number;
+  /** A reflexive trigger after "tap any number of untapped creatures you control": how many were tapped. */
+  tapped?: number;
   /** A reflexive trigger after "you may sacrifice another creature": that creature as it last existed (CR 608.2h). */
   sacrificed?: LastKnown[];
   /** A reflexive trigger after amassing: the amassed Army (CR 701.47c). */
@@ -1410,6 +1414,8 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** How many permanents its tapAnyNumber instruction tapped ("for each creature tapped this way"). */
+  tappedThisWay?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */

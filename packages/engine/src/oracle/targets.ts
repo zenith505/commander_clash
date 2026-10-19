@@ -305,6 +305,8 @@ export function boundAtTargeting(a: AmountExpr): boolean {
     case "party":
     case "greatestManaValue":
     case "lifeGainedThisTurn":
+    // The number a tapAnyNumber instruction tapped, fixed before its reflexive trigger's targets are chosen (settleDivided).
+    case "tappedThisWay":
       return true;
     case "power":
     case "toughness":

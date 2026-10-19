@@ -1,6 +1,8 @@
-// Cards with two faces: an Adventure cast from the menu and then the creature from exile, a split card's half, and a
-// modal double-faced card played as its land face.
+// Cards with two faces: an Adventure cast from the menu and then the creature from exile, a split card's half, a
+// modal double-faced card played as its land face, aftermath and fuse split cards, a disturb card cast transformed
+// from the graveyard, and a daybound permanent at night.
 import { expect, test } from "@playwright/test";
+import { setFace } from "@cc/engine";
 import { LANDS, one, open, pageErrors, scene, state } from "./scene";
 import { card, menu, modal, resolveUntil, seat } from "./ui";
 
@@ -87,5 +89,31 @@ test("Fuse: Wear // Tear cast as both halves from hand, an artifact and an encha
   expect(now.objects[thopter]!.zone).toBe("graveyard");
   expect(now.objects[anthem]!.zone).toBe("graveyard");
   expect(now.battlefield.filter((id) => now.objects[id]!.tapped)).toHaveLength(3);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Disturb: Beloved Beggar cast from the graveyard's menu as Generous Soul", async ({ page }) => {
+  const s = scene({ yard: ["Beloved Beggar // Generous Soul"], board: LANDS });
+  const b = one(s, "Beloved Beggar");
+  await open(page, s);
+  await seat(page, 0).locator(".zone", { hasText: "Graveyard" }).click();
+  await modal(page).locator(".card.playable").click();
+  await menu(page).getByRole("button", { name: /^Disturb: Generous Soul/ }).click();
+  const now = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[b]!.zone === "battlefield");
+  // CR 702.146: it enters with its back face up.
+  expect(now.objects[b]!.face).toBe(1);
+  await expect(page.locator(`[data-obj="${b}"]`)).toContainText("Generous Soul");
+  expect(now.battlefield.filter((id) => now.objects[id]!.tapped)).toHaveLength(6);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Day and night: the turn bar says it's night, and a daybound permanent shows its nightbound face", async ({ page }) => {
+  const s = scene({ board: ["Tireless Hauler // Dire-Strain Brawler"] });
+  const h = one(s, "Tireless Hauler");
+  s.dayNight = "night";
+  setFace(s, s.objects[h]!, 1);
+  await open(page, s);
+  await expect(page.locator(".turn-info .day-night")).toHaveText("☾ Night");
+  await expect(page.locator(`[data-obj="${h}"]`)).toContainText("Dire-Strain Brawler");
   expect(pageErrors(page)).toEqual([]);
 });

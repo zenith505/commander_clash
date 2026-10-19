@@ -1119,6 +1119,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         <div className="control-pane">
           <div className="turn-info">
             <strong>{s.mulligans ? "Mulligans" : `Turn ${s.turn}`}</strong>
+            {s.dayNight && (
+              <span className="day-night" title={s.dayNight === "day" ? "Day: it becomes night next turn if this turn's player casts no spells." : "Night: it becomes day next turn if this turn's player casts two or more spells."}>
+                {s.dayNight === "day" ? "☀ Day" : "☾ Night"}
+              </span>
+            )}
             {waiting !== null && waiting !== HUMAN && <span className="thinking">{s.players[waiting]!.name} is thinking…</span>}
           </div>
           <PhaseTrack s={s} stops={stops} onToggle={toggleStop} />

@@ -380,6 +380,88 @@
   "gameChanger": false
  },
  {
+  "oracleId": "74c9cc13-c03f-4322-82af-b7bce1f2a0d8",
+  "name": "Beloved Beggar // Generous Soul",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Human Peasant // Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Peasant"
+  ],
+  "oracleText": "Disturb {4}{W}{W} (You may cast this card from your graveyard transformed for its disturb cost.)",
+  "power": "0",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Vigilance",
+   "Transform",
+   "Disturb"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "uncommon",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Beloved Beggar",
+    "manaCost": "{1}{W}",
+    "typeLine": "Creature — Human Peasant",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Peasant"
+    ],
+    "oracleText": "Disturb {4}{W}{W} (You may cast this card from your graveyard transformed for its disturb cost.)",
+    "power": "0",
+    "toughness": "4",
+    "colors": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/a/3/a3d5a0d4-1f7b-4a88-b375-b241c8e5e117.jpg?1783924485",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/a/3/a3d5a0d4-1f7b-4a88-b375-b241c8e5e117.jpg?1783924485"
+   },
+   {
+    "name": "Generous Soul",
+    "manaCost": "",
+    "typeLine": "Creature — Spirit",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Spirit"
+    ],
+    "oracleText": "Flying, vigilance\nIf Generous Soul would be put into a graveyard from anywhere, exile it instead.",
+    "power": "4",
+    "toughness": "4",
+    "colors": [
+     "W"
+    ],
+    "colorIndicator": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/a/3/a3d5a0d4-1f7b-4a88-b375-b241c8e5e117.jpg?1783924485",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/a/3/a3d5a0d4-1f7b-4a88-b375-b241c8e5e117.jpg?1783924485"
+   }
+  ]
+ },
+ {
   "oracleId": "8f351961-69e3-4637-b010-d13f19daca39",
   "name": "Bigger on the Inside",
   "manaCost": "{3}{R}{G}",
@@ -6419,6 +6501,88 @@
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "c31e9db3-5d9d-470a-871a-b4b5b0536db5",
+  "name": "Tireless Hauler // Dire-Strain Brawler",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Human Werewolf // Creature — Werewolf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Werewolf"
+  ],
+  "oracleText": "Vigilance\nDaybound (If a player casts no spells during their own turn, it becomes night next turn.)",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Vigilance",
+   "Transform",
+   "Daybound",
+   "Nightbound"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "common",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Tireless Hauler",
+    "manaCost": "{4}{G}",
+    "typeLine": "Creature — Human Werewolf",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Werewolf"
+    ],
+    "oracleText": "Vigilance\nDaybound (If a player casts no spells during their own turn, it becomes night next turn.)",
+    "power": "4",
+    "toughness": "5",
+    "colors": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/b/1/b1384d31-9772-41e9-b6f2-0e2d7961f868.jpg?1783924362",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/b/1/b1384d31-9772-41e9-b6f2-0e2d7961f868.jpg?1783924362"
+   },
+   {
+    "name": "Dire-Strain Brawler",
+    "manaCost": "",
+    "typeLine": "Creature — Werewolf",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Werewolf"
+    ],
+    "oracleText": "Vigilance\nNightbound (If a player casts at least two spells during their own turn, it becomes day next turn.)",
+    "power": "6",
+    "toughness": "6",
+    "colors": [
+     "G"
+    ],
+    "colorIndicator": [
+     "G"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/b/1/b1384d31-9772-41e9-b6f2-0e2d7961f868.jpg?1783924362",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/b/1/b1384d31-9772-41e9-b6f2-0e2d7961f868.jpg?1783924362"
+   }
+  ]
  },
  {
   "oracleId": "986f510c-e2ec-423e-a443-51a169939558",

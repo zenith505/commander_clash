@@ -77,6 +77,22 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const fx = n && parseSearch(`Search your library for two ${howMany[1]}${howMany[3]}`);
     return n && fx?.length === 1 && fx[0]!.type === "search" && !fx[0]!.others ? [{ ...fx[0]!, n }] : null;
   }
+  // An opponent choosing among the cards found or revealed (Gifts Ungiven, Murmurs from Beyond), as parseBody rewrites them.
+  const zoneOf = (to: string) => (to === "into your hand" ? { zone: "hand" as const } : to === "into your graveyard" ? { zone: "graveyard" as const } : { zone: "battlefield" as const, ...(to.endsWith("tapped") ? { tapped: true } : {}) });
+  const opp = /^Search your library for (.+?); (target opponent|an opponent) chooses (one|two); put them (into your hand|into your graveyard) and the rest (into your hand|into your graveyard|onto the battlefield tapped)$/.exec(s);
+  if (opp) {
+    const fx = parseSearch(`Search your library for ${opp[1]!}, reveal them, put them ${opp[5]!}, then shuffle`);
+    const chooser = opp[2] === "target opponent" ? parsePlayer("target opponent", ctx) : undefined;
+    if (fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.others || chooser === null) return null;
+    return [{ ...fx[0]!, split: { ...(chooser ? { chooser } : {}), n: opp[3] === "one" ? 1 : 2, to: zoneOf(opp[4]!) } }];
+  }
+  const revealPick = /^Reveal the top (two|three|four|five) cards of your library; (target opponent|an opponent) chooses (one|an? ([a-z]+) card from among them); put it (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard))?$/.exec(s);
+  if (revealPick) {
+    const filter = revealPick[4] ? parseSearchFilter(`${revealPick[4]} card`) : undefined;
+    const chooser = revealPick[2] === "target opponent" ? parsePlayer("target opponent", ctx) : undefined;
+    if (filter === null || chooser === null) return null;
+    return [{ type: "revealPick", n: num(revealPick[1]!), ...(chooser ? { chooser } : {}), ...(filter ? { filter } : {}), to: zoneOf(revealPick[5]!), ...(revealPick[6] ? { rest: zoneOf(revealPick[6]) } : {}) }];
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That

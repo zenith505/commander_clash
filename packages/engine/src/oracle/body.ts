@@ -456,6 +456,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // "Search your library for up to four cards with different names and reveal them. Target opponent chooses two of those
+  // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
+  // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and
+  // the rest into your hand." (Murmurs from Beyond): one instruction each, the opponent choosing among the revealed cards.
+  text = text.replace(
+    /\bSearch your library for ([^.]+?) and reveal them\. (Target opponent|An opponent) chooses (one|two)(?: of (?:them|those cards))?\. Put (?:that card|the chosen cards?) (into your hand|into your graveyard) and the rest (into your hand|into your graveyard|onto the battlefield tapped)(?:\. Then shuffle|, then shuffle)\./g,
+    (_, what, who, n, to, rest) => `Search your library for ${what}; ${who.toLowerCase()} chooses ${n}; put them ${to} and the rest ${rest}.`,
+  );
+  text = text.replace(
+    /\bReveal the top (\w+) cards of your library\. (Target opponent|An opponent) chooses (one of (?:them|those cards)|an? [a-z]+ card from among them)\. Put that card (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard))?(\.|, then )/g,
+    (_, n, who, which, to, rest, end) => `Reveal the top ${n} cards of your library; ${who.toLowerCase()} chooses ${which.replace(/ of (?:them|those cards)$/, "")}; put it ${to}${rest ? ` and the rest ${rest}` : ""}.${end === "." ? "" : " Then "}`,
+  );
   // "Search your library, graveyard, and/or outside the game for an instant or sorcery card you own" (Invasion of
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
   // learn), so it's the library and/or the graveyard, where every card is one you own.

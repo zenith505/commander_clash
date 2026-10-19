@@ -719,6 +719,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "shuffleSpell":
     case "shuffleZones":
     case "search":
+    case "revealPick":
     case "dig":
       return runLibraryEffect(s, e, ctx, src);
     case "exileNamed":

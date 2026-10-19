@@ -168,6 +168,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => rank(a) - rank(b)).slice(0, pend.max) }];
     }
+    // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
+    // ones go, by how they'd rank them for themselves.
+    if (pend.kind === "searchLibrary" && pend.forPlayer !== undefined) {
+      const ranked = chooseSearch(s, pend.forPlayer, pend.cards, pend.cards.length);
+      return [{ type: "searchLibrary", player: pid, found: pend.helps ? ranked.slice(ranked.length - pend.max) : ranked.slice(0, pend.max) }];
+    }
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // "Put any number of cards from your hand on the bottom of your library, then draw that many plus one": lands once
     // there are enough of them out, spells too costly for a while.

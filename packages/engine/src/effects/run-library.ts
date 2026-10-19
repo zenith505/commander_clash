@@ -1,4 +1,4 @@
-import type { Effect } from "../abilities";
+import type { Effect, PlayerRef, SearchDest } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
@@ -464,7 +464,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // to enchant it stays in the library (303.4g), and is shuffled with it.
       const searchers = searchedBy.map((x) => x.pid);
       const foundBy = (pid: PlayerId) => searchedBy.find((x) => x.pid === pid)!.found;
-      const dest = (pid: PlayerId, id: ObjectId) => (foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.dest);
+      // "Target opponent chooses two of those cards" (Gifts Ungiven): from the revealed cards, before any is put anywhere.
+      let picked: ObjectId[] = [];
+      if (e.split && searchers.length === 1) {
+        const got = opponentPicks(s, ctx, src, e.split.chooser, searchers[0]!, foundBy(searchers[0]!), foundBy(searchers[0]!), e.split.n, e.split.to, e.dest);
+        if (got === "paused") return "paused";
+        picked = got;
+      }
+      const dest = (pid: PlayerId, id: ObjectId) => (picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       const hosts = chooseAuraHosts(s, onto, src);
       if (hosts === "paused") return "paused";
@@ -508,6 +515,28 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           shuffleLibrary(s, player(s, pid));
           log(s, `${player(s, pid).name} shuffles their library.`);
         }
+      return;
+    }
+    case "revealPick": {
+      // "Reveal the top three cards of your library. An opponent chooses one of them." (Murmurs from Beyond): revealed
+      // first, then the opponent chooses (one that fits, if it says what kind: Animal Magnetism), then the cards move.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (!sc.looked) {
+        sc.looked = p.library.slice(0, amountNow(s, e.n, ctx));
+        if (!sc.looked.length) return;
+        log(s, `${p.name} reveals ${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
+      }
+      const looked = sc.looked.filter((id) => obj(s, id).zone === "library");
+      const fits = looked.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+      const got = opponentPicks(s, ctx, src, e.chooser, p.id, looked, fits, 1, e.to, e.rest);
+      if (got === "paused") return "paused";
+      const rest = looked.filter((id) => !got.includes(id));
+      enterTogether(s, () => {
+        for (const id of got) moveObject(s, id, e.to.zone === "libraryTop" ? "library" : e.to.zone, e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
+        if (e.rest) for (const id of rest) moveObject(s, id, e.rest.zone === "libraryTop" ? "library" : e.rest.zone);
+      });
       return;
     }
     case "dig": {
@@ -667,4 +696,56 @@ function clashValue(s: GameState, id: ObjectId): number {
   return defOf(s, obj(s, id))
     .manaCost.split(" // ")
     .reduce((n, half) => n + manaValue(parseManaCost(half)), 0);
+}
+
+const DEST_RANK: Record<string, number> = { battlefield: 4, hand: 3, libraryTop: 2, graveyard: 1, exile: 0 };
+
+/**
+ * "Target opponent chooses two of those cards" (Gifts Ungiven), "An opponent chooses one of them" (Murmurs from
+ * Beyond): of `owner`'s revealed `cards`, the chooser picks `n` from `eligible`, to go `to`; the rest go `rest` (or
+ * stay where they are). "An opponent" is one you choose as it resolves (rulings on Steam Augury). With no more cards
+ * than that to choose from there's no choice: they're all chosen (rulings on Gifts Ungiven and Realms Uncharted).
+ */
+function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: PlayerRef | undefined, owner: PlayerId, cards: ObjectId[], eligible: ObjectId[], n: number, to: SearchDest, rest: SearchDest | undefined): ObjectId[] | "paused" {
+  const r = s.resolving!;
+  const sc = (r.scratch ??= {});
+  if (sc.picking && sc.found) {
+    sc.picked = sc.found;
+    sc.picking = undefined;
+    sc.found = undefined;
+  }
+  if (sc.picked) return sc.picked;
+  if (eligible.length <= n) return (sc.picked = eligible);
+  let chooser: PlayerId | undefined;
+  if (chooserRef) chooser = players(s, chooserRef, ctx)[0];
+  else {
+    const opps = opponents(s, ctx.controller);
+    if (r.chosen?.player === undefined && opps.length === 1) {
+      r.chosen = { ...r.chosen, player: opps[0]! };
+      log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
+    }
+    if (r.chosen?.player === undefined && opps.length > 1) {
+      s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent to choose the cards" };
+      return "paused";
+    }
+    chooser = r.chosen?.player;
+  }
+  // No opponent to choose (they've all left the game): the cards it says to choose can't be chosen.
+  if (chooser === undefined || player(s, chooser).lost) return (sc.picked = []);
+  const whose = player(s, owner).name;
+  const theirs = (d: SearchDest | undefined) => (d ? describeDest(d).replace(/\byour\b/, `${whose}'s`) : `stay on top of ${whose}'s library`);
+  sc.picking = true;
+  s.pending = {
+    kind: "searchLibrary",
+    player: chooser,
+    source: src,
+    what: n === 1 ? "one" : String(n),
+    cards: eligible,
+    min: n,
+    max: n,
+    dig: { looked: cards, to: `to put ${theirs(to)}`, rest: rest ? `go ${theirs(rest)}` : theirs(rest) },
+    forPlayer: owner,
+    ...(DEST_RANK[to.zone]! > (rest ? DEST_RANK[rest.zone]! : 2.5) ? { helps: true as const } : {}),
+  };
+  return "paused";
 }

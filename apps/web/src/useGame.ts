@@ -11,7 +11,6 @@ import {
   applyAction,
   controllerOf,
   objIsType,
-  availableMana,
   botActions,
   compileCard,
   planActivate,
@@ -205,8 +204,8 @@ function hasTimedPlay(s: GameState): boolean {
 
 /**
  * How the human handles priority:
- * - "hold": stop whenever a response could matter and you have mana up, even with no
- *   playable card, so opponents can't read your hand from how fast you pass (the default).
+ * - "hold": stop whenever a response could matter, even with no mana up and nothing you could play (a free spell or
+ *   ability could still matter), so opponents can't read your hand from how fast you pass (the default).
  * - "auto": always pass, even when you could respond, so everything just resolves.
  * Either way you stop on your own main phases, after blocks on your turn when you have
  * something you could play, for decisions only you can make (attacks,
@@ -256,8 +255,9 @@ function shouldAutoPass(s: GameState, mode: PriorityMode, stops: ReadonlySet<Ste
   const worthStopping = s.stack.length > 0 || inCombat || (s.step === "end" && s.activePlayer !== HUMAN);
   if (!worthStopping) return true;
   if (hasInstantPlay(s)) return false;
-  // Holding: stop with mana up, except right after your own spell or ability (nothing to hide there).
-  return top?.controller === HUMAN || availableMana(s, HUMAN) === 0;
+  // Holding: stop even when tapped out with nothing to play, except right after your own spell or ability (nothing
+  // to hide there).
+  return top?.controller === HUMAN;
 }
 
 /** A bot is about to target something; shown as an arrow for a moment before it acts. */

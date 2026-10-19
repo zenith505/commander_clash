@@ -1009,6 +1009,8 @@ export type PendingDecision =
 export interface GameEvent {
   seq: number;
   turn: number;
+  /** The step it happened in (the log groups entries by phase). */
+  step?: Step;
   text: string;
   /** Hidden information only this player sees ("you look at target opponent's hand", CR 402.3). */
   to?: PlayerId;

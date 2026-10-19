@@ -196,6 +196,12 @@ button:disabled { opacity: 0.4; cursor: default; }
 }
 .thinking { color: var(--muted); font-size: 14px; }
 .controls { display: flex; gap: 12px; align-items: center; margin-left: auto; font-size: 15px; }
+/* The window at the end of the game */
+.modal.game-end { width: min(420px, 92vw); align-items: center; text-align: center; padding: 28px 24px; gap: 8px; }
+.game-end h2 { margin: 0; font-size: 30px; }
+.game-end.won h2 { color: var(--accent); }
+.game-end p { margin: 0 0 10px; }
+.game-end-buttons { display: flex; gap: 12px; }
 .game-over { font-size: 20px; font-weight: 800; display: flex; gap: 12px; align-items: center; }
 
 /* Hand: fanned over the bottom right of your seat, partly below the screen edge.
@@ -226,9 +232,9 @@ button:disabled { opacity: 0.4; cursor: default; }
 /* Hovering lifts the card along its own slant. The slot itself stays put, so the card
    can't slide out from under the mouse and flicker. */
 .fan .slot { transition: transform 0.16s ease; }
-.fan-slot:hover { z-index: 30; }
-.fan-slot:hover .slot { transform: translateY(calc(var(--hand-card) * -0.55)) scale(1.06); }
-.hand.tucked .fan-slot:hover .slot { transform: translateY(calc(var(--hand-card) * -0.3)) scale(1.04); }
+/* Straight up, not along the slant, and staying under the next card: the strip of each neighbour you can see stays
+   where it was, so the mouse can slide along the hand from card to card. The large preview shows above the hand. */
+.fan-slot:hover .slot { transform: rotate(calc(-1 * var(--rot))) translateY(calc(var(--hand-card) * -0.35)) rotate(var(--rot)); }
 .fan .card { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); }
 .fan .card:hover { transform: none; }
 .fan .card.playable { box-shadow: 0 0 0 3px var(--ok), 0 6px 18px rgba(0, 0, 0, 0.55); }
@@ -236,7 +242,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 
 /* The card under the mouse, large, beside the mouse */
 .hover-card {
-  position: fixed; left: 0; top: 0; z-index: 70; pointer-events: none; width: clamp(240px, 17vw, 330px);
+  position: fixed; left: 0; top: 0; z-index: 70; transform-origin: 0 0; pointer-events: none; width: clamp(240px, 17vw, 330px);
   filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.7));
 }
 .hover-card img { width: 100%; aspect-ratio: 488 / 680; border-radius: 14px; display: block; background: var(--panel-2); }
@@ -252,9 +258,15 @@ button:disabled { opacity: 0.4; cursor: default; }
 .side-main { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .oracle-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .log { flex: 1; overflow-y: auto; background: var(--panel); border-radius: 10px; padding: 10px; font-size: 13px; min-height: 120px; }
-.log > div { padding: 2px 0; }
+.log-entry { padding: 2px 0; }
 .log .pip { vertical-align: -3px; margin: 0 1px; }
 .turn-line { color: var(--accent); margin-top: 6px; font-weight: 700; }
+.log-turn:first-child .turn-line { margin-top: 0; }
+/* Each phase of a turn under its own small heading. */
+.log-phase { border-left: 2px solid var(--line); padding-left: 8px; margin: 4px 0 2px 2px; }
+.phase-line { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+/* A card named in the log: hover it to see the card. */
+.card-ref { color: #8fd3ff; text-decoration: underline; text-underline-offset: 2px; cursor: help; }
 .quit { background: var(--panel-2); color: var(--text); }
 
 /* Mana symbols */

@@ -710,9 +710,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const at = lib.findIndex((id) => (total += defMv(defOf(s, obj(s, id)))) >= e.untilMv!);
           ids = lib.slice(0, at < 0 ? lib.length : at + 1);
         }
+        let hits: ObjectId[] | undefined;
+        if (e.untilHits) {
+          // All of the library if it never has that many (like other "until" exiles).
+          hits = [];
+          let at = -1;
+          for (let i = 0; i < lib.length && hits.length < e.untilHits.n; i++) if (printedMatches(e.untilHits.filter, defOf(s, obj(s, lib[i]!)))) (hits.push(lib[i]!), (at = i));
+          ids = hits.length < e.untilHits.n ? [...lib] : lib.slice(0, at + 1);
+        }
         for (const id of ids) moveObject(s, id, "exile");
         log(s, `${player(s, whose).name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
-        sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}) };
+        sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}), ...(hits ? { hits } : {}) };
       }
       const st = sc.castAmong;
       if (st.done) return;
@@ -722,8 +730,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
       const finish = (): "paused" | undefined => {
         st.done = true;
+        let left = st.ids.map((x) => x.id).filter(exiled);
+        if (e.hitToHand) {
+          // "Put one of them into your hand": the one not cast; if neither was, the one you pick, and the other stays
+          // exiled (rulings on Invasion of Alara).
+          const hits = (st.hits ?? []).filter(exiled);
+          const named = st.handPick ? st.pick : undefined;
+          st.pick = undefined;
+          if (hits.length === 2 && !named) {
+            st.done = undefined;
+            st.handPick = true;
+            s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: hits, labels: hits.map((id) => defOf(s, obj(s, id)).name), prompt: "put which of them into your hand? The other stays exiled." };
+            return "paused";
+          }
+          const toHand = named && hits.includes(named) ? named : hits.length === 1 ? hits[0] : undefined;
+          if (toHand) {
+            moveObject(s, toHand, "hand");
+            log(s, `${you.name} puts ${defOf(s, obj(s, toHand)).name} into their hand.`);
+          }
+          left = left.filter((id) => !(st.hits ?? []).includes(id));
+        }
         if (!e.rest) return;
-        const left = st.ids.map((x) => x.id).filter(exiled);
         const toHand = e.rest.toHand ? left.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) : [];
         for (const id of toHand) moveObject(s, id, "hand");
         if (toHand.length) log(s, `${you.name} puts ${toHand.map((id) => defOf(s, obj(s, id)).name).join(", ")} into their hand.`);
@@ -747,6 +774,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         st.casting = undefined;
       }
+      if (st.handPick) return finish();
       if (st.pick !== undefined) {
         const pick = st.pick;
         st.pick = undefined;
@@ -763,7 +791,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       };
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && castable(id));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && castable(id));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the exiled cards without paying its mana cost${left}?` };

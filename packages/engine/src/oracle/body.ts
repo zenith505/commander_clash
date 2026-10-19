@@ -157,6 +157,9 @@ const checkableMay = (e: Effect) =>
   // Moonveil Regent).
   (e.type === "discard" && e.who.ref === "you" && e.hand && !e.filter) ||
   (e.type === "draw" && e.who.ref === "you") ||
+  // "You may put a card from your hand on the bottom of your library. If you do, draw a card." (Volcanic Spite): only
+  // with a card in hand.
+  (e.type === "handToTop" && e.n === 1) ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
   // "Whenever a Goblin or Orc you control deals combat damage to a player, you may sacrifice it." (Gorbag): the subject.
   (e.type === "sacrifice" && e.what.ref === "subject") ||
@@ -439,6 +442,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
   // learn), so it's the library and/or the graveyard, where every card is one you own.
   text = text.replace(/\b([Ss])earch your library, graveyard, and\/or outside the game for (an? [a-z ]+? card) you own, /, "$1earch your library and/or graveyard for $2, ");
+  // "Create a token that's a copy of a permanent you control" (Awaken the Maelstrom): not targeted, so chosen as it
+  // resolves (CR 608.2d, rulings), the same as "Choose a permanent you control. Create a token that's a copy of it."
+  text = text.replace(/(^|\. )Create a token that's a copy of an? (permanent|creature|artifact) you control\./g, "$1Choose a $2 you control. Create a token that's a copy of it.");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
@@ -718,6 +724,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Improvisation Capstone: "Exile cards from the top of your library until you exile cards with total mana value 4 or
     // greater."
     const untilMv = /^Exile cards from the top of your library until you exile cards with total mana value (\d+) or greater$/.exec(s);
+    // Invasion of Alara: "Exile cards from the top of your library until you exile two nonland cards with mana value 4 or
+    // less. You may cast one of those two cards without paying its mana cost. Put one of them into your hand. Then put
+    // the other cards exiled this way on the bottom of your library in a random order."
+    const untilTwo = /^[Ee]xile cards from the top of your library until you exile two (nonland cards with mana value \d+ or less)$/.exec(s);
+    if (
+      untilTwo &&
+      sentences[si + 1] === "You may cast one of those two cards without paying its mana cost" &&
+      sentences[si + 2] === "Put one of them into your hand" &&
+      /^(?:Then put|Put) the other cards exiled this way on the bottom of your library in a random order$/.test(sentences[si + 3] ?? "")
+    ) {
+      const filter = parseSearchFilter(untilTwo[1]!.replace(/cards/, "card"));
+      if (!filter) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, untilHits: { n: 2, filter }, hitToHand: true, max: 1, rest: { dest: "bottomRandom" } });
+      si += 3;
+      continue;
+    }
     if (untilMv && /^You may cast any number of spells from among them without paying their mana costs\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, untilMv: Number(untilMv[1]) });
       si++;
@@ -1598,6 +1620,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const inner = amount && parseOne(noCards[2]!.charAt(0).toUpperCase() + noCards[2]!.slice(1), ctx);
       if (!amount || !inner) return null;
       effects.push({ type: "if", cond: { kind: "amountNow", amount, max: 0 }, effects: inner });
+      continue;
+    }
+    // "Target attacking creature gets +1/+1 until end of turn. If it's attacking a battle, put a +1/+1 counter on it
+    // instead." (Rampaging Geoderm): which one happens depends on what it's attacking as this resolves (CR 608.2c).
+    const atBattle = /^If it's attacking a battle, (put an? [^,]+ counters? on it) instead$/.exec(s);
+    const lastT = ctx.lastObjectTarget;
+    if (atBattle && lastT !== undefined && effects.length - prevWhole === 1 && mentionsTarget(effects[prevWhole], lastT)) {
+      const inner = parseOne(atBattle[1]!.charAt(0).toUpperCase() + atBattle[1]!.slice(1), ctx);
+      if (!inner || inner.some((e) => pauses(e))) return null;
+      const previous = effects.splice(prevWhole);
+      effects.push({ type: "if", cond: { kind: "targetIs", index: lastT, filter: { kind: "object", combat: "attackingBattle", text: "attacking a battle" } }, effects: inner, otherwise: previous });
       continue;
     }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);

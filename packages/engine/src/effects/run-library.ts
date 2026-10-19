@@ -323,14 +323,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const n = Math.min(amountNow(s, e.n, ctx), p.hand.length);
         if (!n) return;
         if (p.hand.length > 1) {
-          s.pending = { kind: "handToTop", player: p.id, count: n, source: src };
+          s.pending = { kind: "handToTop", player: p.id, count: n, source: src, ...(e.bottom ? { bottom: true as const } : {}) };
           return "paused";
         }
         ids = [...p.hand];
       }
       const cards = ids.filter((id) => p.hand.includes(id));
-      for (const id of [...cards].reverse()) moveObject(s, id, "library", { top: true });
-      log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on top of their library.`);
+      // On the bottom the first pick goes lowest; on top it ends on top.
+      for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
+      log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
       return;
     }
     case "shuffleIntoLibrary":

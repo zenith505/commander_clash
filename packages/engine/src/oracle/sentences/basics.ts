@@ -448,6 +448,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const tos: DamageRecipient[] = [];
     // "To target creature and each other creature with the same name as that creature" is one recipient.
     for (const part of /with the same name as that/i.test(m[2]!) ? [m[2]!] : m[2]!.split(/,? and (?=each )/i)) {
+      // "Each opponent and each battle they protect" (Joyful Stormsculptor): the battles any opponent protects (CR 310.9).
+      if (/^each battle they protect$/i.test(part) && tos.length === 1 && tos[0]!.ref === "eachOpponent") {
+        tos.push({ ref: "each", filter: { kind: "object", types: ["Battle"], protector: "opponent", text: "each battle they protect" } });
+        continue;
+      }
       const to = parseDamageRecipient(part, ctx);
       if (!to) return null;
       tos.push(to);

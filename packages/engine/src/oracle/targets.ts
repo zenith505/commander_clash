@@ -255,6 +255,15 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (group) return { ref: "each", filter: group.filter, ...(group.other ? { other: true } : {}) };
   const m = /^target (.+)$/i.exec(x);
   if (!m) return null;
+  // "Target planeswalker that player controls or battle that player protects" (Rampaging Raptor), after "Whenever ~ deals
+  // combat damage to an opponent": either, about that player (CR 310.9).
+  if (!cards && ctx.eventPlayer && /^planeswalker that player controls or battle that player protects$/i.test(m[1]!)) {
+    const anyOf: TargetSpec[] = [
+      { kind: "object", types: ["Planeswalker"], controller: "eventPlayer", text: "planeswalker that player controls" },
+      { kind: "object", types: ["Battle"], protector: "eventPlayer", text: "battle that player protects" },
+    ];
+    return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Planeswalker", "Battle"], anyOf, text: `target ${m[1]!}` }) };
+  }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx) });
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;

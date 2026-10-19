@@ -282,7 +282,7 @@ export interface TargetSpec {
    * `couldButDidntAttack`: "creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
-  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack";
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle";
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
   /**
@@ -291,6 +291,9 @@ export interface TargetSpec {
    */
   controller?: "you" | "opponent" | "eventPlayer" | "enchanted";
   controlledBy?: PlayerId;
+  /** A battle's protector (CR 310.9): "each battle they protect" after "each opponent", "battle that player protects". */
+  protector?: "opponent" | "eventPlayer";
+  protectedBy?: PlayerId;
   /** For players: only opponents. */
   opponent?: boolean;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
@@ -839,7 +842,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared"; not?: true }
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "attackedBattleThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1623,7 +1626,8 @@ export type Effect =
    */
   | { type: "earthbend"; what: ObjRef; n: Amount }
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
-  | { type: "handToTop"; n: Amount }
+  /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
+  | { type: "handToTop"; n: Amount; bottom?: true }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
   | { type: "addCombatMana"; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
@@ -1891,7 +1895,12 @@ export type Effect =
    * `rest`: where the exiled cards not cast go once it's done (they stay exiled without it): `toHand` those of the
    * filter's types, the others to `dest` (Muse Vortex, Epic Experiment, Collected Conjuring).
    */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
+  /**
+   * `untilHits`: "exile cards from the top of your library until you exile two nonland cards with mana value 4 or less"
+   * (Invasion of Alara), instead of `n` cards; only those can be cast, and with `hitToHand`, "put one of them into your
+   * hand": the one not cast, or your pick of the two (the other stays exiled), and only the others go to `rest`.
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -2312,7 +2321,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /**

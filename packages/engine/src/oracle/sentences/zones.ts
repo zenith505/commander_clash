@@ -249,6 +249,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // of your library".
   if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on top of your library( in any order)?$`, "i").exec(s)) && (m[1] === "a" || !!m[2]))
     return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!) }];
+  // "Draw three cards, then put a card from your hand on the bottom of your library": in any order (CR 401.4).
+  if ((m = new RegExp(`^Put (a|${NUM}) cards? from your hand on the bottom of your library( in any order)?$`, "i").exec(s)))
+    return [{ type: "handToTop", n: m[1] === "a" ? 1 : num(m[1]!), bottom: true }];
   // "Each player may put an artifact, creature, enchantment, or land card from their hand onto the battlefield" (Show and
   // Tell), "each opponent may put a legendary creature card ..." (Iwamori), "any number of ... cards" (Tempting Wurm):
   // chosen in turn order without revealing them, then put there at the same time (see the putFromHand effect). "Then

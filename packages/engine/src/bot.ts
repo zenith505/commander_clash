@@ -288,7 +288,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "castFromAmong") {
       const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));
       const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
-      return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
+      // "Put which of them into your hand?" (Invasion of Alara): no "none".
+      return [{ type: "chooseOption", player: pid, choice: pick ?? (pend.options.includes("none") ? "none" : pend.options[0]!) }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];

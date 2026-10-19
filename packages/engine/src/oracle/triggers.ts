@@ -5,6 +5,7 @@ import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
+const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
@@ -265,7 +266,9 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
  * "Whenever you cast a noncreature spell", "Whenever an opponent casts a creature spell",
  * "Whenever a player casts a spell", magecraft's "whenever you cast or copy an instant or sorcery spell".
  */
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? .+?)(?: spell)?, (.+)$/;
+// "Whenever you cast another spell that has convoke" (Kasla): the spell is on the stack, never the permanent or card
+// whose ability this is, so "another" changes nothing.
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
 const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
 
@@ -303,7 +306,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
-  let what = m[3]!.replace(/^an? /, "");
+  let what = m[3]!.replace(/^(?:an?|another) /, "");
   // "Whenever you cast a spell from exile", "... from anywhere other than your hand", "... from your graveyard": the zone
   // it was cast from (CR 601.2a); "your graveyard" and "your library" are its caster's own.
   const fromM = / from (anywhere other than (?:your|their) hand|(?:your|their) hand|exile|your graveyard|a graveyard|your library)$/.exec(what);
@@ -338,12 +341,16 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "A creature spell with power 5 or greater" (Monstrous Vortex): the spell's power on the stack (spellMatches).
   const pw = / with (power|toughness) (\d+) or (greater|less)$/.exec(what);
   if (pw) what = what.slice(0, pw.index);
+  // "A spell that has convoke" (Joyful Stormsculptor), "a creature spell with flying", "with infect": the spell as it
+  // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
+  const kwM = !pw ? / (?:with|that has) (convoke|flying|infect)$/.exec(what) : null;
+  if (kwM) what = what.slice(0, kwM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
-  if (pw) what = m[3]!.replace(/^an? /, "").replace(/ that targets .+$/, "");
+  if (pw) what = m[3]!.replace(/^(?:an?|another) /, "").replace(/ that targets .+$/, "");
   // "Whenever you cast a spell, if mana from a Treasure was spent to cast it, ..." (CR 106.3): an intervening if (CR
   // 603.4) that can't change once it's cast. A copy wasn't cast, so no mana was spent on it.
   const treasure = /^if mana from a Treasure was spent to cast it, (.+)$/.exec(m[4]!);
@@ -361,7 +368,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
 }
 
 /**

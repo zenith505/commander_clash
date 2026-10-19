@@ -376,6 +376,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
+  // "~ has indestructible as long as it attacked a battle this turn" (War Historian), "~ has hexproof as long as it
+  // entered this turn" (Zurgo and Ojutai): about ~ itself.
+  if (/^(?:~|it) attacked a battle this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "attackedBattleThisTurn" };
+  if (/^(?:~|it) entered (?:the battlefield )?this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "enteredThisTurn" };
   // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
   // under your control this turn" (Mad Dog: neither happened), "unless it came under your control this turn" (Erg Raiders).
   if (/^~ didn't attack this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn", not: true };

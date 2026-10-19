@@ -293,8 +293,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
   // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it
   // resolves (CR 608.2d).
-  if ((m = new RegExp(`^Distribute (?:${NUMX}|a number of) ${COUNTER} counters (?:equal to (.+?) )?among any number of (.+?) you control$`, "i").exec(s))) {
+  // "Among one, two, or three creatures you control" with three counters (Awaken the Maelstrom) is the same: each chosen
+  // one gets at least one.
+  if ((m = new RegExp(`^Distribute (?:${NUMX}|a number of) ${COUNTER} counters (?:equal to (.+?) )?among (any number of|one or two|one, two, or three) (.+?) you control$`, "i").exec(s))) {
     if (!m[1] === !m[3]) return null;
+    if (m[4] !== "any number of" && m[1] !== (m[4] === "one or two" ? "two" : "three")) return null;
+    m.splice(4, 1);
     const filter = pickFilter(m[4]!);
     const n = m[3] ? parseCount(m[3], ctx) : amt(m[1]!);
     return filter && n ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[4]!} you control` } }] : null;

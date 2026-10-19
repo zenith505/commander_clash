@@ -663,6 +663,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "escaped") return !!src.escaped; // CR 702.138b
       if (cond.is === "attachedToCreature") return !!src.attachedTo && !!chars.get(src.attachedTo)?.types.includes("Creature");
       if (cond.is === "attackedThisTurn") return src.attacked?.turn === s.turn;
+      if (cond.is === "attackedBattleThisTurn") return src.attacked?.turn === s.turn && !!src.attacked.battle;
       // Its controller has controlled it continuously since their most recent turn began, or not (CR 302.6).
       if (cond.is === "controlledThisTurn") return src.zone === "battlefield" && src.controlledSinceTurn === s.turn;
       if (cond.is === "hasCounter") return Object.values(src.counters).some((n) => (n ?? 0) > 0);

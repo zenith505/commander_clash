@@ -337,7 +337,7 @@ export interface GameObject {
   /** The turn it was last exerted (CR 701.43), for "if ~ hasn't been exerted this turn". */
   exertedTurn?: number;
   /** How many times it has attacked in turn `turn` ("creatures that attacked this turn", Moraug), as this object (CR 400.7). */
-  attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[] };
+  attacked?: { turn: number; n: number; /** The players it attacked (not their planeswalkers). */ players?: PlayerId[]; /** It attacked a battle this turn (War Historian). */ battle?: true };
   /**
    * The turn it last could have been declared as an attacker, as this object (CR 508.1a): it was one of the active
    * player's creatures able to attack as a declare attackers step began. Season of the Witch spares "creatures that
@@ -899,7 +899,7 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -1516,7 +1516,7 @@ export interface Resolving {
     faceDownPick?: true;
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

@@ -5221,7 +5221,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o); // CR 508.1f
     const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
     const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
-    o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}) };
+    const battle = before?.battle || (a.planeswalker !== undefined && !!s.objects[a.planeswalker] && objIsType(s, obj(s, a.planeswalker), "Battle"));
+    o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
   if (attacks.length) p.attackedTurn = s.turn; // raid

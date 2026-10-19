@@ -1,6 +1,6 @@
 # Roadmap
 
-20,520 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,558 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,20 +15,21 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-0. Cards with faces (CR 709, 710, 712, 715, 722): 430 of the 846 legal ones play now (`npm run faces` lists each
-   layout's support and the lines blocking it): 138 of 388 transforming double-faced, 104 of 151 adventurer, 76 of 123
-   split (13 of 28 Rooms), 46 of 98 modal double-faced, 49 of 67 preparation, 17 of 19 flip. Still out:
+0. Cards with faces (CR 709, 710, 712, 715, 722): 437 of the 846 legal ones play now (`npm run faces` lists each
+   layout's support and the lines blocking it): 141 of 388 transforming double-faced, 105 of 151 adventurer, 77 of 123
+   split (13 of 28 Rooms), 46 of 98 modal double-faced, 50 of 67 preparation, 18 of 19 flip. 12 of the 14 meld cards
+   play (CR 701.42). Still out:
    - Transformers: only Goldbug of the 13 plays; the others each have a line of their own (`npm run faces`).
-   - Transform: craft (702.167), a delayed "transform ~ at the beginning of the next upkeep" (701.27f's rule for
-     delayed triggers isn't modeled), "~ is all colors", "As ~ transforms into ~" (712.20), and the single lines
-     `npm run faces` lists.
-   - Rooms: 15 still out on their doors' own lines. A token copy of a Room, or a Room turned face up, has no
-     locked or unlocked doors (it's both halves); a Room's door abilities are numbered by which doors are unlocked,
-     so a "once each turn" door ability could trigger again after the other door unlocks.
-   - Flip: Autumn-Tail's "attach an Aura to it" needs a choice prompt; Sasaya's back face.
-   - Prepare: a prepare spell's copy is in its creator's exile, shown there. Croaking Counterpart's copy isn't
-     a Frog exception yet.
-   - The meld pairs (CR 701.42); melded permanents stay unsupported on purpose (712.4b).
+   - Transform: craft (702.167), "~ is all colors" (a characteristic-defining ability, CR 604.3: it has to reach every
+     place that reads a card's colors, in every zone), "As ~ transforms into ~" (712.20: Curse of Leeches, Ludevic,
+     Sephiroth, Zenos each need their own work), and the single lines `npm run faces` lists.
+   - Rooms: 15 still out on their doors' own lines.
+   - Flip: Sasaya's back face.
+   - Meld: Urza, Lord Protector (Urza, Planeswalker has no loyalty in the card data, and its "activate loyalty
+     abilities twice" and "+2: ... cost {2} less" lines aren't supported) and Phyrexian Dragon Engine ("when ~ enters
+     from your graveyard"). Bots don't save Hanweir Battlements' mana for its meld ability (they use it for haste).
+   - Halvar, God of Battle's "enchanted or equipped" and the other lines of Preston, God-Pharaoh's Gift, Ardyn, Hour of
+     Eternity, Dino DNA and Hashaton (copies that are a creature type instead now work; these are blocked elsewhere).
    - Bots don't plan around day and night (casting two spells to make it day).
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:

@@ -71,8 +71,11 @@ export function lockIfRoom(s: GameState, o: GameObject): void {
 /** A Room permanent's: what it is with its unlocked doors (CR 709.5), copied or not (the designations aren't copied). */
 const withDoors = (o: GameObject, key: string): string => (o.unlocked !== undefined ? roomKey(key, o.unlocked) : key);
 
-/** Its own card, or the face of it that's up (faces.ts, CR 709.3b, 710.1b, 712.8). */
-const ownId = (o: GameObject): string => (o.face !== undefined ? faceKey(o.cardId, o.face) : o.cardId);
+/**
+ * Its own card, or the face of it that's up (faces.ts, CR 709.3b, 710.1b, 712.8), or the combined back face a melded
+ * permanent has the characteristics of (712.8g, meld.ts).
+ */
+const ownId = (o: GameObject): string => o.melded ?? (o.face !== undefined ? faceKey(o.cardId, o.face) : o.cardId);
 
 /** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
 /** Disguised and cloaked permanents have ward {2} (CR 702.168a, 701.58a). */

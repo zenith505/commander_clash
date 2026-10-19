@@ -18,9 +18,10 @@ const mv = (cost: string) => manaValue(parseManaCost(cost));
 /**
  * A card's or permanent's mana value (CR 202.3): from its mana cost, except a nonmodal double-faced card's back face,
  * whose is its front face's (712.8c, 712.8e). A copy of a back face isn't that face (copyKey drops `faceOf`), and a
- * double-faced token's back face is a copy of one: 0 (202.3b).
+ * double-faced token's back face is a copy of one: 0 (202.3b). A melded permanent's is the sum of its front faces' (CR
+ * 202.3c, the card data's cmc); a copy of one has no mana cost, so 0 (copyKey drops `meld`).
  */
-export const defMv = (d: CardDef): number => (d.faceOf && d.faceOf.face > 0 && d.layout === "transform" ? (d.dfcCopy ? 0 : d.cmc) : mv(d.manaCost));
+export const defMv = (d: CardDef): number => (d.faceOf && d.faceOf.face > 0 && d.layout === "transform" ? (d.dfcCopy ? 0 : d.cmc) : d.meld?.result === d.name ? d.cmc : mv(d.manaCost));
 
 const faceDefs = new Map<string, CardDef>();
 

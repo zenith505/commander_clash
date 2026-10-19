@@ -50,8 +50,9 @@ export function copyKey(s: GameState, base: CardDef, except?: CopyExcept): strin
   base = unroomed(s.cards, base);
   // A copy of a face isn't that card's face: a copy of a nonmodal double-faced card's back face has mana value 0 (CR
   // 712.8e).
-  if (base.faceOf) {
-    const { faceOf: _, ...plain } = base;
+  // A copy of a melded permanent isn't one: its mana value is 0 (CR 202.3c, 712.8g).
+  if (base.faceOf || base.meld?.result === base.name) {
+    const { faceOf: _, meld: __, ...plain } = base;
     base = { ...plain, oracleId: `${base.oracleId}|copied` };
   }
   if (!except || !Object.keys(except).length) {

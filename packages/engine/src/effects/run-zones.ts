@@ -17,6 +17,7 @@ import { addDelayed, paidUnless } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
 import { asFace, defMv, transformedFace } from "../faces";
+import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
 export function isSuspended(s: GameState, o: GameObject): boolean {
@@ -516,8 +517,39 @@ function cipher(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
 }
 
 /** Moving permanents and cards between zones: destroy, exile, bounce, reanimate, flicker, sacrifice, ninjutsu, impulse draw. */
+/**
+ * "Exile them, then meld them into ..." (CR 701.42a, meld.ts): ~, still the object with the ability (CR 400.7), and a
+ * permanent named its counterpart, if you both own and control them (and both are attacking). With several of that name,
+ * you choose the one exiled (rulings). "It enters tapped and attacking": you choose what it attacks (rulings on Mishra,
+ * Lost to Phyrexia), during combat only (CR 506.3d).
+ */
+function runMeld(s: GameState, e: Extract<Effect, { type: "meld" }>, ctx: ResolveCtx, src: string): "paused" | void {
+  const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  if (!me || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+  const pid = ctx.controller;
+  const options = meldPartners(s, me.id, pid, e.partnerType, e.attacking);
+  if (!options.length) return;
+  const sc = (s.resolving!.scratch ??= {});
+  if (options.length > 1 && !sc.chosen?.[pid]?.length) {
+    sc.queue = [pid];
+    sc.chosen = {};
+    s.pending = { kind: "pickPermanents", player: pid, source: src, action: "meld", what: `${e.partnerType.toLowerCase()} named ${characteristics(s, options[0]!).name}`, options: options.map((o) => o.id), count: 1 };
+    return "paused";
+  }
+  const partner = options.length > 1 ? sc.chosen![pid]![0]! : options[0]!.id;
+  const attackOptions = e.attacking && inCombat(s) ? attackChoices(s, pid, me.id) : [];
+  if (attackOptions.length > 1 && sc.attackWhom === undefined) {
+    s.pending = { kind: "chooseOption", player: pid, source: src, what: "attackWhom", options: attackOptions.map((a) => a.key), labels: attackOptions.map((a) => a.label), prompt: `choose what the melded permanent attacks` };
+    return "paused";
+  }
+  const attack = attackOptions.length > 1 ? attackOptions.find((a) => a.key === sc.attackWhom) : attackOptions[0];
+  meld(s, me.id, partner, pid, attack && { player: attack.player, ...(attack.planeswalker ? { planeswalker: attack.planeswalker } : {}) });
+}
+
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "meld":
+      return runMeld(s, e, ctx, src);
     case "exploit":
       return exploit(s, ctx, src);
     case "champion":

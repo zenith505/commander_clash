@@ -3,7 +3,7 @@ import { allEffects, refCovers, timedCondition, type AbilityBody, type Activated
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
-import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
@@ -1585,6 +1585,12 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   const self = s.resolving?.item.sourceId;
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
+  // Meld (CR 701.42b): the card of the pair itself, not a token or a Clone, which would stay in exile; of those, the one
+  // worth least as it is (counters, Auras and the like don't come along).
+  if (action === "meld") {
+    const real = (id: ObjectId) => (!obj(s, id).isToken && realDefOf(s, obj(s, id)).name === characteristics(s, obj(s, id)).name ? 0 : 1);
+    return [...options].sort((a, b) => real(a) - real(b) || worth(s, pid, obj(s, a)) - worth(s, pid, obj(s, b))).slice(0, count);
+  }
   // "Choose ..., then sacrifice the rest": keep our best permanents, and choosing for another player (Mythos of Snapdax),
   // leave them their least useful ones.
   if (action === "keep") {

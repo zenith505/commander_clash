@@ -23,6 +23,8 @@ import {
   compileCard,
   modsAreHarmful,
   isFullySupported,
+  meldResultsFor,
+  registerMeldResults,
   validateCommanderDeck,
   type CardRecord,
   type Color,
@@ -217,11 +219,14 @@ async function main() {
     console.log(`Rulings for ${Object.keys(rulings).length.toLocaleString()} cards`);
   }
 
+  registerMeldResults(cards);
   if (cardsOnly) console.log(`Fully supported by the engine today: ${cards.filter((c) => c.commanderLegal === "legal" && isFullySupported(c)).length.toLocaleString()} of ${cards.length.toLocaleString()}`);
   else writeDecks(cards);
 }
 
 function writeDecks(cards: CardRecord[]) {
+  // The combined back faces of the meld pairs, for their meld cards (CR 712.4).
+  registerMeldResults(cards);
   mkdirSync(OUT, { recursive: true });
   mkdirSync(WEB, { recursive: true });
   const supported = cards.filter((c) => c.commanderLegal === "legal" && isFullySupported(c)).length;
@@ -230,7 +235,9 @@ function writeDecks(cards: CardRecord[]) {
   const decks = buildSampleDecks(cards);
   writeFileSync(join(OUT, "sample-decks.json"), JSON.stringify(decks, null, 2));
   // The UI gets the decks plus just the card definitions they use.
+  // A meld card's combined back face comes along: it's never in a deck (CR 712.4b), but the game needs it.
   const used = new Set(decks.flatMap((d) => [d.commander, ...d.cards]));
+  for (const r of meldResultsFor(cards.filter((c) => used.has(c.name)))) used.add(r.name);
   const bundle = { decks, cards: cards.filter((c) => used.has(c.name)) };
   writeFileSync(join(WEB, "sample-decks.json"), JSON.stringify(bundle));
   for (const d of decks) console.log(`Deck: ${d.name}`);

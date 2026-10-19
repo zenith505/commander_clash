@@ -4,10 +4,12 @@
 //   npm run coverage            (needs data/generated/cards.json from build:cards)
 
 import { readFileSync } from "node:fs";
-import { compileCard, isFullySupported, type CardDef } from "../packages/engine/src";
+import { compileCard, isFullySupported, registerMeldResults, type CardDef } from "../packages/engine/src";
 
 type Card = CardDef & { commanderLegal?: string };
 const cards: Card[] = JSON.parse(readFileSync(new URL("../data/generated/cards.json", import.meta.url), "utf8"));
+// The combined back faces of the meld pairs, for their meld cards (CR 712.4).
+registerMeldResults(cards);
 const legal = cards.filter((c) => c.commanderLegal === "legal");
 const sup = legal.filter((c) => isFullySupported(c));
 console.log(`fully supported: ${sup.length} of ${legal.length} legal (${cards.length} total)`);

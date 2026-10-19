@@ -7,10 +7,12 @@
 //   BY_COUNT=1 npm run blockers            sort by total appearances instead
 
 import { readFileSync } from "node:fs";
-import { compileCard, isFullySupported, type CardDef } from "../packages/engine/src";
+import { compileCard, isFullySupported, registerMeldResults, type CardDef } from "../packages/engine/src";
 
 type Card = CardDef & { commanderLegal?: string };
 const cards: Card[] = JSON.parse(readFileSync(new URL("../data/generated/cards.json", import.meta.url), "utf8"));
+// The combined back faces of the meld pairs, for their meld cards (CR 712.4).
+registerMeldResults(cards);
 const unsupported = cards.filter((c) => c.commanderLegal === "legal" && !c.name.includes(" // ") && !isFullySupported(c));
 const re = process.argv[2] ? new RegExp(process.argv[2], "i") : null;
 const fams = new Map<string, { n: number; single: number; ex: string[] }>();

@@ -32,6 +32,16 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
+  // Meld (CR 701.42a), as normalizeSelf words it: "exile ~ and the creature named Bruna, the Fading Light, then meld them
+  // into Brisela, Voice of Nightmares", after "if you both own and control ~ and a creature named ..." (checked again as
+  // it melds) or "if ~ and a creature named ... are attacking, and you both own and control them" (with "tapped and
+  // attacking"). The names are the card data's (CardDef.meld).
+  if ((m = /^(?:If (?:(you both own and control ~ and an? (creature|land|artifact) named .+?)|(~ and an? (creature) named .+? are attacking, and you both own and control them)), )?[Ee]xile ~ and the (attacking )?(creature|land|artifact) named .+?, then meld them into .+?( tapped and attacking)?$/.exec(s))) {
+    const partnerType = (m[6]!.charAt(0).toUpperCase() + m[6]!.slice(1)) as "Creature" | "Land" | "Artifact";
+    const attacking = !!m[5];
+    if ((m[2] && m[2] !== m[6]) || (m[4] && m[4] !== m[6]) || !!m[3] !== attacking || !!m[7] !== attacking) return null;
+    return [{ type: "meld", partnerType, ...(attacking ? { attacking: true as const } : {}) }];
+  }
   // Airbend (CR 701.65a): exile them; for as long as each card stays exiled, its owner may cast it by paying {2} rather
   // than its mana cost (a token ceases to exist, a land can't be played, rulings on Airbending Lesson).
   if ((m = /^[Aa]irbend (.+)$/.exec(s))) {

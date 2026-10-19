@@ -214,6 +214,11 @@ export interface GameObject {
   merged?: { parts: ObjectId[]; ownToken: boolean; ownCommander: boolean };
   /** A component of a merged permanent (zone "merged"): the permanent's object. */
   mergedInto?: ObjectId;
+  /**
+   * A melded permanent (CR 701.42, 712.4a): the key of the combined back face it has the characteristics of (712.8g).
+   * It's this card's object, represented by this card and its counterpart (`merged.parts`, the other one in "merged").
+   */
+  melded?: string;
   /** How many times it has mutated (CR 702.140d): "where X is the number of times ~ has mutated". */
   mutations?: number;
   /**

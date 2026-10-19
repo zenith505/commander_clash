@@ -21,6 +21,7 @@ import type { Affects, Amount, DamageMod, Modification, StaticAbility, StaticCon
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
+import { meldPartnerName } from "./meld-results";
 import { bindChosenKeywords, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
@@ -526,6 +527,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.castThisTurn ?? []).some((c) => c.player === you);
     case "creatureDied":
       return (s.diedThisTurn ?? []).filter((p) => !cond.yours || p === you).length >= (cond.n ?? 1);
+    case "meldPartner": {
+      // "If you both own and control ~ and a creature named Bruna, the Fading Light" (CR 701.42): ~ as it is now.
+      const me = chars.get(sourceId);
+      const partner = me && meldPartnerName(defOf(s, src));
+      if (!me || !partner || src.owner !== you || me.controller !== you) return false;
+      for (const [id, c] of chars) if (id !== sourceId && s.objects[id]!.owner === you && c.controller === you && c.name === partner && c.types.includes(cond.type)) return true;
+      return false;
+    }
     case "onBattlefield": {
       let n = 0;
       for (const [id, c] of chars) if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;

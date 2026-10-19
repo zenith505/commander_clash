@@ -1,6 +1,8 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
+import { joinMeld } from "./meld";
+import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
@@ -123,6 +125,8 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
     shuffleLibrary(s, player);
   });
+  // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.
+  for (const r of meldResultsFor(setup.flatMap((p) => [p.commander, ...(p.secondCommander ? [p.secondCommander] : []), ...p.deck]))) s.cards[r.oracleId] ??= r;
   // CR 103.1: randomly determine the starting player.
   const first = Math.floor(nextRandom(s) * setup.length);
   s.activePlayer = first;
@@ -587,6 +591,8 @@ export function moveObject(
     faceDown?: FaceDownKind;
     /** The face it enters with up: a modal double-faced land's (CR 712.12), "transformed" (712.14a). */
     face?: number;
+    /** Melded with its counterpart `with` (in exile), as the combined back face `key` (CR 701.42a, 712.14c): meld.ts. */
+    meld?: { with: ObjectId; key: string };
   } = {},
 ) {
   const o = obj(s, id);
@@ -749,6 +755,7 @@ export function moveObject(
   else if (to === "battlefield" && s.dayNight === "night" && o.face === undefined && !o.faceDown && transformedFace(s, o) === 1 && hasKeyword(defOf(s, o), "Daybound")) setFace(s, o, 1);
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
+  o.melded = undefined; // a melded permanent's cards are separate cards again (CR 712.21)
   o.copyEffects = undefined;
   // Krovikan Vampire: a creature that died after being dealt damage this turn, and what dealt it (rulings: any damage).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && o.damagedBy?.length) ((s.turnLog ??= {}).diedDamaged ??= []).push({ id, zc: o.zoneChanges, by: [...o.damagedBy] });
@@ -817,6 +824,7 @@ export function moveObject(
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
+  if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
   invalidateCharacteristics(s);

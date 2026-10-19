@@ -13,6 +13,7 @@ import {
   faceUpWays,
   assistedRemaining,
   returnCandidates,
+  attackablePermanentProblem,
   attackProblem,
   attackTax,
   attackTaxPer,
@@ -105,6 +106,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "copyTargets", player: pid, ...(best ? { targets: best } : {}) }];
     }
     if (pend.kind === "changeTarget") return [{ type: "changeTarget", player: pid, target: newTargetFor(s, pid, pend) }];
+    if (pend.kind === "castFree" && pend.how === "transformed") {
+      // A defeated Siege: its back face, for free (CR 310.12b).
+      const plan = asFace(s, obj(s, pend.objectId), 1, () => castPlan(s, pid, pend.objectId, true));
+      return plan ? plan.map((a) => (a.type === "castSpell" && a.objectId === pend.objectId ? { ...a, face: 1 } : a)) : [{ type: "chooseMay", player: pid, yes: false }];
+    }
     if (pend.kind === "castFree") {
       const plan = facePlan(s, pid, pend.objectId, true, "first") ?? castPlan(s, pid, pend.objectId, true) ?? facePlan(s, pid, pend.objectId, true, "after");
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
@@ -225,6 +231,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const opps = pend.options.filter((x) => Number(x) !== pid);
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
+    }
+    // A Siege's protector (CR 310.12a): the opponent least able to defend it, so we can defeat it and flip it.
+    if (pend.kind === "chooseOption" && pend.what === "protector") {
+      const guard = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, toughness(s, obj(s, id))), 0);
+      const pick = [...pend.options].sort((a, b) => guard(Number(a)) - guard(Number(b)))[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
     if (pend.kind === "chooseOption" && pend.what === "copy") {
@@ -559,6 +571,8 @@ function canAlsoPayWard(s: GameState, pid: PlayerId, plan: Action[], targets: Ta
   return !!planMana(s, pid, parseManaCost(ward), 0, undefined, used);
 }
 const isCounterOnly = (b: AbilityBody) => b.effects.some((e) => e.type === "counterSpell");
+/** A battle: we don't aim spells at them, only creatures (damage to a Siege helps its controller flip it, CR 310.12b). */
+const isBattleTarget = (s: GameState, t: ChosenTarget) => t.kind === "object" && !!s.objects[t.id] && objIsType(s, obj(s, t.id), "Battle");
 /**
  * The source of what we're choosing targets for: a card that isn't on the battlefield is taken for a spell (it may be a
  * channel or cycling ability, but then "can't be the target of spells" only makes us skip a target we could have had).
@@ -623,7 +637,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       ? all.filter((t) => t.kind !== "object" || (t.id !== sourceId && !(isMine(s, pid, t) && objIsLegendary(s, t.id))))
       : reanimate
         ? all
-        : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)));
+        : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)) && !isBattleTarget(s, t));
     // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
     const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);
     if (provoke && sourceId && s.objects[sourceId]) {
@@ -700,7 +714,7 @@ function divideDamage(s: GameState, pid: PlayerId, body: AbilityBody, first: num
   const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
     (t) => !before.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId),
   );
-  const foes = all.filter((t) => !isMine(s, pid, t));
+  const foes = all.filter((t) => !isMine(s, pid, t) && !isBattleTarget(s, t));
   const need = (t: ChosenTarget) => {
     if (t.kind !== "object") return Infinity;
     const o = obj(s, t.id);
@@ -2970,6 +2984,42 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
   return attacks;
 }
 
+/**
+ * Our own Sieges (CR 310.12): attackers that its protector can't block go at one when, together, they remove all its
+ * defense this combat, so it flips (310.12b). Not when they're needed to finish off a player; other players' battles
+ * we leave alone, as defeating one helps its controller.
+ */
+function attackBattles(s: GameState, pid: PlayerId, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[], hit = combatHits(s)) {
+  const atPlayer = (d: PlayerId) => attacks.filter((a) => a.defender === d && a.planeswalker === undefined).reduce((n, a) => n + hit(obj(s, a.attacker), d), 0);
+  const battles = s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => objIsType(s, o, "Battle") && controllerOf(s, o) === pid && o.protector !== undefined && attackablePermanentProblem(s, pid, o.protector, o.id) === null)
+    .sort((a, b) => (a.counters.defense ?? 0) - (b.counters.defense ?? 0));
+  for (const b of battles) {
+    const guard = b.protector!;
+    const blockers = s.battlefield.map((id) => obj(s, id)).filter((x) => controllerOf(s, x) === guard && !x.tapped && objIsType(s, x, "Creature"));
+    const free = attacks
+      .filter((a) => a.planeswalker === undefined && !characteristics(s, obj(s, a.attacker)).goadedBy.length && !characteristics(s, obj(s, a.attacker)).mustAttack.length && !attackProblem(s, obj(s, a.attacker), guard))
+      .filter((a) => atPlayer(a.defender) < player(s, a.defender).life)
+      .filter((a) => blockers.every((x) => blockProblem(s, x, obj(s, a.attacker), guard)))
+      .filter((a) => hit(obj(s, a.attacker), b) > 0)
+      .sort((x, y) => hit(obj(s, x.attacker), b) - hit(obj(s, y.attacker), b));
+    let need = b.counters.defense ?? 0;
+    const moved: typeof attacks = [];
+    for (const a of free) {
+      if (need <= 0) break;
+      moved.push(a);
+      need -= hit(obj(s, a.attacker), b);
+    }
+    if (need > 0) continue;
+    for (const a of moved) {
+      a.defender = guard;
+      a.planeswalker = b.id;
+    }
+  }
+  return attacks;
+}
+
 function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Damage to a player with protection from us is prevented (CR 702.16k): attack someone else when we can.
   const all = opponents(s, pid);
@@ -3013,7 +3063,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
-  let declared = attackPlaneswalkers(s, pid, attacks, hit);
+  let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
   for (;;) {

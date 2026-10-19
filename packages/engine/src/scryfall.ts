@@ -56,6 +56,7 @@ export function cardFromScryfall(c: any): CardRecord {
     power: pick("power"),
     toughness: pick("toughness"),
     loyalty: pick("loyalty"),
+    defense: pick("defense"),
     colors: (pick("colors") ?? []) as Color[],
     colorIdentity: (c.color_identity ?? []) as Color[],
     keywords: c.keywords ?? [],

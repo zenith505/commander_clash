@@ -39,8 +39,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^At the beginning of (?:each combat|combat on each player's turn), (.+)$/, "eachBeginCombat"],
   [/^At end of combat on your turn, (.+)$/, "yourEndCombat"],
   [/^At end of combat, (.+)$/, "eachEndCombat"],
-  // Battle cards aren't supported, so nothing can attack one and "a player or battle" is just a player.
-  // Revisit when battles are (CR 310).
+  // "To a player or battle": either (TriggeredAbility.orBattle).
   [/^Whenever ~ deals combat damage to a player(?: or battle)?, (.+)$/, "selfDealsCombatDamageToPlayer"],
   [/^Whenever ~ deals combat damage to a player or planeswalker, (.+)$/, "selfDealsCombatDamageToPlayer"],
   [/^Whenever ~ deals combat damage, (.+)$/, "selfDealsCombatDamage"],
@@ -149,6 +148,9 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!h) continue;
     if (m[2] !== "creature" && event !== "selfBecomesTapped" && event !== "selfBecomesUntapped") return "fail";
     let text = o.toOpponent ? otherOpponents(h[1]!) : h[1]!;
+    // "Deals combat damage to a player or battle" (Beamtown Beatstick): "that player" isn't about a battle (CR 310).
+    const orBattle = /^deals combat damage to a player or battle, /.test(m[3]!);
+    if (orBattle && /\b(that player|defending player)\b/.test(text)) return "fail";
     // "~ or equipped creature": "it" could be either (Ogre-Head Helm's "you may sacrifice it" is the Helm).
     if (m[1] && /\b(it|its|that creature)\b/i.test(text)) return "fail";
     if (o.creature) {
@@ -164,7 +166,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     let body = parseBody(text, { ...(o.creature ? { subject: true } : { subjectIt: true }), ...(o.eventPlayer ? { eventPlayer: true } : {}), ...(o.defending ? { defending: true } : {}) });
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
-    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}) };
+    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}) };
   }
   return null; // "whenever equipped creature dies" is parseDiesTrigger's
 }
@@ -474,6 +476,8 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
   const filter = parseTargetPhrase(m[2]!);
   if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
   let text = m[3] === "an opponent" ? otherOpponents(m[4]!) : m[4]!;
+  // "To a player or battle": "that player" isn't about a battle (CR 310).
+  if (m[3] === "a player or battle" && /\b(that player|defending player)\b/.test(text)) return "fail";
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
     if (/\bX\b/.test(text)) return "fail";
@@ -487,6 +491,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     dealer: { filter: { ...filter, controller: "you", text: `${m[2]} you control` }, ...(m[1] === "another" ? { other: true } : {}) },
     body: withOtherOpponents(body),
     ...(m[3] === "an opponent" ? { toOpponent: true as const } : {}),
+    ...(m[3] === "a player or battle" ? { orBattle: true as const } : {}),
   };
 }
 
@@ -1280,13 +1285,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "To a player or planeswalker": "that player" could be either's (a planeswalker's controller isn't dealt it).
       const orPlaneswalker = / to a player or planeswalker, /.test(line);
       if (orPlaneswalker && /\b(that player|defending player)\b/.test(text)) return "fail";
+      // "To a player or battle": the same, a battle isn't a player (CR 310).
+      const orBattle = / to a player or battle, /.test(line);
+      if (orBattle && /\b(that player|defending player)\b/.test(text)) return "fail";
       const firstAttack = /^Whenever ~ attacks for the first time each turn, /.test(line);
       const saddled = /^Whenever ~ attacks while saddled, /.test(line);
       // "Is put into your graveyard": one its controller owns, since a card goes to its owner's graveyard (rulings on
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

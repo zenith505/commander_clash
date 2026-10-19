@@ -5,7 +5,7 @@
 // go where it goes (712.21).
 
 import { defOf, realDefOf } from "./cards";
-import { log, moveObject, obj, player } from "./game";
+import { attackingPermanentOf, log, moveObject, obj, player } from "./game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "./layers";
 import { isMeldResult, meldPartnerName, meldResultDef } from "./meld-results";
 import type { GameObject, GameState, ObjectId, PlayerId } from "./types";
@@ -65,7 +65,7 @@ export function meld(s: GameState, srcId: ObjectId, partnerId: ObjectId, pid: Pl
   if (s.objects[a.id]?.zone !== "battlefield") return undefined; // a replacement effect may have sent it elsewhere
   if (attack && characteristics(s, a).types.includes("Creature")) {
     a.attacking = attack.player;
-    if (attack.planeswalker) a.attackingPermanent = { id: attack.planeswalker, zc: obj(s, attack.planeswalker).zoneChanges ?? 0 };
+    if (attack.planeswalker) a.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
   }
   log(s, `${realDefOf(s, a).name} and ${realDefOf(s, b).name} meld into ${def.name}${attack ? `, tapped and attacking ${player(s, attack.player).name}` : ""}.`);
   return a;

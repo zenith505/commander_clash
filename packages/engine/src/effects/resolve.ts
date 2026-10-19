@@ -610,6 +610,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "castFromAmong":
     case "suspendTick":
     case "suspendCast":
+    case "siegeDefeated":
     case "exileSelfWithTime":
     case "exileSpell":
     case "warpExile":

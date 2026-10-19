@@ -1,4 +1,5 @@
 import { restingDef } from "../faces";
+import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, creatureTypesOf, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType } from "../game";
@@ -156,7 +157,7 @@ export type TriggerSourceEvent =
   /** An attacking creature enlisted another by tapping it (CR 702.154c). */
   | { type: "enlists"; id: ObjectId; enlisted: ObjectId }
   /** With `planeswalker`, the damage was dealt to that planeswalker, and `player` controls it. */
-  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; planeswalker?: ObjectId }
+  | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; planeswalker?: ObjectId; /** Dealt to a battle instead, `player` its protector. */ battle?: ObjectId }
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number }
   /** A permanent dealt damage to a player, in combat or not. */
@@ -799,6 +800,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];
     if (o?.zone === "battlefield" && ev.counter === "time") add(o, controllerOf(s, o), (e) => e === "selfLastTimeCounterRemoved");
+    // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
+    if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
     if (o?.zone === "exile" && ev.counter === "time" && compileCard(defOf(s, o)).suspend)
       s.triggerQueue.push({
@@ -873,6 +876,21 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orPlaneswalker, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+  } else if (ev.type === "combatDamageToPlayer" && ev.battle) {
+    // "Whenever ~ deals combat damage to a player or battle" (CR 310): only those are about a battle dealt it.
+    const o = obj(s, ev.id);
+    const info = { amount: ev.amount };
+    causedBy = { event: "combatDamage", objs: [{ o, controller: controllerOf(s, o) }] };
+    add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orBattle, undefined, undefined, undefined, undefined, undefined, undefined, info);
+    addHosted(o, (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orBattle, undefined, o, info);
+    const dealerBy = controllerOf(s, o);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) !== dealerBy) continue;
+      add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.orBattle && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false), undefined, undefined, o, undefined, undefined, undefined, info);
+    }
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orBattle, triggers, undefined, undefined, undefined, undefined, undefined, info), o);
+    causedBy = null;
   } else if (ev.type === "combatDamageToPlayer") {
     const o = obj(s, ev.id);
     const info = { player: ev.player, amount: ev.amount };

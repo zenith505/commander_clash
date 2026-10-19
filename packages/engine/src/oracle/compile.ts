@@ -154,8 +154,8 @@ const RING_TRIGGERS: TriggeredAbility[] = [
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
-const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Siege"];
+const UNSUPPORTED_TYPES = ["Kindred", "Tribal", "Dungeon"];
+const UNSUPPORTED_SUBTYPES: string[] = [];
 
 const meldResults = new Map<string, boolean>();
 
@@ -312,7 +312,7 @@ export function normalizeSelf(d: CardDef): string {
   if (d.supertypes?.includes("Legendary")) t = t.split(/("[^"]*")/).map((part, i) => (i % 2 ? part : selfPronouns(part))).join("");
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case|Room)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case|Room|Siege|battle)\b/g, "~");
   // A Room's door (CR 709.5j): "When you unlock this door" is about that half, by its index.
   if (d.faceOf && d.subtypes.includes("Room")) t = t.replace(/\bWhen you unlock this door\b/g, `When you unlock door ${d.faceOf.face}`);
   // "Your team" means the same as "you" in a game that isn't between teams (CR 102.4): "Warriors your team controls",

@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import { manaValue } from "../mana";
@@ -16,7 +16,7 @@ import { foundWith, newObjects } from "../mutate";
 import { addDelayed, paidUnless } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
-import { asFace, defMv, transformedFace } from "../faces";
+import { asFace, defMv, registerFace, transformedFace } from "../faces";
 import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -793,6 +793,24 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${defOf(s, o).name} can't be cast; it stays in exile.`);
       return;
     }
+    case "siegeDefeated": {
+      // CR 310.12b: "exile it, then you may cast it transformed without paying its mana cost." Only a transforming
+      // double-faced card can be cast transformed; anything else stays in exile (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.may !== undefined) return; // asked already
+      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== ctx.subject!.zc) return;
+      const name = characteristics(s, o).name;
+      moveObject(s, o.id, "exile");
+      log(s, `${name} is defeated: it's exiled.`);
+      sc.may = false;
+      if ((o.zone as string) !== "exile" || o.isToken || s.cards[o.cardId]?.layout !== "transform") return;
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "transformed" };
+      if (castProblem(s, ctx.controller, o.id, undefined, undefined, undefined, undefined, undefined, { face: 1 }) === null) return "paused";
+      s.pending = null;
+      log(s, `${s.cards[registerFace(s, o, 1)]!.name} can't be cast; it stays in exile.`);
+      return;
+    }
     case "exileSpell":
     case "exileSelfWithTime": {
       const item = s.resolving?.item;
@@ -1082,7 +1100,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
-            if (attack?.planeswalker) o.attackingPermanent = { id: attack.planeswalker, zc: obj(s, attack.planeswalker).zoneChanges ?? 0 };
+            if (attack?.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
           }
           if (o.zone !== "battlefield") continue;
           s.resolving?.created?.push(o.id);
@@ -1504,8 +1522,9 @@ export function enterAttacking(s: GameState, o: GameObject, returned: LastKnown)
 }
 
 /**
- * What a creature put onto the battlefield attacking may attack (CR 508.4): each opponent or a planeswalker they control,
- * chosen by its controller; the one the source attacks first. None outside combat, or on another player's turn.
+ * What a creature put onto the battlefield attacking may attack (CR 508.4): each opponent, a planeswalker they control or
+ * a battle they protect (CR 310.9b), chosen by its controller; the one the source attacks first. None outside combat, or
+ * on another player's turn.
  */
 export function attackChoices(s: GameState, pid: PlayerId, sourceId?: ObjectId): { key: string; label: string; player: PlayerId; planeswalker?: ObjectId }[] {
   const first = attackDefault(s, pid, sourceId);
@@ -1513,6 +1532,6 @@ export function attackChoices(s: GameState, pid: PlayerId, sourceId?: ObjectId):
   const foes = livingPlayers(s).filter((x) => x !== pid).sort((a, b) => (a === first ? -1 : b === first ? 1 : 0));
   return foes.flatMap((x) => [
     { key: String(x), label: player(s, x).name, player: x },
-    ...s.battlefield.filter((id) => objIsType(s, obj(s, id), "Planeswalker") && controllerOf(s, obj(s, id)) === x).map((id) => ({ key: `${x}:${id}`, label: `${defOf(s, obj(s, id)).name} (${player(s, x).name})`, player: x, planeswalker: id })),
+    ...s.battlefield.filter((id) => attackablePermanentProblem(s, pid, x, id) === null).map((id) => ({ key: `${x}:${id}`, label: `${defOf(s, obj(s, id)).name} (${objIsType(s, obj(s, id), "Battle") ? "protected by " : ""}${player(s, x).name})`, player: x, planeswalker: id })),
   ]);
 }

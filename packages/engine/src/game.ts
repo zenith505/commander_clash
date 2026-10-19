@@ -1,6 +1,7 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
+import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
@@ -786,6 +787,7 @@ export function moveObject(
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
+  o.protector = undefined;
   // A Room enters with the door that was cast unlocked, and from anywhere but the stack with both locked (CR 709.5d,
   // rulings). On the battlefield it's the whole card, its doors locked or unlocked, not a half (709.5).
   o.unlocked = undefined;
@@ -964,6 +966,9 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   const entering: Record<string, number> = {};
   const add = (k: string, n: number) => n > 0 && (entering[k] = (entering[k] ?? 0) + n);
   if (loyalty > 0) add("loyalty", loyalty);
+  // A battle enters with its printed defense in defense counters (CR 310.4b), its copiable values' if it's a copy (rulings).
+  const defense = isType(defOf(s, o), "Battle") ? Number.parseInt(defOf(s, o).defense ?? "", 10) : NaN;
+  if (defense > 0) add("defense", defense);
   if (withCounters) add(withCounters.counter, withCounters.n);
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   for (const [k, n] of Object.entries(othersAddCounters(s, o))) add(k, n);
@@ -990,6 +995,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
+  // As a battle enters, its controller chooses its protector (CR 310.9a).
+  if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
   if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
@@ -2555,7 +2562,7 @@ function removeCountersCost(s: GameState, o: GameObject, rc: { counter: string; 
   const left = (o.counters[rc.counter] ?? 0) - rc.n;
   o.counters[rc.counter] = left;
   invalidateCharacteristics(s);
-  if (left === 0 && rc.counter === "time") fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "time" });
+  if (left === 0) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: rc.counter });
 }
 
 export function isSummoningSick(s: GameState, o: GameObject) {
@@ -2674,6 +2681,8 @@ export function castProblem(
   if (!o) return "no such card";
   choices = convertChoices(o, choices);
   if (choices?.alt === "convert" && (choices.face ?? o.face) !== 1) return `${defOf(s, o).name} is cast converted with its back face up`;
+  // A defeated Siege is cast transformed, or not at all (CR 310.12b).
+  if (siegeCastTransformed(s, pid, o) && (choices?.face ?? o.face) !== 1) return `${defOf(s, o).name} can only be cast transformed`;
   if (choices?.face !== undefined && o.face !== choices.face) {
     // A split card's half, a modal double-faced card's face, an Adventure: only that face is looked at (CR 709.3a,
     // 712.11c, 715.3a).
@@ -2879,6 +2888,9 @@ export function convertChoices<C extends Pick<CostChoices, "alt" | "face">>(o: G
   return choices?.alt === "convert" && choices.face === undefined && o.face === undefined ? { ...choices, face: 1 } : choices;
 }
 
+/** `pid` may cast this card now only transformed, as a defeated Siege's trigger resolves (CR 310.12b). */
+const siegeCastTransformed = (s: GameState, pid: PlayerId, o: GameObject) => s.pending?.kind === "castFree" && s.pending.how === "transformed" && s.pending.player === pid && s.pending.objectId === o.id;
+
 /** Why this card can't be cast with the face `choices.face` (CR 709.3, 712.11b, 715.3), or null. */
 function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostChoices): string | null {
   const face = choices.face!;
@@ -2887,7 +2899,9 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
   const transformedWay =
     (choices.via !== undefined && layoutOf(s, o) === "transform" && graveyardWays(s, o).some((g) => g.kind === choices.via && g.face === face)) ||
     // Cast converted for its More Than Meets the Eye cost (CR 702.162a).
-    (choices.alt === "convert" && layoutOf(s, o) === "transform" && face === 1 && !!altCost(defOf(s, o), "convert"));
+    (choices.alt === "convert" && layoutOf(s, o) === "transform" && face === 1 && !!altCost(defOf(s, o), "convert")) ||
+    // A defeated Siege (CR 310.12b).
+    (siegeCastTransformed(s, pid, o) && layoutOf(s, o) === "transform" && face === 1);
   if (!castableFaces(s, o).includes(face) && !transformedWay) return `${defOf(s, o).name} can't be cast as that face`;
   // A card that went on an adventure may be cast from exile, but not as an Adventure again (CR 715.3d), unless
   // something else lets it be cast from there.
@@ -4582,6 +4596,10 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       invalidateCharacteristics(s);
       return;
     }
+    if (pend.what === "protector") {
+      setProtector(s, o, Number(choice));
+      return;
+    }
     if (pend.what === "anchor") {
       if (!pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
       o.chosen = { ...o.chosen, anchor: choice };
@@ -4614,7 +4632,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -4845,6 +4863,18 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
       return true;
     }
+    if (c.what === "protector") {
+      // As a battle enters, or when it needs a new protector, its controller chooses one (CR 310.9a, 704.5x-y).
+      const options = protectorOptions(s, o);
+      if (options.length <= 1) {
+        q.shift();
+        if (options.length) setProtector(s, o, options[0]!);
+        continue;
+      }
+      const siege = isSiege(s, o);
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "protector", options: options.map(String), labels: options.map((x) => player(s, x).name), objectId: o.id, prompt: siege ? "choose an opponent to protect it; you and the others can attack it" : "choose its protector" };
+      return true;
+    }
     if (c.what === "anchor") {
       // "As ~ enters, choose Khans or Dragons" (CR 614.12b).
       const words = compileCard(defOf(s, o)).entersAnchor ?? [];
@@ -5011,6 +5041,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
     (o) =>
       !o.tapped &&
       !isSummoningSick(s, o) &&
+      !objIsType(s, o, "Battle") && // a battle can't attack, even one that's also a creature (rulings)
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
       !characteristics(s, o).cantAttack &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
@@ -5064,13 +5095,33 @@ export function clearCombat(o: GameObject) {
 }
 
 /**
- * The planeswalker an attacking creature attacks, while that planeswalker is still in combat: on the battlefield as the
- * same object, still a planeswalker, still controlled by the defending player (CR 506.4).
+ * The planeswalker or battle an attacking creature attacks, while it's still in combat: on the battlefield as the same
+ * object, still a planeswalker controlled by the defending player, or still a battle that player protects, under the
+ * same controller (CR 506.4).
  */
 export function attackedPlaneswalker(s: GameState, o: GameObject): GameObject | undefined {
   const a = o.attackingPermanent;
   const pw = a && s.objects[a.id];
-  return pw && pw.zone === "battlefield" && (pw.zoneChanges ?? 0) === a.zc && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === o.attacking ? pw : undefined;
+  if (!pw || pw.zone !== "battlefield" || (pw.zoneChanges ?? 0) !== a.zc) return undefined;
+  if (a.battleController !== undefined) return objIsType(s, pw, "Battle") && pw.protector === o.attacking && controllerOf(s, pw) === a.battleController ? pw : undefined;
+  return objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === o.attacking ? pw : undefined;
+}
+
+/**
+ * Why `pid` can't attack this permanent while `defender` is a defending player, or null: a planeswalker that player
+ * controls (CR 506.2, 508.1b), or a battle that player protects (310.9b), but not a battle (CR 506.3).
+ */
+export function attackablePermanentProblem(s: GameState, pid: PlayerId, defender: PlayerId, id: ObjectId): string | null {
+  const o = s.objects[id];
+  if (!o || o.zone !== "battlefield") return "that permanent isn't on the battlefield";
+  if (objIsType(s, o, "Battle")) return o.protector === defender && defender !== pid ? null : "must attack a battle that player protects";
+  return objIsType(s, o, "Planeswalker") && controllerOf(s, o) === defender ? null : "must attack a planeswalker that player controls";
+}
+
+/** Where an attacking creature attacks a permanent: which one, and for a battle, its controller now (CR 506.4). */
+export function attackingPermanentOf(s: GameState, id: ObjectId): NonNullable<GameObject["attackingPermanent"]> {
+  const o = obj(s, id);
+  return { id, zc: o.zoneChanges ?? 0, ...(objIsType(s, o, "Battle") ? { battleController: controllerOf(s, o) } : {}) };
 }
 
 /** Attacking a player, not a planeswalker: "whenever ~ attacks a player", dethrone, melee (rulings). */
@@ -5087,6 +5138,7 @@ function attackedRecipient(s: GameState, at: GameObject): { toPlayer: PlayerId }
 /** "Jace" or "Ana" for the log: what a creature attacks. */
 export function attackedName(s: GameState, o: GameObject): string {
   const pw = o.attackingPermanent && s.objects[o.attackingPermanent.id];
+  if (pw && o.attackingPermanent?.battleController !== undefined) return `${characteristics(s, pw).name}${o.attacking !== undefined ? ` (protected by ${player(s, o.attacking).name})` : ""}`;
   return pw ? `${player(s, controllerOf(s, pw)).name}'s ${characteristics(s, pw).name}` : o.attacking !== undefined ? player(s, o.attacking).name : "nothing";
 }
 
@@ -5099,9 +5151,10 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if (!legal.has(a.attacker) || seen.has(a.attacker)) throw new RulesError(`${nameOf(s, a.attacker)} can't attack`);
     if (!opps.includes(a.defender)) throw new RulesError("must attack a living opponent");
     // A planeswalker a defending player controls can be attacked instead (CR 506.2, 508.1b, 802.3).
+    // So can a battle that player protects, its own controller's too (CR 310.9b).
     if (a.planeswalker !== undefined) {
-      const pw = s.objects[a.planeswalker];
-      if (!pw || pw.zone !== "battlefield" || !objIsType(s, pw, "Planeswalker") || controllerOf(s, pw) !== a.defender) throw new RulesError("must attack a planeswalker that player controls");
+      const why = attackablePermanentProblem(s, p.id, a.defender, a.planeswalker);
+      if (why) throw new RulesError(why);
     }
     const why = attackProblem(s, obj(s, a.attacker), a.defender, a.planeswalker !== undefined);
     if (why) throw new RulesError(why);
@@ -5145,7 +5198,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   for (const a of attacks) {
     const o = obj(s, a.attacker);
     o.attacking = a.defender;
-    if (a.planeswalker !== undefined) o.attackingPermanent = { id: a.planeswalker, zc: obj(s, a.planeswalker).zoneChanges ?? 0 };
+    if (a.planeswalker !== undefined) o.attackingPermanent = attackingPermanentOf(s, a.planeswalker);
     if (!objHasKeyword(s, o, "Vigilance")) tapPermanent(s, o); // CR 508.1f
     const before = o.attacked?.turn === s.turn ? o.attacked : undefined;
     const players = [...(before?.players ?? []), ...(a.planeswalker === undefined ? [a.defender] : [])];
@@ -5431,7 +5484,8 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   const b = characteristics(s, blocker);
   const a = characteristics(s, attacker);
   const has = (c: typeof a, k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
-  if (!b.types.includes("Creature") || blocker.tapped) return `${b.name} can't block`;
+  // A battle can't block, even one that's also a creature (CR 509.1a; rulings).
+  if (!b.types.includes("Creature") || b.types.includes("Battle") || blocker.tapped) return `${b.name} can't block`;
   if (cantBlockNow(s, blocker)) return `${b.name} can't block`;
   if (a.cantBeBlocked) return `${a.name} can't be blocked`;
   if (has(a, "Flying") && !has(b, "Flying") && !has(b, "Reach")) return `${b.name} can't block a creature with flying`; // CR 702.9b
@@ -5627,6 +5681,7 @@ function finishCombatDamage(s: GameState): boolean {
     // To a planeswalker: still on the battlefield as the damage is dealt, before state-based actions (CR 704.3).
     const pw = "object" in e.to && e.dealt ? s.objects[e.to.object] : undefined;
     if (pw?.zone === "battlefield" && objIsType(s, pw, "Planeswalker")) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: controllerOf(s, pw), amount: e.dealt, planeswalker: pw.id });
+    else if (pw?.zone === "battlefield" && objIsType(s, pw, "Battle")) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: pw.protector ?? controllerOf(s, pw), amount: e.dealt, battle: pw.id });
   }
   // "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage.
   const groups = new Map<string, { controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }>();
@@ -5743,6 +5798,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
       } else seen.set(key, id);
     }
     if (attachmentSBAs(s)) changed = true;
+    if (battleSBAs(s)) changed = true; // 704.5v-y
+    if (!s.pending && s.entersChoices?.length && askEntersChoice(s)) return;
     if (roleSBAs(s)) changed = true; // 704.5z
     if (sagaSBAs(s)) changed = true; // 704.5s
     if (dungeonSBAs(s)) changed = true; // 704.5t

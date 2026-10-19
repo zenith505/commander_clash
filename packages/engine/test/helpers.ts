@@ -135,7 +135,7 @@ export function addEffect(s: GameState, controller: PlayerId, ids: string[], mod
 export const pt = (s: GameState, id: string) => `${power(s, s.objects[id]!)}/${toughness(s, s.objects[id]!)}`;
 export const target = (id: string): TargetChoice => ({ kind: "object", id });
 
-type Face = { name: string; mana_cost?: string; type_line: string; oracle_text?: string; power?: string; toughness?: string };
+type Face = { name: string; mana_cost?: string; type_line: string; oracle_text?: string; power?: string; toughness?: string; defense?: string; color_indicator?: string[] };
 /** A card as Scryfall has it, read the way the card database is built (tools/build-cards.ts). */
 export function scry(layout: string, faces: Face[], extra: { keywords?: string[]; color_identity?: string[] } = {}): CardDef {
   const top = layout === "split" || layout === "adventure" || layout === "prepare" ? { mana_cost: faces.map((f) => f.mana_cost ?? "").join(" // ") } : layout === "flip" ? { mana_cost: faces[0]!.mana_cost ?? "" } : {};

@@ -1389,6 +1389,8 @@ export type Effect =
   | { type: "suspendTick" }
   /** Suspend's last-counter trigger (CR 702.62a): its owner may cast the exiled card without paying its mana cost. */
   | { type: "suspendCast" }
+  /** A Siege's intrinsic trigger (CR 310.12b): exile it (the subject), then its controller may cast it transformed for free. */
+  | { type: "siegeDefeated" }
   /** "Exile ~ with three time counters on it": the resolving spell suspends itself again (Arc Blade). */
   | { type: "exileSelfWithTime"; n: number }
   /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
@@ -1889,7 +1891,7 @@ export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -2364,6 +2366,8 @@ export interface TriggeredAbility {
   ifNotRenowned?: boolean;
   /** "Whenever ~ deals combat damage to a player or planeswalker" (Psychic Frog): also to a planeswalker, once each. */
   orPlaneswalker?: true;
+  /** "Whenever ~ deals combat damage to a player or battle" (CR 310): also to a battle, once each. */
+  orBattle?: true;
   /** "When ~ enters, if it was kicked, ..." (an intervening if, CR 603.4). */
   ifKicked?: SpellCondition;
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */

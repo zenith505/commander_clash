@@ -153,6 +153,29 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (ids.length) log(s, `${player(s, ctx.controller).name} untaps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
       return;
     }
+    case "tapAnyNumber": {
+      // Which untapped ones are chosen as it resolves (CR 608.2d), any number including none, then tapped together. Tapping
+      // none still counts as doing it: a "When you do" after it triggers with X = 0 (rulings on Teferi Akosa, Yotia
+      // Declares War). The number tapped stays what it was even if they untap or leave later (rulings on Siege Striker).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (!sc.chosen?.[ctx.controller]) {
+        r.tappedThisWay = 0;
+        const options = s.battlefield.filter((id) => !obj(s, id).tapped && objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+        if (!options.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "tap", what: `untapped ${e.filter.text}`, options, count: options.length, min: 0 };
+        return "paused";
+      }
+      const ids = sc.chosen[ctx.controller]!.filter((id) => s.objects[id]?.zone === "battlefield" && !obj(s, id).tapped);
+      sc.chosen = undefined;
+      sc.queue = undefined;
+      for (const id of ids) tapPermanent(s, obj(s, id));
+      r.tappedThisWay = ids.length;
+      log(s, ids.length ? `${player(s, ctx.controller).name} taps ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}.` : `${player(s, ctx.controller).name} taps nothing.`);
+      return;
+    }
     case "tapOrUntap": {
       // Its controller chooses as it resolves (CR 608.2d); an illegal target isn't asked about (CR 608.2b).
       const o = objects(s, e.what, ctx).find((x) => x.zone === "battlefield");
@@ -619,6 +642,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         return "paused";
       }
       if (sc.may && p.library[0] === sc.explored) moveObject(s, sc.explored, "graveyard");
+      return;
+    }
+    case "doublePT": {
+      // Each one's own power and toughness as this resolves (CR 701.10b-c), so one effect for each, locked onto it.
+      // All worked out before any of them changes (the effect is one event).
+      const list = objects(s, e.what, ctx).filter((o) => o.zone === "battlefield" && objIsType(s, o, "Creature")).map((o) => ({ o, p: e.power ? power(s, o) : 0, t: e.toughness ? toughness(s, o) : 0 }));
+      for (const { o, p, t } of list) {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: "endOfTurn", affected: [o.id], mods: [{ kind: "modifyPT", power: p, toughness: t }] });
+        log(s, `${defOf(s, o).name} gets ${p < 0 ? "" : "+"}${p}/${t < 0 ? "" : "+"}${t} until end of turn.`);
+      }
+      if (list.length) invalidateCharacteristics(s);
       return;
     }
     case "continuous": {

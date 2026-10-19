@@ -2000,6 +2000,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "05e6b243-48a6-4a42-bc5f-413441de9c33",
+  "name": "Elspeth, Sun's Champion",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Legendary Planeswalker — Elspeth",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Elspeth"
+  ],
+  "oracleText": "+1: Create three 1/1 white Soldier creature tokens.\n−3: Destroy all creatures with power 4 or greater.\n−7: You get an emblem with \"Creatures you control get +2/+2 and have flying.\"",
+  "loyalty": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ddo",
+  "releasedAt": "2015-02-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4d5df2d9-06bf-4bec-9be0-dabe75a858fb",
   "name": "Elven Chorus",
   "manaCost": "{3}{G}",
@@ -3414,6 +3445,32 @@
    ],
    "result": "Hanweir, the Writhing Township"
   }
+ },
+ {
+  "oracleId": "6c943c9d-090b-41c1-9003-24c91601e589",
+  "name": "Harmony of Nature",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Tap any number of untapped creatures you control. You gain 4 life for each creature tapped this way.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "p02",
+  "releasedAt": "1998-06-24",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "a1c7cd7a-0795-4135-b787-effeb981d95b",

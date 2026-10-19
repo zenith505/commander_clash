@@ -21,6 +21,8 @@ export interface AmountCtx {
   sourceZc?: number;
   /** The announced X (CR 107.3a); 0 when there's none (CR 107.3g). */
   x?: number;
+  /** A reflexive trigger after "tap any number of untapped creatures you control": how many were tapped. */
+  tapped?: number;
   /** The source as it last existed, if it has left the battlefield (CR 608.2h). */
   lki?: LastKnown;
   /** Kicker costs paid for the spell (or the spell its permanent was), CR 702.33d. */
@@ -159,6 +161,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "revealedFromHand":
     case "bottomedFromHand":
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
+    case "tappedThisWay":
+      return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "excessThisWay":
+      return s.resolving?.excessDamage ?? 0;
     case "tookFromHand":
       return s.resolving?.tookFromHand ?? 0;
     case "cardsInGraveyard": {
@@ -428,6 +434,10 @@ function describeCount(c: Count): string {
       return "#cards put on the bottom";
     case "tookFromHand":
       return "#cards chosen";
+    case "tappedThisWay":
+      return "#tapped";
+    case "excessThisWay":
+      return "the excess damage";
     case "greatestPowerExiled":
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":

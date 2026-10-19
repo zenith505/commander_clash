@@ -545,6 +545,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "getEnergy":
     case "poison":
     case "loseAllCounters":
+    case "emblem":
     case "becomeMonarch":
     case "extraLandThisTurn":
     case "ringTempts":
@@ -631,6 +632,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "suspect":
     case "untap":
     case "untapUpTo":
+    case "tapAnyNumber":
     case "tapOrUntap":
     case "becomeSaddled":
     case "classLevel":
@@ -665,6 +667,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "monstrosity":
     case "evolve":
     case "explore":
+    case "doublePT":
     case "continuous":
     case "playerGains":
     case "attach":

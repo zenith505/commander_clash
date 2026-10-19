@@ -1,16 +1,17 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
-import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
+import { cardIdOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
-import { characteristics, invalidateCharacteristics } from "../layers";
-import { cardSource, dealDamage, dealDamageBatch, objectSource, type DamageEvent, type DamageSource } from "../damage";
-import type { GameObject, GameState, ManaOrigin, ManaType, PlayerId, RedirectShield } from "../types";
+import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
+import { cardSource, dealDamage, dealDamageBatch, excessOver, lethalAmounts, objectSource, type DamageEvent, type DamageSource } from "../damage";
+import type { GameObject, GameState, ManaOrigin, ManaType, ObjectId, PlayerId, RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
+import { createEmblem } from "../emblems";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 /**
@@ -95,16 +96,20 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const from = { ...by, ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
       const lifelink = { n: 0 };
-      const events: DamageEvent[] = [
+      let events: DamageEvent[] = [
         ...all.flatMap((x) => x.objs.map((o): DamageEvent => ({ src: from, to: { object: o.id }, n: x.n }))),
         ...all.flatMap((x) => x.pids.map((pid): DamageEvent => ({ src: from, to: { player: pid }, n: x.n }))),
       ];
-      let dealt = 0;
-      for (const e of dealDamageBatch(s, events, { lifelink })) {
-        dealt += e.dealt;
-        if (e.dealt > 0 && "object" in e.to && s.resolving) (s.resolving.damagedThisWay ??= []).push(e.to.object);
-        if (e.dealt > 0 && "player" in e.to && s.resolving && !(s.resolving.playersDamagedThisWay ??= []).includes(e.to.player)) s.resolving.playersDamagedThisWay.push(e.to.player);
-      }
+      // "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal, worked out
+      // before replacement and prevention, is dealt to its controller at the same time (CR 120.4a; rulings).
+      if (e.excessToController)
+        events = events.flatMap((ev) => {
+          if (!("object" in ev.to)) return [ev];
+          const o = obj(s, ev.to.object);
+          const excess = excessOver(lethalAmounts(s, from, o), ev.n);
+          return excess ? [{ ...ev, n: ev.n - excess }, { src: from, to: { player: controllerOf(s, o) }, n: excess }] : [ev];
+        });
+      const dealt = dealtWithExcess(s, from, events, (evs) => dealDamageBatch(s, evs, { lifelink }));
       gainLife(s, from.controller, lifelink.n);
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
       return;
@@ -242,6 +247,16 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} loses all counters.`);
       }
       return;
+    case "emblem": {
+      // Named for its source as it is now, or as it last existed (CR 114.3: most emblems have no name; this is for the log).
+      const from = ctxSource(s, ctx).name.split(" // ")[0]!;
+      for (const pid of players(s, e.who, ctx)) {
+        createEmblem(s, pid, e.abilities, from);
+        log(s, `${player(s, pid).name} gets an emblem with ${e.abilities.map((a) => `"${a.replace(/~/g, "this emblem")}"`).join(" and ")}.`);
+      }
+      invalidateCharacteristics(s);
+      return;
+    }
     case "getEnergy":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);
@@ -393,9 +408,21 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.type === "bite") {
         // Noncombat damage from the creatures themselves, all dealt at once: their own deathtouch, lifelink, infect
         // apply. Their power as it resolves (rulings on Living Inferno).
-        const events: DamageEvent[] = as.flatMap((x) => bs.map((b): DamageEvent => ({ src: objectSource(s, x), to: { object: b.id }, n: power(s, x) })));
+        const events: DamageEvent[] = as.flatMap((x) =>
+          bs.flatMap((b): DamageEvent[] => {
+            const src = objectSource(s, x);
+            const n = power(s, x);
+            // Ram Through: with trample, the damage beyond lethal goes to the creature's controller (CR 120.4a).
+            const excess = e.excessIfTrample && objHasKeyword(s, x, "Trample") ? excessOver(lethalAmounts(s, src, b), n) : 0;
+            return excess ? [{ src, to: { object: b.id }, n: n - excess }, { src, to: { player: controllerOf(s, b) }, n: excess }] : [{ src, to: { object: b.id }, n }];
+          }),
+        );
         const by = new Map<string, number>();
-        for (const d of dealDamageBatch(s, events)) if (d.dealt && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
+        dealtWithExcess(s, events[0]!.src, events, (evs) => {
+          const out = dealDamageBatch(s, evs);
+          for (const d of out) if (d.dealt && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
+          return out;
+        });
         for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
         return;
       }
@@ -451,4 +478,22 @@ function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined 
   if (!lk || (lk.zc !== ctx.subject!.zc && lk.zc !== ctx.subject!.zc - 1)) return undefined;
   const ref = { object: o.id, zc: lk.zc };
   return lk.source ? { ...lk.source, controller: lk.controller, ref } : cardSource((lk.copyKey && s.cards[lk.copyKey]) || defOf(s, o), lk.controller, ref);
+}
+
+/**
+ * Deal damage events at once with `deal`, noting for "this way" what was damaged and the excess damage dealt to
+ * permanents: beyond what was lethal for each just before (CR 120.10). Returns the damage dealt.
+ */
+function dealtWithExcess(s: GameState, from: DamageSource, events: DamageEvent[], deal: (events: DamageEvent[]) => (DamageEvent & { dealt: number })[]): number {
+  const lethal = new Map(events.flatMap((ev) => ("object" in ev.to ? [[ev.to.object, lethalAmounts(s, ev.src ?? from, obj(s, ev.to.object))] as const] : [])));
+  const toObject = new Map<ObjectId, number>();
+  let dealt = 0;
+  for (const e of deal(events)) {
+    dealt += e.dealt;
+    if (e.dealt > 0 && "object" in e.to) toObject.set(e.to.object, (toObject.get(e.to.object) ?? 0) + e.dealt);
+    if (e.dealt > 0 && "object" in e.to && s.resolving) (s.resolving.damagedThisWay ??= []).push(e.to.object);
+    if (e.dealt > 0 && "player" in e.to && s.resolving && !(s.resolving.playersDamagedThisWay ??= []).includes(e.to.player)) s.resolving.playersDamagedThisWay.push(e.to.player);
+  }
+  if (s.resolving) for (const [id, n] of toObject) s.resolving.excessDamage = (s.resolving.excessDamage ?? 0) + excessOver(lethal.get(id) ?? [], n);
+  return dealt;
 }

@@ -3,6 +3,7 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
+import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
@@ -2133,7 +2134,8 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
   s.battlefield.some((id) => {
     const a = abilitiesOf(s, obj(s, id)).noMaxHandSize;
     return a === "all" || (!!a && controllerOf(s, obj(s, id)) === pid);
-  });
+  }) ||
+  liveEmblems(s).some((o) => o.owner === pid && !!abilitiesOf(s, o).noMaxHandSize);
 
 function finishCleanup(s: GameState) {
   closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
@@ -2999,8 +3001,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
 function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number): { more: number; less: number } {
   let [more, less] = [0, 0];
   const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
-  for (const id of s.battlefield) {
-    const src = obj(s, id);
+  // Emblems' too, which work in the command zone (CR 114.4).
+  for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // Its own or granted ones (Acolyte of Bahamut's "The first Dragon spell you cast each turn costs {2} less").
     const mods = abilitiesOf(s, src).costMods;
     if (!mods) continue;

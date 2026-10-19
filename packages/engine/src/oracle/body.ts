@@ -37,6 +37,10 @@ export interface Ctx {
   sacrificedIt?: boolean;
   /** A revealFromHand instruction came before, here or in the ability whose reflexive trigger this is: "for each card revealed this way". */
   revealedFromHand?: boolean;
+  /** A damage instruction came before: "the excess damage dealt this way" (CR 120.10). */
+  excessDamage?: boolean;
+  /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
+  tappedThisWay?: boolean;
   /** An amass instruction came before, here or in the ability whose reflexive trigger this is: "the amassed Army" (CR 701.47c). */
   amassed?: boolean;
   /** Index of the most recent object target, for "it" / "its controller". */
@@ -373,6 +377,19 @@ function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | nul
 /** Living Death's three parts, each for all players at once (Effect livingDeath): one instruction. */
 const LIVING_DEATH = /^Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then /;
 
+/** Split `text` at each match of `re` (global) that isn't inside double quotes: a quoted ability is one piece. */
+function splitOutsideQuotes(text: string, re: RegExp): string[] {
+  const out: string[] = [];
+  let start = 0;
+  for (const m of text.matchAll(re)) {
+    if ((text.slice(0, m.index).match(/"/g)?.length ?? 0) % 2) continue;
+    out.push(text.slice(start, m.index));
+    start = m.index! + m[0].length;
+  }
+  out.push(text.slice(start));
+  return out;
+}
+
 function splitSentences(text: string): string[] {
   const out: string[] = [];
   let start = 0;
@@ -389,7 +406,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -422,6 +439,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.sacrificedIt ? { sacrificedIt: true } : {}),
     ...(opts.amassed ? { amassed: true } : {}),
     ...(opts.revealedFromHand ? { revealedFromHand: true } : {}),
+    ...(opts.tappedThisWay ? { tappedThisWay: true } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -483,7 +501,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || LIVING_DEATH.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$|meld them into )/).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1271,7 +1289,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (double) s = `${double[1] === "its" ? "It" : double[4] ? double[4].charAt(0).toUpperCase() + double[4].slice(1) : "Target creature"} gets +X/+0 until end of turn, where X is its power`;
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
-    const where = /^(.+), where X is (.+)$/.exec(s);
+    // Not one inside a quoted ability ('You get an emblem with "..., where X is ..."'), which is that ability's own.
+    const where = /^(.+), where X is ([^"]+)$/.exec(s);
     if (where) s = where[1]!;
     ctx.whereX = !!where;
     const before = effects.length;
@@ -1541,10 +1560,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // even if it did nothing (CR 701.47b); earthbending is done whenever the spell resolves, its land the only target.
       // "Reveal any number of Dragon cards from your hand. When you do, ..." (Invasion of Tarkir): revealing none is
       // revealing any number too, so it always triggers (rulings).
-      const always = (prev?.type === "amass" || prev?.type === "revealFromHand" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
+      // "Tap any number of untapped creatures you control. When you do, ..." (Teferi Akosa of Zhalfir, Yotia Declares War):
+      // tapping none is doing it too, so it always triggers (rulings), with X the number tapped.
+      const always = (prev?.type === "amass" || prev?.type === "revealFromHand" || prev?.type === "tapAnyNumber" || (prev?.type === "earthbend" && ctx.targets.length === 1 && ctx.spell)) && effects.length === 1;
       if (!rolled && !counted && !mayDo && !sacSelf && !milled && !created && roleOn === undefined && !returned && !sacrificing && !always) return null;
       // Its own "where X is ..." goes with it.
-      const whenText = [where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
+      let whenText = [where ? `${whenDo[1]!}, where X is ${where[2]!}` : whenDo[1]!, ...sentences.slice(si + 1)].join(". ");
+      // "Tap any number of untapped artifacts you control. When you do, this Saga deals that much damage to target
+      // creature" (Yotia Declares War): one damage for each one tapped.
+      if (prev?.type === "tapAnyNumber") whenText = whenText.replace(/\bdeals that much damage to\b/, "deals damage equal to the number of permanents tapped this way to");
       si = sentences.length;
       // What the "you may" sacrificed, if the reflexive trigger is about it.
       const sacPick = mayDo && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice";
@@ -1765,9 +1789,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // "You may put a land card from your hand onto the battlefield": choosing none is the "may" (one question).
       const only = inner.length === 1 ? inner[0]! : undefined;
       // "You may tap or untap target permanent": tap, untap or neither, as one question.
-      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
+      // "You may tap any number of untapped creatures you control": tapping none is the "may".
+      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard" || only?.type === "tapAnyNumber") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
         // castFromHand offers "Don't cast" itself; returning cards from the graveyard can take none.
-        effects.push(only.type === "castFromHand" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
+        effects.push(only.type === "castFromHand" || only.type === "tapAnyNumber" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
         if (!defineX()) return null;
         continue;
       }
@@ -1873,6 +1898,32 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (/\bbecomes? the creature type of your choice\b/.test(s) || (/\bof the creature type of your choice\b/.test(s) && !/\btarget\b/i.test(s))) {
       effects.push({ type: "choose", choice: "creatureType" });
       s = s.replace(/\b(becomes?) the creature type of your choice\b/, "$1 the chosen creature type").replace(/\bof the creature type of your choice\b/, "of the chosen type");
+    }
+    // "~ deals 4 damage to target creature. Excess damage is dealt to that creature's controller instead." (Flame Spill):
+    // the damage beyond lethal goes to its controller (CR 120.4a).
+    if (/^Excess damage is dealt to that creature's controller instead$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "damage" || last.divided || last.evenly || last.also || last.excessToController) return null;
+      last.excessToController = true;
+      continue;
+    }
+    // "Target creature you control deals damage equal to its power to target creature you don't control. If the creature
+    // you control has trample, excess damage is dealt to that creature's controller instead." (Ram Through)
+    if (/^If the creature you control has trample, excess damage is dealt to that creature's controller instead$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "bite" || last.a.ref !== "target" || last.a.n || ctx.targets[last.a.index]?.controller !== "you") return null;
+      last.excessIfTrample = true;
+      continue;
+    }
+    // "If excess damage was dealt to that creature this way, investigate" (Torch the Witness), "If excess damage was
+    // dealt to a permanent this way, create that many tapped Treasure tokens" (Bottle-Cap Blast): after its damage.
+    const ifExcess = ctx.excessDamage ? /^If excess damage was dealt (?:to (?:that creature|that permanent|a permanent) )?this way, (.+)$/.exec(s) : null;
+    if (ifExcess) {
+      const inner = parseOne(ifExcess[1]!.replace(/^create that many (.+) tokens$/, "create a number of $1 tokens equal to the excess damage dealt this way"), ctx);
+      if (!inner || inner.some((x) => pauses(x))) return null;
+      effects.push({ type: "if", cond: { kind: "excessDealt" }, effects: inner });
+      if (!defineX()) return null;
+      continue;
     }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."
     if (/^You gain life equal to the (?:total )?life lost this way$/.test(s)) {
@@ -2200,6 +2251,7 @@ function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false
     ...(sac ? { sacrificedIt: true } : {}),
     ...(ctx.amassed ? { amassed: true } : {}),
     ...(ctx.revealedFromHand ? { revealedFromHand: true } : {}),
+    ...(ctx.tappedThisWay ? { tappedThisWay: true } : {}),
     ...(about || ctx.subjectIt ? { subjectIt: true } : ctx.subject ? { subject: true } : {}),
     ...(ctx.selfIt ? { selfIt: true } : {}),
     ...(ctx.selfCard ? { selfCard: true } : {}),
@@ -2223,6 +2275,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
     ctx.lastPut =
       (put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject) ||
+      // "Return it to the battlefield ..., then create a Wicked Role token attached to it" (Not Dead After All): the
+      // permanent the card became (CR 400.7; no Role if it didn't return as a creature, rulings).
+      (put?.type === "putOntoBattlefield" && put.what.ref === "selfCard" && !put.attachToSubject && put.attachToTarget === undefined) ||
       (put?.type === "putFromHand" && !put.any) ||
       // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
@@ -2232,10 +2287,13 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown;
     if (last?.type === "amass") ctx.amassed = true;
+    if (last?.type === "damage" || last?.type === "bite") ctx.excessDamage = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
+    // "Double the power of each other creature you control until end of turn. Those creatures gain vigilance" (Rhonas).
+    if (last?.type === "doublePT" && last.what.ref === "each") ctx.lastGroup = last.what;
   }
 }
 

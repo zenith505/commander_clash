@@ -427,7 +427,10 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   const i = s.turnOrder.indexOf(ctx.controller);
   const body = body0.targets.some((t) => t.perOpponent) ? expandPerOpponent(body0, [...s.turnOrder.slice(i + 1), ...s.turnOrder.slice(0, i)].filter((pid) => !player(s, pid).lost)) : body0;
   const castBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "castSpell";
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || castBound(t);
+  // "When you do, shuffle target nonland permanent ... with mana value X or less, where X is the number of creatures
+  // tapped this way" (Teferi Akosa of Zhalfir): the number tapped, fixed before the reflexive trigger's targets are chosen.
+  const tappedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "tappedThisWay";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || castBound(t) || tappedBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -443,6 +446,12 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
     // "With mana value less than or equal to that spell's mana value" (Hammerhead Tyrant): the spell that triggered it, as
     // it was cast (rulings), which can't change.
     if (castBound(t) && ctx.cause !== undefined) t = bindBound(s, t, ctx);
+    if (tappedBound(t) && ctx.tapped !== undefined) {
+      const { bound, ...rest } = t;
+      const n = Math.max(0, ctx.tapped * (bound!.amount.times ?? 1) + (bound!.amount.plus ?? 0));
+      const old = rest[bound!.key];
+      t = { ...rest, [bound!.key]: bound!.at === "exact" ? { min: n, max: n } : bound!.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) }, text: rest.text.replace(/ X or (less|greater)$/, ` ${n} or $1`) };
+    }
     // "With total mana value X or less": the X announced (CR 107.3a), or before then anything.
     if (t.total?.x) t = anyX ? (({ total: _, ...rest }) => rest)(t) : { ...t, total: { key: t.total.key, max: ctx.x ?? 0 }, text: t.text.replace(/ X or less\)$/, ` ${ctx.x ?? 0} or less)`) };
     return t;

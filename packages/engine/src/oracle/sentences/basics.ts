@@ -11,11 +11,25 @@ import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pick
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
 import { parsePreventAll } from "../statics";
+import { emblemAbilityOk } from "../grants";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "You get an emblem with "..."", "Each opponent gets an emblem with ...", "Target opponent gets ..." (CR 114.2), one
+  // or more quoted abilities ('with "..." and "..."'). "This emblem" in them is the emblem; a quoted ability inside one
+  // is in single quotes ("Mountains you control have '{T}: This land deals 1 damage to any target.'").
+  if ((m = /^(You|Each opponent|Target opponent|Target player) gets? an emblem with ("[^"]+"(?: and "[^"]+")*)\.?$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const abilities = [...m[2]!.matchAll(/"([^"]+)"/g)].map((q) =>
+      q[1]!
+        .replace(/\b(ha(?:s|ve)(?: [^']*? and)? )'([^']+?)'/g, '$1"$2"')
+        .replace(/\b[Tt]his emblem\b/g, "~")
+        .replace(/([^.!?"])$/, "$1."),
+    );
+    return who && abilities.every(emblemAbilityOk) ? [{ type: "emblem", who, abilities }] : null;
+  }
   // "Each opponent loses all counters" (Final Act): every counter they have (CR 122.1); poison and energy are the
   // player counters this engine has.
   if ((m = /^(Each opponent|Each player|Target opponent|Target player) loses all counters$/.exec(s))) {

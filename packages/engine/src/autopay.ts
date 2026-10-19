@@ -1,4 +1,5 @@
 import { asFace } from "./faces";
+import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
@@ -399,7 +400,7 @@ function wantCosts(cost: ParsedCost, extra: number, reqs: SpentReq[]): { cost: P
 /** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */
 function costDependsOnBoard(s: GameState, d: CardDef): boolean {
   const c = compileCard(d);
-  return !!(c.costLess?.length || c.costLessIf?.length || s.costModsThisTurn?.length) || s.battlefield.some((id) => !!abilitiesOf(s, obj(s, id)).costMods);
+  return !!(c.costLess?.length || c.costLessIf?.length || s.costModsThisTurn?.length) || s.battlefield.some((id) => !!abilitiesOf(s, obj(s, id)).costMods) || liveEmblems(s).some((o) => !!abilitiesOf(s, o).costMods);
 }
 
 /**

@@ -118,6 +118,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each card revealed this way", "the number of cards revealed this way" after "reveal any number of red cards in
   // your hand" (Scent of Cinder), or in its reflexive trigger (Invasion of Tarkir).
   if (ctx?.revealedFromHand && /^(?:the number of )?cards? revealed this way$/i.test(p)) return { count: { kind: "revealedFromHand" } };
+  // "The amount of excess damage dealt to that creature this way" (Hell to Pay), "that excess damage" (Contest of Claws):
+  // after a damage instruction (CR 120.10).
+  if (ctx?.excessDamage && /^(?:the )?(?:amount of )?excess damage dealt(?: to (?:that creature|that permanent))? this way$|^that excess damage$/i.test(p)) return { count: { kind: "excessThisWay" } };
+  // "For each creature tapped this way", "the number of creatures tapped this way" after "tap any number of untapped
+  // creatures you control" (Harmony of Nature), or in its reflexive trigger (Teferi Akosa of Zhalfir).
+  if (ctx?.tappedThisWay && /^(?:the number of )?(?:[A-Z][a-z]+ )?(?:creatures?|artifacts?|Gates?|Humans?|permanents?) tapped this way$/.test(p)) return { count: { kind: "tappedThisWay" } };
   // "For each card exiled from their hand this way" (Lost Legacy), after its exileNamed instruction.
   if (each && /^card exiled from (?:their|your) hand this way$/i.test(p)) return count({ kind: "exiledFromHandThisWay" });
   // "For each player being attacked", "the number of opponents being attacked" (Pack Attack, Dimir Strandcatcher).

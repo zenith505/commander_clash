@@ -206,6 +206,8 @@ export interface GameObject {
   counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
+  /** An emblem in its owner's command zone (CR 114): neither a card nor a permanent, its abilities working there (114.4). */
+  emblem?: true;
   /** A double-faced token (an Incubator) with its back face up (CR 111.10i, 701.27a): a transformed permanent. */
   tokenBackUp?: true;
   /** A spell cast for its mutate cost: a mutating creature spell (CR 702.140a). */
@@ -649,6 +651,8 @@ export interface StackItem {
   rolled?: number;
   /** See PendingTrigger.revealed. */
   revealed?: number;
+  /** See PendingTrigger.tapped. */
+  tapped?: number;
   /**
    * In `castItems` only: the spell's mana value as it was put on the stack, X included (CR 202.3e), for when it has left
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
@@ -757,6 +761,8 @@ export interface PendingTrigger {
   rolled?: number;
   /** A reflexive trigger after "reveal any number of Dragon cards from your hand": how many were revealed. */
   revealed?: number;
+  /** A reflexive trigger after "tap any number of untapped creatures you control": how many were tapped. */
+  tapped?: number;
   /** A reflexive trigger after "you may sacrifice another creature": that creature as it last existed (CR 608.2h). */
   sacrificed?: LastKnown[];
   /** A reflexive trigger after amassing: the amassed Army (CR 701.47c). */
@@ -1245,6 +1251,8 @@ export interface GameState {
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
+  /** The emblems in the command zone (CR 114.1), in the order they were made: objects with `emblem`. */
+  emblems?: ObjectId[];
   /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */
   dayNight?: "day" | "night";
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
@@ -1406,6 +1414,10 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
+  excessDamage?: number;
+  /** How many permanents its tapAnyNumber instruction tapped ("for each creature tapped this way"). */
+  tappedThisWay?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */

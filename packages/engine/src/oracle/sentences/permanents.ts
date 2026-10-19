@@ -24,6 +24,26 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   let m: RegExpExecArray | null;
 
+  // "Double the power of each creature you control until end of turn" (Double Trouble), "double the power and toughness
+  // of each creature you control", "double the toughness of each creature you control" (CR 701.10b-c): each gets +X/+0
+  // (+X/+Y, +0/+Y), X its own power and Y its own toughness as this resolves.
+  if ((m = /^[Dd]ouble the (power|toughness|power and toughness) of (each .+?|other creatures you control|creatures you control) until end of turn$/.exec(s))) {
+    const what = parseObject(m[2]!.startsWith("each") ? m[2]! : `each ${m[2]!.replace(/^other creatures/, "other creature").replace(/^creatures/, "creature")}`, ctx);
+    if (!what || !isGroup(what)) return null;
+    return [{ type: "doublePT", what, power: m[1] !== "toughness", toughness: m[1] !== "power" }];
+  }
+
+  // "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
+  // control" (Guild Summit): chosen as it resolves, none allowed, so "you may" changes nothing (CR 608.2d). Followed by
+  // "for each creature tapped this way" or "When you do, ... the number of creatures tapped this way".
+  if ((m = /^(?:[Yy]ou may )?[Tt]ap any number of untapped ((?:[A-Z][a-z]+ )?(?:creatures|artifacts|Gates|Humans)) you control$/.exec(s))) {
+    // A land type isn't read as a plural by parseGroup, but "each Gate you control" is the same group.
+    const g = m[1] === "Gates" ? parseGroup("each Gate you control") : parseGroup(`${m[1]!} you control`);
+    if (!g || g.other) return null;
+    ctx.tappedThisWay = true;
+    return [{ type: "tapAnyNumber", filter: { ...g.filter, text: `${m[1]!} you control` } }];
+  }
+
   // "That creature enters with an additional +1/+1 counter on it" about a creature spell a cast trigger is about (Boreal
   // Outrider): the spell, as it resolves (CR 614.1c).
   if ((m = new RegExp(`^[Tt]hat creature enters with (an|${NUMX}) additional ${COUNTER} counters? on it$`).exec(s)))

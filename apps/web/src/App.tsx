@@ -122,6 +122,7 @@ import {
   keywordLabel,
   type CardDef,
   type ManaType,
+  type GameEvent,
   type GameObject,
   type GameState,
   type PlayerId,
@@ -135,6 +136,9 @@ import {
   type TargetChoice,
   type TargetSpec,
   COLOR_NAMES,
+  FACE_DOWN,
+  FACE_DOWN_WARD,
+  faceDef,
   pickOptions,
 } from "@cc/engine";
 import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
@@ -1109,7 +1113,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
 
       <aside className="side">
         <div className="side-main">
-          <GameLog s={s} />
+          <GameLog s={s} onHover={setHover} />
           {s.stack.length > 0 && (
             <StackOverlay
               s={s}
@@ -1560,6 +1564,40 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         />
       )}
       <HoverCard d={hover} onGone={() => setHover(null)} />
+      <GameOverPopup s={s} onQuit={onQuit} />
+    </div>
+  );
+}
+
+/**
+ * Once you're out of the game, or it's over: a window saying whether you won or lost, with the way out. Closing it
+ * leaves the table to look at; if you lost while the others play on, it comes back when the game ends.
+ */
+function GameOverPopup({ s, onQuit }: { s: GameState; onQuit: () => void }) {
+  const lost = s.players[HUMAN]!.lost;
+  const moment = s.over ? "over" : lost ? "lost" : null;
+  const [closed, setClosed] = useState<string | null>(null);
+  if (!moment || closed === moment) return null;
+  const won = s.over && s.winner === HUMAN;
+  const winner = s.winner !== null ? s.players[s.winner]! : undefined;
+  // A card that says its controller wins logs "X wins the game (<card>)."
+  const how = s.over && winner ? /wins the game \((.+)\)\.$/.exec([...s.log].reverse().find((e) => e.text.startsWith(`${winner.name} wins the game (`))?.text ?? "")?.[1] : undefined;
+  return (
+    <div className="modal-backdrop game-end-backdrop">
+      <div className={`modal game-end ${won ? "won" : "lost"}`} role="dialog" aria-label="Game over">
+        <h2>{won ? "You won!" : s.over && !winner ? "It's a draw." : "You lost."}</h2>
+        <p className="muted">
+          {won
+            ? how ? `${how} won you the game.` : "You're the last player standing."
+            : !s.over ? "The others play on without you." : winner ? `${winner.name} wins the game${how ? ` with ${how}` : ""}.` : "No one wins the game."}
+        </p>
+        <div className="game-end-buttons">
+          <button onClick={onQuit}>Back to lobby</button>
+          <button className="ghost" onClick={() => setClosed(moment)}>
+            {s.over ? "Look at the table" : "Watch the rest"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4237,18 +4275,115 @@ function Controls({
   );
 }
 
-function GameLog({ s }: { s: GameState }) {
+/** The phases of a turn (CR 500.1), which the log groups each turn's lines by. */
+const PHASE_LABEL: Record<Step, string> = {
+  untap: "Beginning",
+  upkeep: "Beginning",
+  draw: "Beginning",
+  main1: "Main 1",
+  beginCombat: "Combat",
+  declareAttackers: "Combat",
+  declareBlockers: "Combat",
+  firstStrikeDamage: "Combat",
+  combatDamage: "Combat",
+  endCombat: "Combat",
+  main2: "Main 2",
+  end: "End",
+  cleanup: "End",
+};
+
+const isTurnLine = (e: GameEvent) => e.text.startsWith("— Turn ");
+
+interface LogPhase {
+  key: string;
+  label?: string;
+  entries: GameEvent[];
+}
+
+/** The log's last `max` lines you may see, by turn and, within a turn, by phase, in the order they happened. */
+function logGroups(s: GameState, max: number): { key: string; head: string; phases: LogPhase[] }[] {
   // Hidden information is only shown to the player who may see it (CR 402.3).
-  const entries = s.log.filter((e) => e.to === undefined || e.to === HUMAN).slice(-80).reverse(); // newest first
+  const seen = s.log.filter((e) => e.to === undefined || e.to === HUMAN);
+  const heads = new Map(seen.filter(isTurnLine).map((e) => [e.turn, e.text.replace(/^— | —$/g, "")]));
+  const turns: { key: string; turn: number; head: string; phases: LogPhase[] }[] = [];
+  for (const e of seen.slice(-max)) {
+    let t = turns[turns.length - 1];
+    if (!t || t.turn !== e.turn) turns.push((t = { key: `t${e.seq}`, turn: e.turn, head: heads.get(e.turn) ?? `Turn ${e.turn}`, phases: [] }));
+    if (isTurnLine(e)) continue;
+    const label = e.step && PHASE_LABEL[e.step];
+    let ph = t.phases[t.phases.length - 1];
+    if (!ph || ph.label !== label) t.phases.push((ph = { key: `p${e.seq}`, ...(label ? { label } : {}), entries: [] }));
+    ph.entries.push(e);
+  }
+  return turns;
+}
+
+/** The names of the cards in this game, each with the card it shows when hovered in the log: whole cards and each face. */
+function logCardNames(s: GameState): { names: Map<string, CardDef>; pattern: RegExp | null } {
+  const names = new Map<string, CardDef>();
+  for (const d of Object.values(s.cards)) {
+    if (d.oracleId === FACE_DOWN.oracleId || d.oracleId === FACE_DOWN_WARD.oracleId) continue;
+    if (!names.has(d.name)) names.set(d.name, d);
+    d.faces?.forEach((f, i) => {
+      if (!names.has(f.name)) names.set(f.name, faceDef(d, i));
+    });
+  }
+  const escaped = [...names.keys()]
+    .filter((n) => n.length > 1)
+    .sort((a, b) => b.length - a.length) // the longest name first: "Llanowar Elves" before "Llanowar"
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  // A whole name only, not part of a longer word.
+  return { names, pattern: escaped.length ? new RegExp(`(?<![\\p{L}\\p{N}'])(${escaped.join("|")})(?![\\p{L}\\p{N}])`, "gu") : null };
+}
+
+/** A log line with the cards it names underlined; hovering one shows the card. */
+function LogLine({ text, names, pattern, onHover }: { text: string; names: Map<string, CardDef>; pattern: RegExp | null; onHover: (d: CardDef | null) => void }) {
+  if (!pattern) return <RulesText text={text} />;
+  const parts = text.split(pattern); // the names land at the odd indexes
   return (
-    <div className="log">
-      {entries.map((e) => (
-        <div key={e.seq} className={e.text.startsWith("—") ? "turn-line" : ""}>
-          <RulesText text={youGrammar(e.text)} />
-        </div>
-      ))}
-    </div>
+    <>
+      {parts.map((part, i) => {
+        const d = i % 2 ? names.get(part) : undefined;
+        return d ? (
+          <span key={i} className="card-ref" data-card-ref={part} {...hoverProps(d, onHover)}>
+            {part}
+          </span>
+        ) : (
+          <RulesText key={i} text={part} />
+        );
+      })}
+    </>
   );
+}
+
+function GameLog({ s, onHover }: { s: GameState; onHover: (d: CardDef | null) => void }) {
+  const cardCount = Object.keys(s.cards).length;
+  // The game's cards only ever grow (tokens, copies): look them up again when there are more.
+  const { names, pattern } = useMemo(() => logCardNames(s), [cardCount]);
+  // Newest first: the latest turn on top, and in it the latest phase, each under its heading.
+  return useMemo(() => {
+    const turns = logGroups(s, 80).reverse();
+    return (
+      <div className="log">
+        {turns.map((t) => (
+          <section key={t.key} className="log-turn">
+            <div className="turn-line">{youGrammar(t.head)}</div>
+            {[...t.phases].reverse().map((ph) => (
+              <div key={ph.key} className="log-phase" data-phase={ph.label}>
+                {ph.label && <div className="phase-line">{ph.label}</div>}
+                {[...ph.entries].reverse().map((e) => (
+                  <div key={e.seq} className="log-entry">
+                    <LogLine text={youGrammar(e.text)} names={names} pattern={pattern} onHover={onHover} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </section>
+        ))}
+      </div>
+    );
+    // Only a new line changes it, not every hover elsewhere on the table.
+  }, [s.log, names, pattern, onHover]);
 }
 
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
@@ -4459,7 +4594,7 @@ function HoverCard({ d, onGone }: { d: CardDef | null; onGone: () => void }) {
   // leaving it, so after every update check there's still a card under the mouse.
   const check = () => {
     const { x, y } = mouse.current;
-    if (!document.elementFromPoint(x, y)?.closest(".card")) gone.current();
+    if (!document.elementFromPoint(x, y)?.closest(".card, .card-ref")) gone.current();
   };
 
   const place = () => {
@@ -4468,6 +4603,19 @@ function HoverCard({ d, onGone }: { d: CardDef | null; onGone: () => void }) {
     const { x, y } = mouse.current;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
+    // A card in your hand shows above the hand, so it covers neither its neighbours nor the way to them.
+    const slot = document.elementFromPoint(x, y)?.closest<HTMLElement>(".hand .fan-slot");
+    if (slot) {
+      const fan = slot.parentElement!.getBoundingClientRect();
+      const card = slot.querySelector<HTMLElement>(".card");
+      // Clear of the hovered card, which rises a quarter of its height (styles.css).
+      const room = fan.top - (card?.offsetHeight ?? 0) * 0.25 - 16;
+      const k = Math.min(1, Math.max(0.5, room / h)); // shrunk to fit on a short screen
+      const r = slot.getBoundingClientRect();
+      const left = Math.min(Math.max(8, r.left + r.width / 2 - (w * k) / 2), innerWidth - w * k - 8);
+      el.style.transform = `translate(${left}px, ${Math.max(8, room - h * k)}px) scale(${k})`;
+      return;
+    }
     const gap = 28;
     let left = x + gap;
     if (left + w > innerWidth - 8) left = x - gap - w;
@@ -4609,7 +4757,7 @@ function PriorityToggle({ mode, onChange }: { mode: PriorityMode; onChange: (m: 
         aria-checked={mode === "hold"}
         className={mode === "hold" ? "on" : ""}
         onClick={() => onChange("hold")}
-        title="Stop whenever something happens you could respond to and you have mana up, even with nothing to play, so opponents can't read your hand."
+        title="Stop whenever something happens you could respond to, even when you're tapped out or have nothing to play, so opponents can't read your hand."
       >
         Hold
       </button>

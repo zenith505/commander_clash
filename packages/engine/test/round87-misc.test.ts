@@ -74,3 +74,27 @@ describe("doubling the power or toughness of each creature (CR 701.10b-c)", () =
     expect(pt(s, a)).toBe("4/6");
   });
 });
+
+const tandem = card("Tandem Takedown", "Instant", "{1}{G}{G}", { oracleText: "Up to two target creatures you control each get +1/+0 until end of turn. They each deal damage equal to their power to another target creature, planeswalker, or battle." });
+const bandTogether = card("Band Together", "Instant", "{2}{G}", { oracleText: "Up to two target creatures you control each deal damage equal to their power to another target creature." });
+
+describe("two target creatures each deal damage equal to their power (bite)", () => {
+  it("compile", () => supported(tandem, bandTogether));
+
+  it("Tandem Takedown: each gets +1/+0, then both deal their damage to the last target at once", () => {
+    const { s: s0, ap, opp, ids } = setup([tandem]);
+    const [a, b] = [bear(), bear()].map((d) => putOnBattlefield(s0, ap, d)) as [string, string];
+    const big = putOnBattlefield(s0, opp, bear({ power: "5", toughness: "5" }));
+    const s = settle(cast(s0, ap, ids[0]!, [target(a), target(b), target(big)]));
+    expect(pt(s, a)).toBe("3/2");
+    expect(s.objects[big]!.zone).toBe("graveyard");
+  });
+
+  it("Band Together: with one creature chosen, only it deals damage", () => {
+    const { s: s0, ap, opp, ids } = setup([bandTogether]);
+    const a = putOnBattlefield(s0, ap, bear());
+    const big = putOnBattlefield(s0, opp, bear({ power: "5", toughness: "5" }));
+    const s = settle(cast(s0, ap, ids[0]!, [target(a), { kind: "none" }, target(big)]));
+    expect(s.objects[big]!.damage).toBe(2);
+  });
+});

@@ -209,6 +209,15 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = a && parseObject(m[2]!, ctx);
     return a?.ref === "target" && b && !isGroup(b) && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
   }
+  // "Up to two target creatures you control each deal damage equal to their power to another target creature" (Band
+  // Together), "... each get +1/+0 until end of turn. They each deal damage equal to their power to ..." (Tandem
+  // Takedown): each target still legal, all at once, each the source of its own damage; none if the last target is
+  // illegal (rulings on Tandem Takedown).
+  if ((m = /^(They|(?:Up to two|One or two|Two) target creatures you control) each deal damage equal to their power to (.+)$/.exec(s))) {
+    const a = parseObject(m[1] === "They" ? "them" : m[1]!, ctx);
+    const b = a && parseObject(m[2]!, ctx);
+    return a?.ref === "target" && a.n && b?.ref === "target" && !isGroup(b) && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).

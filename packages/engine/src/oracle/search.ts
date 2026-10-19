@@ -34,11 +34,15 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
     const filter: TargetSpec = { kind: "card", anyOf: [both[1]!, both[2]!].map((name) => ({ kind: "card" as const, named: name, text: `card named ${name}` })), text: m[3]! };
     return [{ type: "search", filter, n: 2, upTo: true, oneEach: true, reveal, dest: searchDest(r[1]!) }];
   }
-  const filter = parseSearchFilter(m[3]!, count);
+  // "Up to four Minotaur creature cards with different names" (Deathbellow War Cry): no two with the same name, which is
+  // one of each name offered (oneEach). Several of them only.
+  const different = / with different names$/.exec(m[3]!);
+  if (different && n === 1) return null;
+  const filter = parseSearchFilter(different ? m[3]!.slice(0, different.index) : m[3]!, count);
   if (filter === null) return null;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
-  const base = { type: "search" as const, ...(filter ? { filter } : {}), n, upTo, reveal };
+  const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}) };
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
   if ((r = new RegExp(`^put one ${SEARCH_DEST} and the other ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
     return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!) }];

@@ -373,6 +373,19 @@ function revealedAction(text: string, ctx: Ctx, targets = false): Effect[] | nul
 /** Living Death's three parts, each for all players at once (Effect livingDeath): one instruction. */
 const LIVING_DEATH = /^Each player exiles all creature cards from their graveyard, then sacrifices all creatures they control, then /;
 
+/** Split `text` at each match of `re` (global) that isn't inside double quotes: a quoted ability is one piece. */
+function splitOutsideQuotes(text: string, re: RegExp): string[] {
+  const out: string[] = [];
+  let start = 0;
+  for (const m of text.matchAll(re)) {
+    if ((text.slice(0, m.index).match(/"/g)?.length ?? 0) % 2) continue;
+    out.push(text.slice(start, m.index));
+    start = m.index! + m[0].length;
+  }
+  out.push(text.slice(start));
+  return out;
+}
+
 function splitSentences(text: string): string[] {
   const out: string[] = [];
   let start = 0;
@@ -483,7 +496,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || LIVING_DEATH.test(x) ? [x] : x.split(/, then (?!shuffle|sacrifices the rest$|meld them into )/).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1271,7 +1284,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (double) s = `${double[1] === "its" ? "It" : double[4] ? double[4].charAt(0).toUpperCase() + double[4].slice(1) : "Target creature"} gets +X/+0 until end of turn, where X is its power`;
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
-    const where = /^(.+), where X is (.+)$/.exec(s);
+    // Not one inside a quoted ability ('You get an emblem with "..., where X is ..."'), which is that ability's own.
+    const where = /^(.+), where X is ([^"]+)$/.exec(s);
     if (where) s = where[1]!;
     ctx.whereX = !!where;
     const before = effects.length;
@@ -2223,6 +2237,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
     ctx.lastPut =
       (put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") && !put.attachToSubject) ||
+      // "Return it to the battlefield ..., then create a Wicked Role token attached to it" (Not Dead After All): the
+      // permanent the card became (CR 400.7; no Role if it didn't return as a creature, rulings).
+      (put?.type === "putOntoBattlefield" && put.what.ref === "selfCard" && !put.attachToSubject && put.attachToTarget === undefined) ||
       (put?.type === "putFromHand" && !put.any) ||
       // One card searched for and put onto the battlefield (Vision Quest's "it gains haste").
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);

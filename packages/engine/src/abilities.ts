@@ -1761,6 +1761,11 @@ export type Effect =
   | { type: "poison"; who: PlayerRef; n: Amount }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
   | { type: "loseAllCounters"; who: PlayerRef }
+  /**
+   * "You get an emblem with "..."", "each opponent gets an emblem with ..." (CR 114.2): each of those players puts an
+   * emblem with these abilities into the command zone. "This emblem" in them is "~".
+   */
+  | { type: "emblem"; who: PlayerRef; abilities: string[] }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */

@@ -22,6 +22,7 @@ import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
+import { liveEmblems } from "./emblems";
 import { bindChosenKeywords, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
@@ -281,6 +282,8 @@ interface Inst {
   locked?: ObjectId[];
   /** A static ability an effect gave its source, not one of its card's (grantedStatics). */
   granted?: true;
+  /** An emblem's static ability (CR 114.4): its source is in the command zone, with `controller` its owner. */
+  emblem?: true;
 }
 
 function gather(s: GameState): Inst[] {
@@ -315,6 +318,11 @@ function gather(s: GameState): Inst[] {
       fixed: [o.id],
     });
   }
+  // Emblems' static abilities, with the emblems' timestamps (CR 114.4, 613.7a).
+  for (const o of liveEmblems(s))
+    compileCard(defOf(s, o)).statics.forEach((st, i) =>
+      out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true }),
+    );
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
@@ -352,7 +360,7 @@ const sameCI = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** Does a static ability's source still have it? It must be on the battlefield and not have lost its abilities. */
 function exists(s: GameState, e: Inst, chars: CharMap): boolean {
-  if (!e.affects) return true;
+  if (!e.affects || e.emblem) return true;
   const src = chars.get(e.sourceId!);
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
   if (e.condition && !conditionMet(s, e.condition, e.sourceId!, src.controller, chars)) return false;
@@ -1106,7 +1114,7 @@ function countsSomething(st: StaticAbility): boolean {
 
 /** Does any static ability on the battlefield count something? */
 function usesCounts(s: GameState): boolean {
-  return s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some(countsSomething));
+  return s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some(countsSomething)) || liveEmblems(s).some((o) => compileCard(defOf(s, o)).statics.some(countsSomething));
 }
 
 /** Turn the cache off to check that invalidation is complete (tests compare both ways). */

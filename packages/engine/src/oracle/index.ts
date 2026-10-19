@@ -23,6 +23,6 @@ export { parseManaAbility } from "./mana-abilities";
 export { parseBody, usesX } from "./body";
 export { parseCount } from "./counts";
 export { parseTargetPhrase } from "./targets";
-export { compileGranted } from "./grants";
+export { compileGranted, emblemAbilityOk } from "./grants";
 export { parseCopyExcept, PREDEFINED_TOKENS } from "./tokens";
 export { UNDERCITY, LOST_MINE, MAD_MAGE, TOMB_OF_ANNIHILATION, DUNGEONS, dungeonByName, dungeonDef, dungeonSupported, roomBody, type Dungeon, type DungeonRoom } from "./dungeons";

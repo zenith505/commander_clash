@@ -157,3 +157,32 @@ export function parseGrants(text: string): Modification[] | null {
   }
   return out.length ? out : null;
 }
+
+/**
+ * The events whose triggered abilities work on an emblem in the command zone (CR 114.4): fireEvent looks for them on
+ * emblems as well as on permanents.
+ */
+export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
+  "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat",
+  "yourEndCombat", "eachEndCombat", "yourFirstMain", "eachFirstMain", "yourPostcombatMain", "eachPostcombatMain",
+  "castSpell", "permanentEnters", "anotherCreatureYouControlEnters", "landYouControlEnters", "permanentDies", "youGainLife",
+  "playerDraws", "creatureYouControlAttacks", "creatureYouControlDealsCombatDamageToPlayer", "permanentBecomesTapped",
+]);
+
+/**
+ * Can an emblem have this ability (CR 114.3), with "this emblem" in it written "~"? A triggered ability for one of
+ * EMBLEM_EVENTS, a static ability about the permanents its controller controls or others (applied by the layers),
+ * "spells you cast cost less", or "you have no maximum hand size". The emblem itself is no permanent, so nothing about
+ * "~" being tapped, attacking or enchanting something can apply.
+ */
+export function emblemAbilityOk(text: string): boolean {
+  if (text.includes(QUOTED_SOURCE_NAME)) return false;
+  const c = compileGranted(text);
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, ...rest } = c;
+  if (unsupported.length || textKeywords.length || entersTapped || activated.length || mana.length || Object.keys(rest).length) return false;
+  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true) return false;
+  if (noMaxHandSize === "all") return false;
+  if (!triggers.every((t) => EMBLEM_EVENTS.has(t.event) && !t.host && !t.zone && !t.activeIf && !t.ifCond && !t.hostControllersUpkeep && !t.enchantedPlayersTurn)) return false;
+  if (!statics.every((st) => st.affects.kind === "filter" && !st.affects.other && !st.condition && st.affects.controller !== "enchanted")) return false;
+  return (costMods ?? []).every((m) => !m.if && m.who !== "enchanted");
+}

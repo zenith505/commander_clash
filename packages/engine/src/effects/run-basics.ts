@@ -11,6 +11,7 @@ import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipien
 import { fireEvent } from "./triggers";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
+import { createEmblem } from "../emblems";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 /**
@@ -242,6 +243,16 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} loses all counters.`);
       }
       return;
+    case "emblem": {
+      // Named for its source as it is now, or as it last existed (CR 114.3: most emblems have no name; this is for the log).
+      const from = ctxSource(s, ctx).name.split(" // ")[0]!;
+      for (const pid of players(s, e.who, ctx)) {
+        createEmblem(s, pid, e.abilities, from);
+        log(s, `${player(s, pid).name} gets an emblem with ${e.abilities.map((a) => `"${a.replace(/~/g, "this emblem")}"`).join(" and ")}.`);
+      }
+      invalidateCharacteristics(s);
+      return;
+    }
     case "getEnergy":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);

@@ -206,6 +206,8 @@ export interface GameObject {
   counterTimestamps?: Record<string, number>;
   isCommander: boolean;
   isToken: boolean;
+  /** An emblem in its owner's command zone (CR 114): neither a card nor a permanent, its abilities working there (114.4). */
+  emblem?: true;
   /** A double-faced token (an Incubator) with its back face up (CR 111.10i, 701.27a): a transformed permanent. */
   tokenBackUp?: true;
   /** A spell cast for its mutate cost: a mutating creature spell (CR 702.140a). */
@@ -1245,6 +1247,8 @@ export interface GameState {
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
+  /** The emblems in the command zone (CR 114.1), in the order they were made: objects with `emblem`. */
+  emblems?: ObjectId[];
   /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */
   dayNight?: "day" | "night";
   /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */

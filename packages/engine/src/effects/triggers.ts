@@ -18,6 +18,7 @@ import { INITIATIVE } from "../oracle";
 import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
 import { isSuspended } from "./run-zones";
+import { liveEmblems } from "../emblems";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
 const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }>["step"], [TriggerEvent, TriggerEvent]>> = {
@@ -371,6 +372,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
   };
   /**
+   * The emblems in the command zone, each with its owner, who controls it (CR 114.2, 114.4); `f` adds the abilities that
+   * trigger. Only the events in EMBLEM_EVENTS (oracle/grants.ts) look at emblems.
+   */
+  const fromEmblems = (f: (o: GameObject, owner: PlayerId) => void) => {
+    for (const o of liveEmblems(s)) f(o, o.owner);
+  };
+  /**
    * The delayed triggered abilities with a duration still in effect (CR 603.7b), each with its source object, wherever it
    * is now, and its controller (603.7d-e); `f` adds the ones this event triggers. `self`: only those about this object, as
    * the object it was when the ability was made (603.7c, 400.7).
@@ -445,17 +453,20 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         add(o, you, (e, t) => e === "anotherCreatureYouControlEnters" && (!t.ifEvolves || evolves(s, o, lki)) && (!t.ifSoulbond || pairable(s, o, entering, you)), undefined, undefined, entering, lki);
       }
       fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "anotherCreatureYouControlEnters", undefined, undefined, entering, lki));
+      fromEmblems((o, owner) => owner === you && add(o, you, (e) => e === "anotherCreatureYouControlEnters", undefined, undefined, entering, lki));
     }
     // Landfall. The land itself sees itself enter too (CR 603.6a).
     if (objIsType(s, entering, "Land")) {
       for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === you) add(obj(s, id), you, (e) => e === "landYouControlEnters");
       fromGraveyards((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
+      fromEmblems((o, owner) => owner === you && add(o, you, (e) => e === "landYouControlEnters"));
     }
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
     const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering);
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
+    fromEmblems(entersWatch);
     locked = null;
     causedBy = null;
   } else if (ev.type === "controlChanged") {
@@ -537,6 +548,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         consider(src, left.controller, left.attachedTo, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
       fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers));
+      fromEmblems((src, owner) => consider(src, owner, undefined));
     }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
     causedBy = null;
@@ -602,6 +614,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
+    fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
   } else if (ev.type === "diceRolled") {
     // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
     // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").
@@ -663,11 +676,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e) => e === "selfBecomesTapped");
     addHosted(o, (e) => e === "selfBecomesTapped");
-    for (const id of s.battlefield) {
-      const w = obj(s, id);
-      const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
-    }
+    const tapWatch = (w: GameObject, ctrl: PlayerId) => add(w, ctrl, (e, t) => e === "permanentBecomesTapped" && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false), undefined, undefined, o);
+    for (const id of s.battlefield) tapWatch(obj(s, id), controllerOf(s, obj(s, id)));
+    fromEmblems(tapWatch);
   } else if (ev.type === "untapped") {
     // "Whenever ~ becomes untapped" (inspired), "whenever equipped creature becomes untapped", "whenever a permanent
     // you control becomes untapped" (the untapped permanent is the subject).
@@ -755,12 +766,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
-    for (const id of s.battlefield) {
-      const w = obj(s, id);
-      const wc = controllerOf(s, w);
+    const attackWatch = (w: GameObject, wc: PlayerId) => {
       const at = attackingYou(o, wc);
       add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, t.attacker.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
-    }
+    };
+    for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
+    fromEmblems(attackWatch);
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
     // "Whenever a creature attacks enchanted player": not one attacking a planeswalker of theirs (rulings).
@@ -899,11 +910,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);
-    for (const id of s.battlefield) {
-      const w = obj(s, id);
-      if (controllerOf(s, w) !== dealerBy) continue;
-      add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
-    }
+    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
+    for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === dealerBy) dealWatch(obj(s, id));
+    fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
     fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && objectMatches(s, t.dealer.filter, o, ctrl, false) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info));
@@ -959,6 +968,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
     fromFloating(castWatch);
+    fromEmblems(castWatch);
     // Heroic: "Whenever you cast a spell that targets ~", once however many of its targets name it.
     const targeted = new Set(ev.copy ? [] : (item?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
     for (const id of targeted) {
@@ -1068,8 +1078,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "draw") {
-    for (const id of s.battlefield) {
-      const o = obj(s, id);
+    for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
       const you = controllerOf(s, o);
       add(o, you, (e, t) => {
         if (e !== "playerDraws" || !t.draws) return false;
@@ -1169,6 +1178,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => (e === "yourMain" && you === ev.active && (ev.step === "main1" || ev.step === "main2")) || (e === want && you === ev.active && (!t.ifEcho || echoDue(s, o, you)) && (!t.secondMain || s.mainPhasesThisTurn === 2)) || (e === each && (!t.hostControllersUpkeep || hostController(s, o) === ev.active) && (!t.opponentsTurn || opponents(s, you).includes(ev.active)) && (!t.enchantedPlayersTurn || o.attachedToPlayer === ev.active)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.active });
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
+    fromEmblems(stepWatch);
   }
 }
 

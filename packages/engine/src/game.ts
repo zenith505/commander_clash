@@ -3,6 +3,7 @@ import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCos
 import { mergeSpell } from "./mutate";
 import { asFace, castableFaces, defMv, hasName, landFaces, layoutOf, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
+import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
@@ -764,6 +765,7 @@ export function moveObject(
   o.classLevel = undefined; // CR 716.2b
   o.solved = undefined; // CR 719.3b
   o.transforms = undefined; // a new object (CR 400.7)
+  o.prepared = undefined; // CR 722.3a
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
@@ -957,6 +959,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     const put = putCounters(s, o, counter, o.colorsSpent.length, true);
     log(s, `${defOf(s, o).name} enters with ${put} ${counter} counter${put === 1 ? "" : "s"} (sunburst).`);
   }
+  // "This creature enters prepared" (CR 722.3a): the copy of its prepare spell is created as it enters (722.3c).
+  if (printed.entersPrepared) becomePrepared(s, o);
   // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
   const saga = characteristics(s, o).subtypes.includes("Saga");
   if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
@@ -2371,7 +2375,7 @@ function exilePermission(s: GameState, o: GameObject, pid: PlayerId): Pick<NonNu
 
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return ownExilePermission(s, o, pid) || linkedPlayPermission(s, o, pid);
+  return ownExilePermission(s, o, pid) || linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
 }
 
 /** The card's own permission to be played from exile (GameObject.mayPlay), if it's `pid`'s and holds now. */
@@ -3358,6 +3362,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   s.cards[d.oracleId] ??= d;
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };
+  // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
+  if (o.preparedFrom) unprepareFor(s, o);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}) });
   fireEvent(s, { type: "targeted", stackId });
@@ -5590,6 +5596,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     checkPairs(s);
     checkAscend(s);
     checkDayNight(s); // not a state-based action, but done at once (CR 702.145c-g)
+    checkPrepared(s); // the copies of prepare spells last as long as their permanents stay prepared (CR 722.3c)
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;

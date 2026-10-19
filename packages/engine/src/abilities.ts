@@ -824,7 +824,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter"; not?: true }
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1718,6 +1718,8 @@ export type Effect =
   | { type: "solve" }
   /** "Transform ~" (CR 701.27a): turn a double-faced permanent over. */
   | { type: "transform"; what: ObjRef }
+  /** "~ becomes prepared" (CR 722.3a): a permanent with a prepare spell gets the prepared designation. */
+  | { type: "becomePrepared"; what: ObjRef }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
@@ -2771,6 +2773,8 @@ export interface CompiledCard {
   shuffleInsteadOfGraveyard?: boolean;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   exileInsteadOfGraveyard?: boolean;
+  /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
+  entersPrepared?: boolean;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

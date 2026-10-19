@@ -4,7 +4,7 @@
 
 import { defOf } from "./cards";
 import { invalidateCharacteristics } from "./layers";
-import type { CardDef, Color, CopyEffect, GameObject, GameState } from "./types";
+import type { CardDef, CardFace, Color, CopyEffect, GameObject, GameState } from "./types";
 
 /**
  * Exceptions to a copy (CR 707.9): "except it isn't legendary", "except it's a 1/1 Spirit in addition to its
@@ -51,8 +51,23 @@ export function copyKey(s: GameState, base: CardDef, except?: CopyExcept): strin
   }
   const key = `${base.oracleId}|copy:${JSON.stringify(except)}`;
   if (s.cards[key]) return key;
-  s.cards[key] = { ...base, ...excepted(base, except), oracleId: key };
+  s.cards[key] = { ...base, ...excepted(base, except), oracleId: key, ...(base.faces ? { faces: exceptedFaces(base, except) } : {}) };
   return key;
+}
+
+/**
+ * The faces of a copy of a card with several (a game's definition has its characteristics from them, faces.ts
+ * restingDef): the exceptions change both faces of a double-faced card (rulings on Soul Separator), both halves of a
+ * split card (CR 709.4) and a flip card's flipped half (710.1c), but not an Adventure or a prepare spell (rulings on
+ * prepare: a copy's exceptions don't reach its prepare spell).
+ */
+function exceptedFaces(base: CardDef, except: CopyExcept | undefined): CardFace[] {
+  const all = base.layout === "transform" || base.layout === "modal_dfc" || base.layout === "split" || base.layout === "flip";
+  return base.faces!.map((f, i) => {
+    if (!except || !Object.keys(except).length || (i > 0 && !all)) return { ...f };
+    const { cmc: _, ...x } = excepted({ ...f, keywords: f.keywords ?? [] }, except);
+    return { ...f, ...x };
+  });
 }
 
 /** A card's or face's characteristics with a copy's exceptions applied (CR 707.9b). */
@@ -95,9 +110,7 @@ export function tokenCopyKey(s: GameState, base: CardDef, except?: CopyExcept): 
   const key = `${whole.oracleId}|dfcCopy:${JSON.stringify(except ?? {})}`;
   if (!s.cards[key]) {
     const ex = except && Object.keys(except).length ? except : undefined;
-    const faces = whole.faces!.map((f) => (ex ? { ...f, ...excepted({ ...f, keywords: f.keywords ?? [] }, ex), ...(ex.noManaCost ? { manaCost: "" } : {}) } : { ...f }));
-    for (const f of faces) delete (f as { cmc?: number }).cmc;
-    s.cards[key] = { ...whole, ...(ex ? excepted(whole, ex) : {}), oracleId: key, faces, dfcCopy: true };
+    s.cards[key] = { ...whole, ...(ex ? excepted(whole, ex) : {}), oracleId: key, faces: exceptedFaces(whole, ex), dfcCopy: true };
   }
   return { key, ...(face ? { face } : {}) };
 }

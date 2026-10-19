@@ -6,6 +6,7 @@ import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, PlayerId } from "../types";
 import { setFace } from "../faces";
+import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
 import { ResolveCtx, objects, amountNow, fixMods } from "./resolve";
 import { createToken } from "./run-tokens";
@@ -160,6 +161,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (o.id === ctx.sourceId && (o.transforms ?? 0) !== (ctx.sourceTransforms ?? 0)) continue;
         transformPermanent(s, o);
       }
+      return;
+    case "becomePrepared":
+      for (const o of objects(s, e.what, ctx)) becomePrepared(s, o);
       return;
     case "solve": {
       // "This Case becomes solved" (CR 719.3a-b): the same object only (CR 400.7); it stays solved until it leaves.

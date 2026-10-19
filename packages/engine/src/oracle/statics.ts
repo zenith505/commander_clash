@@ -417,6 +417,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Kosei, Penitent Warlord: "as long as ~ is enchanted, equipped, and has a counter on it": all three (any counter).
   if (/^~ is enchanted, equipped, and has a counter on it$/.test(text))
     return { kind: "allOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }, { kind: "self", is: "hasCounter" }] };
+  // "If ~ isn't prepared, it becomes prepared" (CR 722.3a).
+  if ((m = /^~ (is|isn't) prepared$/.exec(text))) return { kind: "self", is: "prepared", ...(m[1] === "isn't" ? { not: true as const } : {}) };
   // "It" is the source only when the ability is about the source itself.
   const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };

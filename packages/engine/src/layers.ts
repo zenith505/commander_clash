@@ -655,6 +655,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "saddled") return !!src.saddled; // CR 702.171b
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
+      if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");
       if (cond.is === "enchanted") return attached.some(aura);

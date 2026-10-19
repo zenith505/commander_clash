@@ -219,7 +219,7 @@ describe("rules gaps of card faces", () => {
     let s = settle(cast(s0, ap, ids[0]!, [target(a)]));
     s = run(s, planCast(s, ap, ids[1]!, [target(a)]));
     for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
-      if (s.pending?.kind === "chooseOption") s = act(s, { type: "chooseOption", player: s.pending.player, option: s.pending.options[0]! });
+      if (s.pending?.kind === "chooseOption") s = act(s, { type: "chooseOption", player: s.pending.player, choice: s.pending.options[0]! });
       else s = act(s, { type: "passPriority", player: waitingOn(s)! });
     }
     const o = s.objects[ids[0]!]!;

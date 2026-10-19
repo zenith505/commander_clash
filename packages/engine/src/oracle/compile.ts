@@ -170,7 +170,7 @@ export function isFullySupported(d: CardDef): boolean {
  * fuse or aftermath have those lines reported by their faces. Transforming, flip and preparation cards aren't yet.
  */
 function facesSupported(card: CardDef): boolean {
-  if (!["modal_dfc", "adventure", "split", "transform"].includes(card.layout ?? "")) return false;
+  if (!["modal_dfc", "adventure", "split", "transform", "prepare"].includes(card.layout ?? "")) return false;
   const d = restingDef(card);
   // Rooms: doors that are unlocked, not halves cast on their own (CR 709.5).
   if (d.subtypes.includes("Room")) return false;
@@ -932,6 +932,10 @@ export function compile(d: CardDef): CompiledCard {
     // Darksteel Colossus: a replacement effect that works from every zone (CR 614.1a, 113.6c-style "from anywhere").
     if (/^If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead\.$/.test(line)) {
       out.shuffleInsteadOfGraveyard = true;
+      continue;
+    }
+    if (line === "~ enters prepared.") {
+      out.entersPrepared = true;
       continue;
     }
     if (line === "If ~ would be put into a graveyard from anywhere, exile it instead.") {

@@ -1,3 +1,4 @@
+import { restingDef } from "../faces";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, creatureTypesOf, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType } from "../game";
@@ -1155,7 +1156,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       s.triggerQueue.shift();
       continue;
     }
-    const def = s.cards[t.sourceCardId]!;
+    const def = restingDef(s.cards[t.sourceCardId]!);
     const printed = triggerBody(s, t);
     if (printed.modal && !t.modes) {
       // Modes are chosen as it's put on the stack; a mode without legal targets can't be (CR 603.3c).
@@ -1286,7 +1287,7 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
 }
 
 export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoice[]) {
-  const def = s.cards[t.sourceCardId]!;
+  const def = restingDef(s.cards[t.sourceCardId]!);
   // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
   const fit = fitMany(withModes(triggerBody(s, t), t.modes), chosen, t.x ?? 0);
   if (typeof fit === "string") throw new RulesError(fit);

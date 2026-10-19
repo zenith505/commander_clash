@@ -2262,6 +2262,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             Solved
           </span>
         )}
+        {o.prepared && (
+          <span className="chip other" title="Prepared: you may cast the copy of its prepare spell from exile. Doing so unprepares it.">
+            Prepared
+          </span>
+        )}
         {o.classLevel !== undefined && (
           <span className="chip other" title={`This Class is level ${o.classLevel}: it has the abilities of level ${o.classLevel} and below.`}>
             Level {o.classLevel}

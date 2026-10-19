@@ -258,6 +258,13 @@ export interface GameObject {
   solved?: true;
   /** How many times it has transformed on the battlefield (CR 701.27f). */
   transforms?: number;
+  /**
+   * The prepared designation (CR 722.3a), until it leaves the battlefield or becomes unprepared; not a copiable value
+   * (rulings). `copy`: the copy of its prepare spell in exile (722.3c), none while it's phased out.
+   */
+  prepared?: { copy?: ObjectId };
+  /** A copy of a prepare spell in exile (CR 722.3c): the prepared permanent it was created for, as that object. */
+  preparedFrom?: { id: ObjectId; zc: number };
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
   saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */

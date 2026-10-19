@@ -10,6 +10,7 @@ import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./eff
 import { characteristics, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
+import { defMv } from "./faces";
 
 export interface AmountCtx {
   controller: PlayerId;
@@ -334,7 +335,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         const ch = view(o);
-        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = Math.max(best, manaValue(parseManaCost(defOf(s, o).manaCost)));
+        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = Math.max(best, defMv(defOf(s, o)));
       }
       return best;
     }

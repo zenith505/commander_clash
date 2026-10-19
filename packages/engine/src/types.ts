@@ -254,6 +254,8 @@ export interface GameObject {
   classLevel?: number;
   /** A Case's solved designation (CR 719.3b), kept until it leaves the battlefield; not a copiable value. */
   solved?: true;
+  /** How many times it has transformed on the battlefield (CR 701.27f). */
+  transforms?: number;
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
   saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
@@ -599,6 +601,8 @@ export interface StackItem {
   lki?: LastKnown;
   /** A station ability: the creature tapped to pay for it, and its power as it last existed if it has left (CR 702.184a). */
   stationed?: { id: ObjectId; zc: number; power: number };
+  /** Its source's transform count as it was put on the stack: an ability of it transforms it only if unchanged (CR 701.27f). */
+  sourceTransforms?: number;
   /** Its source's untap count as it was activated: if the source untaps before it resolves, "for as long as ~ remains tapped" never starts (rulings). */
   sourceUntaps?: number;
   /** The value of X announced while casting or activating it (CR 107.3a), or a spell's X for its permanent's ETB trigger (CR 107.3m). */
@@ -1181,6 +1185,10 @@ export interface GameState {
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */
   monarch?: PlayerId;
+  /** Day or night (CR 731.1): neither until something makes it one, then always one of the two. */
+  dayNight?: "day" | "night";
+  /** The last turn taken: its active player and how many spells each player cast during it (CR 731.2, "last turn"). */
+  lastTurn?: { active: PlayerId; cast: number[] };
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */

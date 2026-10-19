@@ -11,6 +11,7 @@ import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { chooseAuraHosts } from "./run-zones";
 import type { AuraHost } from "../game";
+import { defMv } from "../faces";
 
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -67,7 +68,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const d = defOf(s, obj(s, id));
       log(s, `${p.name} reveals ${d.name} and puts it into their hand.`);
       moveObject(s, id, "hand");
-      const n = manaValue(parseManaCost(d.manaCost));
+      const n = defMv(d);
       if (!e.life || n <= 0) return;
       for (const pid of players(s, e.life.who, ctx)) {
         if (e.life.gain) gainLife(s, pid, n);

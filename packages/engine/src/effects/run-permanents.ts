@@ -1,10 +1,11 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { cardIdOf, defOf, isType, objIsType, power, toughness } from "../cards";
+import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { clearCombat, draw, enterTogether, log, moveObject, obj, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
-import type { ContinuousEffect, GameState, PlayerId } from "../types";
+import type { ContinuousEffect, GameObject, GameState, PlayerId } from "../types";
+import { setFace } from "../faces";
 import { objectMatches } from "./targeting";
 import { ResolveCtx, objects, amountNow, fixMods } from "./resolve";
 import { createToken } from "./run-tokens";
@@ -13,6 +14,27 @@ import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
 import { phaseOut } from "../phasing";
 import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../keywords";
+
+/**
+ * Transform a permanent (CR 701.27a): turn it over so its other face is up. Only a double-faced card or token can
+ * (701.27c, 712.9), not one that's face down (712.15a), and not into an instant or sorcery face (701.27d, 712.10). It's
+ * the same object (712.18): its counters, damage, attachments and the effects on it stay.
+ */
+export function transformPermanent(s: GameState, o: GameObject, byDayNight = false): boolean {
+  const d = s.cards[o.cardId];
+  if (o.zone !== "battlefield" || o.faceDown || !d?.faces || d.faces.length !== 2 || (d.layout !== "transform" && d.layout !== "modal_dfc")) return false;
+  // A daybound or nightbound permanent transforms only as day and night say (CR 702.145b, e).
+  if (!byDayNight && (objHasKeyword(s, o, "Daybound") || objHasKeyword(s, o, "Nightbound"))) return false;
+  const to = o.face === 1 ? 0 : 1;
+  if (d.faces[to]!.types.some((t) => t === "Instant" || t === "Sorcery")) return false;
+  const was = defOf(s, o).name;
+  setFace(s, o, to === 0 ? undefined : to);
+  o.transforms = (o.transforms ?? 0) + 1;
+  invalidateCharacteristics(s);
+  log(s, `${was} transforms into ${defOf(s, o).name}.`);
+  fireEvent(s, { type: "transformed", id: o.id, face: to });
+  return true;
+}
 
 /**
  * Proliferate (CR 701.27a): choose any number of permanents and players with counters; each gets another of
@@ -131,6 +153,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       fireEvent(s, { type: "becameLevel", id: o.id, level: e.n });
       return;
     }
+    case "transform":
+      for (const o of objects(s, e.what, ctx)) {
+        // An ability of the permanent transforms it only if it hasn't transformed since the ability was put on the stack
+        // (CR 701.27f).
+        if (o.id === ctx.sourceId && (o.transforms ?? 0) !== (ctx.sourceTransforms ?? 0)) continue;
+        transformPermanent(s, o);
+      }
+      return;
     case "solve": {
       // "This Case becomes solved" (CR 719.3a-b): the same object only (CR 400.7); it stays solved until it leaves.
       const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

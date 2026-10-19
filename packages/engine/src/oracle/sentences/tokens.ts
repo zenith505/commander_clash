@@ -108,9 +108,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Populate$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];
   // Blink: "Exile target creature you control, then return it to the battlefield under its owner's control".
-  if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/i.exec(s))) {
+  // "Exile ~, then return it to the battlefield transformed under your control" (a Saga's last chapter): with its back
+  // face up if it's a double-faced card (CR 712.14a).
+  if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what && !isGroup(what) ? [{ type: "flicker", what, under: m[2] === "your" ? "you" : "owner" }] : null;
+    if (m[2] && what?.ref !== "self") return null;
+    return what && !isGroup(what) ? [{ type: "flicker", what, under: m[3] === "your" ? "you" : "owner", ...(m[2] ? { transformed: true as const } : {}) }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
   if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];

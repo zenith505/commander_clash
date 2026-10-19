@@ -629,6 +629,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "lifeGainedThisTurn":
       return (s.turnLog?.lifeGained?.[you] ?? 0) >= cond.n;
+    case "castLastTurn": {
+      // With no turn before this one there's no last turn to look at.
+      const cast = s.lastTurn?.cast;
+      if (!cast) return false;
+      return cond.none ? cast.every((n) => n === 0) : cast.some((n) => n >= (cond.onePlayer ?? 1));
+    }
     case "citysBlessing":
       return !!s.players[you]?.citysBlessing !== !!cond.not;
     case "self": {

@@ -10,6 +10,7 @@ import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, s
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
+import { defMv } from "../faces";
 
 /**
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
@@ -237,7 +238,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.cascade) {
         const spell = ctx.cause !== undefined ? (s.stack.find((x) => x.id === ctx.cause && x.kind === "spell") ?? s.castItems?.[ctx.cause]) : undefined;
-        const limit = spell ? spellManaValue(s, spell) : manaValue(parseManaCost(ctx.sourceDef.manaCost));
+        const limit = spell ? spellManaValue(s, spell) : defMv(ctx.sourceDef);
         const exiled: ObjectId[] = [];
         let hit: ObjectId | undefined;
         while (p.library.length) {
@@ -245,7 +246,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           moveObject(s, id, "exile");
           exiled.push(id);
           const d = defOf(s, obj(s, id));
-          if (!isType(d, "Land") && manaValue(parseManaCost(d.manaCost)) < limit) {
+          if (!isType(d, "Land") && defMv(d) < limit) {
             hit = id;
             break;
           }
@@ -323,14 +324,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           moveObject(s, id, "exile");
           exiled.push(id);
           const d = defOf(s, obj(s, id));
-          if (!isType(d, "Land") && manaValue(parseManaCost(d.manaCost)) <= n) {
+          if (!isType(d, "Land") && defMv(d) <= n) {
             hit = id;
             break;
           }
         }
         sc.cascade = { exiled, ...(hit ? { hit } : {}) };
         // The discovered card (CR 701.57c), cast or not: "the discovered card's mana value" (Hit the Mother Lode).
-        if (hit) s.resolving!.discovered = { id: hit, mv: manaValue(parseManaCost(defOf(s, obj(s, hit)).manaCost)) };
+        if (hit) s.resolving!.discovered = { id: hit, mv: defMv(defOf(s, obj(s, hit))) };
         log(s, `${p.name} discovers ${n}: exiles ${exiled.length} card${exiled.length === 1 ? "" : "s"}${hit ? `, finding ${defOf(s, obj(s, hit)).name}` : ", finding nothing"}.`);
         if (hit) {
           // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.

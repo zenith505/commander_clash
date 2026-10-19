@@ -963,6 +963,11 @@ export type StaticCondition =
   /** "You've gained 5 or more life this turn": in total. */
   | { kind: "lifeGainedThisTurn"; n: number }
   /**
+   * "If no spells were cast last turn" (`none`), "if a player cast two or more spells last turn" (`onePlayer`: by a single
+   * player, rulings): the whole previous turn (GameState.lastTurn).
+   */
+  | { kind: "castLastTurn"; none?: true; onePlayer?: number }
+  /**
    * "If it's your main phase", "if it's your combat phase" (CR 505.1, 506.1), "if it's the first combat phase of the
    * turn" (`first`; "of your turn": `yours` too).
    */
@@ -1199,6 +1204,8 @@ export type Effect =
       type: "putOntoBattlefield";
       what: ObjRef;
       tapped?: boolean;
+      /** "Return it to the battlefield transformed": with its back face up, if it's a double-faced card (CR 712.14a). */
+      transformed?: true;
       /** "Under its owner's control" rather than yours. */
       owner?: boolean;
       /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
@@ -1250,7 +1257,8 @@ export type Effect =
    * (blink); with `at`, it comes back at the beginning of the next end step (a delayed trigger, CR 603.7), all the cards
    * exiled together by one delayed trigger. `tapped`: "return it to the battlefield tapped".
    */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true }
+  /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true; transformed?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[] }
@@ -1697,6 +1705,8 @@ export type Effect =
   | { type: "classLevel"; n: number }
   /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
   | { type: "solve" }
+  /** "Transform ~" (CR 701.27a): turn a double-faced permanent over. */
+  | { type: "transform"; what: ObjRef }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
@@ -2693,7 +2703,8 @@ export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | 
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission" | "aftermath";
+/** `disturb`: a double-faced card cast transformed from a graveyard for its disturb cost (CR 702.146a). */
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission" | "aftermath" | "disturb";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   /** A split card's half this way casts (graveyardWays): an aftermath half, or a half given flashback. */
@@ -2741,6 +2752,8 @@ export interface CompiledCard {
   exileInsteadOfDying?: { self?: true; filter?: TargetSpec; other?: true };
   /** "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead." */
   shuffleInsteadOfGraveyard?: boolean;
+  /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
+  exileInsteadOfGraveyard?: boolean;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

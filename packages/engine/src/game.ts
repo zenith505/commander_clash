@@ -1,8 +1,9 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
-import { asFace, castableFaces, hasName, landFaces, layoutOf, restingDef, setFace } from "./faces";
-import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
+import { asFace, castableFaces, defMv, hasName, landFaces, layoutOf, restingDef, setFace, transformedFace } from "./faces";
+import { checkDayNight, dayNightUntapCheck } from "./daynight";
+import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
@@ -638,6 +639,11 @@ export function moveObject(
   // library instead" (CR 614.1a). On the battlefield it's the permanent's ability now (it could have lost it);
   // elsewhere the card's. If an "exile it instead" effect also applies, its owner would choose the order (CR 616.1):
   // those were applied above, so the card goes to exile.
+  // "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face): the same way.
+  if (to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).exileInsteadOfGraveyard) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard.`);
+  }
   const shuffleIn = to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).shuffleInsteadOfGraveyard;
   if (shuffleIn) {
     to = "library";
@@ -731,6 +737,9 @@ export function moveObject(
   }
   o.zone = to;
   if (opts.face !== undefined && to === "battlefield") setFace(s, o, opts.face);
+  // Daybound: "If it is night and this permanent is represented by a double-faced card, it enters transformed" (CR
+  // 702.145b).
+  else if (to === "battlefield" && s.dayNight === "night" && o.face === undefined && !o.faceDown && transformedFace(s, o) === 1 && hasKeyword(defOf(s, o), "Daybound")) setFace(s, o, 1);
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
   o.copyEffects = undefined;
@@ -754,6 +763,7 @@ export function moveObject(
   o.suspected = undefined; // CR 701.60a
   o.classLevel = undefined; // CR 716.2b
   o.solved = undefined; // CR 719.3b
+  o.transforms = undefined; // a new object (CR 400.7)
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
@@ -1797,8 +1807,10 @@ export function addPhases(s: GameState, phases: ("combat" | "main")[], after?: "
 /** The combat phase's steps (CR 506.1). */
 export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
 
-function startNextTurn(s: GameState) {
+function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
+  // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
+  if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length) };
   // An extra turn is taken directly after this one, the most recently created first (CR 500.7); one for a player who
   // left the game isn't taken (CR 800.4a). After them, the normal order goes on from the last normal turn.
   let extra: ExtraTurn | undefined;
@@ -1825,7 +1837,7 @@ function startNextTurn(s: GameState) {
   if (takeSkip(s, s.activePlayer, "turn")) {
     log(s, `${player(s, s.activePlayer).name} skips their turn.`);
     s.extraTurn = extra;
-    return startNextTurn(s);
+    return startNextTurn(s, true);
   }
   s.extraTurn = extra;
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
@@ -1932,6 +1944,7 @@ function beginStep(s: GameState, step: Step): void {
   switch (step) {
     case "untap": {
       untapStepPhasing(s, ap); // CR 502.1, 702.26a
+      dayNightUntapCheck(s); // CR 502.2
       // "You may choose not to untap ~": the active player decides which permanents will untap (CR 502.3).
       const may = s.battlefield.filter((id) => {
         const o = obj(s, id);
@@ -2824,7 +2837,9 @@ export function castProblem(
 function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostChoices): string | null {
   const face = choices.face!;
   if (choices.faceDown || o.faceDown) return "a face-down spell has no face to choose";
-  if (!castableFaces(s, o).includes(face)) return `${defOf(s, o).name} can't be cast as that face`;
+  // A double-faced card is cast transformed only by an ability that says so (CR 712.11a, 712.11d): disturb.
+  const transformedWay = choices.via !== undefined && layoutOf(s, o) === "transform" && graveyardWays(s, o).some((g) => g.kind === choices.via && g.face === face);
+  if (!castableFaces(s, o).includes(face) && !transformedWay) return `${defOf(s, o).name} can't be cast as that face`;
   // A card that went on an adventure may be cast from exile, but not as an Adventure again (CR 715.3d), unless
   // something else lets it be cast from there.
   if (layoutOf(s, o) === "adventure" && face === 1 && o.zone === "exile" && o.mayPlay?.until === "adventure" && ownExilePermission(s, o, pid) && !linkedPlayPermission(s, o, pid))
@@ -2891,7 +2906,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Emerge (CR 702.119a): the total cost is reduced by the sacrificed creature's mana value, in generic mana only. It's
   // chosen as the emerge cost is (702.119c), so it's known when the total cost is (601.2f).
   const emerged = how.alt === "emerge" && how.sacrifice?.[0] !== undefined ? s.objects[how.sacrifice[0]] : undefined;
-  if (emerged?.zone === "battlefield") less += manaValue(parseManaCost(defOf(s, emerged).manaCost));
+  if (emerged?.zone === "battlefield") less += defMv(defOf(s, emerged));
   // Harmonize (CR 702.180a-b): less generic mana equal to the tapped creature's power (none for 0 or less).
   const harmonizer = how.via === "harmonize" && how.harmonize !== undefined ? s.objects[how.harmonize] : undefined;
   if (harmonizer?.zone === "battlefield") less += Math.max(0, power(s, harmonizer));
@@ -2913,7 +2928,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
  */
 function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number): { more: number; less: number } {
   let [more, less] = [0, 0];
-  const mv = manaValue(parseManaCost(d.manaCost)) + x * xCount(parseManaCost(d.manaCost));
+  const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
   for (const id of s.battlefield) {
     const src = obj(s, id);
     // Its own or granted ones (Acolyte of Bahamut's "The first Dragon spell you cast each turn costs {2} less").
@@ -3408,6 +3423,16 @@ export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "
 
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
 export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] {
+  // Cast transformed (disturb): the front face's ability is considered too (CR 712.11d).
+  if (o.face !== undefined && layoutOf(s, o) === "transform") {
+    const face = o.face;
+    o.face = undefined;
+    try {
+      return graveyardWays(s, o).filter((g) => g.face === face);
+    } finally {
+      o.face = face;
+    }
+  }
   // A split card in a graveyard is cast as one of its halves (CR 709.3): each half's ways, aftermath's among them
   // (702.127a), or flashback an effect gave the card, for that half's mana cost.
   if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o)).map((g) => ({ ...g, face: f })));
@@ -3543,7 +3568,7 @@ function bargainProblem(s: GameState, pid: PlayerId, spell: ObjectId, d: CardDef
 }
 
 /** A card's mana value in a graveyard: its mana cost's, X as 0 (CR 202.3). */
-const cardMv = (s: GameState, id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+const cardMv = (s: GameState, id: ObjectId) => defMv(defOf(s, obj(s, id)));
 
 /** The total mana value of these cards, for collecting evidence (CR 701.59a). */
 export const evidenceValue = (s: GameState, ids: ObjectId[]) => ids.reduce((n, id) => n + cardMv(s, id), 0);
@@ -3804,7 +3829,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
         const ch = characteristics(s, o);
-        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}) });
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), ...(o.suspected !== undefined ? { suspected: true as const } : {}) });
         log(s, `${p.name} sacrifices ${nameOf(s, id)}.`);
         moveObject(s, id, "graveyard", { sacrificed: true });
       }
@@ -4135,6 +4160,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
+    ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
   };
@@ -4395,7 +4421,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (found.length > pend.max) throw new RulesError(`find at most ${pend.max}`);
   // Searching simply for a number of cards, you find as many as you can (CR 701.23d).
   if (found.length < pend.min) throw new RulesError(`find ${pend.min} card${pend.min === 1 ? "" : "s"}`);
-  if (pend.distinctManaValues && new Set(found.map((id) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)))).size !== found.length)
+  if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
   r.scratch = { ...r.scratch, found };
   s.pending = null;
@@ -5555,6 +5581,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     syncControl(s);
     checkPairs(s);
     checkAscend(s);
+    checkDayNight(s); // not a state-based action, but done at once (CR 702.145c-g)
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;

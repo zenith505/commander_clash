@@ -11,7 +11,7 @@ import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
-import { hasName } from "../faces";
+import { defMv, hasName } from "../faces";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
 const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : n === 0);
@@ -67,7 +67,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // Power and toughness only exist for creatures (CR 208.3); a noncreature has neither.
   if (spec.power && (!c.types.includes("Creature") || !inRange(c.power, spec.power))) return false;
   if (spec.toughness && (!c.types.includes("Creature") || !inRange(c.toughness, spec.toughness))) return false;
-  if (spec.manaValue && !inRange(manaValue(parseManaCost(defOf(s, o).manaCost)), spec.manaValue)) return false;
+  if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
@@ -205,7 +205,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   const creature = d.types.includes("Creature");
   if (spec.power && (!creature || !inRange(Number.parseInt(d.power ?? "0", 10) || 0, spec.power))) return false;
   if (spec.toughness && (!creature || !inRange(Number.parseInt(d.toughness ?? "0", 10) || 0, spec.toughness))) return false;
-  if (spec.manaValue && !inRange(manaValue(parseManaCost(d.manaCost)), spec.manaValue)) return false;
+  if (spec.manaValue && !inRange(defMv(d), spec.manaValue)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   return true;
 }
@@ -218,8 +218,9 @@ export function spellManaValue(s: GameState, item: StackItem): number {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (item.castMv !== undefined && o?.zone !== "stack") return item.castMv;
   if (!o || o.faceDown) return 0;
-  const cost = parseManaCost(defOf(s, o).manaCost);
-  return manaValue(cost) + (cost.hasX ? (item.x ?? 0) * xCount(cost) : 0);
+  const d = defOf(s, o);
+  const cost = parseManaCost(d.manaCost);
+  return defMv(d) + (cost.hasX ? (item.x ?? 0) * xCount(cost) : 0);
 }
 
 /**
@@ -466,7 +467,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
 const totalPart = (s: GameState, key: "manaValue" | "power", c: TargetChoice | undefined): number => {
   const o = c?.kind === "object" ? s.objects[c.id] : undefined;
   if (!o) return 0;
-  return key === "power" ? power(s, o) : manaValue(parseManaCost(defOf(s, o).manaCost));
+  return key === "power" ? power(s, o) : defMv(defOf(s, o));
 };
 
 /**
@@ -640,7 +641,7 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
   if (e.greatest) {
-    const of = (id: ObjectId) => (e.greatest === "power" ? power(s, obj(s, id)) : manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)));
+    const of = (id: ObjectId) => (e.greatest === "power" ? power(s, obj(s, id)) : defMv(defOf(s, obj(s, id))));
     const max = Math.max(...ids.map(of));
     return ids.filter((id) => of(id) === max);
   }

@@ -1181,11 +1181,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const UNDER = "(its owner's|their owner's|their owners'|your)";
     const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of the next end step)(?: with an? ${COUNTER} counter on it)?$`);
     const later = laterRe.exec(s);
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield under (its owner's|their owners'|your) control$/.exec(s);
+    // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
-      if (prev.until || prev.linked || isGroup(prev.what)) return null;
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[1] === "your" ? "you" : "owner" };
+      if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self")) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}) };
       continue;
     }
     // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the

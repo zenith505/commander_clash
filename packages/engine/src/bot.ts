@@ -67,7 +67,7 @@ import {
   hasNoMaxHandSize,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
-import { asFace, castableFaces, layoutOf, registerFace } from "./faces";
+import { asFace, castableFaces, defMv, layoutOf, registerFace } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
@@ -519,7 +519,7 @@ function chooseBottom(s: GameState, pid: PlayerId, count: number): string[] {
   return out;
 }
 
-const mv = (s: GameState, id: string) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+const mv = (s: GameState, id: string) => defMv(defOf(s, obj(s, id)));
 
 /** Ward costs of the opponents' permanents among these targets (each permanent once). */
 export function wardCosts(s: GameState, pid: PlayerId, targets: TargetChoice[]): string[] {
@@ -848,7 +848,7 @@ function facePlan(s: GameState, pid: PlayerId, id: string, free: boolean, when: 
     .filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land"))
     // Not as an Adventure again from exile (CR 715.3d).
     .filter((f) => !(layout === "adventure" && o.zone === "exile"))
-    .sort((a, b) => manaValue(parseManaCost(s.cards[registerFace(s, o, b)]!.manaCost)) - manaValue(parseManaCost(s.cards[registerFace(s, o, a)]!.manaCost)));
+    .sort((a, b) => defMv(s.cards[registerFace(s, o, b)]!) - defMv(s.cards[registerFace(s, o, a)]!));
   for (const face of faces) {
     const plan = asFace(s, o, face, () => castPlan(s, pid, id, free));
     if (plan) return plan.map((a) => (a.type === "castSpell" && a.objectId === id ? { ...a, face } : a));
@@ -1613,7 +1613,7 @@ function revealedMay(s: GameState, card: string): boolean | undefined {
 
 function millExplored(s: GameState, pid: PlayerId, card: string): boolean {
   const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
-  return manaValue(parseManaCost(defOf(s, obj(s, card)).manaCost)) > lands + 1;
+  return defMv(defOf(s, obj(s, card))) > lands + 1;
 }
 
 /** Provoking `target` into blocking `attacker` is good for us: it dies in the block, and ours doesn't. */
@@ -1703,7 +1703,7 @@ function reflexiveWorth(s: GameState, pid: PlayerId, body: AbilityBody, sourceId
 }
 
 /** A permanent's printed worth, to compare what a copy effect would make it: size for creatures, else mana value. */
-const defWorth = (d: CardDef) => (isType(d, "Creature") ? 3 * basePower(d) + baseToughness(d) : manaValue(parseManaCost(d.manaCost)));
+const defWorth = (d: CardDef) => (isType(d, "Creature") ? 3 * basePower(d) + baseToughness(d) : defMv(d));
 
 /**
  * How much the resolving ability's source gains by becoming a copy ("you may have ~ become a copy of ..."): worse
@@ -1897,7 +1897,7 @@ function chooseCardName(s: GameState, pid: PlayerId, pend: Extract<PendingDecisi
     }
     return pick;
   };
-  const value = (o: GameObject) => manaValue(parseManaCost(defOf(s, o).manaCost)) + (isType(defOf(s, o), "Land") ? -5 : 0);
+  const value = (o: GameObject) => defMv(defOf(s, o)) + (isType(defOf(s, o), "Land") ? -5 : 0);
   if (pend.purpose === "guess") {
     // The top card of a library: our own most common card left there; someone else's, what they've shown most of.
     const who = pend.of ?? pid;
@@ -2054,8 +2054,8 @@ function targetWorth(s: GameState, pid: PlayerId, t: ChosenTarget, harmful: bool
   const o = obj(s, t.id);
   const d = defOf(s, o);
   // A card in a graveyard: what it would be worth back in play.
-  if (o.zone !== "battlefield") return manaValue(parseManaCost(d.manaCost)) + (isType(d, "Creature") ? 2 * (Number.parseInt(d.power ?? "0", 10) || 0) : 0) + (o.isCommander ? 10 : 0);
-  if (!objIsType(s, o, "Creature")) return 5 + manaValue(parseManaCost(d.manaCost)) - (harmful && wardCosts(s, pid, [t]).length ? 15 : 0);
+  if (o.zone !== "battlefield") return defMv(d) + (isType(d, "Creature") ? 2 * (Number.parseInt(d.power ?? "0", 10) || 0) : 0) + (o.isCommander ? 10 : 0);
+  if (!objIsType(s, o, "Creature")) return 5 + defMv(d) - (harmful && wardCosts(s, pid, [t]).length ? 15 : 0);
   let n = power(s, o) * 3 + toughness(s, o) + (o.isCommander ? 10 : 0);
   if (harmful && damage > 0) n += lethalDamage(s, o) <= damage ? 50 : -100; // only burn what dies
   if (!harmful && o.attacking !== undefined) n += 20;
@@ -2306,7 +2306,7 @@ function chooseSneak(s: GameState, pid: PlayerId): Action[] | null {
     const sneak = altCost(d, "sneak");
     const cost = sneak?.costs?.find((c) => c.kind === "returnToHand");
     if (!sneak || cost?.kind !== "returnToHand") continue;
-    const value = isType(d, "Creature") ? (Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0) : manaValue(parseManaCost(d.manaCost));
+    const value = isType(d, "Creature") ? (Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0) : defMv(d);
     const ok = returnCandidates(s, pid, cost).some((x) => !obj(s, x).isCommander && (obj(s, x).isToken || worth(s, pid, obj(s, x)) < value));
     if (!ok) continue;
     const plan = castPlan(s, pid, id, false, undefined, "sneak");

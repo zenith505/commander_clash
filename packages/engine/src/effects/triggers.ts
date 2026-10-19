@@ -136,6 +136,8 @@ export type TriggerSourceEvent =
   | { type: "becameLevel"; id: ObjectId; level: number }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
+  /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
+  | { type: "transformed"; id: ObjectId; face: number }
   /** An attacker was exerted as it attacked (CR 701.43d). */
   | { type: "exerted"; id: ObjectId; /** By its "you may exert ~ as it attacks" (its "when you do" is linked to that, CR 607.2h). */ attacking?: true }
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
@@ -1318,6 +1320,8 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     ...(t.ifCond ? { ifCond: t.ifCond } : {}),
     ...(t.index >= 0 && triggerOf(s, t)?.event === "state" ? { stateIndex: t.index } : {}),
     ...(t.chapter ? { chapter: true as const } : {}),
+    // Whether its source transforms before it resolves (CR 701.27f).
+    ...(s.objects[t.sourceId]?.transforms ? { sourceTransforms: s.objects[t.sourceId]!.transforms } : {}),
   });
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });

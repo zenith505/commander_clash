@@ -15,6 +15,12 @@ const keywordsIn = (all: string[], text: string) => all.filter((k) => new RegExp
 const faceKeywords = (d: CardDef, f: CardFace) => f.keywords ?? keywordsIn(d.keywords, f.oracleText);
 const mv = (cost: string) => manaValue(parseManaCost(cost));
 
+/**
+ * A card's or permanent's mana value (CR 202.3): from its mana cost, except a nonmodal double-faced card's back face,
+ * whose is its front face's (712.8c, 712.8e). A copy of a back face isn't that face (copyKey drops `faceOf`): 0.
+ */
+export const defMv = (d: CardDef): number => (d.faceOf && d.layout === "transform" ? d.cmc : mv(d.manaCost));
+
 const faceDefs = new Map<string, CardDef>();
 
 /**
@@ -101,8 +107,26 @@ export function restingDef(d: CardDef): CardDef {
     const colors = COLORS.filter((c) => faces.some((f) => f.colors.includes(c)));
     out = { ...rest, manaCost, cmc: mv(manaCost), colors, supertypes: union("supertypes"), types: union("types"), subtypes: union("subtypes"), oracleText: "", keywords: [], faces };
   } else {
+    // The front face's characteristics, whatever the card's own fields say.
     const f = faces[0]!;
-    out = { ...d, name: f.name, manaCost: f.manaCost, cmc: mv(f.manaCost), typeLine: f.typeLine, keywords: f.keywords, faces };
+    const { power: _p, toughness: _t, loyalty: _l, ...rest } = d;
+    out = {
+      ...rest,
+      name: f.name,
+      manaCost: f.manaCost,
+      cmc: mv(f.manaCost),
+      typeLine: f.typeLine,
+      supertypes: [...f.supertypes],
+      types: [...f.types],
+      subtypes: [...f.subtypes],
+      oracleText: f.oracleText,
+      ...(f.power !== undefined ? { power: f.power } : {}),
+      ...(f.toughness !== undefined ? { toughness: f.toughness } : {}),
+      ...(f.loyalty !== undefined ? { loyalty: f.loyalty } : {}),
+      colors: [...f.colors],
+      keywords: f.keywords,
+      faces,
+    };
   }
   resting.set(d.oracleId, out);
   resting.set(out.oracleId, out);
@@ -138,6 +162,16 @@ export function asFace<T>(s: GameState, o: GameObject, face: number | undefined,
 
 /** Does an object named `name` have the chosen name? A split card has either of its names (CR 709.4a, 709.4d). */
 export const hasName = (name: string | undefined, chosen: string) => name !== undefined && (name === chosen || name.split(" // ").includes(chosen));
+
+/**
+ * The face a card put onto the battlefield "transformed" enters with (CR 712.14a): a double-faced card's back face, if
+ * it's a permanent's (712.13a). Undefined if it can't: it stays where it is.
+ */
+export function transformedFace(s: GameState, o: GameObject): number | undefined {
+  const d = s.cards[o.cardId];
+  if (!d?.faces || d.faces.length !== 2 || (d.layout !== "transform" && d.layout !== "modal_dfc")) return undefined;
+  return ["Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"].some((t) => d.faces![1]!.types.includes(t)) ? 1 : undefined;
+}
 
 /** The card's layout if it has faces: "split", "flip", "transform", "modal_dfc", "adventure", "prepare". */
 export const layoutOf = (s: GameState, o: GameObject): string | undefined => (s.cards[o.cardId]?.faces ? s.cards[o.cardId]!.layout : undefined);

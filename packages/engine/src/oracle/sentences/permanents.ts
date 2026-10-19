@@ -32,6 +32,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^~'s level becomes (\d+)$/.exec(s))) return ctx.activated ? [{ type: "classLevel", n: Number(m[1]) }] : null;
   // A Case's "To solve" trigger (CR 719.3a; see compile.ts): "this Case becomes solved".
   if (s === "~ becomes solved") return [{ type: "solve" }];
+  // "Transform ~" (CR 701.27a).
+  if (/^[Tt]ransform ~$/.test(s)) return [{ type: "transform", what: { ref: "self" } }];
   // "Tap that creature and it doesn't untap during its controller's next untap step" (Kashi-Tribe Warriors).
   if ((m = /^Tap (target .+?|that creature|it) and it doesn't untap during its controller's next untap step$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

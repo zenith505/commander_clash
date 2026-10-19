@@ -69,6 +69,9 @@ export const SUPPORTED_KEYWORDS = [
   // CR 702.102a: a split card with fuse may be cast from hand as both halves, a fused split spell. See castableFaces and
   // faceDef's fused face.
   "Fuse",
+  // CR 702.145: day and night transform these (see daynight.ts); nothing else can.
+  "Daybound",
+  "Nightbound",
 ] as const;
 export type SupportedKeyword = (typeof SUPPORTED_KEYWORDS)[number];
 

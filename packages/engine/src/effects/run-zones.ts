@@ -4,7 +4,7 @@ import { nameLandBan } from "../names";
 import { attackedName, attackedPlaneswalker, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
-import { manaValue, parseManaCost } from "../mana";
+import { manaValue } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor } from "./resolve";
@@ -16,6 +16,7 @@ import { foundWith, newObjects } from "../mutate";
 import { addDelayed, paidUnless } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
+import { defMv, transformedFace } from "../faces";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
 export function isSuspended(s: GameState, o: GameObject): boolean {
@@ -26,8 +27,9 @@ export function isSuspended(s: GameState, o: GameObject): boolean {
  * Put exiled cards onto the battlefield, all at once: an Aura's new controller chooses what it enchants as it enters,
  * and with nothing it can enchant it stays in exile (CR 303.4f-g, rulings on Flicker of Fate).
  */
-function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind, tapped?: boolean): "paused" | void {
-  const back = cards.filter((c) => isPermanentCard(defOf(s, c)));
+function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind, tapped?: boolean, transformed?: boolean): "paused" | void {
+  // Returned transformed: only a double-faced card, with its back face up (CR 712.14a); anything else stays in exile.
+  const back = cards.filter((c) => (transformed ? transformedFace(s, c) !== undefined : isPermanentCard(defOf(s, c))));
   const hosts = chooseAuraHosts(s, back.map((o) => ({ o, under: under(o) })), src);
   if (hosts === "paused") return "paused";
   enterTogether(s, () => {
@@ -38,8 +40,8 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
         log(s, `${d.name} has nothing to enchant, so it stays in exile.`);
         continue;
       }
-      log(s, `${src} returns ${d.name} to the battlefield${tapped ? " tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { counters: { [counter]: 1 } } : {}), ...(tapped ? { tapped: true } : {}) });
+      log(s, `${src} returns ${d.name} to the battlefield${tapped ? " tapped" : ""}${transformed ? " transformed" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { counters: { [counter]: 1 } } : {}), ...(tapped ? { tapped: true } : {}), ...(transformed ? { face: transformedFace(s, c) } : {}) });
     }
   });
 }
@@ -148,7 +150,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       // As it last existed, for a reflexive trigger: "When you do, ~ deals damage equal to that creature's power" (CR 608.2h).
       if (e.action === "sacrifice" && s.resolving) {
         const ch = characteristics(s, o);
-        (s.resolving.sacrificedThisWay ??= []).push({ power: ch.power, toughness: ch.toughness, manaValue: manaValue(parseManaCost(defOf(s, o).manaCost)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid });
+        (s.resolving.sacrificedThisWay ??= []).push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid });
       }
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
     }
@@ -670,7 +672,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.untilMv !== undefined) {
           // A card's mana value with X as 0 (CR 202.3e); lands count 0. All of them if the total never gets there.
           let total = 0;
-          const at = lib.findIndex((id) => (total += manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost))) >= e.untilMv!);
+          const at = lib.findIndex((id) => (total += defMv(defOf(s, obj(s, id)))) >= e.untilMv!);
           ids = lib.slice(0, at < 0 ? lib.length : at + 1);
         }
         for (const id of ids) moveObject(s, id, "exile");
@@ -679,7 +681,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const st = sc.castAmong;
       if (st.done) return;
-      const mvOf = (id: ObjectId) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost));
+      const mvOf = (id: ObjectId) => defMv(defOf(s, obj(s, id)));
       const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
       // Done: the exiled cards that weren't cast go where `rest` says (rulings on Muse Vortex: all the instants and
       // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
@@ -1094,14 +1096,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host.id });
             continue;
           }
-          if (!isPermanentCard(d)) continue;
+          // "Transformed": a double-faced card with its back face up; anything else stays where it is (CR 712.14a).
+          const face = e.transformed ? transformedFace(s, o) : undefined;
+          if (e.transformed ? face === undefined : !isPermanentCard(d)) continue;
           const host = hosts.get(o.id);
           if (d.subtypes.includes("Aura") && !host) {
             log(s, `${d.name} has nothing to enchant, so it stays ${o.zone === "graveyard" ? "in the graveyard" : "where it is"}.`);
             continue;
           }
-          log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...host }); // CR 110.2a
+          log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? " and transformed" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;
@@ -1149,7 +1153,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const mvMax = e.mvMax === undefined ? undefined : amountNow(s, e.mvMax, ctx);
         const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
         const cards = p.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
-        const max = e.distinctManaValues ? new Set(cards.map((id) => manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)))).size : Math.min(e.n, cards.length);
+        const max = e.distinctManaValues ? new Set(cards.map((id) => defMv(defOf(s, obj(s, id))))).size : Math.min(e.n, cards.length);
         if (!max) return;
         const kind = filter?.text ?? "card";
         const what = e.distinctManaValues
@@ -1349,7 +1353,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
       }
       const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
-      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped);
+      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed);
     }
     case "returnExiled": {
       const list = e.cards ?? (ctx.subject ? [ctx.subject] : []);

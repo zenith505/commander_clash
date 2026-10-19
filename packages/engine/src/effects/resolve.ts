@@ -57,6 +57,7 @@ export interface ResolveCtx {
   /** A station ability's tapped creature (CR 702.184a). */
   stationed?: StackItem["stationed"];
   sourceUntaps?: number;
+  sourceTransforms?: number;
   /** The creature type or color chosen as it resolves, or else as its source entered. */
   chosen?: Chosen;
   /** The player an instruction for each player is being done to now (PlayerRef "eachOne"). */
@@ -146,6 +147,7 @@ export function continueResolution(s: GameState): Resolution {
     sacrificed: item.sacrificed,
     stationed: item.stationed,
     sourceUntaps: item.sourceUntaps,
+    sourceTransforms: item.sourceTransforms,
   };
   Object.defineProperty(ctx, "chosen", { get: () => r.chosen ?? sourceChosen(s, ctx), enumerable: true });
   for (;;) {
@@ -615,6 +617,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomeSaddled":
     case "classLevel":
     case "solve":
+    case "transform":
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":

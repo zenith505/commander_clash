@@ -61,3 +61,31 @@ test("Modal double-faced card: play Kazandu Valley as your land, or Emeria untap
   expect(now.objects[mammoth]!.zone).toBe("hand");
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Aftermath: Fame is cast from the graveyard's menu, then exiled", async ({ page }) => {
+  const s = scene({ yard: ["Claim // Fame"], board: LANDS }, [{ board: ["Grizzly Bears"] }]);
+  const [cf, bears] = [one(s, "Claim // Fame"), one(s, "Grizzly Bears")];
+  await open(page, s);
+  await seat(page, 0).locator(".zone", { hasText: "Graveyard" }).click();
+  await modal(page).locator(".card.playable").click();
+  await menu(page).getByRole("button", { name: /^Aftermath: Fame/ }).click();
+  await page.locator(`[data-obj="${bears}"]`).click();
+  const now = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[cf]!.zone === "exile");
+  expect(now.log.some((l) => l.text.includes("Fame"))).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Fuse: Wear // Tear cast as both halves from hand, an artifact and an enchantment destroyed", async ({ page }) => {
+  const s = scene({ hand: ["Wear // Tear"], board: LANDS }, [{ board: ["Ornithopter", "Glorious Anthem"] }]);
+  const [wt, thopter, anthem] = [one(s, "Wear // Tear"), one(s, "Ornithopter"), one(s, "Glorious Anthem")];
+  await open(page, s);
+  await card(page, "Wear // Tear", s).click();
+  await menu(page).getByRole("button", { name: /^Cast Wear \/\/ Tear \(fused\)/ }).click();
+  await page.locator(`[data-obj="${thopter}"]`).click();
+  await page.locator(`[data-obj="${anthem}"]`).click();
+  const now = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[wt]!.zone === "graveyard");
+  expect(now.objects[thopter]!.zone).toBe("graveyard");
+  expect(now.objects[anthem]!.zone).toBe("graveyard");
+  expect(now.battlefield.filter((id) => now.objects[id]!.tapped)).toHaveLength(3);
+  expect(pageErrors(page)).toEqual([]);
+});

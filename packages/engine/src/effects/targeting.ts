@@ -11,6 +11,7 @@ import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
 import { evalAmount, type AmountCtx } from "../amounts";
+import { hasName } from "../faces";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
 const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : n === 0);
@@ -59,7 +60,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name") return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
-  if (spec.named !== undefined && (o.faceDown || c.name !== spec.named)) return false;
+  if (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.notKeywords?.some(hasKw)) return false;
@@ -205,7 +206,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.power && (!creature || !inRange(Number.parseInt(d.power ?? "0", 10) || 0, spec.power))) return false;
   if (spec.toughness && (!creature || !inRange(Number.parseInt(d.toughness ?? "0", 10) || 0, spec.toughness))) return false;
   if (spec.manaValue && !inRange(manaValue(parseManaCost(d.manaCost)), spec.manaValue)) return false;
-  if (spec.named !== undefined && d.name !== spec.named) return false;
+  if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   return true;
 }
 

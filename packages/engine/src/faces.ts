@@ -27,6 +27,10 @@ export function faceDef(d: CardDef, i: number): CardDef {
   const hit = faceDefs.get(key);
   if (hit) return hit;
   const faces = d.faces!;
+  if (i === faces.length && d.layout === "split") {
+    faceDefs.set(key, fusedDef(d, key));
+    return faceDefs.get(key)!;
+  }
   const f = faces[i]!;
   // A flip card's color and mana cost don't change when it flips (CR 710.1c).
   const flip = d.layout === "flip";
@@ -56,6 +60,21 @@ export function faceDef(d: CardDef, i: number): CardDef {
   };
   faceDefs.set(key, out);
   return out;
+}
+
+/** Does this split card have fuse (CR 702.102a)? */
+export const hasFuse = (d: CardDef) => d.layout === "split" && !!d.faces?.every((f) => /^Fuse\b/m.test(f.oracleText));
+
+/**
+ * A fused split spell, the "face" past the last (CR 702.102): both halves' characteristics combined (709.4, 702.102b),
+ * and as text the left half's instructions, then the right half's (702.102d), each half's name in its own text meaning
+ * this spell.
+ */
+function fusedDef(d: CardDef, key: string): CardDef {
+  const r = restingDef(d);
+  const own = (f: CardFace) => f.oracleText.split("\n").filter((l) => !/^Fuse\b/.test(l)).join("\n").replace(new RegExp(`\\b${esc(f.name)}\\b`, "g"), "~");
+  const { faces: _f, ...rest } = r;
+  return { ...rest, oracleId: key, oracleText: r.faces!.map(own).join("\n"), keywords: [...new Set(r.faces!.flatMap((f) => f.keywords ?? []))].filter((k) => k !== "Fuse"), faceOf: { oracleId: d.oracleId, face: d.faces!.length } };
 }
 
 const resting = new Map<string, CardDef>();
@@ -117,6 +136,9 @@ export function asFace<T>(s: GameState, o: GameObject, face: number | undefined,
   }
 }
 
+/** Does an object named `name` have the chosen name? A split card has either of its names (CR 709.4a, 709.4d). */
+export const hasName = (name: string | undefined, chosen: string) => name !== undefined && (name === chosen || name.split(" // ").includes(chosen));
+
 /** The card's layout if it has faces: "split", "flip", "transform", "modal_dfc", "adventure", "prepare". */
 export const layoutOf = (s: GameState, o: GameObject): string | undefined => (s.cards[o.cardId]?.faces ? s.cards[o.cardId]!.layout : undefined);
 
@@ -127,7 +149,8 @@ export const layoutOf = (s: GameState, o: GameObject): string | undefined => (s.
 export function castableFaces(s: GameState, o: GameObject): number[] {
   const d = s.cards[o.cardId];
   if (!d?.faces || o.faceDown) return [];
-  if (d.layout === "split") return d.faces.map((_, i) => i);
+  // From hand, a split card with fuse may also be cast as both halves (CR 702.102a).
+  if (d.layout === "split") return [...d.faces.map((_, i) => i), ...(o.zone === "hand" && hasFuse(d) ? [d.faces.length] : [])];
   if (d.layout === "adventure" || d.layout === "modal_dfc") return [1];
   return [];
 }

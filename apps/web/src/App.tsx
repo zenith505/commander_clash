@@ -876,8 +876,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (face !== undefined && s.objects[id] && s.objects[id]!.face !== face) return asFace(s, s.objects[id]!, face, () => startCast(id, convoke, via, alt, teamwork, face));
     const f = face !== undefined ? { face } : {};
     const d = cardOf(s, id);
-    if (via) return continueCast({ objectId: id, via }); // from a graveyard: the usual steps, without convoke
-    if (alt) return continueCast({ objectId: id, alt }); // evoke or dash
+    if (via) return continueCast({ objectId: id, via, ...f }); // from a graveyard: the usual steps, without convoke
+    if (alt) return continueCast({ objectId: id, alt, ...f }); // evoke or dash
     if (convoke === undefined && compileCard(d).convoke && convokers(s).length && freeCastOf(s, HUMAN) !== id) {
       const fromMana = planCast(s, HUMAN, id, undefined, undefined, undefined, undefined, f) !== null;
       const total = spellCost(s, HUMAN, s.objects[id]!, 0, [], f);
@@ -1284,9 +1284,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 if (isLand(s, menu)) dispatch([{ type: "playLand", player: HUMAN, objectId: menu, ...(untapped ? { untapped } : {}) }]);
                 else startCast(menu);
               }}
-              onCastVia={(via) => {
+              onCastVia={(via, face) => {
                 setMenu(null);
-                startCast(menu, undefined, via);
+                startCast(menu, undefined, via, undefined, undefined, face);
               }}
               onCastFace={(face) => {
                 setMenu(null);
@@ -1593,7 +1593,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
@@ -1612,10 +1612,10 @@ function describeExtraCost(c: AdditionalCost): string {
 }
 
 /** Could you cast this card from your graveyard this way now, tapping mana as needed (costs like discards aside)? */
-function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKind) {
+function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKind, face?: number) {
   const can = (choices: { via: CastFromGraveyardKind; harmonize?: string }) => {
-    const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, choices);
-    return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, choices) !== null);
+    const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { ...choices, face });
+    return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { ...choices, face }) !== null);
   };
   // Harmonize: tapping a creature can take enough off its cost (CR 702.180a).
   return can({ via }) || (via === "harmonize" && convokers(s).some((c) => can({ via, harmonize: c.id })));
@@ -1632,7 +1632,7 @@ function exileOptions(s: GameState, id: string): boolean {
 function graveyardOptions(s: GameState, id: string): boolean {
   const d = cardOf(s, id);
   if (mayPlayLandFromGraveyard(s, s.objects[id]!, HUMAN) && canPlayLand(s, id)) return true; // Crucible of Worlds
-  if (graveyardWays(s, s.objects[id]!).some((g) => canCastFromGraveyard(s, id, g.kind))) return true;
+  if (graveyardWays(s, s.objects[id]!).some((g) => canCastFromGraveyard(s, id, g.kind, g.face))) return true;
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
@@ -3290,7 +3290,8 @@ function AbilityMenu({
   /** For a card in hand: cast it, or play it if it's a land (`untapped`: pay life or reveal so it enters untapped). */
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
-  onCastVia: (via: CastFromGraveyardKind) => void;
+  /** `face`: the split card's half cast this way (an aftermath half). */
+  onCastVia: (via: CastFromGraveyardKind, face?: number) => void;
   /** For a card with several faces: cast it as this one (a split card's half, an Adventure, a modal double-faced card's back). */
   onCastFace: (face: number) => void;
   /** For a modal double-faced card: play it as this land face (`untapped`: pay life or reveal so it enters untapped). */
@@ -3379,7 +3380,7 @@ function AbilityMenu({
         return (
           <button key={`face${face}`} className="face-cast" disabled={!canCastFace(s, objectId, face)} title={problem && !/not enough mana/.test(problem) ? problem : fd.oracleText} onClick={() => onCastFace(face)}>
             Cast {fd.name}
-            {fd.subtypes.includes("Adventure") ? " (Adventure)" : ""} <ManaCost cost={fd.manaCost} size="sm" />
+            {fd.subtypes.includes("Adventure") ? " (Adventure)" : face === s.cards[o.cardId]!.faces!.length ? " (fused)" : ""} <ManaCost cost={fd.manaCost} size="sm" />
           </button>
         );
       })}
@@ -3461,11 +3462,13 @@ function AbilityMenu({
       ))}
       {inYard &&
         graveyardWays(s, o).map((g) => {
-          const ok = canCastFromGraveyard(s, objectId, g.kind);
-          const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind }) ?? "");
+          const ok = canCastFromGraveyard(s, objectId, g.kind, g.face);
+          const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, face: g.face }) ?? "");
+          const half = g.face !== undefined ? s.cards[registerFace(s, o, g.face)]! : undefined;
           return (
-            <button key={g.kind} disabled={!ok} title={problem} onClick={() => onCastVia(g.kind)}>
-              {VIA_NAMES[g.kind]} <ManaCost cost={g.mana ?? d.manaCost} size="sm" />
+            <button key={`${g.kind}${g.face ?? ""}`} disabled={!ok} title={problem || half?.oracleText} onClick={() => onCastVia(g.kind, g.face)}>
+              {VIA_NAMES[g.kind]}
+              {half ? ` ${half.name}` : ""} <ManaCost cost={g.mana ?? half?.manaCost ?? d.manaCost} size="sm" />
               {g.costs.length ? `, ${g.costs.map(describeExtraCost).join(", ")}` : ""}
             </button>
           );
@@ -3584,6 +3587,7 @@ function Controls({
         {faces.map((face) => (
           <button key={face} className="face-cast" disabled={/^(?!not enough mana)/.test(castProblem(s, HUMAN, pending.objectId, undefined, undefined, undefined, undefined, undefined, { face }) ?? "not enough mana")} onClick={() => onCastFree(pending.objectId, face)}>
             Cast {s.cards[registerFace(s, o, face)]!.name}
+            {face === s.cards[o.cardId]!.faces!.length ? " (fused)" : ""}
           </button>
         ))}
         <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>

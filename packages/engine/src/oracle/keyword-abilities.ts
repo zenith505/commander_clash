@@ -55,6 +55,9 @@ export function parseGraveyardKeyword(
     }
     return { fromGraveyard: { kind: "permission", costs, exile: false, ...(cond ? { if: cond } : {}) } };
   }
+  // Aftermath (CR 702.127a): "You may cast this half of this split card from your graveyard", "This half can't be cast
+  // from any zone other than a graveyard", and exiled if it would leave the stack after being cast from a graveyard.
+  if (/^Aftermath$/.test(line)) return isSpell && d.layout === "split" ? { fromGraveyard: { kind: "aftermath", costs: [], exile: true } } : "fail";
   if (/^Jump-start$/.test(line)) return isSpell ? { fromGraveyard: { kind: "jumpStart", costs: [{ kind: "discard", n: 1 }], exile: true } } : "fail";
   if (/^Retrace$/.test(line)) return { fromGraveyard: { kind: "retrace", costs: [{ kind: "discard", n: 1, filter: { kind: "card", types: ["Land"], text: "land card" } }], exile: false } };
   // Mayhem (CR 702.187b): "As long as you discarded this card this turn, you may cast it from your graveyard by paying

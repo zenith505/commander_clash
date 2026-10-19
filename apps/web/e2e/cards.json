@@ -1010,6 +1010,66 @@
   "gameChanger": false
  },
  {
+  "oracleId": "16da9e4b-c6ee-4e70-8653-31ca147f3b01",
+  "name": "Claim // Fame",
+  "manaCost": "{B} // {1}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery // Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target creature card with mana value 2 or less from your graveyard to the battlefield.",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Aftermath"
+  ],
+  "commanderLegal": "legal",
+  "set": "hou",
+  "releasedAt": "2017-07-14",
+  "rarity": "uncommon",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Claim",
+    "manaCost": "{B}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Return target creature card with mana value 2 or less from your graveyard to the battlefield.",
+    "colors": [
+     "B"
+    ]
+   },
+   {
+    "name": "Fame",
+    "manaCost": "{1}{R}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Aftermath (Cast this spell only from your graveyard. Then exile it.)\nTarget creature gets +2/+0 and gains haste until end of turn.",
+    "colors": [
+     "R"
+    ]
+   }
+  ]
+ },
+ {
   "oracleId": "2c6658c3-8c0e-46c9-8127-bc5b77eb0dab",
   "name": "Clutch of Currents",
   "manaCost": "{U}",
@@ -6814,6 +6874,66 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "9842734c-1eac-4509-a731-4c22017ae586",
+  "name": "Wear // Tear",
+  "manaCost": "{1}{R} // {W}",
+  "cmc": 3,
+  "typeLine": "Instant // Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target artifact.\nFuse (You may cast one or both halves of this card from your hand.)",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Fuse"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "uncommon",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Wear",
+    "manaCost": "{1}{R}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Destroy target artifact.\nFuse (You may cast one or both halves of this card from your hand.)",
+    "colors": [
+     "R"
+    ]
+   },
+   {
+    "name": "Tear",
+    "manaCost": "{W}",
+    "typeLine": "Instant",
+    "supertypes": [],
+    "types": [
+     "Instant"
+    ],
+    "subtypes": [],
+    "oracleText": "Destroy target enchantment.\nFuse (You may cast one or both halves of this card from your hand.)",
+    "colors": [
+     "W"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "2df30a75-4957-4eab-8b0b-4c973f00642d",

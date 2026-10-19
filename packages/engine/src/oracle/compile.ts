@@ -1,4 +1,4 @@
-import { faceDef, restingDef } from "../faces";
+import { faceDef, hasFuse, restingDef } from "../faces";
 import { allEffects } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
@@ -146,7 +146,7 @@ export function isFullySupported(d: CardDef): boolean {
   // A melded permanent isn't a card: it exists only as the back faces of its meld pair (CR 712.4b).
   if (d.meld?.result === d.name) return false;
   if (d.faces?.length) return facesSupported(d);
-  if (d.name.includes(" // ")) return false;
+  if (d.name.includes(" // ") && !d.faceOf) return false;
   const cost = parseManaCost(d.manaCost);
   if (!cost.supported) return false;
   if (d.types.some((t) => UNSUPPORTED_TYPES.includes(t)) || d.subtypes.some((t) => UNSUPPORTED_SUBTYPES.includes(t))) return false;
@@ -174,7 +174,26 @@ function facesSupported(card: CardDef): boolean {
   const d = restingDef(card);
   // Rooms: doors that are unlocked, not halves cast on their own (CR 709.5).
   if (d.subtypes.includes("Room")) return false;
-  return d.faces!.every((_, i) => isFullySupported(faceDef(d, i)));
+  if (!d.faces!.every((_, i) => isFullySupported(faceDef(d, i)))) return false;
+  return !hasFuse(d) || fusedSupported(d);
+}
+
+/**
+ * A fused split spell's text is both halves' (CR 702.102d), compiled as one spell: supported when that spell is exactly
+ * the left half's targets and effects followed by the right half's, so nothing in one half was read as being about
+ * the other.
+ */
+function fusedSupported(d: CardDef): boolean {
+  const fused = faceDef(d, d.faces!.length);
+  if (!isFullySupported(fused)) return false;
+  const [left, right] = d.faces!.map((_, i) => compileCard(faceDef(d, i)).spell);
+  const whole = compileCard(fused).spell;
+  if (!whole || !left || !right || left.modal || right.modal || whole.modal) return false;
+  // The right half's targets come after the left half's (an effect names its target by `index`).
+  const shift = (x: unknown): unknown =>
+    Array.isArray(x) ? x.map(shift) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === "index" && typeof v === "number" ? v + left.targets.length : shift(v)])) : x;
+  const strip = (b: AbilityBody) => JSON.stringify({ targets: b.targets.map((t) => ({ ...t, text: "" })), effects: b.effects });
+  return strip(whole) === strip({ ...whole, targets: [...left.targets, ...right.targets], effects: [...left.effects, ...(shift(right.effects) as Effect[])] });
 }
 
 /**

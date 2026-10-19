@@ -7,6 +7,7 @@ import type { TargetSpec } from "./abilities";
 import { abilitiesOf, defOf } from "./cards";
 import { characteristics, controllerOf } from "./layers";
 import { printedMatches } from "./effects/targeting";
+import { faceDef, hasName } from "./faces";
 
 /**
  * An object's name now: a permanent's from its characteristics (a copy has the name it copies, CR 707.2), a card
@@ -27,8 +28,10 @@ export function cardNameOptions(s: GameState, filter?: TargetSpec): string[] {
   for (const o of Object.values(s.objects)) {
     if (o.isToken) continue;
     const d: CardDef | undefined = s.cards[o.cardId];
-    if (!d || (filter && !printedMatches(filter, d))) continue;
-    names.add(d.name);
+    if (!d) continue;
+    // A split card's halves, a double-faced card's back face, a flip or adventurer card's other name: each a name to
+    // choose, matching `filter` by that face's characteristics (CR 201.4b-f).
+    for (const f of d.faces?.length ? d.faces.map((_, i) => faceDef(d, i)) : [d]) if (!filter || printedMatches(filter, f)) names.add(f.name);
   }
   return [...names].sort((a, b) => a.localeCompare(b));
 }
@@ -39,7 +42,7 @@ function bansOn(s: GameState, name: string | undefined) {
   const out: { o: GameObject; ban: NonNullable<ReturnType<typeof abilitiesOf>["nameBans"]>[number] }[] = [];
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
-    if (o.chosen?.name !== name) continue;
+    if (o.chosen?.name === undefined || !hasName(name, o.chosen.name)) continue;
     for (const ban of abilitiesOf(s, o).nameBans ?? []) out.push({ o, ban });
   }
   return out;
@@ -50,7 +53,7 @@ function bansOn(s: GameState, name: string | undefined) {
  * (Gideon's Intervention): why `pid` can't cast this card, or null. A spell has its card's name (CR 201.2).
  */
 export function nameCastBan(s: GameState, pid: PlayerId, d: CardDef): string | null {
-  for (const b of s.namedBansUntil ?? []) if (b.name === d.name && (!b.players || b.players.includes(pid))) return `${b.source}: spells named ${d.name} can't be cast${b.players ? " by you" : ""} until ${s.players[b.controller]!.name}'s next turn`;
+  for (const b of s.namedBansUntil ?? []) if (hasName(d.name, b.name) && (!b.players || b.players.includes(pid))) return `${b.source}: spells named ${d.name} can't be cast${b.players ? " by you" : ""} until ${s.players[b.controller]!.name}'s next turn`;
   for (const { o, ban } of bansOn(s, d.name)) {
     if (ban.kind !== "cast") continue;
     if (ban.who === "opponents" && controllerOf(s, o) === pid) continue;
@@ -73,6 +76,6 @@ export function nameActivationBan(s: GameState, o: GameObject, mana: boolean): s
 
 /** "Lands with the chosen name can't be played" (Conjurer's Ban): why `pid` can't play this land card, or null. */
 export function nameLandBan(s: GameState, pid: PlayerId, d: CardDef): string | null {
-  const b = (s.namedBansUntil ?? []).find((x) => x.lands && x.name === d.name && (!x.players || x.players.includes(pid)));
+  const b = (s.namedBansUntil ?? []).find((x) => x.lands && hasName(d.name, x.name) && (!x.players || x.players.includes(pid)));
   return b ? `${b.source}: lands named ${d.name} can't be played until ${s.players[b.controller]!.name}'s next turn` : null;
 }

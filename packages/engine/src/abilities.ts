@@ -2692,9 +2692,12 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission";
+/** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission" | "aftermath";
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
+  /** A split card's half this way casts (graveyardWays): an aftermath half, or a half given flashback. */
+  face?: number;
   mana?: string;
   costs: AdditionalCost[];
   exile: boolean;

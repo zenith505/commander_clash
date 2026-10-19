@@ -1147,8 +1147,9 @@ function payTribute(s: GameState, id: ObjectId): boolean {
 /** Casting a card from our graveyard (flashback, escape, ...): the first way that works. */
 function graveyardCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   for (const g of graveyardWays(s, obj(s, id))) {
-    const plan = castPlan(s, pid, id, false, g.kind);
-    if (plan) return plan;
+    // A split card's half (an aftermath half): cast as that face.
+    const plan = asFace(s, obj(s, id), g.face, () => castPlan(s, pid, id, false, g.kind));
+    if (plan) return g.face === undefined ? plan : plan.map((a) => (a.type === "castSpell" && a.objectId === id ? { ...a, face: g.face } : a));
   }
   return null;
 }

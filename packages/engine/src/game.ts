@@ -1,7 +1,7 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
-import { asFace, castableFaces, landFaces, layoutOf, restingDef, setFace } from "./faces";
+import { asFace, castableFaces, hasName, landFaces, layoutOf, restingDef, setFace } from "./faces";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
@@ -2697,6 +2697,8 @@ export function castProblem(
   const plotted = !free && plottedCast(s, pid, o);
   // Casting it face down is an alternative cost: no other one can go with it (CR 118.9a).
   if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
+  // An aftermath half can't be cast from any zone other than a graveyard (CR 702.127a).
+  if (o.zone !== "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath")) return `${d.name} can be cast only from a graveyard (aftermath)`;
   const via = graveyardWay(s, o, choices?.via);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
@@ -3237,7 +3239,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (choices.alt === "warp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
-  if (via?.exile) o.exileIfLeaves = "stack"; // CR 702.34a, 702.133a
+  // CR 702.34a, 702.133a; an aftermath half cast from a graveyard any way (702.127a).
+  if (via?.exile || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;
@@ -3405,6 +3408,9 @@ export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "
 
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
 export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] {
+  // A split card in a graveyard is cast as one of its halves (CR 709.3): each half's ways, aftermath's among them
+  // (702.127a), or flashback an effect gave the card, for that half's mana cost.
+  if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o)).map((g) => ({ ...g, face: f })));
   const d = defOf(s, o);
   return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : [])];
 }
@@ -3996,7 +4002,7 @@ function activationTax(s: GameState, o: GameObject): number {
   for (const id of s.battlefield) {
     const src = obj(s, id);
     for (const tax of abilitiesOf(s, src).activationTaxes ?? []) {
-      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || currentName(s, o) !== src.chosen.name : !!tax.filter) continue;
+      if (tax.filter?.chosen === "name" ? src.chosen?.name === undefined || !hasName(currentName(s, o), src.chosen.name) : !!tax.filter) continue;
       n += tax.n;
     }
   }

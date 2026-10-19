@@ -1234,6 +1234,7 @@ export function conditionHolds(s: GameState, cond: EntersCondition, you: PlayerI
         const c = characteristics(s, x);
         if (cond.types && !cond.types.every((ty) => c.types.includes(ty))) return false;
         if (cond.supertypes && !cond.supertypes.every((ty) => c.supertypes.includes(ty))) return false;
+        if (cond.colors && !cond.colors.every((col) => c.colors.includes(col))) return false;
         return !cond.subtypes || cond.subtypes.some((ty) => c.subtypes.includes(ty));
       }).length;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
@@ -2778,7 +2779,9 @@ export function castProblem(
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
-  const limit = castLimitProblem(s, pid, d);
+  // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
+  const proposedCost = parseManaCost(d.manaCost);
+  const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
   if (limit) return limit;
   // "Cast this spell only if you've cast another spell this turn" (Illusory Angel), checked as it's proposed, before it
   // counts itself (CR 601.3); the other spell needn't have resolved (rulings). Face down it has no abilities (CR 708.2).
@@ -3434,8 +3437,12 @@ function spliceProblem(s: GameState, pid: PlayerId, id: ObjectId, ids: ObjectId[
 export const splicedBodies = (s: GameState, ids: ObjectId[] = []): AbilityBody[] => ids.flatMap((c) => compileCard(defOf(s, obj(s, c))).spell ?? []);
 const spliceMana = (s: GameState, ids: ObjectId[] = []) => ids.map((c) => compileCard(defOf(s, obj(s, c))).splice?.mana ?? "").join("");
 
-/** "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2). */
-function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
+/**
+ * "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2).
+ * `mv`: the proposed spell's mana value, X chosen (CR 601.2e); without it, only whether it can begin to be cast, where a
+ * choice still to be made (X) that could lift a mana value ban counts as lifting it (CR 601.3a).
+ */
+function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number): string | null {
   const epic = player(s, pid).cantCastSpells;
   if (epic) return `${epic}: you can't cast spells for the rest of the game`;
   const named = nameCastBan(s, pid, d);
@@ -3448,6 +3455,11 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | nul
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
+    // "Your opponents can't cast spells with mana value 3 or less" (Brisela, Voice of Nightmares).
+    const most = abilitiesOf(s, o).opponentsCantCastMvAtMost;
+    const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
+    if (most !== undefined && controllerOf(s, o) !== pid && value !== undefined && value <= most)
+      return `${characteristics(s, o).name}: opponents can't cast spells with mana value ${most} or less`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {

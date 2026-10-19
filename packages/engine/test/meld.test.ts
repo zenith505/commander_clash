@@ -3,8 +3,8 @@
 // it leaves the battlefield, both go (712.21). Only the two cards of a pair meld; anything else stays in exile (701.42c).
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
-import { botActions, compileCard, defMv, defOf, destroyPermanent, isFullySupported, parseManaCost, planActivate, planCast, planMana, registerMeldResults, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { act, card, forest, pt, putOnBattlefield, setup } from "./helpers";
+import { botActions, castProblem, compileCard, defMv, defOf, destroyPermanent, isFullySupported, parseManaCost, planActivate, planCast, planMana, registerMeldResults, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 // Real oracle text (Scryfall), with the meld pairs as the card data has them.
 const meld = (parts: string[], result: string) => ({ meld: { parts, result } });
@@ -104,7 +104,59 @@ const ragnarok = card("Ragnarok, Divine Deliverance", "Legendary Creature — Be
   oracleText: "Reach, vigilance, menace, trample, haste\nWhen Ragnarok dies, destroy target permanent and return target nonlegendary permanent card from your graveyard to the battlefield.",
   ...FF,
 });
-registerMeldResults([host, township, lost, ragnarok]);
+const BG = meld(["Bruna, the Fading Light", "Gisela, the Broken Blade"], "Brisela, Voice of Nightmares");
+const gisela = card("Gisela, the Broken Blade", "Legendary Creature — Angel Horror", "{2}{W}{W}", {
+  power: "4",
+  toughness: "3",
+  cmc: 4,
+  keywords: ["Flying", "First strike", "Lifelink"],
+  oracleText: "Flying, first strike, lifelink\nAt the beginning of your end step, if you both own and control Gisela and a creature named Bruna, the Fading Light, exile them, then meld them into Brisela, Voice of Nightmares.",
+  ...BG,
+});
+const bruna = card("Bruna, the Fading Light", "Legendary Creature — Angel Horror", "{5}{W}{W}", {
+  power: "5",
+  toughness: "7",
+  cmc: 7,
+  keywords: ["Flying", "Vigilance"],
+  oracleText: "When you cast this spell, you may return target Angel or Human creature card from your graveyard to the battlefield.\nFlying, vigilance\n(Melds with Gisela, the Broken Blade.)",
+  ...BG,
+});
+const brisela = card("Brisela, Voice of Nightmares", "Legendary Creature — Eldrazi Angel", "", {
+  power: "9",
+  toughness: "10",
+  cmc: 11,
+  colors: ["W"],
+  keywords: ["Flying", "First strike", "Vigilance", "Lifelink"],
+  oracleText: "Flying, first strike, vigilance, lifelink\nYour opponents can't cast spells with mana value 3 or less.",
+  ...BG,
+});
+const AT = meld(["Argoth, Sanctum of Nature", "Titania, Voice of Gaea"], "Titania, Gaea Incarnate");
+const argoth = card("Argoth, Sanctum of Nature", "Land", "", {
+  oracleText: "This land enters tapped unless you control a legendary green creature.\n{T}: Add {G}.\n{2}{G}{G}, {T}: Create a 2/2 green Bear creature token, then mill three cards. Activate only as a sorcery.\n(Melds with Titania, Voice of Gaea.)",
+  ...AT,
+});
+const titania = card("Titania, Voice of Gaea", "Legendary Creature — Elemental", "{1}{G}{G}", {
+  power: "3",
+  toughness: "4",
+  cmc: 3,
+  keywords: ["Reach"],
+  oracleText:
+    "Reach\nWhenever one or more land cards are put into your graveyard from anywhere, you gain 2 life.\nAt the beginning of your upkeep, if there are four or more land cards in your graveyard and you both own and control Titania, Voice of Gaea and a land named Argoth, Sanctum of Nature, exile them, then meld them into Titania, Gaea Incarnate.",
+  ...AT,
+});
+const incarnate = card("Titania, Gaea Incarnate", "Legendary Creature — Elemental Avatar", "", {
+  power: "*",
+  toughness: "*",
+  cmc: 3,
+  colors: ["G"],
+  keywords: ["Reach", "Vigilance", "Trample", "Haste"],
+  oracleText:
+    "Reach, vigilance, trample, haste\nTitania's power and toughness are each equal to the number of lands you control.\nWhen Titania enters, return all land cards from your graveyard to the battlefield tapped.\n{3}{G}: Put four +1/+1 counters on target land you control. It becomes a 0/0 Elemental creature with haste. It's still a land.",
+  ...AT,
+});
+registerMeldResults([host, township, lost, ragnarok, brisela, incarnate]);
+const shock = card("Shock", "Instant", "{R}", { cmc: 1, oracleText: "Shock deals 2 damage to any target." });
+const blaze = card("Blaze", "Sorcery", "{X}{R}", { cmc: 1, oracleText: "Blaze deals X damage to any target." });
 
 const copier = card("Copy Test", "Sorcery", "{1}", { oracleText: "Create a token that's a copy of target permanent." });
 
@@ -122,8 +174,8 @@ const zoneOf = (s: GameState, id: string) => s.objects[id]!.zone;
 
 describe("meld (CR 701.42, 712.4)", () => {
   it("supports the meld cards whose combined back face is supported, and never the back face itself", () => {
-    for (const d of [grafRats, scavengers, battlements, garrison, mishra, fang, vanille]) expect(isFullySupported(d), d.name).toBe(true);
-    for (const d of [host, township, lost, ragnarok]) expect(isFullySupported(d), d.name).toBe(false);
+    for (const d of [grafRats, scavengers, battlements, garrison, mishra, fang, vanille, gisela, bruna, argoth, titania]) expect(isFullySupported(d), d.name).toBe(true);
+    for (const d of [host, township, lost, ragnarok, brisela, incarnate]) expect(isFullySupported(d), d.name).toBe(false);
   });
 
   it("Graf Rats and Midnight Scavengers meld into Chittering Host at the beginning of combat: one object, both cards", () => {
@@ -287,5 +339,75 @@ describe("meld (CR 701.42, 712.4)", () => {
     s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
     expect(defOf(s, s.objects[v]!).name).toBe("Ragnarok, Divine Deliverance");
     expect(zoneOf(s, f)).toBe("merged");
+  });
+
+  it("Gisela and Bruna meld into Brisela at the end step; opponents can't cast spells with mana value 3 or less (X counts as chosen)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, gisela);
+    putOnBattlefield(s0, ap, bruna);
+    const shockId = putOnBattlefield(s0, opp, shock);
+    const blazeId = putOnBattlefield(s0, opp, blaze);
+    for (const id of [shockId, blazeId]) {
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "hand";
+      s0.players[opp]!.hand.push(id);
+    }
+    let s = s0;
+    for (let i = 0; i < 60 && !(s.step === "end" && s.stack.length === 0 && s.triggerQueue.length === 0 && defOf(s, s.objects[g]!).name !== "Gisela, the Broken Blade"); i++) {
+      const p = s.pending;
+      if (p?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: p.player, attacks: [] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(defOf(s, s.objects[g]!).name).toBe("Brisela, Voice of Nightmares");
+    expect(defMv(defOf(s, s.objects[g]!))).toBe(11);
+    expect(castProblem(s, opp, shockId)).toMatch(/can't cast spells with mana value 3 or less/);
+    expect(castProblem(s, opp, blazeId, [{ kind: "player", id: ap }], undefined, undefined, undefined, 2)).toMatch(/mana value 3 or less/);
+    expect(castProblem(s, opp, blazeId, [{ kind: "player", id: ap }], undefined, undefined, undefined, 3) ?? "").not.toMatch(/mana value 3 or less/);
+  });
+
+  it("Titania and Argoth meld at the upkeep only with four or more land cards in the graveyard; the lands come back", () => {
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, titania);
+    const a = putOnBattlefield(s0, ap, argoth);
+    // Three land cards in the graveyard: no meld.
+    const yard = [0, 1, 2, 3].map(() => {
+      const id = putOnBattlefield(s0, ap, forest);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      return id;
+    });
+    s0.players[ap]!.graveyard.push(...yard.slice(0, 3));
+    const toUpkeep = (s: GameState) => {
+      const turn = s.turn;
+      for (let i = 0; i < 400 && !(s.step === "upkeep" && s.activePlayer === ap && s.turn > turn); i++) {
+        const p = s.pending;
+        if (p?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: p.player, attacks: [] });
+        else if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+        else if (p) s = act(s, botActions(s, waitingOn(s)!)[0]!);
+        else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      }
+      return settle(s);
+    };
+    let s = toUpkeep(s0);
+    expect(defOf(s, s.objects[t]!).name).toBe("Titania, Voice of Gaea");
+    s.players[ap]!.graveyard.push(yard[3]!);
+    s = toUpkeep(s);
+    for (let i = 0; i < 20 && (s.pending || s.stack.length); i++) s = s.pending ? act(s, botActions(s, waitingOn(s)!)[0]!) : settle(s);
+    expect(defOf(s, s.objects[t]!).name).toBe("Titania, Gaea Incarnate");
+    expect(zoneOf(s, a)).toBe("merged");
+    // "Return all land cards from your graveyard to the battlefield tapped."
+    for (const id of yard) expect([zoneOf(s, id), s.objects[id]!.tapped]).toEqual(["battlefield", true]);
+    const lands = s.battlefield.filter((id) => s.objects[id]!.controller === ap && defOf(s, s.objects[id]!).types.includes("Land")).length;
+    expect(pt(s, t)).toBe(`${lands}/${lands}`);
+  });
+
+  it("Argoth enters tapped unless you control a legendary green creature", () => {
+    const plain = setup([argoth]);
+    let s = act(plain.s, { type: "playLand", player: plain.ap, objectId: plain.ids[0]! });
+    expect(s.objects[plain.ids[0]!]!.tapped).toBe(true);
+    const withTitania = setup([argoth]);
+    putOnBattlefield(withTitania.s, withTitania.ap, titania);
+    s = act(withTitania.s, { type: "playLand", player: withTitania.ap, objectId: withTitania.ids[0]! });
+    expect(s.objects[withTitania.ids[0]!]!.tapped).toBe(false);
   });
 });

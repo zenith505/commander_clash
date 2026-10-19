@@ -2645,7 +2645,7 @@ export interface ManaSpend {
  * have enough opponents.
  */
 export type EntersCondition =
-  | { kind: "control"; who: "you" | "opponents"; types?: string[]; subtypes?: string[]; supertypes?: string[]; other?: boolean; min?: number; max?: number }
+  | { kind: "control"; who: "you" | "opponents"; types?: string[]; subtypes?: string[]; supertypes?: string[]; colors?: Color[]; other?: boolean; min?: number; max?: number }
   | { kind: "playerLifeAtMost"; n: number }
   | { kind: "opponents"; min: number };
 
@@ -2905,6 +2905,8 @@ export interface CompiledCard {
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   opponentsCantCastYourTurn?: true;
+  /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
+  opponentsCantCastMvAtMost?: number;
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
   /**

@@ -1398,6 +1398,13 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // "Your opponents can't cast spells with mana value 3 or less" (Brisela): the spell as it's proposed, X chosen (CR
+    // 601.2e, 601.3a).
+    const mvBan = new RegExp(`^Your opponents can't cast spells with mana value ${NUM} or less\\.$`).exec(line);
+    if (mvBan && out.opponentsCantCastMvAtMost === undefined) {
+      out.opponentsCantCastMvAtMost = num(mvBan[1]!);
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
       continue;

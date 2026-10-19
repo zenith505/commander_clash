@@ -315,6 +315,8 @@ export interface GameObject {
    * with `turn`, any combat of that turn ("target creature blocks ~ this turn if able").
    */
   provokedBy?: { id: ObjectId; zc: number; turn?: number };
+  /** "Target creature can't block ~ this turn" (Duct Crawler): the attackers it can't block that turn, while it's still the object at `selfZc` (CR 400.7). */
+  cantBlockThis?: { id: ObjectId; zc: number; turn: number; selfZc: number }[];
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
   blocking?: ObjectId[];
   blockedBy?: ObjectId[];
@@ -820,7 +822,7 @@ export type PendingDecision =
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[] }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
   | { kind: "handToTop"; player: PlayerId; count: number; source: string }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
@@ -838,7 +840,7 @@ export type PendingDecision =
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
    */
-  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
   /**
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
@@ -1165,7 +1167,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors. */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[] } }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[]; unpreventable?: "all" | "combat" } }>;
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
@@ -1321,6 +1323,8 @@ export interface Resolving {
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
   countersRemoved?: number;
+  /** The two players its exchangeLife instruction named (even one no longer a legal target), and the life each lost doing it. */
+  exchanged?: { players: PlayerId[]; lost: Record<PlayerId, number> };
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
   chosen?: Chosen;
   /**

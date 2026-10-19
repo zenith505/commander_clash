@@ -618,6 +618,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":
+    case "cantBlockSource":
     case "phaseOut":
     case "proliferate":
     case "amass":
@@ -786,8 +787,11 @@ const isObjectTarget = (ctx: ResolveCtx, i: number) => ctx.targets[i]?.kind === 
  */
 export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-  if (o && o.zone === "battlefield") return { ...objectSource(s, o), controller: ctx.controller };
-  // A spell is its own card on the stack; a gone permanent's ability, that permanent as it last existed (CR 609.7a).
+  if (o && o.zone === "battlefield" && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc)) return { ...objectSource(s, o), controller: ctx.controller };
+  // A spell is its own card on the stack; a gone permanent's ability, that permanent as it last existed (CR 609.7a):
+  // with the colors, keywords and "can't be prevented" it had then (Vincent destroyed with its trigger on the stack).
+  const lk = o && ctx.sourceZc !== undefined ? s.lastKnown?.[o.id] : undefined;
+  if (lk?.source && lk.zc === ctx.sourceZc) return { ...lk.source, controller: ctx.controller, ref: { object: o!.id, zc: lk.zc } };
   const item = s.resolving?.item;
   const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
   const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;

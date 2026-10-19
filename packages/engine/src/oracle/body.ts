@@ -1,6 +1,6 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital } from "./words";
+import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -71,6 +71,8 @@ export interface Ctx {
   castSpell?: boolean;
   /** In a "when you cast this spell" ability: "copy it" is the spell itself. */
   selfCastSpell?: boolean;
+  /** An exchange of life totals came before: "the life lost this way", "those players' life totals" are about it. */
+  exchanged?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
   /** "Choose an opponent." came before: "that player" is the one chosen. */
@@ -115,6 +117,22 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  */
 const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "body"]);
+
+/**
+ * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
+ * ability that triggers each time until then (CR 603.7b), the sentences after it its instructions. Undefined when `s`
+ * isn't one, null when it can't be compiled.
+ */
+function floatingTrigger(s: string, after: string[]): Effect | null | undefined {
+  const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
+  if (!m) return undefined;
+  const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
+  const trigger = parseTrigger(`W${text.slice(1)}.`);
+  if (!trigger || trigger === "fail" || !FLOATING_EVENTS.has(trigger.event) || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+  const when = m[1]!.toLowerCase();
+  const until = when === "until your next turn" ? "yourNextTurn" : when === "until the end of your next turn" ? "endOfYourNextTurn" : "endOfTurn";
+  return { type: "floatingTrigger", trigger, until };
+}
 
 /** Starts a results table row's marker sentence (see parseBody). */
 const ROW_MARK = "\u0001";
@@ -447,6 +465,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     .flatMap((x) => {
       // Not under a leading condition ("If you do, put ... and it gains menace"): the condition is for both.
       const m = /^If /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
+      return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+    })
+    // "You draw that many cards and ~ deals that much damage to each other opponent" (Kosei): two instructions, in order.
+    .flatMap((x) => {
+      const m = /^If /.test(x) ? null : /^([Yy]ou draw [^,]+?) and (~ deals .+)$/.exec(x);
+      return m ? [m[1]!, m[2]!] : [x];
+    })
+    // "~ gets +2/+0 until end of turn and deals 1 damage to you" (Electric Eel): two instructions, both about ~.
+    .flatMap((x) => {
+      const m = /^(~ gets [+-]\d+\/[+-]\d+ until end of turn) and (deals \d+ damage to you)$/.exec(x);
       return m ? [m[1]!, `~ ${m[2]!}`] : [x];
     })
     .filter(Boolean);
@@ -937,6 +965,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+      // "You may pay {R}{G}{W}{U}. If you do, until end of turn, whenever he deals combat damage to an opponent, ..."
+      // (Human Torch): the delayed triggered ability, and the rest of the paragraph its instructions, if paid.
+      const floatingPaid = floatingTrigger(then[1]!, sentences.slice(si + 1));
+      if (floatingPaid !== undefined) {
+        if (!floatingPaid) return null;
+        effects.push({ type: "may", effects: [floatingPaid], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` });
+        payFirst = null;
+        si = sentences.length;
+        continue;
+      }
       // "You may pay {2}{U}. If you do, exile the top card of your library face down. You may look at that card ... You
       // may play that card ..." (Intet): the exile and its permissions depend on the payment.
       const paidFaceDown = parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
@@ -1441,6 +1479,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const trailIf = !insteadIf ? /^((?:[Dd]raw|[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
+    // "It deals that much damage to each other opponent if ~'s power is 7 or greater" (Vincent), "Then if ~'s power is 4
+    // or greater, draw a card" (Jor Kadeen): ~'s power as the ability resolves, or as it last existed on the battlefield
+    // once it has left (CR 608.2h; rulings on Vincent). "Its" is ~ only where "it" is.
+    const trailPT = !ctx.spell && !ctx.subjectIt ? new RegExp(`^(.+) if (~'s|its) (power|toughness) is ${NUM} or (greater|less)$`).exec(s) : null;
+    const leadPT = !ctx.spell && !ctx.subjectIt && !trailPT ? new RegExp(`^If (~'s|its) (power|toughness) is ${NUM} or (greater|less), (.+)$`).exec(s) : null;
+    const selfPTIf = trailPT ? { then: trailPT[1]!, whose: trailPT[2]!, stat: trailPT[3]!, n: trailPT[4]!, cmp: trailPT[5]! } : leadPT ? { then: leadPT[5]!, whose: leadPT[1]!, stat: leadPT[2]!, n: leadPT[3]!, cmp: leadPT[4]! } : null;
+    if (selfPTIf && (selfPTIf.whose === "~'s" || ctx.selfIt) && !/\binstead$/.test(selfPTIf.then)) {
+      const inner = parseOne(capital(selfPTIf.then), ctx);
+      if (!inner) return null;
+      const n = num(selfPTIf.n);
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfPT", stat: selfPTIf.stat as "power" | "toughness", ...(selfPTIf.cmp === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
     // "If ~ is a Warrior, put a flying counter on it and it becomes a ..." (Figure of Destiny, Ascendant Spirit): its
     // creature types as it resolves (CR 608.2c; rulings: it doesn't matter how it got them). "It" is ~ there.
     const ifSelfIs = !ctx.spell ? /^If ~ is an? ([A-Z][a-z]+), ((?:(?!\btarget\b).)+)$/.exec(s) : null;
@@ -1605,16 +1656,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
-    // "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed
-    // triggered ability that triggers each time until then (CR 603.7b), the rest of the paragraph its instructions.
-    const floatingFor = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
-    if (floatingFor) {
-      const text = [floatingFor[2]!, ...sentences.slice(si + 1).map((x) => x.replace(/\.$/, ""))].join(". ");
-      const trigger = parseTrigger(`W${text.slice(1)}.`);
-      if (!trigger || trigger === "fail" || !FLOATING_EVENTS.has(trigger.event) || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
-      const when = floatingFor[1]!.toLowerCase();
-      const until = when === "until your next turn" ? "yourNextTurn" : when === "until the end of your next turn" ? "endOfYourNextTurn" : "endOfTurn";
-      effects.push({ type: "floatingTrigger", trigger, until });
+    // A delayed triggered ability with a duration (CR 603.7b): the rest of the paragraph is its instructions.
+    const floating = floatingTrigger(s, sentences.slice(si + 1));
+    if (floating !== undefined) {
+      if (!floating) return null;
+      effects.push(floating);
       si = sentences.length;
       continue;
     }
@@ -2241,7 +2287,7 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
  * order. A target is chosen once; the second verb is about the same player ("that player").
  */
 function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
-  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?|sacrifices?)`;
+  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?|sacrifices?|exiles)`;
   const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+|scry \\d+|surveil \\d+)$`).exec(s);
   if (!m) return null;
   const subject = m[1]!;

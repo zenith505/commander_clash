@@ -133,6 +133,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
+    case "lifeLostThisWay":
+      return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
+    case "exchangedLifeDifference": {
+      const ps = s.resolving?.exchanged?.players ?? [];
+      return ps.length === 2 ? Math.abs(s.players[ps[0]!]!.life - s.players[ps[1]!]!.life) : 0;
+    }
     case "votes":
       return (s.resolving?.votes ?? []).filter((v) => v.choice === c.option).length;
     case "discoveredBelow": {
@@ -414,6 +420,10 @@ function describeCount(c: Count): string {
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
+    case "lifeLostThisWay":
+      return "the life you lost";
+    case "exchangedLifeDifference":
+      return "the difference between their life totals";
     case "votes":
       return `#${c.option} votes`;
     case "discoveredBelow":

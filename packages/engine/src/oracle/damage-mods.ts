@@ -98,6 +98,14 @@ function parseTo(t: string | undefined, attached: boolean): DamageMod["to"] | nu
  * deal combat damage, it deals double that damage instead"). Null when the line isn't one, or isn't fully understood.
  */
 export function parseDamageMod(line: string): StaticAbility | null {
+  // Personal Sanctuary: "During your turn, prevent all damage that would be dealt to you": only while it's your turn.
+  const during = /^During your turn, ([a-z].+)$/.exec(line);
+  if (during) {
+    const a = parseDamageMod(during[1]!.charAt(0).toUpperCase() + during[1]!.slice(1));
+    const m = a?.mods[0];
+    if (!a || a.mods.length !== 1 || m?.kind !== "damageMod" || m.mod.while) return null;
+    return { ...a, mods: [{ ...m, mod: { ...m.mod, while: { kind: "yourTurn" }, text: line } }], text: line };
+  }
   const text = line
     .replace(/\.$/, "")
     .replace(/^[A-Z][A-Za-z' -]+ — (?=If )/, "")

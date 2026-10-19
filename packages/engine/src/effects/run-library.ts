@@ -118,11 +118,24 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         const n = nFor[pid] ?? 0;
         if (!e.hand && hand.length > n) {
-          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}) };
+          s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
           return "paused";
         }
         sc.chosen![pid] = [...hand]; // no choice to make: the whole hand (all the cards that match)
         sc.queue.shift();
+      }
+      if (e.exile) {
+        // "Exiles a card from their hand": they choose it, and it's exiled, not discarded (CR 701.9a, 406.3).
+        for (const pid of apnap(s, who))
+          for (const id of sc.chosen![pid] ?? []) {
+            if (obj(s, id).zone !== "hand") continue;
+            log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their hand.`);
+            moveObject(s, id, "exile");
+            const o = obj(s, id);
+            // Linked to the source as it was when the ability was put on the stack (CR 607.2a).
+            if (o.zone === "exile" && e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+          }
+        return;
       }
       for (const pid of apnap(s, who)) discardCards(s, pid, sc.chosen![pid] ?? [], "", false, false, ctx.controller);
       return;

@@ -143,7 +143,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {
-      // Pay for ward whenever we can: the spell or ability was worth casting.
+      // Pay for ward whenever we can: the spell or ability was worth casting. Life only while we have that much (CR 119.4),
+      // and a sacrifice only with enough permanents that aren't our commander.
+      if (pend.life && payableLife(s, pid) <= pend.life) return [{ type: "payUnless", player: pid, pay: false }];
+      if (pend.sacrifice && pickOptions(s, pend.sacrifice, pid).filter((id) => !obj(s, id).isCommander).length < pend.sacrifice.n) return [{ type: "payUnless", player: pid, pay: false }];
       const taps = planMana(s, pid, parseManaCost(pend.cost));
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
@@ -529,6 +532,8 @@ export function wardCosts(s: GameState, pid: PlayerId, targets: TargetChoice[]):
  */
 function canPayUnless(s: GameState, payer: PlayerId, unless: UnlessPays, pid: PlayerId, sourceId: ObjectId, x: number): boolean {
   if (unless.life && payableLife(s, payer) < unless.life) return false;
+  if (unless.lifeAmount && payableLife(s, payer) < evalAmount(s, unless.lifeAmount, { controller: pid, sourceId, x })) return false;
+  if (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n) return false;
   const n = unless.generic === undefined ? 0 : evalAmount(s, unless.generic, { controller: pid, sourceId, x });
   return !!planMana(s, payer, parseManaCost(unlessCost(unless.cost, n)));
 }
@@ -628,7 +633,8 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const exchange = allEffects(body.effects).find((e): e is Extract<Effect, { type: "exchangeLife" }> => e.type === "exchangeLife" && [e.a, e.b].some((r) => r.ref === "target" && r.index === i));
     if (exchange && spec.kind === "player") {
       const mine = player(s, pid).life;
-      const richest = all.filter((t) => t.kind === "player" && t.id !== pid).sort((a, b) => player(s, b.id as PlayerId).life - player(s, a.id as PlayerId).life)[0];
+      // Psychic Transfer: only a total within its difference of ours swaps.
+      const richest = all.filter((t) => t.kind === "player" && t.id !== pid && (exchange.maxDiff === undefined || Math.abs(player(s, t.id as PlayerId).life - mine) <= exchange.maxDiff)).sort((a, b) => player(s, b.id as PlayerId).life - player(s, a.id as PlayerId).life)[0];
       const ourSlot = exchange.a.ref === "target" && exchange.a.index === i && exchange.b.ref === "target";
       const me = all.find((t) => t.kind === "player" && t.id === pid);
       const pick = ourSlot ? me : richest;
@@ -1940,6 +1946,7 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
           return r.ref === "you" ? pid : t?.kind === "player" ? t.id : undefined;
         };
         const [a, b] = [who(e.a), who(e.b)];
+        if (a !== undefined && b !== undefined && e.maxDiff !== undefined && Math.abs(player(s, a).life - player(s, b).life) > e.maxDiff) break;
         if (a === pid && b !== undefined) v += (player(s, b).life - player(s, pid).life) / 2;
         else if (b === pid && a !== undefined) v += (player(s, a).life - player(s, pid).life) / 2;
         break;

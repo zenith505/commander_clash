@@ -1,6 +1,6 @@
 # Roadmap
 
-20,025 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,077 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -74,19 +74,29 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Left from the round after Show and Tell (Alhammarret's Archive and dredge in either order, Grand Abolisher, Living
    Death, Parallax Wave, Memory Jar, life swaps, Glacial Chasm, Terminus, Bonfire of the Damned, "each other opponent",
    a trigger's creature as the damage source, Steel Golem and Nikya, Rites of Flourishing, Curious Obsession):
-   - Life swaps still out: Mister Negative and Profane Transfusion (what the swap's difference does next), Psychic
-     Transfer ("if the difference is 5 or less"). Also out: Personal Sanctuary, Parallax Nexus, Heart of Bogardan,
-     Spirit of Resistance.
-   - "Each other opponent" still out: Vincent ("if Vincent's power is 7 or greater" checked as it resolves, with its
-     last-known power once it's gone), Kosei and Human Torch (the ability inside other text), Parapet Thrasher ("one or
-     more Dragons"), Shredder ("for each other opponent").
-   - "~ didn't attack this turn" (Air Nomad Student, Mad Dog, Erg Raiders) and "you can't cast" variants other than
-     creature or noncreature spells are still out. Ward costs still out: pay life equal to its power, {2} plus 2 life,
-     sacrifice a legendary artifact or creature, discard a card.
-   - A creature that has left the battlefield deals its trigger's damage with its last-known name, colors, types and
-     keywords (lifelink, deathtouch, infect); a "can't be prevented" it had then isn't kept.
+   - Life swaps still out: Heart of Bogardan, Spirit of Resistance.
+   - "Each other opponent" still out: Shredder, Shadow Master ("for each other opponent, create a token ... attacking
+     that player").
+   - "You can't cast" variants other than creature or noncreature spells are still out. Ward costs still out: discard
+     a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors), "discard a card or pay {2}"
+     (Titania), blight, collect evidence, poison counters; most of these cards have other lines that are out too.
    - Bots cast Living Death, Terminus and Memory Jar by their usual rough value, without weighing whose creatures or
      hands they help.
+   Left from the round after Living Death (last-known power for intervening-if checks, last-known "can't be
+   prevented", life swaps that use the difference, ward costs with life or a sacrifice, Kosei, Human Torch, Parapet
+   Thrasher, "target opponent exiles a card from their hand", "Cowards can't block Warriors", "target creature can't
+   block ~ this turn", Electric Eel):
+   - Exiling from hand still out: "you may play that card" or face down (Fiend of the Shadows, Kheru Mind-Eater,
+     Lightstall Inquisitor), "until ~ leaves the battlefield" (Intellect Devourer), Arcane Artisan, Ashiok's -3, Muse
+     Vessel's second ability, Karn Liberated's -14, Ruthless Negotiation ("if ~ was cast from a graveyard"). Bots
+     exile the cards they'd discard, without weighing that exile loses graveyard value they don't have anyway.
+   - Bots decide Human Torch's and The Thing's "you may pay {R}{G}{W}{U}" with the usual "may pay" check, not by
+     what it would do.
+   - "{T}, Mill a card: Add {C}" (Deranged Assistant, Millikin, Rot Farm Skeleton, Charmed Pendant): mill as a cost,
+     and an ability that adds mana but uses the stack because it moves a card from a library (CR 605.1a, Millikin
+     rulings), are both still out.
+   - Bots don't use "target creature can't block ~ this turn" (Duct Crawler, Spin Engine) or the Intimidators'
+     "becomes a Coward" on purpose: they value them by the usual rough check.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,
    Brago's Representative, Illusion of Choice; storage lands like Bottomless Vault and Calciform Pools, depletion lands
    like Hickory Woodlot and Land Cap):

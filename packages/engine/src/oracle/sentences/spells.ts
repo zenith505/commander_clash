@@ -119,6 +119,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "discard", who, n: { count: { kind: "cardsInHand", who: { ref: "eachOne" } }, half } }];
   }
+  // "Target opponent exiles a card from their hand" (Skullcap Snail): they choose it (rulings on Parallax Nexus).
+  if ((m = /^(.+?) exiles (a|two|three) cards? from their hand$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "discard", who, n: num(m[2]!), exile: true }] : null;
+  }
   if ((m = new RegExp(`^(.+?) discards? ${NUMX} cards?( at random)?$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "discard", who, n: amt(m[2]!), random: !!m[3] }] : null;

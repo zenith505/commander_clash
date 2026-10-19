@@ -1,4 +1,4 @@
-import type { DamageRecipient, Effect } from "../abilities";
+import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { cardIdOf, defOf, objIsType, power, toughness } from "../cards";
 import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
@@ -320,8 +320,20 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Both players must still be there (an illegal target does nothing, CR 608.2b), and different (CR 701.12a).
       const [a] = players(s, e.a, ctx);
       const [b] = players(s, e.b, ctx);
+      // Profane Transfusion's token counts both players' totals, also one that's no longer a legal target (CR 608.2b).
+      const named = (r: PlayerRef, p: PlayerId | undefined) => p ?? (r.ref === "target" && ctx.targets[r.index]?.kind === "player" ? (ctx.targets[r.index] as { id: PlayerId }).id : undefined);
+      const [na, nb] = [named(e.a, a), named(e.b, b)];
+      const record = (lost: Record<PlayerId, number>) => {
+        if (s.resolving && na !== undefined && nb !== undefined) s.resolving.exchanged = { players: [na, nb], lost };
+      };
+      record({});
       if (a === undefined || b === undefined || a === b) return;
       const [la, lb] = [player(s, a).life, player(s, b).life];
+      // Psychic Transfer: the difference as it resolves, with a negative total as it is (rulings).
+      if (e.maxDiff !== undefined && Math.abs(la - lb) > e.maxDiff) {
+        log(s, `${player(s, a).name} and ${player(s, b).name}'s life totals differ by more than ${e.maxDiff}.`);
+        return;
+      }
       if (la === lb) return;
       const [up, down] = la < lb ? [a, b] : [b, a];
       const diff = Math.abs(la - lb);
@@ -331,7 +343,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       log(s, `${player(s, a).name} and ${player(s, b).name} exchange life totals: ${player(s, up).name} gains ${diff} life and ${player(s, down).name} loses ${diff} life.`);
+      const before = player(s, down).life;
       loseLife(s, down, diff);
+      record({ [down]: before - player(s, down).life });
       gainLife(s, up, diff);
       return;
     }

@@ -188,6 +188,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "cantBlockSource": {
+      // The source as it is now; if it has left the battlefield, there's nothing for this to apply to (CR 400.7).
+      const source = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!source || source.zone !== "battlefield" || (source.zoneChanges ?? 0) !== ctx.sourceZc) return;
+      for (const o of objects(s, e.what, ctx)) {
+        (o.cantBlockThis ??= []).push({ id: source.id, zc: source.zoneChanges ?? 0, turn: s.turn, selfZc: o.zoneChanges ?? 0 });
+        log(s, `${characteristics(s, o).name} can't block ${characteristics(s, source).name} this turn.`);
+      }
+      return;
+    }
     case "proliferate":
       return proliferate(s, ctx.controller, src);
     case "amass": {

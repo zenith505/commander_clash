@@ -20,14 +20,24 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Mortality): CR 701.12c.
   if ((m = /^[Ee]xchange life totals with (target opponent|target player)$/.exec(s))) {
     const b = parsePlayer(m[1]!, ctx);
+    ctx.exchanged = true;
     return b ? [{ type: "exchangeLife", a: { ref: "you" }, b }] : null;
+  }
+  // Psychic Transfer: "If the difference between your life total and target player's life total is 5 or less, exchange
+  // life totals with that player": checked as it resolves; the target is chosen either way.
+  if ((m = new RegExp(`^If the difference between your life total and target player's life total is ${NUM} or less, exchange life totals with that player$`).exec(s))) {
+    const index = addTarget(ctx, { kind: "player", text: "target player" });
+    return [{ type: "exchangeLife", a: { ref: "you" }, b: { ref: "target", index }, maxDiff: num(m[1]!) }];
   }
   if (/^(?:Have t|T)wo target players exchange life totals$/.test(s)) {
     const first = addTarget(ctx, { kind: "player", text: "target player" });
     const second = addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first] });
     ctx.lastPlayerTarget = undefined;
+    ctx.exchanged = true;
     return [{ type: "exchangeLife", a: { ref: "target", index: first }, b: { ref: "target", index: second } }];
   }
+  // Mister Negative: "If you lost life this way, draw that many cards" (none if you didn't).
+  if (ctx.exchanged && /^If you lost life this way, draw that many cards$/.test(s)) return [{ type: "draw", who: { ref: "you" }, n: { count: { kind: "lifeLostThisWay" } } }];
 
   // "Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then
   // that player shuffles." (Bribery), "Search target player's library for a card and exile it." (Extract): you search

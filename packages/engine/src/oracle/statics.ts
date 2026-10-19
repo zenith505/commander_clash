@@ -8,6 +8,7 @@ import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./t
 import { parseGrants } from "./grants";
 import { parseSearchFilter } from "./search";
 import { parseDamageMod } from "./damage-mods";
+import { QUOTED_SOURCE_NAME } from "./compile";
 
 /** What "~ enters tapped unless ..." waits for (CR 614.1d). */
 export function parseEntersCondition(text: string): EntersCondition | null {
@@ -89,7 +90,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if ((m = /^As long as (?:enchanted|equipped) permanent is an? (Vehicle), it's a creature in addition to its other types$/.exec(text)))
     return { affects: { kind: "attached" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }], text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [m[1]!], text: m[1]! } } };
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
-  else if ((m = /^As long as ([^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
+  else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
@@ -325,6 +326,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^a source you controlled dealt (\d+) or more damage this turn$/.exec(text))) return { kind: "sourceDealtAtLeast", n: Number(m[1]) };
   // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
   if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };
+  // "If you've cast a noncreature spell this turn" (Human Torch): one or more such spells cast (copies aren't cast, CR 707.10).
+  if ((m = /^you've cast an? ((?!other\b|another\b)[a-z]+) spell this turn$/.exec(text))) {
+    const filter = parseSearchFilter(`${m[1]!} card`);
+    return filter ? { kind: "castCount", n: 1, filter } : null;
+  }
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
     const filter = parseSearchFilter(`${m[2]!.replace(/ and /g, " or ")} card`);
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
@@ -358,6 +364,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
+  // "At the beginning of your end step, if ~ didn't attack this turn" (Air Nomad Student), "if ~ didn't attack or come
+  // under your control this turn" (Mad Dog: neither happened), "unless it came under your control this turn" (Erg Raiders).
+  if (/^~ didn't attack this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn", not: true };
+  if (/^~ didn't attack or come under your control this turn$/.test(text))
+    return { kind: "allOf", conds: [{ kind: "self", is: "attackedThisTurn", not: true }, { kind: "self", is: "controlledThisTurn", not: true }] };
+  if (/^(?:~|it) came under your control this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "controlledThisTurn" };
   if (/^(?:it's|~ is) attacking the player with the most life or tied for most life$/.test(text) && st.affects.kind === "self") return { kind: "attackingMostLife" };
   // "If it's your main phase", "if it's the first combat phase of the turn" (CR 505.1, 506.1).
   if ((m = /^it's your (main|combat) phase$/.exec(text))) return { kind: "phase", phase: m[1] as "main" | "combat", yours: true };
@@ -399,6 +411,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(?:~|it)(?:'s| is) (not )?suspected$/.exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "suspected", ...(m[1] ? { not: true as const } : {}) };
   // "~ can't be blocked as long as it's attacking alone" (Dream Prowler): attacking with no other creature attacking (CR 506.5).
   if (/^(?:~|it)(?:'s| is) attacking alone$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "attackingAlone" };
+  // Kosei, Penitent Warlord: "as long as ~ is enchanted, equipped, and has a counter on it": all three (any counter).
+  if (/^~ is enchanted, equipped, and has a counter on it$/.test(text))
+    return { kind: "allOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }, { kind: "self", is: "hasCounter" }] };
   // "It" is the source only when the ability is about the source itself.
   const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };
@@ -636,6 +651,11 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
+  // "Cowards can't block Warriors" (Boldwyr Intimidator): a creature type (CR 509.1b, 205.3m).
+  if ((m = /^can't block ([A-Z][a-z]+)$/.exec(rest))) {
+    const one = singular(m[1]!);
+    return one !== m[1] && CREATURE_TYPES.has(one) ? [{ kind: "cantBlockCreatures", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [one], text: m[1]! } }] : null;
+  }
   // "Can't block creatures with power 2 or greater" (CR 509.1b).
   if ((m = /^can't block creatures with power (\d+) or (greater|less)$/.exec(rest))) {
     const filter = parseTargetPhrase(`creature with power ${m[1]} or ${m[2]}`);
@@ -921,7 +941,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   // "~ gets +1/+1 for each artifact you control": counted continuously (CR 611.3a).
   const each = new RegExp(`^(gets? ${PT}/${PT}) for each (.+)$`).exec(m[2]!);
-  let mods = parseStaticMods(each ? each[1]! : m[2]!);
+  // "~ has "Whenever Kosei deals combat damage ..."": the name in an ability it gives itself is that object (CR 201.5a).
+  const said = affects.kind === "self" ? m[2]!.replaceAll(QUOTED_SOURCE_NAME, "~") : m[2]!;
+  let mods = parseStaticMods(each ? each[1]! : said);
   if (!mods) return null;
   const counts = (c: AmountExpr | null) => c && staticCountOk(c, affects) ? c : null;
   if (each) {

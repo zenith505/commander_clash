@@ -6,7 +6,7 @@ import { shuffle, shuffleLibrary } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { isLegalTarget, legalTargets, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets } from "./targeting";
+import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets } from "./targeting";
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
@@ -490,18 +490,32 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
     discardCards(s, payer, sc.chosen[payer]!);
     sc.paid = true;
   }
+  // "Ward—Sacrifice a creature": the permanents they chose (see payUnless), sacrificed as the payment (CR 701.21a).
+  if (sc.paid === undefined && unless.sacrifice && sc.chosen?.[payer]) {
+    for (const id of sc.chosen[payer]!) {
+      const o = s.objects[id];
+      if (o?.zone !== "battlefield") continue;
+      log(s, `${player(s, payer).name} sacrifices ${defOf(s, o).name}.`);
+      moveObject(s, id, "graveyard", { sacrificed: true });
+    }
+    sc.paid = true;
+  }
   if (sc.paid === undefined) {
     const p = player(s, payer);
     // The amount is fixed as the choice is offered (CR 608.2h).
     const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : amountNow(s, unless.generic, ctx));
-    // A player can't discard more cards than they have (CR 701.9b), so they can't pay that.
-    if (p.lost || (unless.discard && p.hand.length < unless.discard)) sc.paid = false;
-    else if (cost === "{0}" && !unless.life && !unless.discard) {
+    // "Pay life equal to this creature's power": its power now, or as it last existed (CR 608.2h). Paying 0 life is
+    // allowed (CR 119.4).
+    const life = unless.life ?? (unless.lifeAmount ? Math.max(0, amountNow(s, unless.lifeAmount, ctx)) : 0);
+    // A player can't discard more cards than they have (CR 701.9b), nor sacrifice permanents they don't control
+    // (CR 118.3), so they can't pay that.
+    if (p.lost || (unless.discard && p.hand.length < unless.discard) || (unless.sacrifice && pickOptions(s, unless.sacrifice, payer).length < unless.sacrifice.n)) sc.paid = false;
+    else if (cost === "{0}" && !life && !unless.discard && !unless.sacrifice) {
       // Paying {0} is just saying so (CR 118.5); nobody would refuse.
-      log(s, `${p.name} pays {0} for ${by}.`);
+      log(s, `${p.name} pays {0}${unless.lifeAmount ? " (0 life)" : ""} for ${by}.`);
       sc.paid = true;
     } else {
-      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(unless.life ? { life: unless.life } : {}), ...(unless.discard ? { discard: unless.discard } : {}) };
+      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}) };
       return "paused";
     }
   }

@@ -61,6 +61,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(?:the number of )?(.+?) votes?$/i.exec(p)) && ctx?.vote?.options?.includes(m[1]!)) return { count: { kind: "votes", option: m[1]! } };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
+  // Profane Transfusion: "where X is the difference between those players' life totals", after they exchanged them.
+  if (!each && ctx?.exchanged && /^the difference between those players' life totals$/i.test(p)) return { count: { kind: "exchangedLifeDifference" } };
   // "Draw a card for each creature destroyed this way" (Decree of Pain), "for each permanent destroyed this way", "the
   // number of enchantments destroyed this way": what this spell's or ability's destroy instructions destroyed.
   if ((m = /^(.+?) (destroyed|exiled) this way$/i.exec(p)) && !/\b(you|your|that|they|their|cards?)\b/i.test(m[1]!)) {

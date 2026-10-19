@@ -2409,6 +2409,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "696363c9-e8a7-4c65-b65c-4a94891ec43d",
+  "name": "Gisa, the Hellraiser",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Warlock",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Ward—{2}, Pay 2 life.\nSkeletons and Zombies you control get +1/+1 and have menace.\nWhenever you commit a crime, create two tapped 2/2 blue and black Zombie Rogue creature tokens. This ability triggers only once each turn. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e65a8ab8-84a7-4fe2-b009-ceb87bec6b4e",
   "name": "Glacial Ray",
   "manaCost": "{1}{R}",
@@ -3837,6 +3872,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4af20f8c-2ba0-49d5-a64e-d3668cec30cd",
+  "name": "Mind Swords",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "If you control a Swamp, you may sacrifice a creature rather than pay this spell's mana cost.\nEach player exiles two cards from their hand.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nem",
+  "releasedAt": "2000-02-14",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0923ad85-2ea4-4463-8f71-b7d0a162b486",
   "name": "Mogg Salvage",
   "manaCost": "{2}{R}",
@@ -4039,6 +4100,32 @@
   "commanderLegal": "legal",
   "set": "mor",
   "releasedAt": "2008-02-01",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "938b4e2c-88d9-4637-bc00-e228920c9a78",
+  "name": "Murder",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -4348,6 +4435,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d3a5a830-cd14-49da-9412-c50049c74c92",
+  "name": "Phyrexian Fleshgorger",
+  "manaCost": "{7}",
+  "cmc": 7,
+  "typeLine": "Artifact Creature — Phyrexian Wurm",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Wurm"
+  ],
+  "oracleText": "Prototype {1}{B}{B} — 3/3 (You may cast this spell with different mana cost, color, and size. It keeps its abilities and types.)\nMenace, lifelink\nWard—Pay life equal to this creature's power.",
+  "power": "7",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Menace",
+   "Ward",
+   "Prototype"
+  ],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "prototype",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a188fe7e-68de-4c7c-806c-bfe8fc7b44bf",
   "name": "Pithing Needle",
   "manaCost": "{1}",
@@ -4396,6 +4518,60 @@
   "commanderLegal": "legal",
   "set": "trk",
   "releasedAt": "2026-11-13",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "02090581-61aa-4348-ad57-451be8ee91c2",
+  "name": "Ponder",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top three cards of your library, then put them back in any order. You may shuffle.\nDraw a card.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ac641490-ca14-48d7-8cc4-b69ce984befa",
+  "name": "Preordain",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Scry 2, then draw a card. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom and the rest on top in any order.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Scry"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -6155,6 +6331,40 @@
   "set": "tdm",
   "releasedAt": "2025-04-11",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f83a768c-162d-46f0-8ebd-d9c6b2c69322",
+  "name": "Vein Ripper",
+  "manaCost": "{3}{B}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Vampire Assassin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Assassin"
+  ],
+  "oracleText": "Flying\nWard—Sacrifice a creature.\nWhenever a creature dies, target opponent loses 2 life and you gain 2 life.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkm",
+  "releasedAt": "2024-02-09",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

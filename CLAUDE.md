@@ -38,6 +38,10 @@ card unsupported. Cite the CR number in a comment where the code implements a ru
   `mkdir -p data/generated && for f in cards rulings; do gunzip -c /mnt/project-files/commander-clash-data/$f.json.gz > data/generated/$f.json; done`
   (the Comprehensive Rules text is `/mnt/project-files/commander-clash-data/cr.txt`). The game itself only needs
   `apps/web/public/data/sample-decks.json`, which is in git.
+- Rebuilding the card data after a change to `tools/build-cards.ts` works in the cloud, from the Scryfall extract in
+  the same folder: `D=/mnt/project-files/commander-clash-data; npm run build:cards -- $D/scryfall-oracle-cards.jsonl.gz $D/scryfall-rulings.jsonl.gz --cards-only`
+  (`--cards-only` leaves the sample decks alone), then gzip `data/generated/cards.json` back into the folder and
+  update its `md5.txt`. Only newer Scryfall data needs Ken's PC (`node tools/scryfall-extract.mjs` there).
 
 - `npm run typecheck` (root), `cd packages/engine && npx vitest run`
 - `npm run coverage` (supported card count), `npm run blockers`, `npm run simulate -- 20` (bot games)

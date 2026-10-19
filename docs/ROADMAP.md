@@ -1,6 +1,6 @@
 # Roadmap
 
-20,029 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,025 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,11 +15,12 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-0. Double-faced, split, adventure, prepare and flip cards (846 legal cards, the largest group left) can't be supported
-   from the current card data, which has only the first face. `tools/build-cards.ts` now keeps every face
-   (`CardDef.faces`, and `CardDef.meld` for the seven meld pairs, CR 712.5), but the shared `cards.json.gz` has to be
-   rebuilt from the Scryfall bulk file on Ken's PC first (Scryfall is blocked from the cloud): there,
-   `node tools/scryfall-extract.mjs --push <branch>` pushes a ~20 MB extract that the cloud builds from.
+0. Double-faced, split, adventure, prepare and flip cards (846 legal cards, the largest group left) are ready for a
+   card round: the shared card data now has every face (`CardDef.faces`: 388 transform, 151 adventure, 123 split,
+   98 modal double-faced, 67 prepare, 19 flip) and the seven meld pairs (`CardDef.meld`, CR 712.5). The card's own
+   fields are still its front face's, and `isFullySupported` turns away every card with " // " in its name until the
+   engine models faces (CR 709, 710, 712, 715, 722). Melded permanents (Brisela, Chittering Host, ...) aren't cards
+   and stay unsupported (712.4b); the meld pairs themselves need CR 701.42.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:
    Gemrazer, Huntmaster Liger, Snapdax, Nethroi, Mindleecher):
@@ -310,9 +311,6 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      mana value is ..." (Bre, Breaching Dragonstorm, Ryan Sinclair, Solstice Revelations), paying life or energy instead
      (Bismuth Mindrender, Amped Raptor), each opponent / each player (Fevered Suspicion, Etali, Plargg and Nassari),
      suspend and time counters (Kang Prime, The Tenth Doctor), Neera, Demonlord Belzenlok ("repeat this process").
-   - The shared card data in /mnt/project-files/commander-clash-data/cards.json.gz still splits "Time Lord" into two
-     subtypes (it was built before the type-line fix); rebuilding cards.json on Ken's PC fixes it, or a cloud thread
-     can rewrite the gz once Ken allows writing to the shared folder.
    Left from the round after dice (choose an opponent, choose a die result, leaves-the-battlefield triggers, searching
    another player's library):
    - "Choose an opponent" as a spell resolves works (Myrkul's Edict; bots choose the strongest opponent); "You and that

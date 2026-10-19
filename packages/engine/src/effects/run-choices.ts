@@ -219,6 +219,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.destroyed?.length
             : e.cond.kind === "sacrificedThisWay"
             ? !!s.resolving!.sacrificedThisWay?.length
+            : e.cond.kind === "excessDealt"
+            ? (s.resolving!.excessDamage ?? 0) > 0
             : e.cond.kind === "rollIn"
             ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"

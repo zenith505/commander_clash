@@ -5,7 +5,7 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
-import { abilitiesOf } from "./cards";
+import { abilitiesOf, toughness } from "./cards";
 import { commanderOf } from "./mutate";
 import { evalAmount } from "./amounts";
 import { putCounters } from "./counters";
@@ -64,6 +64,27 @@ export { protectedFrom };
 
 /** Who has a permanent's protection, for protection from a player (CR 702.16k): its controller and its chosen player. */
 export const protectionHolder = (s: GameState, o: GameObject) => ({ controller: controllerOf(s, o), ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}) });
+
+/**
+ * What would be lethal for a permanent about to be dealt damage by `src` (CR 120.4a): for a creature its toughness minus
+ * the damage already marked on it (1 at most from a source with deathtouch, 702.2c), ignoring indestructible and any
+ * prevention; for a planeswalker its loyalty; for a battle its defense. One for each of those types it has; none for
+ * anything else.
+ */
+export function lethalAmounts(s: GameState, src: DamageSource, o: GameObject): number[] {
+  const c = characteristics(s, o);
+  const out: number[] = [];
+  if (c.types.includes("Creature")) {
+    const left = Math.max(0, toughness(s, o) - o.damage);
+    out.push(has(src, "Deathtouch") ? Math.min(left, 1) : left);
+  }
+  if (c.types.includes("Planeswalker")) out.push(o.counters.loyalty ?? 0);
+  if (c.types.includes("Battle")) out.push(o.counters.defense ?? 0);
+  return out;
+}
+
+/** The excess damage `n` is beyond those lethal amounts: the greatest for each of its types (CR 120.4a, 120.10). */
+export const excessOver = (lethal: number[], n: number) => Math.max(0, ...lethal.map((l) => n - l));
 
 /**
  * Deal `n` damage from `src` to a permanent or player. Returns how much was dealt (0 if it

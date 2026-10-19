@@ -118,6 +118,11 @@ export type Count =
   | { kind: "countersRemovedThisWay" }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
+  /**
+   * "The amount of excess damage dealt to that creature this way" (Hell to Pay), "that excess damage": what this spell's or
+   * ability's damage dealt to permanents beyond lethal damage, their loyalty or their defense (CR 120.4a, 120.10).
+   */
+  | { kind: "excessThisWay" }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
   | { kind: "lifeLostThisWay" }
   /**
@@ -1071,6 +1076,8 @@ export type Effect =
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
       by?: "subject";
+      /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
+      excessToController?: true;
     }
   | { type: "draw"; who: PlayerRef; n: Amount }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
@@ -1672,7 +1679,11 @@ export type Effect =
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
   | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
-  | { type: "bite"; a: ObjRef; b: ObjRef } // a deals damage equal to its power to b
+  /**
+   * a deals damage equal to its power to b. `excessIfTrample`: "If the creature you control has trample, excess damage is
+   * dealt to that creature's controller instead" (Ram Through; CR 120.4a).
+   */
+  | { type: "bite"; a: ObjRef; b: ObjRef; excessIfTrample?: true }
   /**
    * Counter the targeted spell (CR 701.6a), maybe unless its controller pays (CR 118.12); "exile it instead", "put it on
    * top of its owner's library instead".
@@ -2001,6 +2012,8 @@ export type SpellCondition =
   | { kind: "destroyedThisWay" }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   | { kind: "sacrificedThisWay" }
+  /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
+  | { kind: "excessDealt" }
   /**
    * A results table's row (CR 706.3a): "1—9 | ..." is "if the result was in this range". `event`: the result a "whenever
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).

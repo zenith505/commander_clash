@@ -1414,6 +1414,8 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
+  excessDamage?: number;
   /** How many permanents its tapAnyNumber instruction tapped ("for each creature tapped this way"). */
   tappedThisWay?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */

@@ -163,6 +163,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "excessThisWay":
+      return s.resolving?.excessDamage ?? 0;
     case "tookFromHand":
       return s.resolving?.tookFromHand ?? 0;
     case "cardsInGraveyard": {
@@ -434,6 +436,8 @@ function describeCount(c: Count): string {
       return "#cards chosen";
     case "tappedThisWay":
       return "#tapped";
+    case "excessThisWay":
+      return "the excess damage";
     case "greatestPowerExiled":
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":

@@ -37,6 +37,8 @@ export interface Ctx {
   sacrificedIt?: boolean;
   /** A revealFromHand instruction came before, here or in the ability whose reflexive trigger this is: "for each card revealed this way". */
   revealedFromHand?: boolean;
+  /** A damage instruction came before: "the excess damage dealt this way" (CR 120.10). */
+  excessDamage?: boolean;
   /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
   tappedThisWay?: boolean;
   /** An amass instruction came before, here or in the ability whose reflexive trigger this is: "the amassed Army" (CR 701.47c). */
@@ -1897,6 +1899,32 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "choose", choice: "creatureType" });
       s = s.replace(/\b(becomes?) the creature type of your choice\b/, "$1 the chosen creature type").replace(/\bof the creature type of your choice\b/, "of the chosen type");
     }
+    // "~ deals 4 damage to target creature. Excess damage is dealt to that creature's controller instead." (Flame Spill):
+    // the damage beyond lethal goes to its controller (CR 120.4a).
+    if (/^Excess damage is dealt to that creature's controller instead$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "damage" || last.divided || last.evenly || last.also || last.excessToController) return null;
+      last.excessToController = true;
+      continue;
+    }
+    // "Target creature you control deals damage equal to its power to target creature you don't control. If the creature
+    // you control has trample, excess damage is dealt to that creature's controller instead." (Ram Through)
+    if (/^If the creature you control has trample, excess damage is dealt to that creature's controller instead$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "bite" || last.a.ref !== "target" || last.a.n || ctx.targets[last.a.index]?.controller !== "you") return null;
+      last.excessIfTrample = true;
+      continue;
+    }
+    // "If excess damage was dealt to that creature this way, investigate" (Torch the Witness), "If excess damage was
+    // dealt to a permanent this way, create that many tapped Treasure tokens" (Bottle-Cap Blast): after its damage.
+    const ifExcess = ctx.excessDamage ? /^If excess damage was dealt (?:to (?:that creature|that permanent|a permanent) )?this way, (.+)$/.exec(s) : null;
+    if (ifExcess) {
+      const inner = parseOne(ifExcess[1]!.replace(/^create that many (.+) tokens$/, "create a number of $1 tokens equal to the excess damage dealt this way"), ctx);
+      if (!inner || inner.some((x) => pauses(x))) return null;
+      effects.push({ type: "if", cond: { kind: "excessDealt" }, effects: inner });
+      if (!defineX()) return null;
+      continue;
+    }
     // "Each opponent loses 2 life. You gain life equal to the life lost this way."
     if (/^You gain life equal to the (?:total )?life lost this way$/.test(s)) {
       const last = effects[effects.length - 1];
@@ -2259,6 +2287,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown;
     if (last?.type === "amass") ctx.amassed = true;
+    if (last?.type === "damage" || last?.type === "bite") ctx.excessDamage = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
     if (last?.type === "continuous" && last.what.ref === "each" && (last.duration === "endOfTurn" || last.duration === "yourNextTurn")) ctx.lastGroup = { ref: "affected" };
     // "Put a +1/+1 counter on each creature you control. Untap those creatures": still the same ones.

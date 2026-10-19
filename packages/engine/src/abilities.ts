@@ -1376,8 +1376,12 @@ export type Effect =
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep" }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
-  /** CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player). */
-  | { type: "myriad" }
+  /**
+   * CR 702.116a: token copies of the source attacking each opponent other than defending player (the event player).
+   * `must`: not "you may" (Shredder's "for each other opponent, create a token that's a copy of ~ tapped and attacking
+   * that player, except it isn't legendary").
+   */
+  | { type: "myriad"; must?: true; except?: CopyExcept }
   /**
    * Encore (CR 702.141a): for each opponent, a token copy of this card that attacks that opponent this turn if able.
    * The tokens gain haste. (The sacrifice at the next end step is a separate delayed trigger about each token.)

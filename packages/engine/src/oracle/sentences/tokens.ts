@@ -61,6 +61,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };
     return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(except ? { except } : {}), ...state }];
   }
+  // "Whenever ~ attacks a player, for each other opponent, create a token that's a copy of ~ tapped and attacking that
+  // player, except it isn't legendary" (Shredder): myriad's tokens (CR 702.116a), each opponent but the defending player,
+  // with no "may".
+  if (ctx.defending && (m = /^[Ff]or each other opponent, create a token that's a copy of ~ (?:that's )?tapped and attacking that player(?:, except (.+))?$/.exec(s))) {
+    const except = m[1] ? parseCopyExcept(m[1]) : undefined;
+    return except === null ? null : [{ type: "myriad", must: true, ...(except ? { except } : {}) }];
+  }
   // "Sacrifice them at the beginning of the next end step" / "Exile it ...": about the tokens just created.
   if (ctx.lastCreatedAny && (m = /^(Sacrifice|Exile) (?:it|them|the tokens?|that token|those tokens) at (the beginning of (?:the|your) next end step|end of combat|the beginning of the next cleanup step)$/i.exec(s))) {
     const verb = m[1]!.toLowerCase();

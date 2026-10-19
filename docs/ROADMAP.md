@@ -1,6 +1,6 @@
 # Roadmap
 
-20,081 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,077 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions

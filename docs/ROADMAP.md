@@ -1,6 +1,6 @@
 # Roadmap
 
-20,077 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,419 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -15,12 +15,21 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
-0. Double-faced, split, adventure, prepare and flip cards (846 legal cards, the largest group left) are ready for a
-   card round: the shared card data now has every face (`CardDef.faces`: 388 transform, 151 adventure, 123 split,
-   98 modal double-faced, 67 prepare, 19 flip) and the seven meld pairs (`CardDef.meld`, CR 712.5). The card's own
-   fields are still its front face's, and `isFullySupported` turns away every card with " // " in its name until the
-   engine models faces (CR 709, 710, 712, 715, 722). Melded permanents (Brisela, Chittering Host, ...) aren't cards
-   and stay unsupported (712.4b); the meld pairs themselves need CR 701.42.
+0. Cards with faces (CR 709, 710, 712, 715, 722): 336 of the 846 legal ones play now (`npm run faces` lists each
+   layout's support and the lines blocking it): 123 of 388 transforming double-faced, 104 of 151 adventurer, 63 of 123
+   split (aftermath and fuse included), 46 of 98 modal double-faced. Still out:
+   - Prepare cards (67, CR 722) and flip cards (19, CR 710): not modeled yet.
+   - Transform: living metal (13 cards, CR 702.161), More Than Meets the Eye and convert (701.28, 702.162), craft
+     (702.167), "transforms into" triggers (701.27e), a delayed "transform ~ at the beginning of the next upkeep"
+     (701.27f's rule for delayed triggers isn't modeled), "~ is all colors", "return it to the battlefield transformed
+     ... attached to target opponent", and the single lines `npm run faces` lists.
+   - Rooms (split enchantments with doors, CR 709.5) and the meld pairs (CR 701.42); melded permanents stay
+     unsupported on purpose (712.4b).
+   - Known gaps: a token copy of a double-faced permanent is single-faced (CR 707.8a gives it both faces, so it could
+     transform); a copy of a disturbed spell has its front face's mana value, not 0 (712.8e); an Aura back face
+     entering transformed doesn't choose what it enchants from the back face; ripple and "with the same name" compare
+     a split card's whole name, not each half's (709.4a); bots don't plan around day and night (casting two spells to
+     make it day), and cast a fuse card fused whenever they can pay for both halves.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:
    Gemrazer, Huntmaster Liger, Snapdax, Nethroi, Mindleecher):
@@ -75,8 +84,6 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    Death, Parallax Wave, Memory Jar, life swaps, Glacial Chasm, Terminus, Bonfire of the Damned, "each other opponent",
    a trigger's creature as the damage source, Steel Golem and Nikya, Rites of Flourishing, Curious Obsession):
    - Life swaps still out: Heart of Bogardan, Spirit of Resistance.
-   - "Each other opponent" still out: Shredder, Shadow Master ("for each other opponent, create a token ... attacking
-     that player").
    - "You can't cast" variants other than creature or noncreature spells are still out. Ward costs still out: discard
      a card at random (Alpharael), discard a card of a kind (Saruman of Many Colors), "discard a card or pay {2}"
      (Titania), blight, collect evidence, poison counters; most of these cards have other lines that are out too.
@@ -92,9 +99,8 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      exile the cards they'd discard, without weighing that exile loses graveyard value they don't have anyway.
    - Bots decide Human Torch's and The Thing's "you may pay {R}{G}{W}{U}" with the usual "may pay" check, not by
      what it would do.
-   - "{T}, Mill a card: Add {C}" (Deranged Assistant, Millikin, Rot Farm Skeleton, Charmed Pendant): mill as a cost,
-     and an ability that adds mana but uses the stack because it moves a card from a library (CR 605.1a, Millikin
-     rulings), are both still out.
+   - Mill costs: Charmed Pendant ("the milled card's mana cost") and The Warring Triad ("target player adds") are
+     still out.
    - Bots don't use "target creature can't block ~ this turn" (Duct Crawler, Spin Engine) or the Intimidators'
      "becomes a Coward" on purpose: they value them by the usual rough check.
    Left from the voting and storage lands round (CR 701.38: Council's Judgment, Coercive Portal, Tyrant's Choice,

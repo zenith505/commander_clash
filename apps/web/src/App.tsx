@@ -757,7 +757,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.targets === undefined && specs.length && specs.every((t) => t.skip)) return continueCast({ ...d, targets: specs.map(() => ({ kind: "none" })) });
     if (d.targets === undefined && specs.length) return setTargeting({ mode: "cast", draft: d, specs, chosen: skipped(specs, []), label: d.x !== undefined ? `${card.name} (X=${d.x})` : card.name });
     for (const c of castExtraCosts(card, d, d.x ?? 0, s, HUMAN)) {
-      if (c.kind === "payLife" || c.kind === "revealHand" || (c.kind === "discard" && c.random)) continue;
+      if (c.kind === "payLife" || c.kind === "revealHand" || c.kind === "mill" || (c.kind === "discard" && c.random)) continue;
       // Conspiracy Unraveler: collect evidence 10 rather than pay the mana cost (CR 701.59a, 118.9).
       if (c.kind === "collectEvidence") {
         if (d.collect !== undefined) continue;
@@ -1612,6 +1612,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "tap") return `tap ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
+  if (c.kind === "mill") return `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
   if (c.kind === "exileFromHand") return c.toLibrary ? `put ${n(c.n, "card")} from your hand on top of your library` : `exile ${n(c.n, c.filter?.text ?? "card")} from your hand`;
   return `exile ${n(c.n, c.filter?.text ?? "other card")} from your graveyard`;
 }

@@ -2677,7 +2677,13 @@ export type AdditionalCost =
    * "Collect evidence N" (CR 701.59a): exile any number of cards from your graveyard with total mana value N or greater,
    * as a cost (an ability's, Conspiracy Unraveler's alternative cost); paid with CostChoices.collect.
    */
-  | { kind: "collectEvidence"; n: number };
+  | { kind: "collectEvidence"; n: number }
+  /**
+   * "{T}, Mill a card: Add {C}" (Deranged Assistant), "Mill four cards" (Rot Farm Skeleton): the top cards of your library
+   * into your graveyard, not payable with fewer cards there (CR 701.17b). It moves cards from a library, so an ability
+   * with it isn't a mana ability (CR 605.1a).
+   */
+  | { kind: "mill"; n: number };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,

@@ -3691,6 +3691,11 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
+    if (c.kind === "mill") {
+      // Not with fewer cards in the library (CR 701.17b).
+      if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to mill to ${doing}`;
+      continue;
+    }
     if (c.kind === "giveLife") {
       // A player who can't gain life can't be had gain life to pay a cost (CR 119.7; Invigorate rulings), though a
       // replaced life gain (Sulfuric Vortex's) can. Players who left the game aren't players any more (CR 800.4a).
@@ -3841,7 +3846,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       discardCards(s, p.id, picked, " at random");
     } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
-    else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
+    else if (c.kind === "mill") {
+      log(s, `${p.name} mills ${c.n === 1 ? "a card" : `${c.n} cards`}.`);
+      for (const id of p.library.slice(0, c.n)) moveObject(s, id, "graveyard");
+    } else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
     else if (c.kind === "giveLife") {
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
       const to = c.each ? opponents(s, p.id) : [choices.lifeTo ?? opponents(s, p.id).find((q) => canGainLife(s, q))!];

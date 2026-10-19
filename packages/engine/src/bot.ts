@@ -1485,6 +1485,8 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     } else if (c.kind === "exileFromGraveyard" && c.top) {
       // "The top three black cards of your graveyard": no choice (CR 404.1).
       if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
+    } else if (c.kind === "mill") {
+      if (player(s, pid).library.length < c.n + 10) return null;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -2395,6 +2397,9 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .sort((a, b) => mv(s, a) - mv(s, b));
       if (pool.length < c.n) return null;
       out.exileCards = [...(out.exileCards ?? []), ...pool.slice(0, c.n)];
+    } else if (c.kind === "mill") {
+      // Mill only with plenty of library left: not toward decking ourselves.
+      if (player(s, pid).library.length < c.n + 10) return null;
     } else return null;
   }
   return out;

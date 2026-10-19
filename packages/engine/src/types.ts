@@ -102,6 +102,15 @@ export interface CardDef {
   faces?: CardFace[];
   /** A face's own definition (faces.ts faceDef): the card it's a face of, and which face. */
   faceOf?: { oracleId: string; face: number };
+  /** A double-faced token's card, made as a copy of a double-faced object (CR 707.8a): its back face has mana value 0 (202.3b). */
+  dfcCopy?: true;
+  /**
+   * A transforming double-faced card's back face, when its front face has More Than Meets the Eye: that cost, to cast
+   * the card converted (CR 702.162a), with this face up on the stack.
+   */
+  convertCost?: string;
+  /** A Room permanent's definition (faces.ts roomDef): the doors it has unlocked (CR 709.5c), whose text it has. */
+  roomDoors?: number[];
   /**
    * A meld pair (CR 712.4, 712.5): the two cards that meld and the melded permanent they become. A melded permanent's
    * card exists only as the back faces of the pair (712.4b), so the card named `result` can't be in a deck.
@@ -256,6 +265,18 @@ export interface GameObject {
   solved?: true;
   /** How many times it has transformed on the battlefield (CR 701.27f). */
   transforms?: number;
+  /**
+   * The prepared designation (CR 722.3a), until it leaves the battlefield or becomes unprepared; not a copiable value
+   * (rulings). `copy`: the copy of its prepare spell in exile (722.3c), none while it's phased out.
+   */
+  prepared?: { copy?: ObjectId };
+  /**
+   * A Room permanent's unlocked designations (CR 709.5c): the doors (0 left, 1 right) that are unlocked. Set as it
+   * enters (709.5d), for as long as it's on the battlefield; not a copiable value.
+   */
+  unlocked?: number[];
+  /** A copy of a prepare spell in exile (CR 722.3c): the prepared permanent it was created for, as that object. */
+  preparedFrom?: { id: ObjectId; zc: number };
   /** Saddled (CR 702.171b): until end of turn or until it leaves the battlefield. */
   saddled?: true;
   /** It escaped: the spell that became this permanent was cast with escape (CR 702.138b). */
@@ -669,8 +690,18 @@ export interface DelayedTrigger {
   about?: { id: ObjectId; zc: number };
   /** `lostControl` with `about`: `controller` has controlled the watched object since this was made (Seraph rulings). */
   held?: true;
-  /** `lostControl`: it lasts only until the end of this turn ("When you lose control of that Equipment this turn"). */
+  /**
+   * `lostControl` and `leaves`: it lasts only until the end of this turn ("When you lose control of that Equipment this
+   * turn", "When that creature dies this turn").
+   */
   thisTurn?: number;
+  /** `leaves`: only when it dies, a creature put into a graveyard from the battlefield (CR 700.4). */
+  dies?: true;
+  /**
+   * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
+   * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7).
+   */
+  source?: { id: ObjectId; zc: number };
   body: AbilityBody;
   /** Made during an end step, "the next end step" is the following turn's (CR 603.7c doesn't fire it in the same step). */
   turn: number;
@@ -1542,6 +1573,8 @@ export type Action =
   | { type: "suspend"; player: PlayerId; objectId: ObjectId }
   /** Exile a card from your hand with plot, paying its plot cost: a special action (CR 116.2k, 702.170a). */
   | { type: "plot"; player: PlayerId; objectId: ObjectId }
+  /** Pay a locked door's mana cost to unlock it: a special action (CR 116.2m, 709.5e). `door`: 0 left, 1 right. */
+  | { type: "unlockDoor"; player: PlayerId; objectId: ObjectId; door: number }
   /** Foretell a card from your hand: pay {2} and exile it face down, a special action (CR 116.2h, 702.143a). */
   | { type: "foretell"; player: PlayerId; objectId: ObjectId }
   /** Answer to assist: how much of the spell's generic mana to pay from your mana pool (0 to decline). */

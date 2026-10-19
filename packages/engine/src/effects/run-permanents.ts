@@ -6,6 +6,7 @@ import { putCounters, tokensToCreate } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, PlayerId } from "../types";
 import { setFace } from "../faces";
+import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
 import { ResolveCtx, objects, amountNow, fixMods } from "./resolve";
 import { createToken } from "./run-tokens";
@@ -20,7 +21,7 @@ import { keywordLabel, protectionFromPlayer, THAT_PLAYER_PROTECTION } from "../k
  * (701.27c, 712.9), not one that's face down (712.15a), and not into an instant or sorcery face (701.27d, 712.10). It's
  * the same object (712.18): its counters, damage, attachments and the effects on it stay.
  */
-export function transformPermanent(s: GameState, o: GameObject, byDayNight = false): boolean {
+export function transformPermanent(s: GameState, o: GameObject, byDayNight = false, convert = false): boolean {
   const d = s.cards[o.cardId];
   if (o.zone !== "battlefield" || o.faceDown || !d?.faces || d.faces.length !== 2 || (d.layout !== "transform" && d.layout !== "modal_dfc")) return false;
   // A daybound or nightbound permanent transforms only as day and night say (CR 702.145b, e).
@@ -31,8 +32,23 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
   setFace(s, o, to === 0 ? undefined : to);
   o.transforms = (o.transforms ?? 0) + 1;
   invalidateCharacteristics(s);
-  log(s, `${was} transforms into ${defOf(s, o).name}.`);
+  log(s, `${was} ${convert ? "converts" : "transforms"} into ${defOf(s, o).name}.`);
   fireEvent(s, { type: "transformed", id: o.id, face: to });
+  return true;
+}
+
+/**
+ * Flip a permanent (CR 710): a flip card's, unflipped, turns so its flipped half's name, text, type line, power and
+ * toughness apply; its color and mana cost don't change (710.1c). Nothing else can flip, and it can't flip back (710.4).
+ * It's the same object: counters, damage and effects on it stay.
+ */
+export function flipPermanent(s: GameState, o: GameObject): boolean {
+  const d = s.cards[o.cardId];
+  if (o.zone !== "battlefield" || o.faceDown || o.face === 1 || d?.layout !== "flip" || d.faces?.length !== 2) return false;
+  const was = defOf(s, o).name;
+  setFace(s, o, 1);
+  invalidateCharacteristics(s);
+  log(s, `${was} flips into ${defOf(s, o).name}.`);
   return true;
 }
 
@@ -158,8 +174,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         // An ability of the permanent transforms it only if it hasn't transformed since the ability was put on the stack
         // (CR 701.27f).
         if (o.id === ctx.sourceId && (o.transforms ?? 0) !== (ctx.sourceTransforms ?? 0)) continue;
-        transformPermanent(s, o);
+        transformPermanent(s, o, false, e.convert);
       }
+      return;
+    case "becomePrepared":
+      for (const o of objects(s, e.what, ctx)) becomePrepared(s, o);
+      return;
+    case "flip":
+      for (const o of objects(s, e.what, ctx)) flipPermanent(s, o);
       return;
     case "solve": {
       // "This Case becomes solved" (CR 719.3a-b): the same object only (CR 400.7); it stays solved until it leaves.

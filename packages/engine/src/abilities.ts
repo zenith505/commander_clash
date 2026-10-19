@@ -451,8 +451,13 @@ export type ObjRef =
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
   | { ref: "subjectCard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
-  /** After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your hand"). */
-  | { ref: "selfCard" }
+  /**
+   * After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your
+   * hand"). `moved`: an Aura's "when enchanted creature dies, return this card ..." (Angelic Destiny), the Aura card in a
+   * graveyard it went to from the battlefield then or since, while it's still there (rulings); `yours`: "from your
+   * graveyard", only if that's its controller's (rulings on Screams from Within).
+   */
+  | { ref: "selfCard"; moved?: true; yours?: true }
   /** "Create a 0/0 Fractal creature token. Put X +1/+1 counters on it": the token(s) this ability just created. */
   | { ref: "created" }
   /** "The amassed Army" (CR 701.47c): the Army chosen by this ability's amass, or by the one whose reflexive trigger this is. */
@@ -819,7 +824,7 @@ export type StaticCondition =
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
   /** `controlledThisTurn`: "it came under your control this turn" (CR 302.6). `hasCounter`: a counter of any kind on it. `not`: "~ didn't attack this turn" (Air Nomad Student). */
-  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter"; not?: true }
+  | { kind: "self"; is: "attacking" | "attackingAlone" | "enchanted" | "equipped" | "modified" | "devoured" | "attachedToCreature" | "tapped" | "untapped" | "monstrous" | "escaped" | "attackedThisTurn" | "saddled" | "enteredThisTurn" | "onBattlefield" | "controlledThisTurn" | "hasCounter" | "prepared"; not?: true }
   /**
    * "If ~ is a Warrior, ..." (Figure of Destiny): its source as it is now, with every effect applied (CR 608.2c). Only an
    * instruction's condition, checked as it resolves: a static ability's condition about its own types would depend
@@ -1206,10 +1211,14 @@ export type Effect =
       tapped?: boolean;
       /** "Return it to the battlefield transformed": with its back face up, if it's a double-faced card (CR 712.14a). */
       transformed?: true;
+      /** "Return it to the battlefield flipped" (Homura): a flip card enters flipped (CR 710.1b). */
+      flipped?: true;
       /** "Under its owner's control" rather than yours. */
       owner?: boolean;
       /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
       attachToSubject?: boolean;
+      /** An Aura "attached to target opponent" (Accursed Witch): this target, if the Aura could enchant it (CR 303.4f). */
+      attachToTarget?: number;
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[] };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */
@@ -1352,7 +1361,7 @@ export type Effect =
    */
   /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
   /** `thisTurn`: "When you lose control of that Equipment this turn" (Stolen Uniform): only until the turn ends. */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1710,7 +1719,12 @@ export type Effect =
   /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
   | { type: "solve" }
   /** "Transform ~" (CR 701.27a): turn a double-faced permanent over. */
-  | { type: "transform"; what: ObjRef }
+  /** `convert`: "convert ~" (CR 701.28a), which works just as transforming does. */
+  | { type: "transform"; what: ObjRef; convert?: true }
+  /** "Flip ~", "you may flip it" (CR 710): a flip card's permanent turns to its flipped half, for good (710.4). */
+  | { type: "flip"; what: ObjRef }
+  /** "~ becomes prepared" (CR 722.3a): a permanent with a prepare spell gets the prepared designation. */
+  | { type: "becomePrepared"; what: ObjRef }
   /** "The Ring tempts you" (CR 701.54a): choose a creature you control as your Ring-bearer. */
   | { type: "ringTempts" }
   /** "~ phases out", "target creature phases out" (CR 702.26b). */
@@ -1931,6 +1945,11 @@ export type SpellCondition =
   | { kind: "state"; cond: StaticCondition }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
   | { kind: "xAtLeast"; n: number }
+  /**
+   * "Then if that player has no cards in hand" (Nezumi Shortfang), "if no cards are in that graveyard" (Nezumi
+   * Graverobber): a number counted as it resolves, which may name its targets (CR 608.2c).
+   */
+  | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /**
@@ -2043,6 +2062,7 @@ export type TriggerEvent =
   /** "Whenever a permanent you control becomes the target of a spell or ability an opponent controls": see `subjectFilter`. */
   | "permanentBecomesTarget"
   | "selfAttacks" // Whenever this attacks
+  | "selfDoorUnlocked" // "When you unlock this door" (CR 709.5h), see TriggeredAbility.door
   /** Enlist's trigger (CR 702.154a), "Whenever ~ enlists a creature": the subject is the enlisted creature. */
   | "selfEnlists"
   | "selfDealsCombatDamageToPlayer"
@@ -2085,6 +2105,7 @@ export type TriggerEvent =
   | "eachUpkeep" // At the beginning of each upkeep / each player's upkeep ("that player" is the active player)
   | "yourDrawStep" // At the beginning of your draw step (after the draw, CR 504.2)
   | "eachDrawStep" // At the beginning of each player's draw step
+  | "selfTransformsInto" // "When ~ transforms into ~" (CR 701.27e): it transformed or converted into this face
   | "selfTurnedFaceUp" // "When ~ is turned face up" (CR 708.8: it doesn't enter again)
   | "selfCast" // "When you cast this spell": cascade (CR 702.85a), triggering from the stack
   | "castSpell" // Whenever you cast a noncreature spell (see `cast`), prowess (CR 702.108a)
@@ -2311,6 +2332,10 @@ export interface TriggeredAbility {
   firstAttack?: true;
   /** Battalion: "Whenever ~ and at least two other creatures attack", at least this many others attacking with it. */
   withOthers?: number;
+  /** "Whenever ~ and at least one Human attack": the others counted for `withOthers` are of this creature type. */
+  withOthersType?: string;
+  /** For "selfDoorUnlocked": which door (0 left, 1 right). */
+  door?: number;
   /** Training (CR 702.149a): "and at least one other creature with power greater than this creature's power attack". */
   training?: boolean;
   /** Renown's "if it isn't renowned" (CR 702.112a), checked as it triggers and as it resolves. */
@@ -2709,7 +2734,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle";
+export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -2764,6 +2789,8 @@ export interface CompiledCard {
   shuffleInsteadOfGraveyard?: boolean;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   exileInsteadOfGraveyard?: boolean;
+  /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
+  entersPrepared?: boolean;
   /**
    * "Creatures your opponents control enter tapped", "Artifacts and lands enter tapped": a replacement effect on other
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.

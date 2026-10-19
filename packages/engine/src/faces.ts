@@ -17,9 +17,10 @@ const mv = (cost: string) => manaValue(parseManaCost(cost));
 
 /**
  * A card's or permanent's mana value (CR 202.3): from its mana cost, except a nonmodal double-faced card's back face,
- * whose is its front face's (712.8c, 712.8e). A copy of a back face isn't that face (copyKey drops `faceOf`): 0.
+ * whose is its front face's (712.8c, 712.8e). A copy of a back face isn't that face (copyKey drops `faceOf`), and a
+ * double-faced token's back face is a copy of one: 0 (202.3b).
  */
-export const defMv = (d: CardDef): number => (d.faceOf && d.layout === "transform" ? d.cmc : mv(d.manaCost));
+export const defMv = (d: CardDef): number => (d.faceOf && d.faceOf.face > 0 && d.layout === "transform" ? (d.dfcCopy ? 0 : d.cmc) : mv(d.manaCost));
 
 const faceDefs = new Map<string, CardDef>();
 
@@ -62,6 +63,8 @@ export function faceDef(d: CardDef, i: number): CardDef {
     ...(f.imageUrl ?? d.imageUrl ? { imageUrl: f.imageUrl ?? d.imageUrl } : {}),
     ...(f.artUrl ?? d.artUrl ? { artUrl: f.artUrl ?? d.artUrl } : {}),
     ...(d.layout ? { layout: d.layout } : {}),
+    ...(d.dfcCopy ? { dfcCopy: true as const } : {}),
+    ...(i === 1 && d.layout === "transform" && /^More Than Meets the Eye (?:\{[^}]+\})+/m.test(faces[0]!.oracleText) ? { convertCost: /^More Than Meets the Eye ((?:\{[^}]+\})+)/m.exec(faces[0]!.oracleText)![1]! } : {}),
     faceOf: { oracleId: d.oracleId, face: i },
   };
   faceDefs.set(key, out);
@@ -163,6 +166,9 @@ export function asFace<T>(s: GameState, o: GameObject, face: number | undefined,
 /** Does an object named `name` have the chosen name? A split card has either of its names (CR 709.4a, 709.4d). */
 export const hasName = (name: string | undefined, chosen: string) => name !== undefined && (name === chosen || name.split(" // ").includes(chosen));
 
+/** Do objects with these names have the same name: one of each's names, a split card having two (CR 709.4a)? */
+export const sameName = (a: string | undefined, b: string | undefined) => a !== undefined && b !== undefined && (a === b || a.split(" // ").some((n) => b.split(" // ").includes(n)));
+
 /**
  * The face a card put onto the battlefield "transformed" enters with (CR 712.14a): a double-faced card's back face, if
  * it's a permanent's (712.13a). Undefined if it can't: it stays where it is.
@@ -194,4 +200,55 @@ export function landFaces(s: GameState, o: GameObject): number[] {
   const d = s.cards[o.cardId];
   if (!d?.faces || d.layout !== "modal_dfc" || o.faceDown) return [];
   return d.faces.flatMap((f, i) => (f.types.includes("Land") ? [i] : []));
+}
+
+/** A split card with a shared type line whose halves are doors (CR 709.5, 709.5j): a Room. */
+export const isRoom = (d: CardDef | undefined): boolean => !!d && d.layout === "split" && d.faces?.length === 2 && d.subtypes.includes("Room");
+
+/** The key a Room permanent's definition has with these doors unlocked: its card's (or copy's) key and the doors. */
+export const roomKey = (base: string, doors: number[]) => `${base}|doors:${doors.join("")}`;
+
+const rooms = new Map<string, { def: CardDef; doors: CardDef[] }>();
+
+/**
+ * A Room on the battlefield (CR 709.5): it has the name, mana cost and rules text of its unlocked doors only, so its
+ * colors and mana value are theirs too, and with none unlocked it has no name and no abilities (rulings). Its types
+ * are the shared type line's (709.5a). Anything that isn't a Room is just itself.
+ */
+export function roomDef(card: CardDef, key: string, doors: number[]): CardDef {
+  const hit = rooms.get(key);
+  if (hit) return hit.def;
+  const d = restingDef(card);
+  if (!isRoom(d)) {
+    rooms.set(key, { def: { ...d, oracleId: key }, doors: [] });
+    return rooms.get(key)!.def;
+  }
+  const open = [0, 1].filter((i) => doors.includes(i));
+  const faces = open.map((i) => d.faces![i]!);
+  const manaCost = faces.map((f) => f.manaCost).join("");
+  const { faces: _f, ...rest } = d;
+  const def: CardDef = {
+    ...rest,
+    oracleId: key,
+    name: faces.map((f) => f.name).join(" // "),
+    manaCost,
+    cmc: mv(manaCost),
+    colors: COLORS.filter((c) => faces.some((f) => f.colors.includes(c))),
+    oracleText: "",
+    keywords: [...new Set(faces.flatMap((f) => f.keywords ?? []))],
+    roomDoors: open,
+  };
+  rooms.set(key, { def, doors: open.map((i) => faceDef(d, i)) });
+  return def;
+}
+
+/** The doors' own definitions, for a Room permanent's abilities: each unlocked door's (see compileCard). */
+export const roomDoorDefs = (d: CardDef): CardDef[] | undefined => rooms.get(d.oracleId)?.doors;
+
+/** Register the definition `o` has with its doors as they are now, so its key (cardIdOf) finds it in GameState.cards. */
+export function registerRoom(s: GameState, key: string): void {
+  if (s.cards[key]) return;
+  const m = /^(.*)\|doors:(\d*)$/.exec(key);
+  const base = m && s.cards[m[1]!];
+  if (base) s.cards[key] = roomDef(base, key, [...m[2]!].map(Number));
 }

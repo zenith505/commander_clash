@@ -253,6 +253,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, undefined, undefined, ctx.sourceId ? ctx.sourceZc : undefined)
             : e.cond.kind === "voteWins"
             ? voteWins(s, e.cond.option, !!e.cond.orTie)
+            : e.cond.kind === "amountNow"
+            ? ((n) => (e.cond.kind !== "amountNow" ? false : (e.cond.min === undefined || n >= e.cond.min) && (e.cond.max === undefined || n <= e.cond.max)))(amountNow(s, e.cond.amount, ctx))
             : e.cond.kind === "xAtLeast"
             ? (ctx.x ?? 0) >= e.cond.n
             : kickedMatches(ctx.kicked, e.cond);

@@ -50,7 +50,9 @@ describe("triggers from the graveyard (CR 113.6m)", () => {
     supported(eidolon, squee, firebird, killians);
     expect(compileCard(eidolon).triggers[0]!.zone).toBe("graveyard");
     expect(compileCard(squee).triggers[0]!.zone).toBe("graveyard");
-    expect(isFullySupported(screams)).toBe(false);
+    // It's the Aura's battlefield trigger, returning the Aura card from the graveyard (see face-gaps.test.ts).
+    expect(isFullySupported(screams)).toBe(true);
+    expect(compileCard(screams).triggers[0]!.zone).toBeUndefined();
   });
 
   it("an Eidolon returns when its owner casts a multicolored spell, not a monocolored one (CR 105.4)", () => {

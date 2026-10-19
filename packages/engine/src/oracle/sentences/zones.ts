@@ -114,8 +114,11 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // A graveyard ability's "{2}{B}: Return this card from your graveyard to your hand" (CR 113.6j) or "Whenever you
   // cast a multicolored spell, you may return ~ from your graveyard to your hand" (CR 113.6m): the card itself,
   // while it's still the object whose ability was activated or triggered (CR 400.7).
-  if (ctx.selfCard && (m = /^Return ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s)))
-    return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what: { ref: "selfCard" } }]) : [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[2] ? { tapped: true } : {}) }];
+  if ((ctx.selfCard || ctx.auraCard) && (m = /^[Rr]eturn ~ from your graveyard to (your hand|the battlefield)( tapped)?$/.exec(s))) {
+    // An Aura's card only from its controller's graveyard (rulings on Screams from Within).
+    const what = { ref: "selfCard" as const, ...(ctx.auraCard ? { moved: true as const, yours: true as const } : {}) };
+    return m[1] === "your hand" ? (m[2] ? null : [{ type: "bounce", what }]) : [{ type: "putOntoBattlefield", what, ...(m[2] ? { tapped: true } : {}) }];
+  }
   // Dragon Breath: "When a creature with mana value 6 or greater enters, you may return this card from your graveyard
   // to the battlefield attached to that creature."
   // An ability that works only while the card is in your graveyard (Loathsome Troll's rows): "~" is the card there.
@@ -289,10 +292,28 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Return it to the battlefield tapped under its owner's control" (Supernatural Stamina, Fungal Fortitude), "... with a
   // +1/+1 counter on it" (Undying Malice; it enters with it, CR 614.1c).
   // "Return it to the battlefield tapped and transformed" (Hanweir Garrison's kin): its back face up (CR 712.14a).
-  if (ctx.selfCard && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)?((?: and)? transformed)? under (your|its owner's) control(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?$`).exec(s))) {
-    if (m[2] && !m[1] !== !/ and/.test(m[2])) return null; // "tapped and transformed", or "transformed" alone
+  // "Return it to the battlefield transformed under your control attached to target opponent" (Accursed Witch): an Aura
+  // back face, attached as it enters to what the ability targets, if it could enchant that (CR 303.4f, 712.14a).
+  // An Aura's "when enchanted creature dies, return ~ to the battlefield transformed" (Skin Invasion): the Aura card.
+  // "When ~ dies, return it to the battlefield converted under its owner's control" (Optimus Prime): its back face up,
+  // converting working as transforming does (CR 701.28a).
+  // "When Homura dies, return it to the battlefield flipped": under the ability's controller's control (CR 110.2a), as
+  // Homura's Essence (710.1b).
+  if ((ctx.selfCard || (ctx.auraCard && /^[Rr]eturn ~ /.test(s))) && (m = new RegExp(`^[Rr]eturn (?:it|~) to the battlefield( tapped)?((?: and)? (?:transformed|converted)| flipped)?(?: under (your|its owner's) control)?(?: with ${NUM} ${COUNTER} counters? on it)?( and suspect it)?(?: attached to (target .+))?$`).exec(s))) {
+    const flipped = m[2] === " flipped";
+    if (m[2] && !flipped && !m[1] !== !/ and/.test(m[2])) return null; // "tapped and transformed", or "transformed" alone
+    if (flipped && (m[1] || m[3] || m[4] || m[6] || m[7])) return null; // only Homura's "return it to the battlefield flipped"
+    // No "under ... control": the ability's controller puts it there, so it enters under their control (CR 110.2a).
+    if (!m[3] && !flipped) return null;
+    let attachToTarget: number | undefined;
+    if (m[7]) {
+      if (!m[2] || m[6] || m[4]) return null;
+      attachToTarget = ctx.targets.length;
+      const what = /^target (player|opponent)$/.test(m[7]) ? parsePlayer(m[7], ctx) : parseObject(m[7], ctx);
+      if (!what || what.ref !== "target" || ctx.targets.length !== attachToTarget + 1) return null;
+    }
     return [
-      { type: "putOntoBattlefield", what: { ref: "selfCard" }, ...(m[1] ? { tapped: true } : {}), ...(m[2] ? { transformed: true as const } : {}), ...(m[3] === "its owner's" ? { owner: true } : {}), ...(m[4] ? { counters: { [counterKind(m[5]!)]: num(m[4]) } } : {}) },
+      { type: "putOntoBattlefield", what: { ref: "selfCard", ...(ctx.selfCard ? {} : { moved: true as const }) }, ...(m[1] ? { tapped: true } : {}), ...(m[2] ? (flipped ? { flipped: true as const } : { transformed: true as const }) : {}), ...(m[3] === "its owner's" ? { owner: true } : {}), ...(m[4] ? { counters: { [counterKind(m[5]!)]: num(m[4]) } } : {}), ...(attachToTarget !== undefined ? { attachToTarget } : {}) },
       ...(m[6] ? [{ type: "suspect" as const, what: { ref: "created" as const } }] : []),
     ];
   }

@@ -1,8 +1,9 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
-import { asFace, castableFaces, defMv, hasName, landFaces, layoutOf, restingDef, setFace, transformedFace } from "./faces";
+import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
+import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
@@ -257,6 +258,8 @@ export function newObject(s: GameState, card: CardDef, owner: PlayerId, zone: Zo
     counters: {},
     isCommander: false,
     isToken: false,
+    // A Room made on the battlefield has both doors locked (CR 709.5d).
+    ...(zone === "battlefield" && isRoom(card) ? { unlocked: [] } : {}),
   };
   s.objects[o.id] = o;
   return o;
@@ -411,6 +414,10 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "plot":
       requireNoPending(s);
       plotCard(s, p, action.objectId);
+      break;
+    case "unlockDoor":
+      requireNoPending(s);
+      unlockDoor(s, p, action.objectId, action.door);
       break;
     case "foretell":
       requireNoPending(s);
@@ -764,6 +771,7 @@ export function moveObject(
   o.classLevel = undefined; // CR 716.2b
   o.solved = undefined; // CR 719.3b
   o.transforms = undefined; // a new object (CR 400.7)
+  o.prepared = undefined; // CR 722.3a
   o.saddled = undefined; // CR 702.171b
   o.tribute = undefined; // CR 702.104
   o.hiddenExile = undefined; // a hideaway card that leaves exile is face up again
@@ -771,6 +779,14 @@ export function moveObject(
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
+  // A Room enters with the door that was cast unlocked, and from anywhere but the stack with both locked (CR 709.5d,
+  // rulings). On the battlefield it's the whole card, its doors locked or unlocked, not a half (709.5).
+  o.unlocked = undefined;
+  if (to === "battlefield" && isRoom(s.cards[o.cardId]) && !o.faceDown) {
+    o.unlocked = fromZone === "stack" && o.face !== undefined && o.face < 2 ? [o.face] : [];
+    o.face = undefined;
+    registerRoom(s, cardIdOf(o));
+  }
   if (to === "battlefield") o.devoured = undefined; // kept elsewhere for "for each creature it devoured" (CR 608.2h)
   if (to === "battlefield") o.mutations = undefined; // and for "the number of times ~ has mutated"
   o.counters = {};
@@ -957,6 +973,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     const put = putCounters(s, o, counter, o.colorsSpent.length, true);
     log(s, `${defOf(s, o).name} enters with ${put} ${counter} counter${put === 1 ? "" : "s"} (sunburst).`);
   }
+  // "This creature enters prepared" (CR 722.3a): the copy of its prepare spell is created as it enters (722.3c).
+  if (printed.entersPrepared) becomePrepared(s, o);
   // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
   const saga = characteristics(s, o).subtypes.includes("Saga");
   if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
@@ -973,6 +991,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     if (together) together.events.push(ev);
     else fireEvent(s, ev);
   }
+  // The door that was cast becomes unlocked as the Room enters (CR 709.5d, 709.5h).
+  for (const door of o.unlocked ?? []) fireEvent(s, { type: "doorUnlocked", id, door });
 }
 
 /** What a permanent entering "as a copy of" something could copy: other permanents on the battlefield (not targeted). */
@@ -2371,7 +2391,7 @@ function exilePermission(s: GameState, o: GameObject, pid: PlayerId): Pick<NonNu
 
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return ownExilePermission(s, o, pid) || linkedPlayPermission(s, o, pid);
+  return ownExilePermission(s, o, pid) || linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
 }
 
 /** The card's own permission to be played from exile (GameObject.mayPlay), if it's `pid`'s and holds now. */
@@ -2640,6 +2660,8 @@ export function castProblem(
   const p = player(s, pid);
   const o = s.objects[id];
   if (!o) return "no such card";
+  choices = convertChoices(o, choices);
+  if (choices?.alt === "convert" && (choices.face ?? o.face) !== 1) return `${defOf(s, o).name} is cast converted with its back face up`;
   if (choices?.face !== undefined && o.face !== choices.face) {
     // A split card's half, a modal double-faced card's face, an Adventure: only that face is looked at (CR 709.3a,
     // 712.11c, 715.3a).
@@ -2833,12 +2855,25 @@ export function castProblem(
   return null;
 }
 
+/**
+ * More Than Meets the Eye (CR 702.162a): a card cast converted is put on the stack with its back face up (rulings), so
+ * casting it for that cost casts its back face.
+ */
+export function convertChoices<C extends Pick<CostChoices, "alt" | "face">>(o: GameObject, choices: C): C;
+export function convertChoices<C extends Pick<CostChoices, "alt" | "face">>(o: GameObject, choices: C | undefined): C | undefined;
+export function convertChoices<C extends Pick<CostChoices, "alt" | "face">>(o: GameObject, choices: C | undefined): C | undefined {
+  return choices?.alt === "convert" && choices.face === undefined && o.face === undefined ? { ...choices, face: 1 } : choices;
+}
+
 /** Why this card can't be cast with the face `choices.face` (CR 709.3, 712.11b, 715.3), or null. */
 function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostChoices): string | null {
   const face = choices.face!;
   if (choices.faceDown || o.faceDown) return "a face-down spell has no face to choose";
   // A double-faced card is cast transformed only by an ability that says so (CR 712.11a, 712.11d): disturb.
-  const transformedWay = choices.via !== undefined && layoutOf(s, o) === "transform" && graveyardWays(s, o).some((g) => g.kind === choices.via && g.face === face);
+  const transformedWay =
+    (choices.via !== undefined && layoutOf(s, o) === "transform" && graveyardWays(s, o).some((g) => g.kind === choices.via && g.face === face)) ||
+    // Cast converted for its More Than Meets the Eye cost (CR 702.162a).
+    (choices.alt === "convert" && layoutOf(s, o) === "transform" && face === 1 && !!altCost(defOf(s, o), "convert"));
   if (!castableFaces(s, o).includes(face) && !transformedWay) return `${defOf(s, o).name} can't be cast as that face`;
   // A card that went on an adventure may be cast from exile, but not as an Adventure again (CR 715.3d), unless
   // something else lets it be cast from there.
@@ -2852,6 +2887,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
 export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice" | "harmonize"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+  how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
   // Face down, it's a 2/2 with no abilities that costs {3} to cast (CR 702.37c).
@@ -3101,7 +3137,7 @@ export const spellTargets = (s: GameState, id: ObjectId, modes?: number[], alt?:
 /** Which optional costs these choices announce, for the targets that depend on them (see gateTargets). */
 export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamwork" | "gift" | "evidence" | "alt" | "face">): CastHow => ({
   ...(choices?.alt ? { alt: choices.alt } : {}),
-  ...(choices?.face !== undefined ? { face: choices.face } : {}),
+  ...(choices?.face !== undefined ? { face: choices.face } : choices?.alt === "convert" ? { face: 1 } : {}),
   ...(choices?.kicks?.length ? { kicks: choices.kicks } : {}),
   ...(choices?.bargain ? { bargained: true } : {}),
   ...(choices?.evidence ? { evidence: true } : {}),
@@ -3139,6 +3175,7 @@ export const spellModes = (s: GameState, id: ObjectId) => compileCard(defOf(s, o
 
 function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice[], modes?: number[], convoke?: ObjectId[], improvise?: ObjectId[], x?: number, choices: CostChoices = {}) {
   const o = obj(s, id);
+  choices = convertChoices(o, choices);
   if (choices.face !== undefined && o.face !== choices.face) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
@@ -3294,7 +3331,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness ? " for its madness cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
@@ -3358,6 +3395,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   s.cards[d.oracleId] ??= d;
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };
+  // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
+  if (o.preparedFrom) unprepareFor(s, o);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}) });
   fireEvent(s, { type: "targeted", stackId });
@@ -5590,6 +5629,7 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     checkPairs(s);
     checkAscend(s);
     checkDayNight(s); // not a state-based action, but done at once (CR 702.145c-g)
+    checkPrepared(s); // the copies of prepare spells last as long as their permanents stay prepared (CR 722.3c)
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;
@@ -5968,6 +6008,7 @@ export function legalActions(s: GameState, pid: PlayerId): Action[] {
     if (plotProblem(s, pid, id) === null) out.push({ type: "plot", player: pid, objectId: id });
     if (foretellProblem(s, pid, id) === null) out.push({ type: "foretell", player: pid, objectId: id });
   }
+  for (const id of s.battlefield) for (const door of [0, 1]) if (unlockProblem(s, pid, id, door) === null) out.push({ type: "unlockDoor", player: pid, objectId: id, door });
   // "You may play lands from your graveyard" (Crucible of Worlds).
   if (canActAtSorcerySpeed(s, pid) && p.landsPlayedThisTurn < landsAllowed(s, pid))
     for (const id of p.graveyard) if (mayPlayLandFromGraveyard(s, obj(s, id), pid) && !nameLandBan(s, pid, defOf(s, obj(s, id)))) out.push({ type: "playLand", player: pid, objectId: id });
@@ -6122,6 +6163,49 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   log(s, `${p.name} foretells a card.`);
   log(s, `(You foretold ${d.name}: cast it on a later turn for ${compileCard(d).foretell}.)`, p.id);
   s.passedInSuccession = [];
+}
+
+/** A Room permanent's locked door's unlock cost: that half's mana cost (CR 709.5e), or undefined if there's none to unlock. */
+export function unlockCost(s: GameState, o: GameObject, door: number): string | undefined {
+  const d = s.cards[o.cardId];
+  if (o.zone !== "battlefield" || o.faceDown || o.unlocked === undefined || o.unlocked.includes(door) || !isRoom(d)) return undefined;
+  return restingDef(d!).faces![door]?.manaCost;
+}
+
+/**
+ * Why `pid` can't unlock this door of a Room now, or null (with the mana in their pool). Unlocking is a special action
+ * its controller takes any time they have priority during a main phase of their turn with the stack empty (CR 116.2m,
+ * 709.5e).
+ */
+export function unlockProblem(s: GameState, pid: PlayerId, id: ObjectId, door: number): string | null {
+  const o = s.objects[id];
+  const cost = o && unlockCost(s, o, door);
+  if (!o || cost === undefined) return "only a locked door of a Room on the battlefield can be unlocked";
+  if (controllerOf(s, o) !== pid) return "only a Room you control can be unlocked";
+  if (!canActAtSorcerySpeed(s, pid)) return "you can only unlock a door during your main phase while the stack is empty";
+  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to unlock ${restingDef(s.cards[o.cardId]!).faces![door]!.name} (${cost})`;
+  return null;
+}
+
+/** Unlock a door of a Room (CR 709.5e): pay its mana cost, and it has that door's name, cost and text from now on. */
+function unlockDoor(s: GameState, p: Player, id: ObjectId, door: number) {
+  const problem = unlockProblem(s, p.id, id, door);
+  if (problem) throw new RulesError(problem);
+  const o = obj(s, id);
+  const cost = unlockCost(s, o, door)!;
+  spendFromPool(s, p.id, parseManaCost(cost), "other");
+  log(s, `${p.name} unlocks ${restingDef(s.cards[o.cardId]!).faces![door]!.name} (${cost}).`);
+  setUnlocked(s, o, [...o.unlocked!, door]);
+  s.passedInSuccession = [];
+}
+
+/** Give a Room these unlocked designations (CR 709.5c); each door that becomes unlocked triggers its abilities (709.5h). */
+export function setUnlocked(s: GameState, o: GameObject, doors: number[]) {
+  const was = o.unlocked ?? [];
+  o.unlocked = [0, 1].filter((i) => doors.includes(i));
+  registerRoom(s, cardIdOf(o));
+  invalidateCharacteristics(s);
+  for (const door of o.unlocked) if (!was.includes(door)) fireEvent(s, { type: "doorUnlocked", id: o.id, door });
 }
 
 /** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */

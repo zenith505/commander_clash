@@ -35,6 +35,74 @@
   "gameChanger": false
  },
  {
+  "oracleId": "02125db4-4507-467a-ac0c-406de2c7d533",
+  "name": "Adventurous Eater // Have a Bite",
+  "manaCost": "{2}{B} // {B}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Warlock // Sorcery",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "This creature enters prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Prepared"
+  ],
+  "commanderLegal": "legal",
+  "set": "sos",
+  "releasedAt": "2026-04-24",
+  "rarity": "common",
+  "layout": "prepare",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Adventurous Eater",
+    "manaCost": "{2}{B}",
+    "typeLine": "Creature — Human Warlock",
+    "supertypes": [],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Human",
+     "Warlock"
+    ],
+    "oracleText": "This creature enters prepared. (While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)",
+    "power": "3",
+    "toughness": "2",
+    "colors": [
+     "B"
+    ]
+   },
+   {
+    "name": "Have a Bite",
+    "manaCost": "{B}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Put a +1/+1 counter on target creature. You gain 1 life.",
+    "colors": [
+     "B"
+    ]
+   }
+  ]
+ },
+ {
   "oracleId": "e101b744-9175-4aa5-bf80-d6944359e538",
   "name": "Airbending Lesson",
   "manaCost": "{2}{W}",
@@ -782,6 +850,68 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "b9ac4856-5cdb-479f-b0f5-7fa0b232a5ff",
+  "name": "Bottomless Pool // Locker Room",
+  "manaCost": "{U} // {4}{U}",
+  "cmc": 6,
+  "typeLine": "Enchantment — Room // Enchantment — Room",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Room"
+  ],
+  "oracleText": "When you unlock this door, return up to one target creature to its owner's hand.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Bottomless Pool",
+    "manaCost": "{U}",
+    "typeLine": "Enchantment — Room",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Room"
+    ],
+    "oracleText": "When you unlock this door, return up to one target creature to its owner's hand.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
+    "colors": [
+     "U"
+    ]
+   },
+   {
+    "name": "Locker Room",
+    "manaCost": "{4}{U}",
+    "typeLine": "Enchantment — Room",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Room"
+    ],
+    "oracleText": "Whenever one or more creatures you control deal combat damage to a player, draw a card.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
+    "colors": [
+     "U"
+    ]
+   }
+  ]
  },
  {
   "oracleId": "e43413e4-be17-49af-978a-26210d05f52a",
@@ -2819,6 +2949,98 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "d1960749-c11e-4ac4-97cb-f37d7875d479",
+  "name": "Goldbug, Humanity's Ally // Goldbug, Scrappy Scout",
+  "manaCost": "{1}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Artifact Creature — Robot // Legendary Artifact — Vehicle",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Robot"
+  ],
+  "oracleText": "More Than Meets the Eye {W}{U} (You may cast this card converted for {W}{U}.)\nPrevent all combat damage that would be dealt to attacking Humans you control.\nWhenever you cast your second spell each turn, convert Goldbug.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Living metal",
+   "Convert",
+   "More Than Meets the Eye"
+  ],
+  "commanderLegal": "legal",
+  "set": "bot",
+  "releasedAt": "2022-11-18",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Goldbug, Humanity's Ally",
+    "manaCost": "{1}{W}{U}",
+    "typeLine": "Legendary Artifact Creature — Robot",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Creature"
+    ],
+    "subtypes": [
+     "Robot"
+    ],
+    "oracleText": "More Than Meets the Eye {W}{U} (You may cast this card converted for {W}{U}.)\nPrevent all combat damage that would be dealt to attacking Humans you control.\nWhenever you cast your second spell each turn, convert Goldbug.",
+    "power": "3",
+    "toughness": "3",
+    "colors": [
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/8/e/8e4a8db9-ef57-4ea0-952c-1e5d343fb5d9.jpg?1783919904",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/8/e/8e4a8db9-ef57-4ea0-952c-1e5d343fb5d9.jpg?1783919904"
+   },
+   {
+    "name": "Goldbug, Scrappy Scout",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact — Vehicle",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [
+     "Vehicle"
+    ],
+    "oracleText": "Living metal (During your turn, this Vehicle is also a creature.)\nHuman spells you control can't be countered.\nWhenever Goldbug and at least one Human attack, draw a card and convert Goldbug.",
+    "power": "1",
+    "toughness": "3",
+    "colors": [
+     "U",
+     "W"
+    ],
+    "colorIndicator": [
+     "U",
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/8/e/8e4a8db9-ef57-4ea0-952c-1e5d343fb5d9.jpg?1783919904",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/8/e/8e4a8db9-ef57-4ea0-952c-1e5d343fb5d9.jpg?1783919904"
+   }
+  ]
  },
  {
   "oracleId": "09ff28b1-b6c9-48e6-b12e-2f0e644f709f",

@@ -1,4 +1,4 @@
-import { faceDef, hasFuse, restingDef } from "../faces";
+import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { allEffects } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
@@ -36,7 +36,8 @@ export function compileCard(card: CardDef): CompiledCard {
   const d = restingDef(card);
   const hit = cache.get(d.oracleId);
   if (hit) return hit;
-  const out = compile(d);
+  const doors = d.roomDoors ? roomDoorDefs(d) : undefined;
+  const out = doors ? roomAbilities(doors) : compile(d);
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;
@@ -44,6 +45,20 @@ export function compileCard(card: CardDef): CompiledCard {
   if (rooms) out.triggers = rooms;
   cache.set(d.oracleId, out);
   return out;
+}
+
+/**
+ * A Room permanent's abilities: those in each unlocked door's text box (CR 709.5, rulings), left door first, so the
+ * left door's triggered abilities keep their places as the right one unlocks.
+ */
+function roomAbilities(doors: CardDef[]): CompiledCard {
+  const out: Record<string, unknown> = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
+  for (const c of doors.map((d) => compileCard(d)))
+    for (const [k, v] of Object.entries(c)) {
+      if (Array.isArray(v)) out[k] = [...((out[k] as unknown[] | undefined) ?? []), ...v];
+      else if (v !== undefined && v !== false && (out[k] === undefined || out[k] === false)) out[k] = v;
+    }
+  return out as unknown as CompiledCard;
 }
 
 /**
@@ -136,7 +151,7 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
 /** Card types/subtypes whose rules we don't model yet, whatever their text says. */
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
-const UNSUPPORTED_SUBTYPES = ["Room", "Siege"];
+const UNSUPPORTED_SUBTYPES = ["Siege"];
 
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
@@ -170,10 +185,9 @@ export function isFullySupported(d: CardDef): boolean {
  * fuse or aftermath have those lines reported by their faces. Transforming, flip and preparation cards aren't yet.
  */
 function facesSupported(card: CardDef): boolean {
-  if (!["modal_dfc", "adventure", "split", "transform"].includes(card.layout ?? "")) return false;
+  if (!["modal_dfc", "adventure", "split", "transform", "prepare", "flip"].includes(card.layout ?? "")) return false;
   const d = restingDef(card);
-  // Rooms: doors that are unlocked, not halves cast on their own (CR 709.5).
-  if (d.subtypes.includes("Room")) return false;
+  // Rooms (CR 709.5): each door is cast on its own as a half, and is the text of the Room permanent while unlocked.
   if (!d.faces!.every((_, i) => isFullySupported(faceDef(d, i)))) return false;
   return !hasFuse(d) || fusedSupported(d);
 }
@@ -271,7 +285,9 @@ export function normalizeSelf(d: CardDef): string {
   if (d.supertypes?.includes("Legendary")) t = t.split(/("[^"]*")/).map((part, i) => (i % 2 ? part : selfPronouns(part))).join("");
   // 'Equipped creature has "... sacrifice this Equipment"': the Equipment, not the creature.
   t = t.replace(/"[^"]*"/g, (q) => q.replace(/\b[Tt]his (Equipment|Aura)\b/g, QUOTED_SOURCE_NAME));
-  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case)\b/g, "~");
+  t = t.replace(/\b[Tt]his (creature|artifact|enchantment|land|permanent|spell|card|token|Equipment|Vehicle|Spacecraft|Planet|Aura|planeswalker|Saga|Class|Case|Room)\b/g, "~");
+  // A Room's door (CR 709.5j): "When you unlock this door" is about that half, by its index.
+  if (d.faceOf && d.subtypes.includes("Room")) t = t.replace(/\bWhen you unlock this door\b/g, `When you unlock door ${d.faceOf.face}`);
   // "Your team" means the same as "you" in a game that isn't between teams (CR 102.4): "Warriors your team controls",
   // "if your team gained life this turn".
   t = t.replace(/\byour team controls\b/g, "you control").replace(/\byour team gained\b/g, "you gained");
@@ -331,6 +347,8 @@ const FLASH_IF: StaticCondition["kind"][] = ["committedCrime", "control", "monar
 
 export function compile(d: CardDef): CompiledCard {
   const out: CompiledCard = { triggers: [], activated: [], mana: [], statics: [], entersTapped: false, unsupported: [], textKeywords: [] };
+  // A back face cast converted (CR 702.162a): the front face's More Than Meets the Eye cost is what's paid for it.
+  if (d.convertCost && plainMana(d.convertCost)) out.altCosts = [{ kind: "convert", mana: d.convertCost }];
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   const spellLines: string[] = [];
   let ascendSpell = false;
@@ -932,6 +950,10 @@ export function compile(d: CardDef): CompiledCard {
     // Darksteel Colossus: a replacement effect that works from every zone (CR 614.1a, 113.6c-style "from anywhere").
     if (/^If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead\.$/.test(line)) {
       out.shuffleInsteadOfGraveyard = true;
+      continue;
+    }
+    if (line === "~ enters prepared.") {
+      out.entersPrepared = true;
       continue;
     }
     if (line === "If ~ would be put into a graveyard from anywhere, exile it instead.") {
@@ -1541,14 +1563,15 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "When you cast or cycle ~, ...", "When you cycle ~ and when ~ dies, ...", "Whenever ~ enters or attacks, ...",
-    // "When ~ enters or dies, ...", "When ~ enters and at the beginning of your upkeep, ...": one ability that triggers on
+    // "When ~ enters or dies, ...", "When ~ transforms into ~ or dies, ...", "When ~ enters and at the beginning of your upkeep, ...": one ability that triggers on
     // either event, which works like two with the same effect (CR 702.29c). The text is read for each event ("it" after it
     // died is the card).
     const twice =
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
-      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
+      /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
@@ -1560,6 +1583,8 @@ export function compile(d: CardDef): CompiledCard {
             ? [`When ~ enters, ${effect}`, `When the creature ~ haunts dies, ${effect}`]
             : /^at the beginning/.test(twice[1]!)
               ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
+            : /^When ~ transforms into ~ or dies/.test(line)
+              ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);

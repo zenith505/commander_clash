@@ -25,6 +25,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const c = parseCount(m[2]!, ctx);
     return c && { count: c.count, times: -(c.times ?? 1), plus: num(m[1]!) - (c.plus ?? 0) };
   }
+  // "Loses 1 life for each card fewer than three in their hand" (Stabwhisker the Odious): three minus that many, none
+  // with three or more.
+  if ((m = new RegExp(`^cards? fewer than ${NUM} in (your|their|that player's) hand$`, "i").exec(p))) return parseCount(`${m[1]} minus cards in ${m[2]} hand`, ctx);
   if ((m = new RegExp(`^(.+) (plus|minus) ${NUM}$`, "i").exec(p))) {
     const c = parseCount(m[1]!, ctx);
     const n = num(m[3]!) * (m[2]!.toLowerCase() === "minus" ? -1 : 1);

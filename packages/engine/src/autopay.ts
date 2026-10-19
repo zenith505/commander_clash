@@ -2,7 +2,7 @@ import { asFace } from "./faces";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, altCost, isTreasure, castProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { poolFor, spendAllows, type ManaUse } from "./spend";
@@ -271,6 +271,7 @@ export function planCast(
   choices: CostChoices = {},
 ): Action[] | null {
   const o = obj(s, objectId);
+  choices = convertChoices(o, choices);
   // Cast as one of its faces: that face's cost and text (CR 709.3a, 712.11c, 715.3a).
   if (choices.face !== undefined && o.face !== choices.face) return asFace(s, o, choices.face, () => planCast(s, pid, objectId, targets, modes, convoke, x, choices));
   const d = choices.faceDown ? FACE_DOWN : defOf(s, o);
@@ -604,6 +605,17 @@ export function planForetell(s: GameState, pid: PlayerId, id: ObjectId): Action[
   if (problem && !/not enough mana/.test(problem)) return null;
   const taps = problem ? planMana(s, pid, parseManaCost("{2}")) : [];
   return taps ? [...taps, { type: "foretell", player: pid, objectId: id }] : null;
+}
+
+/** Tap mana for a Room's locked door's unlock cost, then unlock it (CR 709.5e), or null if that can't be done now. */
+export function planUnlock(s: GameState, pid: PlayerId, id: ObjectId, door: number): Action[] | null {
+  const o = s.objects[id];
+  const cost = o && unlockCost(s, o, door);
+  if (cost === undefined) return null;
+  const problem = unlockProblem(s, pid, id, door);
+  if (problem && !/not enough mana/.test(problem)) return null;
+  const taps = problem ? planMana(s, pid, parseManaCost(cost)) : [];
+  return taps ? [...taps, { type: "unlockDoor", player: pid, objectId: id, door }] : null;
 }
 
 /** Tap mana for a card's plot cost, then plot it (CR 702.170a), or null if that can't be done now. */

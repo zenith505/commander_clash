@@ -336,6 +336,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };
+  // "If there are two or more ki counters on ~" (the Kamigawa flip cards).
+  if ((m = new RegExp(`^there are ${NUM} or more ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };
   // The werewolves of Innistrad (rulings: the whole previous turn; "a player" is a single player).
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
@@ -417,6 +419,13 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Kosei, Penitent Warlord: "as long as ~ is enchanted, equipped, and has a counter on it": all three (any counter).
   if (/^~ is enchanted, equipped, and has a counter on it$/.test(text))
     return { kind: "allOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }, { kind: "self", is: "hasCounter" }] };
+  // "If ~ is enchanted by two or more Auras, flip it" (Kitsune Mystic): the Auras attached to it.
+  if ((m = new RegExp(`^~ is enchanted by ${NUM} or more Auras$`).exec(text))) return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: num(m[1]!) };
+  // "When ~ has flying, flip it" (Student of Elements): one of its keywords.
+  if ((m = /^~ has (flying|first strike|double strike|deathtouch|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance)$/.exec(text)))
+    return { kind: "selfIs", filter: { kind: "object", keywords: [capital(m[1]!)], text: m[1]! } };
+  // "If ~ isn't prepared, it becomes prepared" (CR 722.3a).
+  if ((m = /^~ (is|isn't) prepared$/.exec(text))) return { kind: "self", is: "prepared", ...(m[1] === "isn't" ? { not: true as const } : {}) };
   // "It" is the source only when the ability is about the source itself.
   const self = /^(?:~|it)(?:'s| is) (attacking|enchanted|equipped|modified|tapped|untapped|monstrous)$/.exec(text);
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };

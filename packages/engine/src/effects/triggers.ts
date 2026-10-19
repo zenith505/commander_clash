@@ -1,3 +1,4 @@
+import { restingDef } from "../faces";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
 import { checkAscend, creatureTypesOf, describeTargets, draw, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType } from "../game";
@@ -134,6 +135,8 @@ export type TriggerSourceEvent =
   /** A mutating spell merged with this permanent (CR 702.140d). */
   | { type: "mutates"; id: ObjectId }
   | { type: "becameLevel"; id: ObjectId; level: number }
+  /** A Room's door became unlocked (CR 709.5h). */
+  | { type: "doorUnlocked"; id: ObjectId; door: number }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
   /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
@@ -254,8 +257,8 @@ function trains(s: GameState, o: GameObject): boolean {
 }
 
 /** The other creatures attacking along with it (battalion): those just declared as attackers with it. */
-function othersAttacking(s: GameState, o: GameObject): number {
-  return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature")).length;
+function othersAttacking(s: GameState, o: GameObject, type?: string): number {
+  return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature") && (!type || characteristics(s, s.objects[id]!).subtypes.includes(type))).length;
 }
 
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
@@ -471,7 +474,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const d of [...(s.delayed ?? [])]) {
       if (d.when !== "leaves" || d.subject.id !== ev.id || d.subject.zc !== was) continue;
       s.delayed = s.delayed!.filter((x) => x !== d);
-      if (d.to?.includes(ev.to)) s.triggerQueue.push({ sourceId: ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body });
+      // "When that creature dies this turn": only this turn, and only if it dies (CR 700.4).
+      if (d.thisTurn !== undefined && d.thisTurn !== s.turn) continue;
+      if (d.dies && !ev.wasCreature) continue;
+      if (d.to?.includes(ev.to))
+        s.triggerQueue.push({ sourceId: d.source?.id ?? ev.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: { id: ev.id, zc: o.zoneChanges ?? 0 }, body: d.body, ...(d.source ? { sourceZc: d.source.zc } : {}) });
     }
     // Its abilities as it last existed on the battlefield (CR 603.10a): a merged permanent's from all its cards (730.2a),
     // a copy's from what it copied.
@@ -713,6 +720,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       if (controllerOf(s, w) === you) add(w, you, (e) => e === "youExert", undefined, undefined, o);
     }
+  } else if (ev.type === "transformed") {
+    // "When this creature transforms into [this face]" (CR 701.27e): an ability of the face now up.
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e) => e === "selfTransformsInto");
+  } else if (ev.type === "doorUnlocked") {
+    // "When you unlock this door": an ability of that door, which the Room has now that it's unlocked (CR 709.5h).
+    const o = obj(s, ev.id);
+    add(o, controllerOf(s, o), (e, t) => e === "selfDoorUnlocked" && t.door === ev.door);
   } else if (ev.type === "becameLevel") {
     // "When this Class becomes level 2": an ability it has from that level on (CR 716.2a), so it has it now.
     const o = obj(s, ev.id);
@@ -734,7 +749,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // planeswalker's controller)?
     const attackingYou = (a: GameObject, pid: PlayerId) => ({ player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid });
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
-    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+    add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
@@ -1155,7 +1170,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
       s.triggerQueue.shift();
       continue;
     }
-    const def = s.cards[t.sourceCardId]!;
+    const def = restingDef(s.cards[t.sourceCardId]!);
     const printed = triggerBody(s, t);
     if (printed.modal && !t.modes) {
       // Modes are chosen as it's put on the stack; a mode without legal targets can't be (CR 603.3c).
@@ -1286,7 +1301,7 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
 }
 
 export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoice[]) {
-  const def = s.cards[t.sourceCardId]!;
+  const def = restingDef(s.cards[t.sourceCardId]!);
   // With "any number of target ...", as many targets as were chosen (CR 601.2c, 603.3d).
   const fit = fitMany(withModes(triggerBody(s, t), t.modes), chosen, t.x ?? 0);
   if (typeof fit === "string") throw new RulesError(fit);

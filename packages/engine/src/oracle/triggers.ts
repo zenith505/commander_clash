@@ -3,10 +3,14 @@ import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./word
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
+import { CREATURE_TYPES } from "../keywords";
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^When(?:ever)? ~ enters(?: the battlefield)?, (.+)$/, "selfEnters"],
   [/^When(?:ever)? ~ dies, (.+)$/, "selfDies"],
+  // "When this creature transforms into [this face]" (CR 701.27e): it transformed or converted and now has this face up,
+  // so this face's abilities are the ones it has. Entering transformed isn't transforming (712.14a).
+  [/^When(?:ever)? ~ transforms into ~, (.+)$/, "selfTransformsInto"],
   // Coin flips (CR 705.2): each one won or lost.
   [/^Whenever you win a coin flip, (.+)$/, "youWinFlip"],
   [/^Whenever you lose a coin flip, (.+)$/, "youLoseFlip"],
@@ -87,7 +91,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 const SELF_EVENTS: TriggerEvent[] = [
-  "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp",
+  "selfEnters", "selfDies", "selfDiesOrExiled", "selfLeaves", "selfLostControl", "selfToGraveyard", "selfBecomesTarget", "selfAttacks", "selfAttacksOrBlocks", "selfDealsCombatDamageToPlayer", "selfTurnedFaceUp", "selfTransformsInto",
   "selfDealsDamage", "selfDealsCombatDamage", "selfTargetedByYourSpell", "selfLastTimeCounterRemoved", "selfExploits",
   "selfBlocks", "selfBecomesBlocked", "selfAttacksUnblocked", "selfAttacksAlone", "selfBlocksOrBecomesBlocked", "selfBlocksCreature", "selfBlockedByCreature", "selfBlocksOrBlockedByCreature",
   "selfDealsDamageToCreature", "selfDealsCombatDamageToCreature", "selfDealsDamageToPlayer", "selfBecomesTapped", "selfIsDealtDamage", "selfBecomesMonstrous", "selfMutates",
@@ -429,9 +433,14 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
   if (hadKw) bodyText = hadKw[3]!;
-  const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true });
+  const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
   if (!body) return "fail";
-  if (attached) return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
+  if (attached) {
+    // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
+    // died or just after (CR 704.5m), not the Aura on the battlefield it no longer is (CR 400.7).
+    if (attached[1] === "enchanted") for (const e of allEffects(body.effects)) if ((e.type === "bounce" || e.type === "putOntoBattlefield") && e.what.ref === "self") e.what = { ref: "selfCard", moved: true };
+    return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
+  }
   let phrase = m![2]!;
   const damaged = / dealt damage by ~ this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
@@ -883,10 +892,20 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return t && t !== "fail" ? { ...t, hostControllersUpkeep: true } : "fail";
   }
   // Battalion: "Whenever ~ and at least two other creatures attack, ..." (as attackers are declared, CR 508.1).
-  const battalion = /^Whenever ~ and at least (one|two|three) other creatures attack, (.+)$/.exec(line);
+  // "When you unlock this door, ..." (CR 709.5h): as the door becomes unlocked, on the battlefield or as the Room enters
+  // because that half was cast (see normalizeSelf for the door's index).
+  const door = /^When you unlock door ([01]), (.+)$/.exec(line);
+  if (door) {
+    const body = parseBody(door[2]!, {});
+    return body ? { event: "selfDoorUnlocked", door: Number(door[1]), body } : "fail";
+  }
+  // "Whenever ~ and at least one Human attack, ..." (Goldbug, Scrappy Scout): others of that creature type.
+  const battalion = /^Whenever ~ and at least (one|two|three) (other creatures|[A-Z][a-z]+) attack, (.+)$/.exec(line);
   if (battalion) {
-    const t = parseTrigger(`Whenever ~ attacks, ${battalion[2]}`);
-    return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!) } : "fail";
+    const type = battalion[2] === "other creatures" ? undefined : battalion[2]!;
+    if (type && !CREATURE_TYPES.has(type)) return "fail";
+    const t = parseTrigger(`Whenever ~ attacks, ${battalion[3]}`);
+    return t && t !== "fail" ? { ...t, withOthers: num(battalion[1]!), ...(type ? { withOthersType: type } : {}) } : "fail";
   }
   // "Whenever a creature you control attacks alone" (exalted's event, CR 702.83a, 506.5): that creature is the subject.
   const alone = /^Whenever an? (.+?) you control attacks alone, (?!if )(.+)$/.exec(line);
@@ -922,7 +941,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
   const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to that creature)?))\.$/.exec(line);
-  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!)) {
+  // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger.
+  if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
     if (!t || t === "fail" || t.body.effects.length !== 1 || t.body.effects[0]!.type !== "draw" || t.body.targets.length) return "fail";
     if (!YARD_EVENTS.includes(t.event) || t.host) return "fail";
@@ -943,7 +963,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
   // "If it's attacking" is about the source only in an ability about the source itself.
-  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) )/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!);
+  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) )/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
@@ -970,7 +990,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // only thing named.
     // So is every "it" of "sacrifice it" (Mad Dog) and "it deals 2 damage to you unless it came under your control this
     // turn" (Erg Raiders), with no target or other object in the text.
-    if (/^~ /.test(intervening[2]!) && /^At /.test(intervening[1]!))
+    // So is "it" after "if there are two or more ki counters on ~" (the Kamigawa flip cards).
+    if ((/^~ /.test(intervening[2]!) || / counters on ~$/.test(intervening[2]!)) && /^At /.test(intervening[1]!))
       rest = /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.") : rest.replace(/\bit\b/g, "~");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond } : "fail";
@@ -1090,10 +1111,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     return body ? { event: "selfCycled", body } : "fail";
   }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
-  const st = /^When (you control no .+?), (.+)$/.exec(line);
+  // "When you have 30 or more life, flip ~" (Rune-Tail), "When ~ has flying, flip it" (Student of Elements).
+  const st = new RegExp(`^When (you control no .+?|you have ${NUM} or more life|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
-    const body = state && parseBody(st[2]!, { selfIt: true });
+    const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
   }
   // "Whenever you commit a crime during your turn" (Overzealous Muscle, CR 700.13): only while it's your turn, whether it

@@ -2,7 +2,7 @@ import type { Effect, TokenSpec } from "../abilities";
 import { defOf, power, toughness } from "../cards";
 import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokensToCreate } from "../counters";
-import { copyKey, type CopyExcept } from "../copies";
+import { tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault } from "./triggers";
@@ -15,14 +15,15 @@ import { controllerOf, invalidateCharacteristics } from "../layers";
  * enter at the same time (CR 608.2f), so each sees the others enter and none counts another as it enters (603.6a, 614.12).
  */
 export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
-  const key = copyKey(s, base, opts.except);
+  // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
+  const { key, face } = tokenCopyKey(s, base, opts.except);
   const k = tokensToCreate(s, pid, s.cards[key]!, n);
   const defender = opts.defender ?? (opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined);
   enterTogether(s, () => {
     for (let i = 0; i < k; i++) {
       const o = newObject(s, s.cards[key]!, pid, "exile");
       o.isToken = true;
-      moveObject(s, o.id, "battlefield", opts.tapped || opts.attacking ? { tapped: true } : {});
+      moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}) });
       if (defender !== undefined && o.zone === "battlefield") o.attacking = defender;
       s.resolving?.created?.push(o.id);
       noteCreated(s, pid, o);

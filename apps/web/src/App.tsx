@@ -12,6 +12,10 @@ import {
   canCast,
   castProblem,
   planTurnFaceUp,
+  planUnlock,
+  unlockCost,
+  unlockProblem,
+  restingDef,
   faceUpWays,
   turnFaceUpProblem,
   delveRoom,
@@ -1028,7 +1032,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const mana = usableManaOptions(s, o);
       const abs = manaAbilitiesOn(s, o);
       // A menu when there's a choice to make: other abilities, a color, or a cost beyond tapping it.
-      if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0)) return setMenu(o.id);
+      // A Room with a locked door to unlock (CR 709.5e) has a menu too.
+      if (o.faceDown || abilitiesOf(s, o).activated.length || mana.length > 1 || mana.some((x) => manaPenalty(abs[x.ability]!) > 0) || [0, 1].some((door) => unlockCost(s, o, door) !== undefined)) return setMenu(o.id);
       const plan = mana[0] && planManaAbility(s, HUMAN, o.id, mana[0].ability, mana[0].mana, undefined, mana[0].extra, mana[0].combo);
       if (plan) dispatch(plan);
     }
@@ -1325,6 +1330,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 dispatch(planForetell(s, HUMAN, menu) ?? [{ type: "foretell", player: HUMAN, objectId: menu }]);
               }}
+              onUnlock={(door) => {
+                setMenu(null);
+                dispatch(planUnlock(s, HUMAN, menu, door) ?? [{ type: "unlockDoor", player: HUMAN, objectId: menu, door }]);
+              }}
               onTurnFaceUp={(way) => {
                 setMenu(null);
                 dispatch(planTurnFaceUp(s, HUMAN, menu, way) ?? [{ type: "turnFaceUp", player: HUMAN, objectId: menu, ...(way ? { way } : {}) }]);
@@ -1574,7 +1583,7 @@ function canUseFace(s: GameState, id: string) {
   return castableFaces(s, o).some((f) => canCastFace(s, id, f)) || landFaces(s, o).some((f) => f !== 0 && canPlayLand(s, id, f));
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate" };
+const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
@@ -1596,6 +1605,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   awaken: "also put +1/+1 counters on target land you control: it becomes a 0/0 Elemental creature with haste",
   miracle: "",
   mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
+  convert: "cast it converted: its back face is the spell, and it enters with that face up",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
@@ -2260,6 +2270,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
         {o.solved && (
           <span className="chip other" title="Solved: this Case's Solved ability works now. It stays solved until it leaves the battlefield.">
             Solved
+          </span>
+        )}
+        {o.prepared && (
+          <span className="chip other" title="Prepared: you may cast the copy of its prepare spell from exile. Doing so unprepares it.">
+            Prepared
           </span>
         )}
         {o.classLevel !== undefined && (
@@ -3287,6 +3302,7 @@ function AbilityMenu({
   onPlot,
   onForetell,
   onTurnFaceUp,
+  onUnlock,
   onClose,
 }: {
   s: GameState;
@@ -3316,6 +3332,8 @@ function AbilityMenu({
   onForetell: () => void;
   /** For your face-down permanent: turn it face up. */
   onTurnFaceUp: (way: number) => void;
+  /** For your Room: unlock this locked door by paying its mana cost (CR 709.5e). */
+  onUnlock: (door: number) => void;
   onClose: () => void;
 }) {
   const o = s.objects[objectId]!;
@@ -3461,6 +3479,15 @@ function AbilityMenu({
           Cast face down <ManaCost cost="{3}" size="sm" /> ({faceDownCast.kind})
         </button>
       )}
+      {[0, 1].flatMap((door) => {
+        const cost = unlockCost(s, o, door);
+        if (cost === undefined || controllerOf(s, o) !== HUMAN) return [];
+        return [
+          <button key={`unlock${door}`} disabled={!planUnlock(s, HUMAN, objectId, door)} title={unlockProblem(s, HUMAN, objectId, door) ?? "A special action: it doesn't use the stack."} onClick={() => onUnlock(door)}>
+            Unlock {restingDef(s.cards[o.cardId]!).faces![door]!.name} <ManaCost cost={cost} size="sm" />
+          </button>,
+        ];
+      })}
       {upWays.map((upCost, way) => (
         <button key={`up${way}`} disabled={!planTurnFaceUp(s, HUMAN, objectId, way)} title={turnFaceUpProblem(s, HUMAN, objectId, way) ?? "A special action: it doesn't use the stack."} onClick={() => onTurnFaceUp(way)}>
           Turn face up: {upCost.kind === "manifest" || upCost.kind === "cloak" ? "mana cost" : upCost.kind} <ManaCost cost={upCost.cost} size="sm" />

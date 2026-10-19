@@ -138,6 +138,10 @@ export function parseCostKeyword(
   // creatures are attacking, you may pay {1}{W} ..." (Arrow Volley Trap): only while that's true, as it's cast (CR 601.2b).
   // "If an opponent controls an Island and you control a Mountain, you may cast ~ without paying its mana cost" (Mogg
   // Salvage): any opponent's Island, checked only as it's cast (rulings); its mana value doesn't change (CR 118.9c).
+  // More Than Meets the Eye (CR 702.162a): "You may cast this card converted by paying [cost] rather than its mana cost",
+  // its back face up on the stack (rulings), on a transforming double-faced card's front face.
+  if ((m = /^More Than Meets the Eye ((?:\{[^}]+\})+)$/.exec(line)))
+    return d.layout === "transform" && (d.faceOf?.face ?? 0) === 0 && plainMana(m[1]!) ? { alt: { kind: "convert", mana: m[1]! } } : "fail";
   if ((m = /^If (.+), you may cast ~ without paying its mana cost\.?$/.exec(line))) {
     const cond = altCondition(m[1]!);
     return cond ? { alt: { kind: "alternative", mana: "", if: cond, text: "without paying its mana cost" } } : "fail";
@@ -855,6 +859,10 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
       // for as long as both remain creatures on the battlefield under your control."
       out.triggers.push({ event: "selfEnters", ifSoulbond: true, body: { targets: [], effects: [{ type: "soulbond" }], text: "Soulbond: you may pair ~ with another unpaired creature you control." } });
       out.triggers.push({ event: "anotherCreatureYouControlEnters", ifSoulbond: true, body: { targets: [], effects: [{ type: "soulbond" }], text: "Soulbond: you may pair that creature with ~." } });
+    } else if (/^living metal$/i.test(p)) {
+      // CR 702.161a: "During your turn, this permanent is an artifact creature in addition to its other types", with its
+      // printed power and toughness (rulings).
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addTypes", types: ["Artifact", "Creature"], subtypes: [] }], condition: { kind: "yourTurn" }, text: "Living metal: during your turn, ~ is an artifact creature in addition to its other types." });
     } else if (/^riot$/i.test(p)) out.entersOptions.push("riot"); // CR 702.136a; each instance works separately (702.136b)
     else if (/^unleash$/i.test(p)) {
       // CR 702.98a: "You may have this permanent enter with an additional +1/+1 counter on it" and "This

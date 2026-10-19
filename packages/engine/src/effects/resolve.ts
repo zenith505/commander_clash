@@ -239,9 +239,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     return out;
   }
   if (ref.ref === "selfCard") {
+    const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    // An Aura's card in the graveyard it went to from the battlefield, as its creature died or since (Angelic Destiny
+    // rulings): one zone change after the trigger, or none if it was already there.
+    if (ref.moved) return o && o.zone === "graveyard" && ctx.sourceZc !== undefined && ((o.zoneChanges ?? 0) === ctx.sourceZc || (o.zoneChanges ?? 0) === ctx.sourceZc + 1) && (!ref.yours || o.owner === ctx.controller) ? [o] : [];
     // The card a leaves-the-battlefield trigger came from, in its new zone, while it's still that object (CR 400.7).
     // A merged permanent's other cards too, for an ability triggered by its leaving (CR 730.3c).
-    const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.sourceZc ? [o] : []), ...foundWith(s, ctx.lki, ctx.sourceId)];
   }
   if (ref.ref === "subjectCard") {
@@ -618,6 +621,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "classLevel":
     case "solve":
     case "transform":
+    case "becomePrepared":
+    case "flip":
     case "removeFromCombat":
     case "earthbend":
     case "mustBlockSource":

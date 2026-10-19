@@ -10,7 +10,8 @@ import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, s
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
-import { defMv } from "../faces";
+import { defMv, sameName } from "../faces";
+import { copyKey } from "../copies";
 
 /**
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
@@ -19,7 +20,9 @@ import { defMv } from "../faces";
 function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }) {
   const card = orig.objectId ? s.objects[orig.objectId] : undefined;
   if (!card) return;
-  const o = newObject(s, s.cards[cardIdOf(card)]!, controller, "stack");
+  // A copy of a nonmodal double-faced spell's back face (cast transformed: disturb) has mana value 0 (CR 202.3b).
+  const def = s.cards[cardIdOf(card)]!;
+  const o = newObject(s, def.faceOf && def.faceOf.face > 0 && def.layout === "transform" ? s.cards[copyKey(s, def)]! : def, controller, "stack");
   o.spellCopy = true;
   if (gains) o.copyGains = { mods: gains.mods, timestamp: s.nextTimestamp++, controller, source: gains.source };
   o.kicked = card.kicked;
@@ -62,6 +65,18 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const exiled = (s.resolving?.faceDownExiled ?? []).map((x) => ({ id: x, zc: s.objects[x]?.zoneChanges ?? 0 }));
       const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x));
       const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
+      if (e.when === "dies") {
+        // "When that creature dies this turn, flip ~" (Initiate of Blood): about that permanent as it is now (CR 603.7c,
+        // 400.7), its instructions about this ability's source.
+        const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        for (const o of objects(s, e.of!, ctx)) {
+          if (o.zone !== "battlefield") continue;
+          addDelayed(s, "leaves", ctx.controller, o, body, src ? cardIdOf(src) : cardIdOf(o));
+          const d = s.delayed![s.delayed!.length - 1]!;
+          Object.assign(d, { to: ["graveyard"], dies: true, ...(e.thisTurn ? { thisTurn: s.turn } : {}), ...(src ? { source: { id: src.id, zc: ctx.sourceZc ?? src.zoneChanges ?? 0 } } : {}) });
+        }
+        return;
+      }
       if (e.when === "lostControl") {
         // About the object as it is now (CR 400.7); one that isn't on the battlefield can't be controlled.
         for (const o of objects(s, e.of!, ctx)) {
@@ -361,7 +376,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const revealed = p.library.slice(0, e.n); // all of them if there are fewer (702.60a)
         if (!revealed.length) return;
         log(s, `${p.name} reveals the top ${revealed.length === 1 ? "card" : `${revealed.length} cards`} of their library for ripple (${revealed.map((id) => defOf(s, obj(s, id)).name).join(", ")}).`);
-        sc.ripple = { revealed, queue: revealed.filter((id) => defOf(s, obj(s, id)).name === name) };
+        sc.ripple = { revealed, queue: revealed.filter((id) => sameName(defOf(s, obj(s, id)).name, name)) };
       }
       // Each card with that name, one at a time, cast as this resolves (its card type's timing doesn't matter).
       while (sc.ripple.queue.length) {

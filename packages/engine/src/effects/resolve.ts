@@ -572,6 +572,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "haunt":
     case "grantFlashback":
     case "pick":
+    case "meld":
     case "sacrificeEach":
     case "keepRest":
     case "empowerJace":
@@ -652,6 +653,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "continuous":
     case "playerGains":
     case "attach":
+    case "attachElsewhere":
     case "unattach":
     case "unattachSelf":
     case "transformSelf":

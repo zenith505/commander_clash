@@ -17,6 +17,7 @@ import {
   planActivate,
   planCast,
   createGame,
+  registerMeldResults,
   defOf,
   doesNothingNow,
   realDefOf,
@@ -48,6 +49,8 @@ export interface DeckBundle {
 }
 
 export function newGame(bundle: DeckBundle, humanDeck: number, seed = Date.now() >>> 0): GameState {
+  // The combined back faces of the meld pairs, for the decks' meld cards (CR 712.4).
+  registerMeldResults(bundle.cards);
   const byName = new Map(bundle.cards.map((c) => [c.name, c]));
   const get = (n: string) => {
     const c = byName.get(n);
@@ -304,6 +307,8 @@ const loadStops = () =>
   });
 
 export function useGame(initial: GameState | null) {
+  // The combined back faces of the meld pairs in this game (CR 712.4), for its meld cards' abilities (a test's game too).
+  if (initial) registerMeldResults(Object.values(initial.cards));
   const [state, setState] = useState<GameState | null>(initial);
   const [error, setError] = useState<string | null>(null);
   const [intent, setIntent] = useState<Intent | null>(null);

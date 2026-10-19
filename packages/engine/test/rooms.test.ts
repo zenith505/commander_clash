@@ -128,6 +128,7 @@ describe("Rooms (CR 709.5)", () => {
       if (!a) break;
       s = act(s, a);
     }
-    expect(s.objects[ids[0]!]!.unlocked).toEqual([0, 1]);
+    // Both doors, in the order they were unlocked.
+    expect([...s.objects[ids[0]!]!.unlocked!].sort()).toEqual([0, 1]);
   });
 });

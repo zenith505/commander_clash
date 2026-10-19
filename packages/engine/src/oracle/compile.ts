@@ -1,4 +1,5 @@
 import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
+import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
@@ -38,6 +39,9 @@ export function compileCard(card: CardDef): CompiledCard {
   if (hit) return hit;
   const doors = d.roomDoors ? roomDoorDefs(d) : undefined;
   const out = doors ? roomAbilities(doors) : compile(d);
+  // A meld card's ability melds it with its counterpart into their combined back face (CR 701.42a): only if what that
+  // puts onto the battlefield is supported.
+  if (d.meld && !isMeldResult(d) && /\bmeld them into\b/.test(d.oracleText) && !meldResultSupported(d.meld.result)) out.unsupported.push(`(${d.meld.result}, the permanent it melds into)`);
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;
@@ -153,13 +157,25 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 const UNSUPPORTED_TYPES = ["Battle", "Kindred", "Tribal", "Dungeon"];
 const UNSUPPORTED_SUBTYPES = ["Siege"];
 
+const meldResults = new Map<string, boolean>();
+
+/** Is the combined back face called `name` known (meld-results.ts) and supported, as a permanent on the battlefield? */
+function meldResultSupported(name: string): boolean {
+  const known = meldResults.get(name);
+  if (known !== undefined) return known;
+  const r = meldResultDef(undefined, name);
+  const ok = !!r && isFullySupported({ ...r, meld: undefined });
+  if (r) meldResults.set(name, ok);
+  return ok;
+}
+
 /**
  * True when the engine executes everything the card does. Unsupported cards can still be
  * played, but some of their text does nothing yet, so decks and the UI flag them.
  */
 export function isFullySupported(d: CardDef): boolean {
   // A melded permanent isn't a card: it exists only as the back faces of its meld pair (CR 712.4b).
-  if (d.meld?.result === d.name) return false;
+  if (isMeldResult(d)) return false;
   if (d.faces?.length) return facesSupported(d);
   if (d.name.includes(" // ") && !d.faceOf) return false;
   const cost = parseManaCost(d.manaCost);
@@ -262,6 +278,17 @@ export function normalizeSelf(d: CardDef): string {
   let t = stripReminder(d.oracleText);
   const full = d.name.split(" // ")[0]!;
   const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // A meld card's meld ability (CR 701.42a): "if you both own and control ~ and a creature named Bruna, the Fading Light,
+  // exile them, then meld them into Brisela, Voice of Nightmares", "If ~ and a creature named Phyrexian Dragon Engine are
+  // attacking, and you both own and control them, exile them, then meld them into Mishra, Lost to Phyrexia. It enters
+  // tapped and attacking." "Them" is ~ and the permanent with its counterpart's name: said so here, to be read alone.
+  const partner = d.meld && meldPartnerName(d);
+  if (partner && full) {
+    const into = `then meld them into ${esc(d.meld!.result)}`;
+    const re = new RegExp(`(an? (creature|land|artifact) named ${esc(partner)})((?:(?! named ).)*?)exile them, ${into}(\\. It enters tapped and attacking)?`, "g");
+    t = t.replace(re, (_, named: string, type: string, mid: string, attacking?: string) =>
+      `${named}${mid}exile ${full} and the ${/ are attacking, /.test(mid) ? "attacking " : ""}${type} named ${partner}, then meld them into ${d.meld!.result}${attacking ? " tapped and attacking" : ""}`);
+  }
   // In a quoted ability the card gives something else, its name still means the card (CR 201.5a), not the
   // object with the ability, which is "~" there: mark it so that text isn't compiled as "~".
   if (full) {
@@ -1369,6 +1396,13 @@ export function compile(d: CardDef): CompiledCard {
       const filter = words ? parseTargetPhrase(`${words} spell`) : { kind: "spell" as const, text: "spell" };
       if (filter?.kind === "spell" && !filter.controller) (out.uncounterable ??= []).push({ filter: { ...filter, text: `${words ? `${words} ` : ""}spells` }, ...(uncounterable[2] ? {} : { anyone: true as const }) });
       else out.unsupported.push(raw);
+      continue;
+    }
+    // "Your opponents can't cast spells with mana value 3 or less" (Brisela): the spell as it's proposed, X chosen (CR
+    // 601.2e, 601.3a).
+    const mvBan = new RegExp(`^Your opponents can't cast spells with mana value ${NUM} or less\\.$`).exec(line);
+    if (mvBan && out.opponentsCantCastMvAtMost === undefined) {
+      out.opponentsCantCastMvAtMost = num(mvBan[1]!);
       continue;
     }
     if (line === "Your opponents can't cast spells during your turn.") {

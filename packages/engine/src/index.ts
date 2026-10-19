@@ -3,6 +3,7 @@ export * from "./mana";
 export * from "./manaabilities";
 export * from "./cards";
 export * from "./faces";
+export { registerMeldResults, meldResultsFor, isMeldResult } from "./meld-results";
 export * from "./game";
 export * from "./autopay";
 export * from "./deck";

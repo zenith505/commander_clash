@@ -4,10 +4,12 @@
 //   npm run faces            (needs data/generated/cards.json; LINES=40 for more lines per layout)
 
 import { readFileSync } from "node:fs";
-import { compileCard, faceDef, isFullySupported, restingDef, type CardDef } from "../packages/engine/src";
+import { compileCard, faceDef, isFullySupported, registerMeldResults, restingDef, type CardDef } from "../packages/engine/src";
 
 type Card = CardDef & { commanderLegal?: string };
 const cards: Card[] = JSON.parse(readFileSync(new URL("../data/generated/cards.json", import.meta.url), "utf8"));
+// The combined back faces of the meld pairs, for their meld cards (CR 712.4).
+registerMeldResults(cards);
 const top = Number(process.env.LINES ?? 12);
 const by = new Map<string, { all: number; ok: number; lines: Map<string, number> }>();
 for (const c of cards.filter((c) => c.commanderLegal === "legal" && c.faces?.length)) {

@@ -533,6 +533,12 @@ export function parseTargetPhrase(
     extra.status = "unenchanted";
     p = p.slice(0, bare.index);
   }
+  // "Target Aura attached to a creature" (Crown of the Ages), "Aura or Equipment attached to a creature you control" (Halvar).
+  const attached = / attached to an? (creature|permanent)( you control)?$/.exec(p);
+  if (attached) {
+    extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
+    p = p.slice(0, attached.index);
+  }
   // "creature an opponent controls that was dealt damage this turn"
   const hurt = / that was dealt damage this turn$/.exec(p);
   if (hurt) {

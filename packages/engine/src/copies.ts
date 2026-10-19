@@ -2,7 +2,9 @@
 // own, registered in GameState.cards, so everything that reads an object's definition (its name, types,
 // power and toughness, abilities compiled from its rules text) sees the copied values (layer 1, CR 613.2).
 
-import { defOf } from "./cards";
+import { defOf, lockIfRoom } from "./cards";
+import { unroomed } from "./faces";
+import { subtypeSet } from "./keywords";
 import { invalidateCharacteristics } from "./layers";
 import type { CardDef, CardFace, Color, CopyEffect, GameObject, GameState } from "./types";
 
@@ -13,6 +15,12 @@ import type { CardDef, CardFace, Color, CopyEffect, GameObject, GameState } from
 export interface CopyExcept {
   notLegendary?: boolean;
   legendary?: boolean;
+  /**
+   * "Except it's a 4/4 black Zombie": these creature types instead of its other ones (CR 205.1a, rulings on God-Pharaoh's
+   * Gift); "a 6/6 green Dinosaur creature": these card types instead of its other ones.
+   */
+  setTypes?: string[];
+  setSubtypes?: string[];
   /** "In addition to its other types". */
   addTypes?: string[];
   addSubtypes?: string[];
@@ -39,10 +47,12 @@ export function copiableDef(s: GameState, o: GameObject): CardDef {
 
 /** Register the definition a copy of `base` with these exceptions has, and return its key in GameState.cards. */
 export function copyKey(s: GameState, base: CardDef, except?: CopyExcept): string {
+  base = unroomed(s.cards, base);
   // A copy of a face isn't that card's face: a copy of a nonmodal double-faced card's back face has mana value 0 (CR
   // 712.8e).
-  if (base.faceOf) {
-    const { faceOf: _, ...plain } = base;
+  // A copy of a melded permanent isn't one: its mana value is 0 (CR 202.3c, 712.8g).
+  if (base.faceOf || base.meld?.result === base.name) {
+    const { faceOf: _, meld: __, ...plain } = base;
     base = { ...plain, oracleId: `${base.oracleId}|copied` };
   }
   if (!except || !Object.keys(except).length) {
@@ -74,8 +84,12 @@ function exceptedFaces(base: CardDef, except: CopyExcept | undefined): CardFace[
 function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "subtypes" | "typeLine" | "oracleText" | "colors" | "manaCost"> & { keywords?: string[] }>(base: T, except: CopyExcept): Partial<T> & { cmc?: number } {
   const supertypes = base.supertypes.filter((t) => !(except.notLegendary && t === "Legendary"));
   if (except.legendary && !supertypes.includes("Legendary")) supertypes.push("Legendary");
-  const types = [...base.types, ...(except.addTypes ?? []).filter((t) => !base.types.includes(t))];
-  const subtypes = [...base.subtypes, ...(except.addSubtypes ?? []).filter((t) => !base.subtypes.includes(t))];
+  const baseTypes = except.setTypes ?? base.types;
+  // Subtypes of card types it no longer has go, and set subtypes replace those of the same kind (CR 205.1a).
+  const sets = new Set((except.setSubtypes ?? []).map(subtypeSet));
+  const baseSubtypes = [...base.subtypes.filter((st) => { const k = subtypeSet(st); return !sets.has(k) && (!except.setTypes || (k !== null && k !== "Spell" && baseTypes.includes(k))); }), ...(except.setSubtypes ?? [])];
+  const types = [...baseTypes, ...(except.addTypes ?? []).filter((t) => !baseTypes.includes(t))];
+  const subtypes = [...baseSubtypes, ...(except.addSubtypes ?? []).filter((t) => !baseSubtypes.includes(t))];
   const keywords = [...(base.keywords ?? []), ...(except.keywords ?? []).filter((k) => !base.keywords?.includes(k))];
   const name = except.name ?? base.name;
   // "~" in an added ability is the copy itself (CR 707.9a).
@@ -104,6 +118,7 @@ const isDfc = (d: CardDef | undefined): d is CardDef => !!d?.faces && d.faces.le
  * same face up. Its back face, a copy of a back face, has mana value 0 (CR 202.3b). Anything else: copyKey.
  */
 export function tokenCopyKey(s: GameState, base: CardDef, except?: CopyExcept): { key: string; face?: number } {
+  base = unroomed(s.cards, base);
   const whole = base.faceOf ? s.cards[base.faceOf.oracleId] : base;
   if (!isDfc(whole) || (base.faceOf && !isDfc(s.cards[base.faceOf.oracleId]))) return { key: copyKey(s, base, except) };
   const face = base.faceOf?.face;
@@ -132,6 +147,7 @@ export function exceptFor(s: GameState, o: GameObject, except: CopyExcept | unde
  */
 export function addCopyEffect(s: GameState, o: GameObject, key: string, until?: CopyEffect["until"]) {
   (o.copyEffects ??= []).push({ key, timestamp: s.nextTimestamp++, ...(until ? { until } : {}) });
+  lockIfRoom(s, o);
   invalidateCharacteristics(s);
 }
 

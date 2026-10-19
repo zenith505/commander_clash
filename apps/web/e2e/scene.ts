@@ -2,11 +2,12 @@
 
 import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { applyAction, createGame, invalidateCharacteristics, newObject, PREDEFINED_TOKENS, tokenDef, waitingOn, type CardDef, type GameState, type PlayerId, type Step, type ZoneName } from "@cc/engine";
+import { applyAction, createGame, meldResultsFor, registerMeldResults, invalidateCharacteristics, newObject, PREDEFINED_TOKENS, tokenDef, waitingOn, type CardDef, type GameState, type PlayerId, type Step, type ZoneName } from "@cc/engine";
 
 /** Real card definitions, written by `npm run e2e:cards` from every card name quoted in these files. */
 const CARDS: CardDef[] = JSON.parse(readFileSync(new URL("./cards.json", import.meta.url), "utf8"));
 const byName = new Map(CARDS.map((c) => [c.name, c]));
+registerMeldResults(CARDS);
 
 export function def(name: string): CardDef {
   const d = byName.get(name);
@@ -51,6 +52,8 @@ export function scene(you: Seat, opps: Seat[] = [], opts: { step?: Step; seed?: 
   s.turnOrder = [0, 1, 2, 3];
   s = passUntil(s, opts.step ?? "main1", 0);
   for (let pid = 0; pid < 4; pid++) place(s, pid, seats[pid] ?? {}, false);
+  // The combined back faces the meld cards here meld into (CR 712.4), part of the game's cards as in a game built from decks.
+  for (const r of meldResultsFor(Object.values(s.cards))) s.cards[r.oracleId] ??= r;
   invalidateCharacteristics(s);
   return s;
 }

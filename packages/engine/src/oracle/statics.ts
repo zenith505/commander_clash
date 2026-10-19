@@ -21,6 +21,8 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   // The Roads (Outlaws of Thunder Junction): a permanent with either subtype (CR 205.3).
   if (/^you control a Mount or Vehicle$/.test(text)) return { kind: "control", who: "you", subtypes: ["Mount", "Vehicle"], min: 1 };
   if (/^you control a legendary creature$/.test(text)) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], min: 1 };
+  // "Unless you control a legendary green creature" (Argoth, Sanctum of Nature).
+  if ((m = /^you control a legendary (white|blue|black|red|green) creature$/.exec(text))) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], colors: [COLOR_WORDS[m[1]!]!], min: 1 };
   if ((m = /^you control an? (\w+)(?: or an? (\w+))?$/.exec(text)) && [m[1], m[2]].every((x) => x === undefined || BASIC_TYPES.includes(x)))
     return { kind: "control", who: "you", subtypes: [m[1]!, ...(m[2] ? [m[2]] : [])], min: 1 };
   if ((m = new RegExp(`^your opponents control ${NUM} or more lands$`).exec(text))) return { kind: "control", who: "opponents", types: ["Land"], min: num(m[1]!) };
@@ -293,6 +295,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
+  // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
+  if ((m = new RegExp(`^there are ${NUM} or more (\\w+) cards in your graveyard$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2]} cards in your graveyard`, null);
+    return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
+  }
   // "Your devotion to black is less than five" (Theros gods, CR 700.5), "... is five or greater".
   if ((m = new RegExp(`^(your devotion to .+?) is (?:less than ${NUM}|${NUM} or greater)$`).exec(text))) {
     const amount = parseCount(m[1]!, null);

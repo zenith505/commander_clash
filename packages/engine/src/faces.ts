@@ -18,9 +18,10 @@ const mv = (cost: string) => manaValue(parseManaCost(cost));
 /**
  * A card's or permanent's mana value (CR 202.3): from its mana cost, except a nonmodal double-faced card's back face,
  * whose is its front face's (712.8c, 712.8e). A copy of a back face isn't that face (copyKey drops `faceOf`), and a
- * double-faced token's back face is a copy of one: 0 (202.3b).
+ * double-faced token's back face is a copy of one: 0 (202.3b). A melded permanent's is the sum of its front faces' (CR
+ * 202.3c, the card data's cmc); a copy of one has no mana cost, so 0 (copyKey drops `meld`).
  */
-export const defMv = (d: CardDef): number => (d.faceOf && d.faceOf.face > 0 && d.layout === "transform" ? (d.dfcCopy ? 0 : d.cmc) : mv(d.manaCost));
+export const defMv = (d: CardDef): number => (d.faceOf && d.faceOf.face > 0 && d.layout === "transform" ? (d.dfcCopy ? 0 : d.cmc) : d.meld?.result === d.name ? d.cmc : mv(d.manaCost));
 
 const faceDefs = new Map<string, CardDef>();
 
@@ -225,6 +226,9 @@ export function roomDef(card: CardDef, key: string, doors: number[]): CardDef {
   }
   const open = [0, 1].filter((i) => doors.includes(i));
   const faces = open.map((i) => d.faces![i]!);
+  // Its abilities in the order the doors were unlocked, so a door's abilities keep their places (and what "once each
+  // turn" remembers about them) as the other door unlocks.
+  const order = doors.filter((i, k) => open.includes(i) && doors.indexOf(i) === k);
   const manaCost = faces.map((f) => f.manaCost).join("");
   const { faces: _f, ...rest } = d;
   const def: CardDef = {
@@ -238,12 +242,23 @@ export function roomDef(card: CardDef, key: string, doors: number[]): CardDef {
     keywords: [...new Set(faces.flatMap((f) => f.keywords ?? []))],
     roomDoors: open,
   };
-  rooms.set(key, { def, doors: open.map((i) => faceDef(d, i)) });
+  rooms.set(key, { def, doors: order.map((i) => faceDef(d, i)) });
   return def;
 }
 
 /** The doors' own definitions, for a Room permanent's abilities: each unlocked door's (see compileCard). */
 export const roomDoorDefs = (d: CardDef): CardDef[] | undefined => rooms.get(d.oracleId)?.doors;
+
+/**
+ * What a copy of this definition copies (CR 707.2): a Room permanent's whole card, both doors, since the unlocked
+ * designations aren't copiable values (709.5). Anything else is itself.
+ */
+export function unroomed(cards: Record<string, CardDef>, d: CardDef): CardDef {
+  if (!d.roomDoors) return d;
+  const m = /^(.*)\|doors:\d*$/.exec(d.oracleId);
+  const base = m && cards[m[1]!];
+  return base ? restingDef(base) : d;
+}
 
 /** Register the definition `o` has with its doors as they are now, so its key (cardIdOf) finds it in GameState.cards. */
 export function registerRoom(s: GameState, key: string): void {

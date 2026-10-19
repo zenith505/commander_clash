@@ -214,6 +214,11 @@ export interface GameObject {
   merged?: { parts: ObjectId[]; ownToken: boolean; ownCommander: boolean };
   /** A component of a merged permanent (zone "merged"): the permanent's object. */
   mergedInto?: ObjectId;
+  /**
+   * A melded permanent (CR 701.42, 712.4a): the key of the combined back face it has the characteristics of (712.8g).
+   * It's this card's object, represented by this card and its counterpart (`merged.parts`, the other one in "merged").
+   */
+  melded?: string;
   /** How many times it has mutated (CR 702.140d): "where X is the number of times ~ has mutated". */
   mutations?: number;
   /**
@@ -705,6 +710,8 @@ export interface DelayedTrigger {
   body: AbilityBody;
   /** Made during an end step, "the next end step" is the following turn's (CR 603.7c doesn't fire it in the same step). */
   turn: number;
+  /** How many times its subject had transformed when it was made: it transforms it only if that's still so (CR 701.27f). */
+  transforms?: number;
   step: Step;
 }
 
@@ -726,6 +733,8 @@ export interface PendingTrigger {
   cause?: string; // the stack item that triggered it, see StackItem.cause
   /** The object the event was about, as it was then ("that creature" for exalted). */
   subject?: { id: ObjectId; zc: number };
+  /** A delayed trigger: how many times its source had transformed when it was made (CR 701.27f). */
+  transformsAt?: number;
   /** Last known information the ability needs: the counters on a permanent that left, evolve's creature's P/T. */
   lki?: LastKnown;
   /** For an enters trigger of a permanent that was a spell with X: that X (CR 107.3m). */

@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "choose";
+export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "choose" | "meld";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -338,6 +338,8 @@ export interface TargetSpec {
    * "creatures that aren't enchanted".
    */
   status?: "enchanted" | "equipped" | "modified" | "unenchanted";
+  /** "Target Aura attached to a creature", "Aura or Equipment attached to a creature you control": what it's attached to. */
+  attachedTo?: TargetSpec;
   /** "Suspected creature" (CR 701.60). */
   suspected?: true;
   /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
@@ -442,6 +444,11 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /**
+       * "Exile target creature card from a graveyard. Create a token that's a copy of it" (The Scarab God): the targeted
+       * card wherever this spell or ability has put it since (CR 400.7), copied as that card (rulings).
+       */
+      card?: true;
     }
   | { ref: "self" } // the source permanent ("this creature")
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
@@ -1001,7 +1008,12 @@ export type StaticCondition =
    * "Only if you've been attacked this step", with "during the declare attackers step": a creature declared as an
    * attacker this step attacks you, not only planeswalkers you control (rulings on Heavy Fog).
    */
-  | { kind: "attackedThisStep" };
+  | { kind: "attackedThisStep" }
+  /**
+   * "If you both own and control ~ and a creature named [its meld counterpart]" (CR 701.42, 712.5): an intervening if
+   * on a meld card's meld trigger (meld.ts). The counterpart's name is from the card's copiable values.
+   */
+  | { kind: "meldPartner"; type: "Creature" | "Land" | "Artifact" };
 
 /** A restriction naming a part of the turn (CR 506.8, 602.5b): "only during your upkeep", "only during combat". */
 export const timedCondition = (c: StaticCondition | undefined): boolean =>
@@ -1470,6 +1482,14 @@ export type Effect =
    * Equipment you control to target creature you control", Brass Squire).
    */
   | { type: "attach"; what: ObjRef; source?: ObjRef }
+  /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
+  | { type: "attachElsewhere"; source: ObjRef }
+  /**
+   * "Exile them, then meld them into [the combined back face]" (CR 701.42): ~ and a permanent of this card type named its
+   * counterpart, if you both own and control them (and both are attacking, `attacking`: then it enters tapped and
+   * attacking). See meld.ts.
+   */
+  | { type: "meld"; partnerType: "Creature" | "Land" | "Artifact"; attacking?: true }
   /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to; `ifAttachedToYours`: "if it's attached to a creature you control" (Stolen Uniform). */
   | { type: "unattach"; what: ObjRef; ifAttachedToYours?: true }
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */
@@ -2625,7 +2645,7 @@ export interface ManaSpend {
  * have enough opponents.
  */
 export type EntersCondition =
-  | { kind: "control"; who: "you" | "opponents"; types?: string[]; subtypes?: string[]; supertypes?: string[]; other?: boolean; min?: number; max?: number }
+  | { kind: "control"; who: "you" | "opponents"; types?: string[]; subtypes?: string[]; supertypes?: string[]; colors?: Color[]; other?: boolean; min?: number; max?: number }
   | { kind: "playerLifeAtMost"; n: number }
   | { kind: "opponents"; min: number };
 
@@ -2885,6 +2905,8 @@ export interface CompiledCard {
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   opponentsCantCastYourTurn?: true;
+  /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
+  opponentsCantCastMvAtMost?: number;
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
   /**

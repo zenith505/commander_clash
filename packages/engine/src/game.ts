@@ -1,10 +1,12 @@
 import { kickerName } from "./abilities";
 import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
+import { joinMeld } from "./meld";
+import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
-import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
+import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
@@ -123,6 +125,8 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
     shuffleLibrary(s, player);
   });
+  // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.
+  for (const r of meldResultsFor(setup.flatMap((p) => [p.commander, ...(p.secondCommander ? [p.secondCommander] : []), ...p.deck]))) s.cards[r.oracleId] ??= r;
   // CR 103.1: randomly determine the starting player.
   const first = Math.floor(nextRandom(s) * setup.length);
   s.activePlayer = first;
@@ -587,6 +591,8 @@ export function moveObject(
     faceDown?: FaceDownKind;
     /** The face it enters with up: a modal double-faced land's (CR 712.12), "transformed" (712.14a). */
     face?: number;
+    /** Melded with its counterpart `with` (in exile), as the combined back face `key` (CR 701.42a, 712.14c): meld.ts. */
+    meld?: { with: ObjectId; key: string };
   } = {},
 ) {
   const o = obj(s, id);
@@ -749,6 +755,7 @@ export function moveObject(
   else if (to === "battlefield" && s.dayNight === "night" && o.face === undefined && !o.faceDown && transformedFace(s, o) === 1 && hasKeyword(defOf(s, o), "Daybound")) setFace(s, o, 1);
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
+  o.melded = undefined; // a melded permanent's cards are separate cards again (CR 712.21)
   o.copyEffects = undefined;
   // Krovikan Vampire: a creature that died after being dealt damage this turn, and what dealt it (rulings: any damage).
   if (fromZone === "battlefield" && to === "graveyard" && wasCreature && o.damagedBy?.length) ((s.turnLog ??= {}).diedDamaged ??= []).push({ id, zc: o.zoneChanges, by: [...o.damagedBy] });
@@ -817,6 +824,7 @@ export function moveObject(
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
+  if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
   invalidateCharacteristics(s);
@@ -1008,6 +1016,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     const key = copyKey(s, defOf(s, target), exceptFor(s, o, own.except, realDefOf(s, o).name));
     if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
     else o.copyOf = key;
+    lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
   }
@@ -1225,6 +1234,7 @@ export function conditionHolds(s: GameState, cond: EntersCondition, you: PlayerI
         const c = characteristics(s, x);
         if (cond.types && !cond.types.every((ty) => c.types.includes(ty))) return false;
         if (cond.supertypes && !cond.supertypes.every((ty) => c.supertypes.includes(ty))) return false;
+        if (cond.colors && !cond.colors.every((col) => c.colors.includes(col))) return false;
         return !cond.subtypes || cond.subtypes.some((ty) => c.subtypes.includes(ty));
       }).length;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
@@ -2769,7 +2779,9 @@ export function castProblem(
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
-  const limit = castLimitProblem(s, pid, d);
+  // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
+  const proposedCost = parseManaCost(d.manaCost);
+  const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
   if (limit) return limit;
   // "Cast this spell only if you've cast another spell this turn" (Illusory Angel), checked as it's proposed, before it
   // counts itself (CR 601.3); the other spell needn't have resolved (rulings). Face down it has no abilities (CR 708.2).
@@ -3425,8 +3437,12 @@ function spliceProblem(s: GameState, pid: PlayerId, id: ObjectId, ids: ObjectId[
 export const splicedBodies = (s: GameState, ids: ObjectId[] = []): AbilityBody[] => ids.flatMap((c) => compileCard(defOf(s, obj(s, c))).spell ?? []);
 const spliceMana = (s: GameState, ids: ObjectId[] = []) => ids.map((c) => compileCard(defOf(s, obj(s, c))).splice?.mana ?? "").join("");
 
-/** "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2). */
-function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | null {
+/**
+ * "Each player can't cast more than one spell each turn" and the like: a "can't" that wins over any "can" (CR 101.2).
+ * `mv`: the proposed spell's mana value, X chosen (CR 601.2e); without it, only whether it can begin to be cast, where a
+ * choice still to be made (X) that could lift a mana value ban counts as lifting it (CR 601.3a).
+ */
+function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number): string | null {
   const epic = player(s, pid).cantCastSpells;
   if (epic) return `${epic}: you can't cast spells for the rest of the game`;
   const named = nameCastBan(s, pid, d);
@@ -3439,6 +3455,11 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef): string | nul
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
+    // "Your opponents can't cast spells with mana value 3 or less" (Brisela, Voice of Nightmares).
+    const most = abilitiesOf(s, o).opponentsCantCastMvAtMost;
+    const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
+    if (most !== undefined && controllerOf(s, o) !== pid && value !== undefined && value <= most)
+      return `${characteristics(s, o).name}: opponents can't cast spells with mana value ${most} or less`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
@@ -6167,9 +6188,9 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
 
 /** A Room permanent's locked door's unlock cost: that half's mana cost (CR 709.5e), or undefined if there's none to unlock. */
 export function unlockCost(s: GameState, o: GameObject, door: number): string | undefined {
-  const d = s.cards[o.cardId];
-  if (o.zone !== "battlefield" || o.faceDown || o.unlocked === undefined || o.unlocked.includes(door) || !isRoom(d)) return undefined;
-  return restingDef(d!).faces![door]?.manaCost;
+  const d = roomOf(s, o);
+  if (o.zone !== "battlefield" || o.unlocked === undefined || o.unlocked.includes(door) || !d) return undefined;
+  return d.faces![door]?.manaCost;
 }
 
 /**
@@ -6183,7 +6204,7 @@ export function unlockProblem(s: GameState, pid: PlayerId, id: ObjectId, door: n
   if (!o || cost === undefined) return "only a locked door of a Room on the battlefield can be unlocked";
   if (controllerOf(s, o) !== pid) return "only a Room you control can be unlocked";
   if (!canActAtSorcerySpeed(s, pid)) return "you can only unlock a door during your main phase while the stack is empty";
-  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to unlock ${restingDef(s.cards[o.cardId]!).faces![door]!.name} (${cost})`;
+  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to unlock ${roomOf(s, o)!.faces![door]!.name} (${cost})`;
   return null;
 }
 
@@ -6194,7 +6215,7 @@ function unlockDoor(s: GameState, p: Player, id: ObjectId, door: number) {
   const o = obj(s, id);
   const cost = unlockCost(s, o, door)!;
   spendFromPool(s, p.id, parseManaCost(cost), "other");
-  log(s, `${p.name} unlocks ${restingDef(s.cards[o.cardId]!).faces![door]!.name} (${cost}).`);
+  log(s, `${p.name} unlocks ${roomOf(s, o)!.faces![door]!.name} (${cost}).`);
   setUnlocked(s, o, [...o.unlocked!, door]);
   s.passedInSuccession = [];
 }
@@ -6202,7 +6223,8 @@ function unlockDoor(s: GameState, p: Player, id: ObjectId, door: number) {
 /** Give a Room these unlocked designations (CR 709.5c); each door that becomes unlocked triggers its abilities (709.5h). */
 export function setUnlocked(s: GameState, o: GameObject, doors: number[]) {
   const was = o.unlocked ?? [];
-  o.unlocked = [0, 1].filter((i) => doors.includes(i));
+  // In the order they were unlocked (faces.ts roomDef).
+  o.unlocked = [...was.filter((i) => doors.includes(i)), ...[0, 1].filter((i) => doors.includes(i) && !was.includes(i))];
   registerRoom(s, cardIdOf(o));
   invalidateCharacteristics(s);
   for (const door of o.unlocked) if (!was.includes(door)) fireEvent(s, { type: "doorUnlocked", id: o.id, door });
@@ -6270,6 +6292,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0) {
   // Its copiable values go back to the card's, or what a copy effect made it (CR 708.8, 707.3); it's the same
   // permanent, so nothing "enters".
   o.faceDown = undefined;
+  lockIfRoom(s, o);
   invalidateCharacteristics(s);
   const d = defOf(s, o);
   log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}).`);

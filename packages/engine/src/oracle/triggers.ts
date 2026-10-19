@@ -575,7 +575,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     toOpponent = m[2] === "an opponent";
     if (toOpponent) bodyText = otherOpponents(bodyText).replace(/\bthat opponent\b/g, "that player");
   } else return null;
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText) && !/that player/.test(bodyText)) return "fail"; // the attackers as a group aren't modeled
+  // The attackers as a group aren't modeled. Mishra's meld sentence's "them" is Mishra and the other creature it names.
+  const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
@@ -958,6 +960,18 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (ring) {
     const body = parseBody(ring[2]!, {});
     return body ? { event: "ringTemptsYou", body, ...(ring[1] ? { ifOtherBearer: true } : {}) } : "fail";
+  }
+  // A meld card's meld trigger (CR 701.42a), as normalizeSelf words it: "At the beginning of your end step, if you both
+  // own and control ~ and a creature named Bruna, the Fading Light, exile ~ and the creature named Bruna, the Fading
+  // Light, then meld them into ...": an intervening if (CR 603.4), its name maybe with a comma. Titania's also counts
+  // the land cards in your graveyard.
+  const meldIf = /^((?:When|Whenever|At)\b[^,]*), if (?:(.+?) and )?you both own and control ~ and an? (creature|land|artifact) named (.+?), ((?:you may pay [^.]+\. If you do, )?exile ~ and the \3 named \4, then meld them into .+)$/.exec(line);
+  if (meldIf) {
+    const meld: StaticCondition = { kind: "meldPartner", type: (meldIf[3]!.charAt(0).toUpperCase() + meldIf[3]!.slice(1)) as "Creature" | "Land" | "Artifact" };
+    const also = meldIf[2] ? parseStaticCondition(meldIf[2], { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    if (also === null) return "fail";
+    const t = parseTrigger(`${meldIf[1]}, ${meldIf[5]}`);
+    return t && t !== "fail" && !t.ifCond ? { ...t, ifCond: also ? { kind: "allOf", conds: [also, meld] } : meld } : "fail";
   }
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.

@@ -32,6 +32,16 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
+  // Meld (CR 701.42a), as normalizeSelf words it: "exile ~ and the creature named Bruna, the Fading Light, then meld them
+  // into Brisela, Voice of Nightmares", after "if you both own and control ~ and a creature named ..." (checked again as
+  // it melds) or "if ~ and a creature named ... are attacking, and you both own and control them" (with "tapped and
+  // attacking"). The names are the card data's (CardDef.meld).
+  if ((m = /^(?:If (?:(you both own and control ~ and an? (creature|land|artifact) named .+?)|(~ and an? (creature) named .+? are attacking, and you both own and control them)), )?[Ee]xile ~ and the (attacking )?(creature|land|artifact) named .+?, then meld them into .+?( tapped and attacking)?$/.exec(s))) {
+    const partnerType = (m[6]!.charAt(0).toUpperCase() + m[6]!.slice(1)) as "Creature" | "Land" | "Artifact";
+    const attacking = !!m[5];
+    if ((m[2] && m[2] !== m[6]) || (m[4] && m[4] !== m[6]) || !!m[3] !== attacking || !!m[7] !== attacking) return null;
+    return [{ type: "meld", partnerType, ...(attacking ? { attacking: true as const } : {}) }];
+  }
   // Airbend (CR 701.65a): exile them; for as long as each card stays exiled, its owner may cast it by paying {2} rather
   // than its mana cost (a token ceases to exist, a land can't be played, rulings on Airbending Lesson).
   if ((m = /^[Aa]irbend (.+)$/.exec(s))) {
@@ -212,7 +222,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // all graveyards under their owners' control.
   const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s);
   if (eachReturns) s = `Return all ${eachReturns[1]} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
-  if ((m = /^Return all (.+?) cards from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
+  if ((m = /^[Rr]eturn all (.+?) cards from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
     const kinds = m[1]!.replace(/,? and /g, " or ").replace(/, /g, " or ");
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
@@ -390,7 +400,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Attach target Equipment you control to target creature you control" (Brass Squire), "attach up to one target
   // Equipment you control to ~" (Cloud), "... to that creature" (Kemba: the creature that entered), Magnetic Theft's
   // "Attach target Equipment to target creature" (CR 701.3a). Either target illegal: the Equipment doesn't move (rulings).
-  if ((m = /^Attach ((?:up to one )?target Equipment\b(?:(?! to ).)*) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
+  // "Attach target Aura attached to a creature to another creature" (Crown of the Ages, Autumn-Tail): moving an Aura to a
+  // creature chosen as it resolves (rulings), not targeted.
+  if ((m = /^Attach (target Aura attached to a creature) to another creature$/.exec(s))) {
+    const source = parseObject(m[1]!, ctx);
+    return source?.ref === "target" && !source.n ? [{ type: "attachElsewhere", source }] : null;
+  }
+  // "Attach target Aura you control to target creature" (Aura Finesse), "target Aura or Equipment you control" (Codsworth).
+  if ((m = /^Attach ((?:up to one )?target (?:Equipment|Aura|Aura or Equipment)\b(?:(?! to )(?! attached to ).)*(?: attached to an? creature(?: you control)?)?) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
     const pronoun = !/\btarget\b/i.test(m[2]!);
     if (pronoun && ctx.spell) return null;
     const hostFirst = pronoun ? parseObject(m[2]!, ctx) : null;

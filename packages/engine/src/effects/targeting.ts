@@ -56,6 +56,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.anyOf && !spec.anyOf.some((a) => objectMatches(s, a, o, controller, false, src, chars, view))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
+  if (spec.attachedTo) {
+    const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    if (!host || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, undefined, view)) return false;
+  }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name") return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;

@@ -100,6 +100,9 @@ export type Count =
   | { kind: "exiledFromHandThisWay" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
   | { kind: "revealedFromHand" }
+  | { kind: "bottomedFromHand" }
+  /** How many cards "you may choose a nonland card from it" chose (0 or 1): for "If you do" and "If you don't". */
+  | { kind: "tookFromHand" }
   /** "The greatest power among creature cards exiled this way" (Szat's Will): as they were in the graveyard (rulings), 0 with none. */
   | { kind: "greatestPowerExiled" }
   /** "For each creature destroyed this way" (Decree of Pain): by this spell's or ability's destroy instructions, as they last existed. */
@@ -1215,9 +1218,10 @@ export type Effect =
   /**
    * "Reveal any number of red cards in your hand" (Scent of Cinder, Cinder Seer), "reveal any number of Dragon cards from
    * your hand" (Invasion of Tarkir): you choose which (CR 701.20a), and "for each card revealed this way" counts them
-   * (Count "revealedFromHand").
+   * (Count "revealedFromHand"). With `bottom`, "put any number of cards from your hand on the bottom of your library"
+   * (Valakut Awakening), the first pick lowest, and "that many" counts them (Count "bottomedFromHand").
    */
-  | { type: "revealFromHand"; filter?: TargetSpec }
+  | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
   | { type: "exileHand"; until: "nextTurn" }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
@@ -1238,7 +1242,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), or put onto the battlefield under your control. */ dest?: "exile" | "battlefield"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1755,6 +1759,8 @@ export type Effect =
   | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true } }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
+  /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
+  | { type: "loseAllCounters"; who: PlayerRef }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */
@@ -2029,6 +2035,8 @@ export type SpellCondition =
    * printed characteristics, which are the ones it had in the graveyard (CR 608.2h).
    */
   | { kind: "targetCardWas"; index: number; filter: TargetSpec }
+  /** "Counter target spell unless its controller pays {4}. If they do, you incubate 2." (Assimilate Essence): it was paid. */
+  | { kind: "unlessPaid" }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
   /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */

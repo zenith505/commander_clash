@@ -156,6 +156,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       if (!sc.found) {
         const cards = p.hand.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        s.resolving!.tookFromHand = 0;
         if (!cards.length) return;
         const kind = e.filter?.text ?? "card";
         const what = `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
@@ -164,6 +165,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return "paused";
       }
       const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
+      s.resolving!.tookFromHand = ids.length;
       if (e.action === "discard") discardCards(s, pid, ids, "", false, false, ctx.controller);
       else if (e.action === "libraryThird")
         for (const id of ids) {

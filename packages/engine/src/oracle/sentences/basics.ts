@@ -16,6 +16,12 @@ import { parsePreventAll } from "../statics";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Each opponent loses all counters" (Final Act): every counter they have (CR 122.1); poison and energy are the
+  // player counters this engine has.
+  if ((m = /^(Each opponent|Each player|Target opponent|Target player) loses all counters$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "loseAllCounters", who }] : null;
+  }
   // "Exchange life totals with target opponent" (Mirror Universe), "two target players exchange life totals" (Axis of
   // Mortality): CR 701.12c.
   if ((m = /^[Ee]xchange life totals with (target opponent|target player)$/.exec(s))) {

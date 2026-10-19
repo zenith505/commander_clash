@@ -169,6 +169,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => rank(a) - rank(b)).slice(0, pend.max) }];
     }
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    // "Put any number of cards from your hand on the bottom of your library, then draw that many plus one": lands once
+    // there are enough of them out, spells too costly for a while.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.bottom) {
+      const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+      return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => (isType(defOf(s, obj(s, id)), "Land") ? lands >= 5 : mv(s, id) > lands + 2)) }];
+    }
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];

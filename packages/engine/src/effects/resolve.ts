@@ -544,6 +544,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "draw":
     case "getEnergy":
     case "poison":
+    case "loseAllCounters":
     case "becomeMonarch":
     case "extraLandThisTurn":
     case "ringTempts":

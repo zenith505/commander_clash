@@ -705,6 +705,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Exile all cards from your hand, then draw that many cards. Until the end of your next turn, you may play cards exiled
     // this way." (Invasion of Kaldheim): face up (CR 406.3), each card's permission its own (CR 400.7).
+    // "Put any number of cards from your hand on the bottom of your library, then draw that many cards plus one" (Valakut
+    // Awakening, Into the Fire).
+    if (/^[Pp]ut any number of cards from your hand on the bottom of your library$/.test(s) && /^Draw that many cards plus one$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "revealFromHand", bottom: true }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "bottomedFromHand" }, plus: 1 } });
+      si++;
+      continue;
+    }
     // By now split at ", then".
     if (/^[Ee]xile all cards from your hand$/.test(s) && /^Draw that many cards$/.test(sentences[si + 1] ?? "") && /^Until the end of your next turn, you may play cards exiled this way$/.test(sentences[si + 2] ?? "")) {
       effects.push({ type: "exileHand", until: "nextTurn" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "exiledFromHandThisWay" } } });
@@ -962,6 +969,44 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push(take);
       continue;
     }
+    // "Counter target spell unless its controller pays {2}. If they do, surveil 2." (Assimilate Essence, Spell Pierce-likes):
+    // only if they paid as it resolved (CR 608.2c).
+    const theyDo = /^If they do, (.+)$/.exec(s);
+    const prevCounter = effects[effects.length - 1];
+    if (theyDo && prevCounter?.type === "counterSpell" && prevCounter.unless && effects.length - prevWhole === 1) {
+      const before = ctx.targets.length;
+      const inner = parseOne(theyDo[1]!.charAt(0).toUpperCase() + theyDo[1]!.slice(1), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "unlessPaid" }, effects: inner });
+      continue;
+    }
+    // "Target opponent reveals their hand. You may choose a creature or battle card from it. If you do, that player
+    // discards that card. If you don't, incubate 3." (Traumatic Revelation): one or none (rulings), then what follows
+    // depends on which.
+    const mayChoose = /^You may choose an? (.+?) from it$/.exec(s);
+    if (mayChoose) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(mayChoose[1]!);
+      if (prev?.type !== "lookAtHand" || filter === null) return null;
+      const next = sentences[si + 1] ?? "";
+      const act = /^(?:If you do, )?(?:(that player discards that card|they discard it)(?:, then (?:they )?draws? a card)?|(?:that player exiles|exile) that card)$/i.exec(next);
+      if (!act || (/^If you do, (?:that player exiles|exile)/.test(next) && /^If a /.test(sentences[si + 2] ?? ""))) return null;
+      effects.push({ type: "takeFromHand", who: prev.who, ...(filter ? { filter } : {}), action: act[1] ? "discard" : "exile", optional: true });
+      si++;
+      const took: Amount = { count: { kind: "tookFromHand" } };
+      // "..., then draws a card": that player, only if they discarded.
+      if (/ then (?:they )?draws? a card$/.test(next)) effects.push({ type: "if", cond: { kind: "amountNow", amount: took, min: 1 }, effects: [{ type: "draw", who: prev.who, n: 1 }] });
+      const otherwise = /^(?:If you don't|Otherwise), (.+)$/.exec(sentences[si + 1] ?? "");
+      if (otherwise) {
+        const t = otherwise[1]!.replace(/^that player discards /, "That player discards ");
+        const before = ctx.targets.length;
+        const inner = parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+        if (!inner || ctx.targets.length !== before) return null;
+        effects.push({ type: "if", cond: { kind: "amountNow", amount: took, max: 0 }, effects: inner });
+        si++;
+      }
+      continue;
+    }
     // Hand disruption: "Target opponent reveals their hand. You choose a nonland card from it. That player discards
     // that card." Another player picks the card (CR 701.9b), among those that match.
     const choose = /^You choose an? (.+?) from it( with mana value \d+ or (?:less|greater))?( and exile that card)?$/.exec(s);
@@ -1216,9 +1261,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // Doubling a creature's power (CR 701.10b-c): it gets +X/+0, where X is its power as this resolves (for a negative
-    // power, -X/-0 for X below 0 comes to the same).
-    const double = /^[Dd]ouble (?:(its|target creature's) power|the power of (target creature)) until end of turn$/.exec(s);
-    if (double) s = `${double[1] === "its" ? "It" : "Target creature"} gets +X/+0 until end of turn, where X is its power`;
+    // power, -X/-0 for X below 0 comes to the same). Its power and toughness: +X/+Y, Y its toughness (Grunn, Dragonclaw
+    // Strike), each signed on its own.
+    const double = /^[Dd]ouble (?:(its|target creature's) power( and toughness)?|the power( and toughness)? of (target creature(?: you control)?)) until end of turn$/.exec(s);
+    const doubleBoth = !!double && !!(double[2] ?? double[3]);
+    if (double) s = `${double[1] === "its" ? "It" : double[4] ? double[4].charAt(0).toUpperCase() + double[4].slice(1) : "Target creature"} gets +X/+0 until end of turn, where X is its power`;
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     const where = /^(.+), where X is (.+)$/.exec(s);
@@ -1239,7 +1286,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const counted = parseCount(asCast ? what.slice(0, asCast.index) : what, ctx);
       if (!counted) return false;
       const def = double ? { ...counted, signed: true as const } : counted;
-      effects.splice(before, effects.length - before, ...replaceX(added, def));
+      let replaced = replaceX(added, def);
+      if (doubleBoth) {
+        const c = def.count;
+        const e0 = replaced[0];
+        if (replaced.length !== 1 || e0?.type !== "continuous" || e0.mods.length !== 1 || e0.mods[0]!.kind !== "modifyPT" || c.kind !== "power") return false;
+        replaced = [{ ...e0, mods: [{ ...e0.mods[0]!, toughness: { count: { ...c, kind: "toughness" }, signed: true } }] }];
+      }
+      effects.splice(before, effects.length - before, ...replaced);
       for (let k = targetsBefore; k < ctx.targets.length; k++) {
         const t = ctx.targets[k]!;
         // "Counter target spell with mana value X or less, where X is the number of Faeries you control": not the X

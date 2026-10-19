@@ -240,6 +240,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "targetCardWas"
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "unlessPaid"
+            ? !!s.resolving!.unlessPaid
             : e.cond.kind === "targetWasYours"
             ? targetWasYours(s, ctx, e.cond.index)
             : e.cond.kind === "teamwork"

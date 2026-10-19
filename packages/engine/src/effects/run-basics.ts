@@ -233,6 +233,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} gets ${n === 1 ? "a poison counter" : `${n} poison counters`}.`);
       }
       return;
+    case "loseAllCounters":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        if (!p.poison && !p.energy) continue;
+        p.poison = 0;
+        p.energy = 0;
+        log(s, `${p.name} loses all counters.`);
+      }
+      return;
     case "getEnergy":
       for (const pid of players(s, e.who, ctx)) {
         const n = amountNow(s, e.n, ctx);

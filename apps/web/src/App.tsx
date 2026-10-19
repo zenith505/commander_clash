@@ -3140,10 +3140,14 @@ function LibrarySearch({
               ? `${pending.source}: put ${pending.what} ${dig.to}`
               : pending.reveal
                 ? `${pending.source}: you may reveal ${pending.what} from your hand`
+                : pending.bottom
+                ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
                 : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile"
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from your graveyard`
+                  : pending.fromGraveyard === "libraryTop"
+                  ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
                   : pending.fromGraveyard
                   ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to ${pending.fromGraveyard === "battlefield" ? "the battlefield" : "your hand"}`
                   : zones
@@ -3160,6 +3164,8 @@ function LibrarySearch({
                 ? `The first you find goes ${pending.firstTo}, the other ${pending.othersTo}.`
                 : pending.reveal
                 ? `Revealing ${found.length}.`
+                : pending.bottom
+                ? `Chosen ${found.length}; the first goes lowest.`
                 : pending.distinctManaValues
                   ? `Chosen ${found.length}. Each must have a different mana value.`
                   : pending.also?.length
@@ -3167,7 +3173,7 @@ function LibrarySearch({
                     : `Found ${found.length} of ${pending.max}.`}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {pending.reveal ? (found.length ? "Reveal" : "Reveal none") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
+            {pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">

@@ -169,6 +169,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
   }
+  // "You may put a land card from your graveyard on top of your library" (Halo-Charged Skaab, after milling): chosen as
+  // it resolves, not targeted.
+  if ((m = /^(?:[Yy]ou may )?[Pp]ut (an?|one) (.+?) from your graveyard on top of your library$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {
+    const filter = parseSearchFilter(m[2]!.replace(/ and\/or /g, " or "));
+    if (filter === null) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "libraryTop", ...(filter ? { filter } : {}), ...(/^[Yy]ou may /.test(s) ? { upTo: true as const } : {}) }];
+  }
   // "Return any number of cards with different mana values from your graveyard to your hand" (Seasons Past): chosen as it
   // resolves (rulings), no two with the same mana value; X in a mana cost is 0 and a card with no mana cost has 0 (CR 202.3).
   if ((m = /^[Rr]eturn any number of (.+?) with different mana values from your graveyard to your hand$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {

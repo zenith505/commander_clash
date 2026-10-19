@@ -1089,15 +1089,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const cards = p.hand.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         s.resolving!.revealedFromHand = 0;
         if (!cards.length) {
-          log(s, `${p.name} reveals no cards.`);
+          log(s, e.bottom ? `${p.name} has no cards in hand to put on the bottom of their library.` : `${p.name} reveals no cards.`);
           return;
         }
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `any number of ${e.filter?.text ?? "card"}s`, cards, min: 0, max: cards.length, fromHand: true, reveal: true };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `any number of ${e.filter?.text ?? "card"}s`, cards, min: 0, max: cards.length, fromHand: true, ...(e.bottom ? { bottom: true as const } : { reveal: true as const }) };
         return "paused";
       }
       const shown = sc.found.filter((id) => p.hand.includes(id));
       sc.found = undefined;
       s.resolving!.revealedFromHand = shown.length;
+      if (e.bottom) {
+        // In the order picked, the first lowest (its owner orders them, CR 401.4).
+        for (const id of [...shown].reverse()) moveObject(s, id, "library");
+        log(s, `${p.name} puts ${shown.length === 1 ? "a card" : `${shown.length} cards`} from their hand on the bottom of their library.`);
+        return;
+      }
       log(s, shown.length ? `${p.name} reveals ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} reveals no cards.`);
       return;
     }
@@ -1306,8 +1312,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
-      if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : `${p.name} returns ${names} from their graveyard to their hand.`);
-      for (const id of found) moveObject(s, id, e.dest ?? "hand");
+      if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
+      for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));
       return;
     }
     case "reorderGraveyard": {

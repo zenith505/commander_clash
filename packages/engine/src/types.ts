@@ -976,7 +976,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal. */ fromHand?: boolean; reveal?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[] }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[] }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -1404,6 +1404,10 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
+  unlessPaid?: boolean;
+  /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
+  tookFromHand?: number;
   /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */

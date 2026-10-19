@@ -16,7 +16,7 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 ## Next rounds
 
 0. Cards with faces (CR 709, 710, 712, 715, 722): 458 of the 846 legal ones play now (`npm run faces` lists each
-   layout's support and the lines blocking it): 160 of 388 transforming double-faced (17 of the 36 Invasion Sieges),
+   layout's support and the lines blocking it): 160 of 388 transforming double-faced (18 of the 36 Invasion Sieges),
    106 of 151 adventurer, 77 of 123 split (13 of 28 Rooms), 47 of 98 modal double-faced, 50 of 67 preparation, 18 of
    19 flip. All 14 meld cards play (CR 701.42). Still out:
    - Transformers: only Goldbug of the 13 plays; the others each have a line of their own (`npm run faces`).

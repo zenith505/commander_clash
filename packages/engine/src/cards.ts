@@ -3,7 +3,7 @@ import { characteristics, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
-import { faceKey, registerFace, registerRoom, restingDef, roomKey } from "./faces";
+import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey } from "./faces";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
 export function pairedWith(s: GameState, o: GameObject): GameObject | undefined {
@@ -46,7 +46,27 @@ export const FACE_DOWN_WARD = faceDownCard("face-down-ward", true);
  * Its copiable values before face-down status (CR 613.2a): the latest copy effect that began after it entered
  * (CR 707.4), or what it entered as a copy of (CR 707.5), or its own card.
  */
-const copiedId = (o: GameObject): string => withDoors(o, o.copyEffects?.[o.copyEffects.length - 1]?.key ?? o.copyOf ?? ownId(o));
+const copiedId = (o: GameObject): string => withDoors(o, roomlessId(o));
+
+/** Its copiable values' key before a Room's unlocked designations are applied (CR 709.5: they aren't copiable values). */
+const roomlessId = (o: GameObject): string => o.copyEffects?.[o.copyEffects.length - 1]?.key ?? o.copyOf ?? ownId(o);
+
+/** The Room `o` is by its copiable values (CR 709.5), whatever doors it has unlocked, or undefined if it isn't one. */
+export function roomOf(s: GameState, o: GameObject): CardDef | undefined {
+  if (o.faceDown) return undefined;
+  const d = s.cards[roomlessId(o)];
+  return d && isRoom(restingDef(d)) ? restingDef(d) : undefined;
+}
+
+/**
+ * A permanent that has just become a Room without having entered as one (a Clone or a "becomes a copy" effect copying a
+ * Room, a Room turned face up) has neither unlocked designation (CR 709.5c-d): both its doors are locked.
+ */
+export function lockIfRoom(s: GameState, o: GameObject): void {
+  if (o.zone !== "battlefield" || o.unlocked !== undefined || !roomOf(s, o)) return;
+  o.unlocked = [];
+  registerRoom(s, cardIdOf(o));
+}
 
 /** A Room permanent's: what it is with its unlocked doors (CR 709.5), copied or not (the designations aren't copied). */
 const withDoors = (o: GameObject, key: string): string => (o.unlocked !== undefined ? roomKey(key, o.unlocked) : key);

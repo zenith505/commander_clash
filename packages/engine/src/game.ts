@@ -4,7 +4,7 @@ import { mergeSpell } from "./mutate";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
-import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
+import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
@@ -1008,6 +1008,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     const key = copyKey(s, defOf(s, target), exceptFor(s, o, own.except, realDefOf(s, o).name));
     if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
     else o.copyOf = key;
+    lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
   }
@@ -6167,9 +6168,9 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
 
 /** A Room permanent's locked door's unlock cost: that half's mana cost (CR 709.5e), or undefined if there's none to unlock. */
 export function unlockCost(s: GameState, o: GameObject, door: number): string | undefined {
-  const d = s.cards[o.cardId];
-  if (o.zone !== "battlefield" || o.faceDown || o.unlocked === undefined || o.unlocked.includes(door) || !isRoom(d)) return undefined;
-  return restingDef(d!).faces![door]?.manaCost;
+  const d = roomOf(s, o);
+  if (o.zone !== "battlefield" || o.unlocked === undefined || o.unlocked.includes(door) || !d) return undefined;
+  return d.faces![door]?.manaCost;
 }
 
 /**
@@ -6183,7 +6184,7 @@ export function unlockProblem(s: GameState, pid: PlayerId, id: ObjectId, door: n
   if (!o || cost === undefined) return "only a locked door of a Room on the battlefield can be unlocked";
   if (controllerOf(s, o) !== pid) return "only a Room you control can be unlocked";
   if (!canActAtSorcerySpeed(s, pid)) return "you can only unlock a door during your main phase while the stack is empty";
-  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to unlock ${restingDef(s.cards[o.cardId]!).faces![door]!.name} (${cost})`;
+  if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to unlock ${roomOf(s, o)!.faces![door]!.name} (${cost})`;
   return null;
 }
 
@@ -6194,7 +6195,7 @@ function unlockDoor(s: GameState, p: Player, id: ObjectId, door: number) {
   const o = obj(s, id);
   const cost = unlockCost(s, o, door)!;
   spendFromPool(s, p.id, parseManaCost(cost), "other");
-  log(s, `${p.name} unlocks ${restingDef(s.cards[o.cardId]!).faces![door]!.name} (${cost}).`);
+  log(s, `${p.name} unlocks ${roomOf(s, o)!.faces![door]!.name} (${cost}).`);
   setUnlocked(s, o, [...o.unlocked!, door]);
   s.passedInSuccession = [];
 }
@@ -6202,7 +6203,8 @@ function unlockDoor(s: GameState, p: Player, id: ObjectId, door: number) {
 /** Give a Room these unlocked designations (CR 709.5c); each door that becomes unlocked triggers its abilities (709.5h). */
 export function setUnlocked(s: GameState, o: GameObject, doors: number[]) {
   const was = o.unlocked ?? [];
-  o.unlocked = [0, 1].filter((i) => doors.includes(i));
+  // In the order they were unlocked (faces.ts roomDef).
+  o.unlocked = [...was.filter((i) => doors.includes(i)), ...[0, 1].filter((i) => doors.includes(i) && !was.includes(i))];
   registerRoom(s, cardIdOf(o));
   invalidateCharacteristics(s);
   for (const door of o.unlocked) if (!was.includes(door)) fireEvent(s, { type: "doorUnlocked", id: o.id, door });
@@ -6270,6 +6272,7 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0) {
   // Its copiable values go back to the card's, or what a copy effect made it (CR 708.8, 707.3); it's the same
   // permanent, so nothing "enters".
   o.faceDown = undefined;
+  lockIfRoom(s, o);
   invalidateCharacteristics(s);
   const d = defOf(s, o);
   log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}).`);

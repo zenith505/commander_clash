@@ -390,7 +390,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // "Attach target Equipment you control to target creature you control" (Brass Squire), "attach up to one target
   // Equipment you control to ~" (Cloud), "... to that creature" (Kemba: the creature that entered), Magnetic Theft's
   // "Attach target Equipment to target creature" (CR 701.3a). Either target illegal: the Equipment doesn't move (rulings).
-  if ((m = /^Attach ((?:up to one )?target Equipment\b(?:(?! to ).)*) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
+  // "Attach target Aura attached to a creature to another creature" (Crown of the Ages, Autumn-Tail): moving an Aura to a
+  // creature chosen as it resolves (rulings), not targeted.
+  if ((m = /^Attach (target Aura attached to a creature) to another creature$/.exec(s))) {
+    const source = parseObject(m[1]!, ctx);
+    return source?.ref === "target" && !source.n ? [{ type: "attachElsewhere", source }] : null;
+  }
+  // "Attach target Aura you control to target creature" (Aura Finesse), "target Aura or Equipment you control" (Codsworth).
+  if ((m = /^Attach ((?:up to one )?target (?:Equipment|Aura|Aura or Equipment)\b(?:(?! to )(?! attached to ).)*(?: attached to an? creature(?: you control)?)?) to (~|it|him|her|that creature|(?:up to one |another )?target .+)$/i.exec(s))) {
     const pronoun = !/\btarget\b/i.test(m[2]!);
     if (pronoun && ctx.spell) return null;
     const hostFirst = pronoun ? parseObject(m[2]!, ctx) : null;

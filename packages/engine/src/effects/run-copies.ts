@@ -1,5 +1,6 @@
 import type { Effect, ObjRef } from "../abilities";
 import { defOf } from "../cards";
+import { restingDef } from "../faces";
 import { log, player } from "../game";
 import { addCopyEffect, copyKey, exceptFor } from "../copies";
 import type { CardDef, GameState } from "../types";
@@ -19,6 +20,8 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
     const t = ctx.targets[ref.index];
     if (!ctx.legal[ref.index] || t?.kind !== "object") return undefined;
     const o = s.objects[t.id]!;
+    // A targeted card this spell or ability moved since: copied as that card (CR 707.2, rulings on The Scarab God).
+    if (ref.card && o.zone !== "battlefield" && o.zone !== "stack" && !o.isToken) return restingDef(s.cards[o.cardId]!);
     // A permanent that left since (bounced earlier in the same spell): as it last existed there.
     const lk = s.lastKnown?.[t.id];
     if (t.zc !== undefined && (o.zoneChanges ?? 0) !== t.zc) return lk && lk.zc === t.zc ? key(lk.copyKey) : undefined;

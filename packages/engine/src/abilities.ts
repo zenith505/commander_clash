@@ -338,6 +338,8 @@ export interface TargetSpec {
    * "creatures that aren't enchanted".
    */
   status?: "enchanted" | "equipped" | "modified" | "unenchanted";
+  /** "Target Aura attached to a creature", "Aura or Equipment attached to a creature you control": what it's attached to. */
+  attachedTo?: TargetSpec;
   /** "Suspected creature" (CR 701.60). */
   suspected?: true;
   /** true: a commander ("commander creature you control", CR 903.3); false: "noncommander". */
@@ -442,6 +444,11 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /**
+       * "Exile target creature card from a graveyard. Create a token that's a copy of it" (The Scarab God): the targeted
+       * card wherever this spell or ability has put it since (CR 400.7), copied as that card (rulings).
+       */
+      card?: true;
     }
   | { ref: "self" } // the source permanent ("this creature")
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
@@ -1470,6 +1477,8 @@ export type Effect =
    * Equipment you control to target creature you control", Brass Squire).
    */
   | { type: "attach"; what: ObjRef; source?: ObjRef }
+  /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
+  | { type: "attachElsewhere"; source: ObjRef }
   /** "Unattach it" (CR 701.3d): Ogre Geargrabber's Equipment, from whatever it's attached to; `ifAttachedToYours`: "if it's attached to a creature you control" (Stolen Uniform). */
   | { type: "unattach"; what: ObjRef; ifAttachedToYours?: true }
   /** "{2}: Transform this token." (CR 701.27a): a double-faced token turns its back face up. */

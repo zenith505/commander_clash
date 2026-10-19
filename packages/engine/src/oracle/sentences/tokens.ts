@@ -55,7 +55,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
-    const what = parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
+    // "A copy of it" after "exile target creature card from a graveyard": that card, now in exile (The Scarab God).
+    const cardTargets = ctx.targets.flatMap((t, i) => (t.kind === "card" && !t.many ? [i] : []));
+    const ofCard = /^(?:it|that card)$/.test(m[4]!) && ctx.lastObjectTarget === undefined && !ctx.lastCreated && cardTargets.length === 1 && cardTargets[0] === ctx.targets.length - 1;
+    const what = ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
     const except = m[5] ? parseCopyExcept(m[5]) : undefined;
     if (!who || !what || except === null || isGroup(what)) return null;
     const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };

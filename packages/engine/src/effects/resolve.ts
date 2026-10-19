@@ -652,6 +652,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "continuous":
     case "playerGains":
     case "attach":
+    case "attachElsewhere":
     case "unattach":
     case "unattachSelf":
     case "transformSelf":

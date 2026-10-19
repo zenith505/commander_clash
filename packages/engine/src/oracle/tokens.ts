@@ -109,9 +109,9 @@ export function parseCopyExcept(text: string): CopyExcept | null {
     else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're|he's|she's) legendary$/.test(p)) out.legendary = true;
     // "It doesn't copy that creature's color": it keeps its own (CR 707.9c).
     else if (/^(?:doesn't|does not) copy that creature's colou?r$/.test(p)) out.keepColors = true;
-    else if ((m = /^(?:is|are|it's|they're|he's|she's) (?:an? )?(?:(\d+)\/(\d+) )?((?:(?:white|blue|black|red|green|colorless) )*)(?:and (?:white|blue|black|red|green) )?(.+?) in addition to (?:its|their|his|her) other (?:creature )?types$/.exec(p))) {
+    else if ((m = /^(?:is|are|it's|they're|he's|she's) (?:an? )?(?:(\d+)\/(\d+) )?((?:(?:white|blue|black|red|green|colorless) )*(?:and (?:white|blue|black|red|green) )?)(.+?) in addition to (?:its|their|his|her) other (?:creature )?types$/.exec(p))) {
       if (m[1]) out.pt = [Number(m[1]), Number(m[2])];
-      const colors = (m[3] ?? "").trim().split(" ").filter((c) => c && c !== "colorless");
+      const colors = (m[3] ?? "").trim().split(" ").filter((c) => c && c !== "colorless" && c !== "and");
       if (colors.length) out.colors = colors.map((c) => ({ white: "W", blue: "U", black: "B", red: "R", green: "G" })[c]) as Color[];
       const words = m[4]!.split(" ").map((w) => w.replace(/s$/, "")).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
       if (words.some((w) => !/^[A-Z][a-z]+$/.test(w))) return null;
@@ -124,6 +124,25 @@ export function parseCopyExcept(text: string): CopyExcept | null {
       if (words.some((w) => COPY_CARD_TYPES.has(w))) out.addTypes = words.filter((w) => COPY_CARD_TYPES.has(w));
       if (words.some((w) => !COPY_CARD_TYPES.has(w))) out.addSubtypes = words.filter((w) => !COPY_CARD_TYPES.has(w));
     } else if ((m = /^(?:'s|’s|is|are|it's|they're|he's|she's) (\d+)\/(\d+)$/.exec(p))) out.pt = [Number(m[1]), Number(m[2])];
+    else if ((m = /^(?:is|are|it's|they're|he's|she's) (?:an? )?(\d+)\/(\d+) ((?:(?:white|blue|black|red|green) )*(?:and (?:white|blue|black|red|green) )?)([A-Z][a-z]+(?: [A-Z][a-z]+)*?)( creatures?)?(?: with (.+))?$/.exec(p))) {
+      // "Except it's a 4/4 black Zombie" (God-Pharaoh's Gift): a Zombie instead of its other creature types, black
+      // instead of its other colors (rulings, CR 205.1a); "a 6/6 green Dinosaur creature" sets its card types too.
+      out.pt = [Number(m[1]), Number(m[2])];
+      const colors = m[3]!.trim().split(" ").filter((c) => c && c !== "and");
+      if (colors.length) out.colors = colors.map((c) => ({ white: "W", blue: "U", black: "B", red: "R", green: "G" })[c]) as Color[];
+      const subtypes = m[4]!.split(" ");
+      if (subtypes.some((w) => !CREATURE_TYPES.has(w))) return null;
+      out.setSubtypes = subtypes;
+      if (m[5]) out.setTypes = ["Creature"];
+      for (const w of m[6] ? m[6].split(/,? and |, /) : []) {
+        if (w === "no mana cost") out.noManaCost = true;
+        else {
+          const kw = parseKeywordList(w);
+          if (!kw) return null;
+          (out.keywords ??= []).push(...kw);
+        }
+      }
+    }
     else if ((m = /^(?:has|have) (.+)$/.exec(p))) {
       for (const piece of m[1]!.split(/,? and (?=\u0000)|, (?=\u0000)|(?<=\u0000) and /)) {
         const q = /^\u0000(\d+)\u0000$/.exec(piece.trim());

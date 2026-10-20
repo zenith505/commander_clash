@@ -2,8 +2,8 @@
 // printed, defined or set, before modifications and counters, rulings), and more of the round's cards.
 
 import { describe, expect, it } from "vitest";
-import { act, activate, addEffect, bear, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, isFullySupported, waitingOn, type GameState, type PlayerId } from "../src";
+import { act, activate, addEffect, bear, card, cast, commander, passUntil, pt, putOnBattlefield, setup } from "./helpers";
+import { abilityProblem, isFullySupported, objHasKeyword, waitingOn, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const kutzil = card("Kutzil, Malamet Exemplar", "Legendary Creature — Cat Warrior", "{1}{G}{W}", { power: "3", toughness: "3", oracleText: "Your opponents can't cast spells during your turn.\nWhenever one or more creatures you control each with power greater than its base power deals combat damage to a player, draw a card." });
@@ -104,5 +104,45 @@ describe("a token copy of each one (Second Harvest, Clone Legion)", () => {
     const copies = s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap);
     expect(copies.map((id) => s.cards[s.objects[id]!.cardId]!.name).sort()).toEqual(["Ogre A", "Ogre B"]);
     expect(s.battlefield.length).toBe(before + 4);
+  });
+});
+
+// Lieutenant with two groups: "this creature gets +2/+2 and creatures you control have ..." (both halves depend on
+// controlling your commander, CR 903.3).
+const marshal = card("Angelic Field Marshal", "Creature — Angel", "{2}{W}{W}", { power: "3", toughness: "3", keywords: ["Flying", "Lieutenant"], oracleText: "Flying\nLieutenant — As long as you control your commander, this creature gets +2/+2 and creatures you control have vigilance." });
+const baloth = card("Thunderfoot Baloth", "Creature — Beast", "{4}{G}{G}", { power: "5", toughness: "5", keywords: ["Trample", "Lieutenant"], oracleText: "Trample\nLieutenant — As long as you control your commander, this creature gets +2/+2 and other creatures you control get +2/+2 and have trample." });
+
+describe("Lieutenant with a bonus for the team", () => {
+  it("parse", () => {
+    for (const d of [marshal, baloth]) expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("Angelic Field Marshal: +2/+2 and vigilance for your creatures while you control your commander", () => {
+    const { s, ap, opp } = setup([]);
+    const m = putOnBattlefield(s, ap, marshal);
+    const b = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear());
+    expect(pt(s, m)).toBe("3/3");
+    expect(objHasKeyword(s, s.objects[b]!, "Vigilance")).toBe(false);
+    const c = putOnBattlefield(s, ap, commander("Mine"), { commander: true });
+    expect(pt(s, m)).toBe("5/5");
+    for (const id of [m, b, c]) expect(objHasKeyword(s, s.objects[id]!, "Vigilance")).toBe(true);
+    expect(objHasKeyword(s, s.objects[theirs]!, "Vigilance")).toBe(false);
+    expect(pt(s, b)).toBe("2/2");
+  });
+
+  it("Thunderfoot Baloth: +2/+2 itself, and other creatures you control get +2/+2 and trample", () => {
+    const { s, ap, opp } = setup([]);
+    const t = putOnBattlefield(s, ap, baloth);
+    const b = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear());
+    expect(pt(s, t)).toBe("5/5");
+    expect(pt(s, b)).toBe("2/2");
+    putOnBattlefield(s, ap, commander("Mine"), { commander: true });
+    expect(pt(s, t)).toBe("7/7");
+    expect(pt(s, b)).toBe("4/4");
+    expect(objHasKeyword(s, s.objects[b]!, "Trample")).toBe(true);
+    expect(pt(s, theirs)).toBe("2/2");
+    expect(objHasKeyword(s, s.objects[theirs]!, "Trample")).toBe(false);
   });
 });

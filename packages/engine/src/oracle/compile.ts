@@ -1733,6 +1733,15 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push(st);
       continue;
     }
+    // "Lieutenant — As long as you control your commander, ~ gets +2/+2 and creatures you control have vigilance"
+    // (Angelic Field Marshal), "... and other creatures you control get +2/+2 and have trample" (Thunderfoot Baloth):
+    // two effects of one static ability with one condition, each read as its own (CR 604.2, 611.3).
+    const twoGroups = /^(?:[A-Z][A-Za-z' -]+ — )?As long as ([^,]+), (~ (?:gets|has) .+?) and ((?:other )?creatures you control .+)\.$/.exec(line);
+    const parts = twoGroups && [parseConditionalStatic(`As long as ${twoGroups[1]}, ${twoGroups[2]}.`), parseConditionalStatic(`As long as ${twoGroups[1]}, ${twoGroups[3]}.`)];
+    if (parts?.every((p) => p)) {
+      for (const p of parts) out.statics.push({ ...p!, text: line });
+      continue;
+    }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a).
     if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {

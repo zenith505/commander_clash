@@ -206,7 +206,10 @@ function namePurpose(rest: string): NamePurpose {
  * battlefield", "That creature gains haste [until end of turn]" and "Sacrifice it at the beginning of the next end step".
  * `next`: the sentence after the last one used.
  */
-function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
+function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
+  // "If it's a creature card of the chosen type, ..." (Herald's Horn): the type chosen for its source.
+  const ofChosen = /^If (?:it's|that card is) an? [^,]+? card of the chosen type, /.test(sentences0[at] ?? "");
+  const sentences = ofChosen ? sentences0.map((x, i) => (i === at ? x.replace(/ card of the chosen type, /, " card, ") : x)) : sentences0;
   const first = /^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? "");
   // "If that card has the chosen name, sacrifice ~ and draw three cards" (Diviner's Lockbox), after "choose a card name".
   const named = !first && /^If (?:it|that card) has the chosen name, (.+)$/.exec(sentences[at] ?? "");
@@ -216,7 +219,8 @@ function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: E
     return then && { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: then }, next: at + 1 };
   }
   if (!first) return null;
-  const filter = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
+  const filter0 = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
+  const filter = filter0 && ofChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
   const then = filter && revealedAction(first[3]!, ctx);
   if (!filter || !then) return null;
   let next = at + 1;

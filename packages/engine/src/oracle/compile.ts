@@ -1648,7 +1648,9 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
-      /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line);
+      /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
+      // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
+      /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast/.test(line)
@@ -1661,6 +1663,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
             : /^When ~ transforms into ~ or dies/.test(line)
               ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
+            : /^Whenever an? [^,]+? enters or attacks, /.test(line)
+              ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);

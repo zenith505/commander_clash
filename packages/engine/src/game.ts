@@ -21,7 +21,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { compileCard, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
-import { addMana, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
@@ -2653,7 +2653,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
-  addMana(s, p.id, adds, { only: ab.spendOnly, from });
+  const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -3355,6 +3356,18 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (Object.keys(spentFrom).length) spent.from = spentFrom;
   o.spent = Object.keys(spent).length ? spent : undefined;
   o.treasureSpent = paid.treasure || undefined;
+  // "Spend this mana only to cast a creature spell of the chosen type, and that spell can't be countered" (Cavern of Souls).
+  o.uncounterableCast = paid.uncounterable;
+  // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
+  // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings).
+  if (paid.spentTriggers && isType(d, "Creature")) {
+    // Changeling is every creature type (CR 702.73a); a commander with no creature type shares none (rulings).
+    const kinds = (types: string[], all: boolean) => (all ? [...CREATURE_TYPES] : types.filter((t) => CREATURE_TYPES.has(t)));
+    const mine = kinds(d.subtypes, d.keywords.includes("Changeling"));
+    const theirs = Object.values(s.objects).flatMap((c) => (c.isCommander && c.owner === p.id ? kinds(characteristics(s, c).subtypes, characteristics(s, c).allCreatureTypes) : []));
+    if (mine.some((t) => theirs.includes(t)))
+      for (const t of paid.spentTriggers) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body });
+  }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
   // A once-a-turn permission to cast from the top is used up (Johann).

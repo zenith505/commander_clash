@@ -427,8 +427,8 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   let phrase = m[2]!;
   if (m[3]) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
   const ench = ENCHANTED_CONTROLS.test(phrase);
-  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase);
-  if (!filter || filter.kind !== "object") return "fail";
+  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, { chosen: true });
+  if (!filter || filter.kind !== "object" || (filter.chosen && filter.chosen !== "type")) return "fail";
   // "That land's controller" (Zo-Zu), and "that player" after "a creature an opponent controls" (Suture Priest): the
   // entering permanent's controller.
   let bodyText = ench ? m[4]!.replace(/\bthat player\b/g, "enchanted player") : m[4]!.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
@@ -554,7 +554,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
  * the attacker; "defending player" is the player it's attacking (CR 508.5a).
  */
 function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (another|an?) (.+?) you control attacks, (.+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type)?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks you or a planeswalker you control" (Blood Reckoning, Isperia): one attacking this
@@ -569,12 +569,14 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   const w = m ?? any;
   if (!w) return null;
-  const filter = parseTargetPhrase(w[2]!);
-  if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
+  // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
+  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
+  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$|$)/, "");
+  if (!filter || filter.kind !== "object" || filter.controller || (filter.chosen && filter.chosen !== "type") || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
   const body = parseBody(w[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
   if (!body) return "fail";
   if (any) return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: w[2]! }, anyone: true, ...(w[1] === "another" ? { other: true } : {}) }, body };
-  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
+  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: filter.chosen ? `${w[2]!.replace(/ of the chosen type$/, "")} you control of the chosen type` : `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
 }
 
 /**

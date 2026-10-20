@@ -239,7 +239,8 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
     if (en.orSelf) return true;
     if (en.other) return false;
   }
-  return objectMatches(s, bindEnchanted(en.filter, o), entering, you, false);
+  // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for the watcher.
+  return objectMatches(s, bindChosen(bindEnchanted(en.filter, o), o.chosen), entering, you, false);
 }
 
 /** "A creature enchanted player controls": the player the watching Aura is attached to now. */
@@ -773,7 +774,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
     const attackWatch = (w: GameObject, wc: PlayerId) => {
       const at = attackingYou(o, wc);
-      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, t.attacker.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems(attackWatch);

@@ -2748,6 +2748,12 @@ export interface ManaAbility {
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
   spendOnly?: ManaSpend;
+  /**
+   * "When that mana is spent to cast a creature spell that shares a creature type with your commander, scry 1." (Path
+   * of Ancestry): a triggered ability of its source, once for each of that mana spent so (rulings), with your
+   * commanders' creature types as they are just after the spell is cast.
+   */
+  spentTrigger?: { body: AbilityBody; sharesCommanderType: true };
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
@@ -2790,6 +2796,8 @@ export interface ManaSpend {
   anyZone?: boolean;
   /** Any other cost too: a Powerstone's mana "can't be spent to cast a nonartifact spell" (CR 111.10h). */
   other?: boolean;
+  /** "..., and that spell can't be countered" (Cavern of Souls): a spell this mana is spent on, on any of its costs. */
+  uncounterable?: true;
   text: string;
 }
 

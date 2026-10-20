@@ -418,6 +418,8 @@ export interface GameObject {
   evidence?: true;
   /** As a spell, and as the permanent it became: how much mana from Treasures was spent to cast it (CR 106.3). */
   treasureSpent?: number;
+  /** A spell: mana that makes it uncounterable was spent on it (Cavern of Souls, CR 106.6). */
+  uncounterableCast?: true;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
@@ -510,6 +512,17 @@ export interface ManaLot {
   /** Sorted, without repeats. */
   from?: ManaOrigin[];
   keep?: "turn" | "combat";
+  /** "When that mana is spent to cast a creature spell ..." (Path of Ancestry): see ManaAbility.spentTrigger. */
+  spentTrigger?: ManaSpentTrigger;
+}
+
+/** A mana's "when that mana is spent" ability: its source as it made the mana, and what it does. */
+export interface ManaSpentTrigger {
+  sourceId: ObjectId;
+  sourceCardId: string;
+  sourceZc: number;
+  body: AbilityBody;
+  sharesCommanderType: true;
 }
 
 export interface Player {

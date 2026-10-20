@@ -130,7 +130,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
 export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | "fail" | null {
-  const text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
+  let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
@@ -166,6 +166,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const who = m[1] ? "opponents" : m[2] === " you cast" ? "you" : m[2] ? "enchanted" : "all";
     return { costMod: { who, filter: { kind: "spell", chosen: "name", text: "spells with the chosen name" }, n: Number(m[3]) * (m[4] === "less" ? -1 : 1), text: line } };
   }
+  // "Creature spells you cast of the chosen type cost {1} less to cast" (Herald's Horn), "Creature spells of the chosen
+  // type ..." (Urza's Incubator): the type chosen as the permanent entered.
+  const ofChosen = / of the chosen type costs? \{/.test(text);
+  if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with mana value \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
@@ -178,7 +182,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   return {
     costMod: {
       who,
-      filter: { ...filter, text: `${words ? `${words.toLowerCase()} ` : ""}spells` },
+      filter: { ...filter, ...(ofChosen ? { chosen: "type" as const } : {}), text: `${words ? `${words.toLowerCase()} ` : ""}spells${ofChosen ? " of the chosen type" : ""}` },
       n,
       ...(m[1] ? { turn: m[1] === "During your turn" ? "yours" : "notYours" } : {}),
       ...(m[5] ? { fromGraveyard: true } : {}),

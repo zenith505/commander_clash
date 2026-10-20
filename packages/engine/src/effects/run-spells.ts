@@ -516,7 +516,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
   const d = defOf(s, o);
-  if (compileCard(d).cantBeCountered) return true;
+  if (compileCard(d).cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d));

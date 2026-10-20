@@ -1267,6 +1267,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {pending?.kind === "chooseOption" && pending.what === "cardName" && pending.player === HUMAN && (
             <NamePicker key={pending.source} s={s} pending={pending} onHover={setHover} onDone={(choice) => dispatch([{ type: "chooseOption", player: HUMAN, choice }])} />
           )}
+          {pending?.kind === "chooseOption" && pending.what === "pile" && pending.player === HUMAN && (
+            <PilePicker key={pending.source} s={s} pending={pending} onHover={setHover} onDone={(choice) => dispatch([{ type: "chooseOption", player: HUMAN, choice }])} />
+          )}
           {pending?.kind === "searchLibrary" && (
             <LibrarySearch
               key={pending.source + pending.cards.join(",")}
@@ -3197,6 +3200,51 @@ function NamePicker({
   );
 }
 
+/** Fact or Fiction (CR 700.3): the two piles side by side, and which one goes to the hand. */
+function PilePicker({
+  s,
+  pending,
+  onHover,
+  onDone,
+}: {
+  s: GameState;
+  pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>;
+  onHover: (d: CardDef | null) => void;
+  onDone: (choice: string) => void;
+}) {
+  const whose = pending.of === HUMAN ? "your" : `${s.players[pending.of ?? 0]!.name}'s`;
+  return (
+    <div className="modal-backdrop">
+      <div className="modal search">
+        <header>
+          <strong>{`${pending.source}: ${pending.prompt}`}</strong>
+        </header>
+        <div className="modal-body">
+          {(pending.piles ?? [[], []]).map((pile, i) => (
+            <div key={i} data-pile={i}>
+              <h4>
+                Pile {i + 1} ({pile.length === 1 ? "1 card" : `${pile.length} cards`}){" "}
+                <button onClick={() => onDone(String(i))}>{`Put pile ${i + 1} into ${whose} hand`}</button>
+              </h4>
+              <div className="modal-cards">
+                {pile.length === 0 && <span className="muted">No cards</span>}
+                {pile.map((id) => {
+                  const d = cardOf(s, id);
+                  return (
+                    <div key={id} className="card big" {...hoverProps(d, onHover)}>
+                      <CardFace d={d} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LibrarySearch({
   s,
   pending,
@@ -3236,7 +3284,9 @@ function LibrarySearch({
       <div className="modal search">
         <header>
           <strong>
-            {dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
+            {pending.piles
+              ? `${pending.source}: separate ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name}'s` : "your"} revealed cards into two piles. Choose the cards for the first pile`
+              : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `${pending.source}: choose ${pending.what} ${dig.to}`
               : dig
               ? `${pending.source}: put ${pending.what} ${dig.to}`
@@ -3262,7 +3312,9 @@ function LibrarySearch({
           </strong>
           <span className="muted">
             {" "}
-            {dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
+            {pending.piles
+              ? `The rest form the second pile. A pile may be empty. ${pending.forPlayer !== undefined ? `${s.players[pending.forPlayer]!.name} chooses one for their hand` : "An opponent chooses one for your hand"}, the other goes ${/bottom/.test(dig?.rest ?? "") ? "on the bottom of the library" : "to the graveyard"}.`
+              : dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `The rest ${dig.rest}.`
               : dig
               ? `The rest go ${dig.rest}.`
@@ -3284,13 +3336,13 @@ function LibrarySearch({
             {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
-            {pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
+            {pending.piles ? (found.length ? "Done" : "Done (the first pile empty)") : pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}
           </button>
         </header>
         <div className="modal-body">
           {found.length > 0 && (
             <>
-              <h4>Found</h4>
+              <h4>{pending.piles ? "First pile" : "Found"}</h4>
               <div className="modal-cards">
                 {found.map((id, i) => {
                   const d = cardOf(s, id);
@@ -3308,7 +3360,7 @@ function LibrarySearch({
           )}
           {dig && (
             <>
-              <h4>{pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : "The top of your library"}</h4>
+              <h4>{pending.piles ? "Second pile (click a card to move it to the first)" : pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : "The top of your library"}</h4>
               <div className="modal-cards">
                 {dig.looked
                   .filter((id) => !found.includes(id))

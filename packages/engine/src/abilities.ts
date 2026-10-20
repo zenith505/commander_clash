@@ -2064,6 +2064,14 @@ export type Effect =
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
+   * "Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your
+   * hand and the other into your graveyard." (Fact or Fiction), or you separate them and an opponent chooses the pile
+   * (Steam Augury): the cards stay in the library while they're separated (CR 700.3c) and a pile may be empty. The
+   * opponent is one you choose as it resolves (rulings). `rest`: the other pile goes to the graveyard, or on the bottom
+   * of the library in any order (Jace, Architect of Thought).
+   */
+  | { type: "piles"; n: Amount; separator: "you" | "opponent"; rest: "graveyard" | "bottom" }
+  /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.

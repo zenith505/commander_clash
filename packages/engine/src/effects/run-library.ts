@@ -576,6 +576,56 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       return;
     }
+    case "piles": {
+      // CR 700.3: the revealed cards are separated into two piles while still in the library (700.3c); one pile is chosen
+      // and put into the hand, the other into the graveyard (or on the bottom of the library, in an order its owner
+      // chooses). Piles can be empty (rulings).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const p = player(s, ctx.controller);
+      const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+      if (!sc.looked) {
+        sc.looked = p.library.slice(0, Math.max(0, amountNow(s, e.n, ctx)));
+        if (!sc.looked.length) return;
+        log(s, `${p.name} reveals the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library (${names(sc.looked)}).`);
+      }
+      if (sc.moved) return toBottom(s, p.id, sc.looked.filter((id) => obj(s, id).zone === "library"), src, false);
+      const looked = sc.looked.filter((id) => obj(s, id).zone === "library");
+      const opp = chooseAnOpponent(s, ctx, src, e.separator === "opponent" ? "choose an opponent to separate the cards into two piles" : "choose an opponent to choose a pile");
+      if (opp === "paused") return "paused";
+      // No opponent left to separate or to choose: the game is over, and nothing more happens.
+      if (opp === undefined || player(s, opp).lost) return;
+      const separator = e.separator === "you" ? p.id : opp;
+      const chooser = e.separator === "you" ? opp : p.id;
+      if (sc.separating && sc.found) {
+        sc.pileOne = sc.found;
+        sc.separating = undefined;
+        sc.found = undefined;
+      }
+      if (!sc.pileOne) {
+        sc.separating = true;
+        s.pending = { kind: "searchLibrary", player: separator, source: src, what: "the cards", cards: looked, min: 0, max: looked.length, dig: { looked, to: "for the first pile", rest: "form the second pile" }, piles: true, ...(separator !== p.id ? { forPlayer: p.id } : {}) };
+        return "paused";
+      }
+      const one = sc.pileOne.filter((id) => looked.includes(id));
+      const two = looked.filter((id) => !one.includes(id));
+      if (sc.pileChoice === undefined) {
+        log(s, `${player(s, separator).name} separates them into two piles: ${names(one) || "no cards"}; and ${names(two) || "no cards"}.`);
+        const label = (pile: ObjectId[], i: number) => `Pile ${i + 1}: ${pile.length ? names(pile) : "no cards"}`;
+        s.pending = { kind: "chooseOption", player: chooser, source: src, what: "pile", options: ["0", "1"], labels: [label(one, 0), label(two, 1)], piles: [one, two], of: p.id, prompt: `choose the pile to put into ${chooser === p.id ? "your" : `${p.name}'s`} hand (the other goes ${e.rest === "graveyard" ? "into the graveyard" : "on the bottom of the library"})` };
+        return "paused";
+      }
+      const hand = sc.pileChoice === 0 ? one : two;
+      const rest = sc.pileChoice === 0 ? two : one;
+      log(s, `${p.name} puts ${hand.length ? names(hand) : "no cards"} into their hand${e.rest === "graveyard" ? ` and ${rest.length ? names(rest) : "no cards"} into their graveyard` : ""}.`);
+      enterTogether(s, () => {
+        for (const id of hand) moveObject(s, id, "hand");
+        if (e.rest === "graveyard") for (const id of rest) moveObject(s, id, "graveyard");
+      });
+      if (e.rest !== "bottom") return;
+      sc.moved = true;
+      return toBottom(s, p.id, rest, src, false);
+    }
     case "revealPick": {
       // "Reveal the top three cards of your library. An opponent chooses one of them." (Murmurs from Beyond): revealed
       // first, then the opponent chooses (one that fits, if it says what kind: Animal Magnetism), then the cards move.
@@ -758,6 +808,24 @@ function clashValue(s: GameState, id: ObjectId): number {
 }
 
 /**
+ * "An opponent chooses", "an opponent separates": an opponent you choose as it resolves, not targeted (rulings on Steam
+ * Augury, Sphinx of Uthuun); kept as the resolving object's chosen player. None when no opponent is left.
+ */
+function chooseAnOpponent(s: GameState, ctx: ResolveCtx, src: string, prompt: string): PlayerId | undefined | "paused" {
+  const r = s.resolving!;
+  const opps = opponents(s, ctx.controller);
+  if (r.chosen?.player === undefined && opps.length === 1) {
+    r.chosen = { ...r.chosen, player: opps[0]! };
+    log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
+  }
+  if (r.chosen?.player === undefined && opps.length > 1) {
+    s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt };
+    return "paused";
+  }
+  return r.chosen?.player;
+}
+
+/**
  * Opposition Agent, for a player about to search their own library: the controller of the one that entered the
  * battlefield most recently among those controlled by that player's opponents controls them during the search (CR 723.2,
  * rulings). Several Agents each try to exile what they find; the owner of the cards chooses which applies (CR 616.1), and
@@ -797,16 +865,9 @@ function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: P
   let chooser: PlayerId | undefined;
   if (chooserRef) chooser = players(s, chooserRef, ctx)[0];
   else {
-    const opps = opponents(s, ctx.controller);
-    if (r.chosen?.player === undefined && opps.length === 1) {
-      r.chosen = { ...r.chosen, player: opps[0]! };
-      log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
-    }
-    if (r.chosen?.player === undefined && opps.length > 1) {
-      s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent to choose the cards" };
-      return "paused";
-    }
-    chooser = r.chosen?.player;
+    const opp = chooseAnOpponent(s, ctx, src, "choose an opponent to choose the cards");
+    if (opp === "paused") return "paused";
+    chooser = opp;
   }
   // No opponent to choose (they've all left the game): the cards it says to choose can't be chosen.
   if (chooser === undefined || player(s, chooser).lost) return (sc.picked = []);

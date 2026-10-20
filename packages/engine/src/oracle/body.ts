@@ -505,6 +505,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     /\bReveal the top (\w+) cards of your library\. (Target opponent|An opponent) chooses (one of (?:them|those cards)|an? [a-z]+ card from among them)\. Put that card (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard))?(\.|, then )/g,
     (_, n, who, which, to, rest, end) => `Reveal the top ${n} cards of your library; ${who.toLowerCase()} chooses ${which.replace(/ of (?:them|those cards)$/, "")}; put it ${to}${rest ? ` and the rest ${rest}` : ""}.${end === "." ? "" : " Then "}`,
   );
+  // "Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your
+  // hand and the other into your graveyard." (Fact or Fiction), "Reveal the top five cards of your library and separate
+  // them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your
+  // graveyard." (Steam Augury): one instruction each (CR 700.3).
+  text = text.replace(
+    /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library(, where X is [^.;]+)?\. An opponent separates (?:those cards|them) into two piles\. Put one pile into your hand and the other (into your graveyard|on the bottom of your library in any order)\./g,
+    (_, r, n, where, rest) => `${r}eveal the top ${n} cards of your library; an opponent separates them into two piles; put one pile into your hand and the other ${rest}${where ?? ""}.`,
+  );
+  text = text.replace(
+    /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library and separate them into two piles\. An opponent chooses one of those piles\. Put that pile into your hand and the other into your graveyard\./g,
+    (_, r, n) => `${r}eveal the top ${n} cards of your library; you separate them into two piles and an opponent chooses one; put one pile into your hand and the other into your graveyard.`,
+  );
   // "Search your library, graveyard, and/or outside the game for an instant or sorcery card you own" (Invasion of
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
   // learn), so it's the library and/or the graveyard, where every card is one you own.

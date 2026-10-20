@@ -4981,6 +4981,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "pile") {
+    if (choice !== "0" && choice !== "1") throw new RulesError("choose one of the two piles");
+    (r.scratch ??= {}).pileChoice = Number(choice);
+    log(s, `${p.name} chooses ${(pend.labels?.[Number(choice)] ?? `pile ${Number(choice) + 1}`).replace(/^Pile/, "pile")} (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "castFromHand") {
     (r.scratch ??= {}).castFromHand = choice;
     continueResolution(s);

@@ -4684,10 +4684,11 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
   const given = Object.entries(parts).filter(([, n]) => n !== 0);
   if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`distribute the counters among the ${pend.what}`);
   const sum = given.reduce((a, [, n]) => a + n, 0);
-  if (sum !== pend.total) throw new RulesError(`distribute all ${pend.total} ${pend.counter} counters`);
+  if (pend.move ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
   r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
   s.pending = null;
-  log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
+  if (pend.move) log(s, sum ? `${p.name} moves ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} onto ${nameOf(s, id)}`).join(", ")}.` : `${p.name} moves no counters.`);
+  else log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
   continueResolution(s);
 }
 

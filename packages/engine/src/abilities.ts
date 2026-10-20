@@ -1438,7 +1438,11 @@ export type Effect =
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
    * chosen one getting at least one.
    */
-  | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec }
+  /**
+   * `move`: "you may move any number of +1/+1 counters from ~ onto other creatures" (Forgotten Ancient): from this
+   * permanent, as many as it has (`n` aside), onto any number of other creatures anyone controls, none at all included.
+   */
+  | { type: "distribute"; counter: CounterKind; n: Amount; filter: TargetSpec; move?: true }
   /** "Sacrifice ~" as an effect: only a permanent its controller controls (CR 701.21a). */
   /** `byController`: the permanent's controller sacrifices it, whoever controls the effect. */
   | { type: "sacrifice"; what: ObjRef; byController?: true }

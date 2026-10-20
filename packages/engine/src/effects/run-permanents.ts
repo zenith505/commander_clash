@@ -428,18 +428,33 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       const n = (sc.n ??= amountNow(s, e.n, ctx));
-      const options = s.battlefield.filter((id) => objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), ctx.controller, false));
+      // Moving them (Forgotten Ancient): from this permanent, still here as the same object (CR 122.5, 400.7), onto other
+      // creatures anyone controls.
+      const self = e.move ? objects(s, { ref: "self" }, ctx).find((o) => o.zone === "battlefield") : undefined;
+      if (e.move && !self) return;
+      const options = s.battlefield.filter((id) => (e.move ? id !== self!.id && objectMatches(s, e.filter, obj(s, id), ctx.controller, false) : objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), ctx.controller, false)));
       if (n <= 0 || !options.length) return;
       let parts = sc.distributed;
-      if (!parts && options.length === 1) parts = { [options[0]!]: n };
+      if (!parts && options.length === 1 && !e.move) parts = { [options[0]!]: n };
       if (!parts) {
-        s.pending = { kind: "distribute", player: ctx.controller, source: src, counter: e.counter, total: n, options, what: e.filter.text };
+        s.pending = { kind: "distribute", player: ctx.controller, source: src, counter: e.counter, total: n, options, what: e.filter.text, ...(e.move ? { move: true as const } : {}) };
         return "paused";
       }
       for (const id of options) {
         const k = parts[id] ?? 0;
         const o = obj(s, id);
         if (k <= 0) continue;
+        if (self) {
+          // Only as many as are still on it.
+          const has = self.counters[e.counter] ?? 0;
+          const m = Math.min(k, has);
+          if (m <= 0) continue;
+          self.counters[e.counter] = has - m;
+          invalidateCharacteristics(s);
+          const put = putCounters(s, o, e.counter, m);
+          log(s, `${defOf(s, self).name} moves ${m} ${e.counter} counter${m > 1 ? "s" : ""} onto ${defOf(s, o).name}${put !== m ? ` (${put} are put on it)` : ""}.`);
+          continue;
+        }
         invalidateCharacteristics(s);
         const put = putCounters(s, o, e.counter, k);
         log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);

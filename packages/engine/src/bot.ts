@@ -226,7 +226,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found: best }];
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
-    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
+    // Moving counters off its own permanent (Forgotten Ancient): bots keep them where they are.
+    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? {} : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.

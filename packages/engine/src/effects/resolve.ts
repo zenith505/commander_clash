@@ -613,6 +613,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noCombatDamage":
     case "lookAtHand":
     case "sacrifice":
+    case "animateDead":
+    case "sacrificeAnimated":
     case "exploit":
     case "champion":
     case "returnChampioned":

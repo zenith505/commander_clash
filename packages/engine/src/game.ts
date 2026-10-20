@@ -816,6 +816,9 @@ export function moveObject(
   o.band = undefined;
   o.timestamp = s.nextTimestamp++; // CR 613.7d
   o.attachedTo = to === "battlefield" ? opts.attachTo : undefined;
+  // An Aura with "enchant creature card in a graveyard" (Animate Dead) attached to that card, as that object.
+  const card = to === "battlefield" && opts.attachTo ? s.objects[opts.attachTo] : undefined;
+  o.enchantsCard = card?.zone === "graveyard" ? { id: card.id, zc: card.zoneChanges ?? 0 } : undefined;
   o.attachedToPlayer = to === "battlefield" ? opts.attachToPlayer : undefined;
   if (fromZone === "battlefield") {
     // It's a new object now (CR 400.7): effects locked onto it end, and things attached to it
@@ -1179,6 +1182,8 @@ export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): 
   if (!enchant) return [];
   // "Enchant player", "enchant opponent" (CR 702.5d): a player still in the game.
   if (enchant.kind === "player") return (enchant.opponent ? opponents(s, pid) : livingPlayers(s)).map((p) => ({ attachToPlayer: p }));
+  // "Enchant creature card in a graveyard" (Animate Dead): such a card in any graveyard.
+  if (enchant.kind === "card") return graveyardCards(s, enchant).map((id) => ({ attachTo: id }));
   return s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura))).map((id) => ({ attachTo: id }));
 }
 
@@ -1186,7 +1191,12 @@ export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): 
 export const auraHostKey = (h: AuraHost) => ("attachTo" in h ? h.attachTo : `player:${h.attachToPlayer}`);
 export const auraHostOf = (key: string): AuraHost => (key.startsWith("player:") ? { attachToPlayer: Number(key.slice(7)) } : { attachTo: key });
 
+/** The cards in every living player's graveyard that match a card filter (Animate Dead's "creature card in a graveyard"). */
+const graveyardCards = (s: GameState, f: TargetSpec): ObjectId[] => livingPlayers(s).flatMap((p) => player(s, p).graveyard.filter((id) => printedMatches(f, defOf(s, obj(s, id)))));
+
 function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec, among?: string[]): ObjectId | undefined {
+  // Animate Dead entering without being cast: the biggest creature card in a graveyard.
+  if (enchant.kind === "card") return graveyardCards(s, enchant).filter((id) => !among || among.includes(id)).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
   const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
@@ -6027,6 +6037,20 @@ function attachmentSBAs(s: GameState): boolean {
       const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller, c);
       if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+      }
+    } else if (c.subtypes.includes("Aura") && compileCard(defOf(s, o)).animate) {
+      // Animate Dead: attached to the creature card in a graveyard it entered attached to, then to the creature it put
+      // onto the battlefield ("enchant creature put onto the battlefield with ~", rulings), which it can't leave for another.
+      const link = s.animated?.[`${o.id}@${o.zoneChanges ?? 0}`];
+      const card = o.enchantsCard;
+      const hc = host && host.zone === "battlefield" ? characteristics(s, host) : undefined;
+      const legal = link
+        ? !!host && host.id === link.id && (host.zoneChanges ?? 0) === link.zc && !!hc && hc.types.includes("Creature") && !protectedFrom(hc.keywords, c, protectionHolder(s, host))
+        : !!host && !!card && host.id === card.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === card.zc && printedMatches(compileCard(defOf(s, o)).enchant!, defOf(s, host));
+      if (!legal) {
+        log(s, `${c.name} is put into the graveyard (not attached to anything it can enchant).`);
         moveObject(s, id, "graveyard");
         changed = true;
       }

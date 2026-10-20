@@ -458,6 +458,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
+  // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
+  if ((m = new RegExp(`^~ has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");

@@ -376,6 +376,8 @@ export interface GameObject {
    * applying when it changes.
    */
   zoneChanges?: number;
+  /** An Aura with "enchant creature card in a graveyard" (Animate Dead): the card it's attached to there, as that object. */
+  enchantsCard?: { id: ObjectId; zc: number };
   /** The turn it was drawn, as this object (`zc`): "cards in your hand drawn this turn" (Sylvan Library). */
   drawn?: { turn: number; zc: number };
   /** How many times it has untapped as this object: "for as long as ~ remains tapped" ends at the next (CR 611.2b). */
@@ -1161,6 +1163,12 @@ export interface GameState {
   graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number } }[];
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
+  /**
+   * Animate Dead: the creature an Aura with "enchant creature card in a graveyard" put onto the battlefield, by
+   * `${Aura id}@${its zone changes}` (its "enchant creature put onto the battlefield with ~", and "that creature" of its
+   * leaves trigger).
+   */
+  animated?: Record<string, { id: ObjectId; zc: number }>;
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */

@@ -251,6 +251,8 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
   const c = compileCard(d);
   if (c.spell) return c.spell;
   if (!c.enchant) return undefined;
+  // Animate Dead: what it does to its target is reanimate it.
+  if (c.animate) return { targets: [c.enchant], effects: [{ type: "putOntoBattlefield", what: { ref: "target", index: 0 } }], text: d.oracleText };
   const effects: Effect[] = c.statics
     .filter((st) => st.affects.kind === "attached")
     .map((st) => ({ type: "continuous", what: { ref: "target", index: 0 }, mods: st.mods, duration: "game" }));
@@ -1516,6 +1518,20 @@ export function compile(d: CardDef): CompiledCard {
         out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}) };
         if (tapped) out.entersTapped = true;
       }
+      continue;
+    }
+    // Animate Dead, Dance of the Dead (CR 303.4a, rulings): the Aura spell targets a creature card in a graveyard and enters
+    // attached to it; its enters trigger returns the card and attaches the Aura to the creature it became (Effect
+    // "animateDead"), and its leaves trigger sacrifices that creature.
+    if (line === "Enchant creature card in a graveyard" && d.subtypes.includes("Aura") && !out.enchant) {
+      out.enchant = { kind: "card", types: ["Creature"], text: "creature card in a graveyard to enchant" };
+      out.animate = true;
+      continue;
+    }
+    const animate = out.animate && /^When ~ enters, if it's on the battlefield, it loses "enchant creature card in a graveyard" and gains "enchant creature put onto the battlefield with ⟪source⟫\." (?:Return enchanted creature card to the battlefield under your control|Put enchanted creature card onto the battlefield (tapped )?under your control) and attach ~ to it\. When ~ leaves the battlefield, that creature's controller sacrifices it\.$/.exec(line);
+    if (animate) {
+      out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "animateDead", ...(animate[1] ? { tapped: true as const } : {}) }], text: `Return enchanted creature card to the battlefield${animate[1] ? " tapped" : ""} under your control and attach ~ to it.` } });
+      out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
       continue;
     }
     const enchant = /^Enchant (.+)$/.exec(line);

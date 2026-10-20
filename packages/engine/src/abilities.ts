@@ -1682,6 +1682,14 @@ export type Effect =
    * top of your library." With fewer drawn cards still in hand, those (rulings); none, nothing happens.
    */
   | { type: "drawnPayOrTop"; n: number; life: number }
+  /**
+   * Animate Dead's enters trigger: "it loses 'enchant creature card in a graveyard' and gains 'enchant creature put onto
+   * the battlefield with ~.' Return enchanted creature card to the battlefield under your control and attach ~ to it."
+   * `tapped`: Dance of the Dead's "... to the battlefield tapped". Only while the Aura is on the battlefield (rulings).
+   */
+  | { type: "animateDead"; tapped?: true }
+  /** Its leaves trigger: "that creature's controller sacrifices it", the creature it put onto the battlefield. */
+  | { type: "sacrificeAnimated" }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
   | { type: "addCombatMana"; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
@@ -3029,6 +3037,11 @@ export interface CompiledCard {
    * don't, put it into its owner's graveyard." (CR 614.1a): chosen as it would enter; if not, it never entered (rulings).
    */
   entersDiscardInstead?: TargetSpec;
+  /**
+   * Animate Dead, Dance of the Dead: "Enchant creature card in a graveyard" with the trigger that returns that card and
+   * attaches the Aura to it (`enchant` is then a graveyard card filter). See Effect "animateDead".
+   */
+  animate?: true;
   /** "As ~ enters, secretly choose an opponent" (Guardian Archon): see Chosen.secret. */
   entersChooseSecret?: true;
   /**

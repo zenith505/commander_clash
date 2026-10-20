@@ -112,6 +112,9 @@ export function canonicalKeyword(text: string): string | undefined {
   const k = SUPPORTED_LOWER.get(p);
   if (k) return k;
   if (p === CHOSEN_KEYWORD) return CHOSEN_KEYWORD;
+  // "Hexproof from blue" (CR 702.11d): from a color, or from all of them, one or more than one.
+  const hx = /^hexproof from (white|blue|black|red|green|each color|monocolored|multicolored)$/.exec(p);
+  if (hx) return `Hexproof from ${hx[1]}`;
   const m = /^protection from (.+)$/.exec(p);
   if (!m) return undefined;
   const q = m[1]!;
@@ -197,6 +200,22 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (PROTECTION_TYPES[q] && src.types?.includes(PROTECTION_TYPES[q])) return true;
     const st = creatureTypeOfPlural(q);
     if (st && src.subtypes?.includes(st)) return true;
+  }
+  return false;
+}
+
+/**
+ * "Hexproof from [quality]" (CR 702.11d): can't be the target of [quality] spells its opponents control or abilities
+ * they control from [quality] sources. `src` is the spell or the ability's source; who controls it is checked by the caller.
+ */
+export function hexproofFrom(keywords: readonly string[], src: SourceQuality): boolean {
+  for (const k of keywords) {
+    const q = /^hexproof from (.+)$/i.exec(k)?.[1]?.toLowerCase();
+    if (!q) continue;
+    if (PROTECTION_COLOR[q] && src.colors.includes(PROTECTION_COLOR[q])) return true;
+    if (q === "each color" && src.colors.length > 0) return true; // CR 702.11g
+    if (q === "multicolored" && src.colors.length > 1) return true;
+    if (q === "monocolored" && src.colors.length === 1) return true;
   }
   return false;
 }

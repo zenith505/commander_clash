@@ -344,6 +344,12 @@ export interface TargetSpec {
   distinctFrom?: number[];
   /** "Up to three target cards from a single graveyard": in the same graveyard as these targets of the group, if chosen. */
   sameGraveyardAs?: number[];
+  /**
+   * "Each opponent may sacrifice a permanent of their choice that shares a card type with it" (Braids, Arisen Nightmare):
+   * a card type of what this ability sacrificed, as it last existed (rulings: any one of them if it had several), made into
+   * `types` as the choice is made.
+   */
+  sharesTypeWithSacrificed?: true;
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
@@ -396,6 +402,11 @@ export interface TargetSpec {
    */
   stackAbilities?: "activated" | "triggered" | "both";
   noSpells?: true;
+  /**
+   * For "spell" targets: a permanent matching this can be the target instead, "target spell or nonland permanent an
+   * opponent controls" (Sink into Stupor, Venser, Shaper Savant). One target, either kind (CR 115.1, 115.2).
+   */
+  orPermanent?: TargetSpec;
   /**
    * "Target spell that targets a permanent you control", "... that targets you": a spell with at least one target that's
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
@@ -564,6 +575,8 @@ export type PlayerRef =
   | { ref: "notChoseThisWay"; opponents?: true }
   /** The players who did none of a punisher's options (see the punisher effect). */
   | { ref: "punished" }
+  /** "Each player who can't discards a card" (Plaguecrafter): those who had nothing to sacrifice for the "pick" before. */
+  | { ref: "couldntPick" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */
@@ -780,8 +793,11 @@ export type Modification =
   | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
-  /** "Creatures with power less than ~'s power can't block it" (CR 509.1b). */
-  | { kind: "cantBeBlockedByLesserPower" }
+  /**
+   * "Creatures with power less than ~'s power can't block it" (CR 509.1b). `than: "source"`: less than the power of the
+   * permanent with this ability, not the attacker's ("... can't block creatures you control", Champion of Lambholt).
+   */
+  | { kind: "cantBeBlockedByLesserPower"; than?: "source" }
   /** The Ring-bearer: "can't be blocked by creatures with greater power" (CR 701.54c). */
   | { kind: "cantBeBlockedByGreaterPower" }
   /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */
@@ -985,8 +1001,13 @@ export type StaticCondition =
   | { kind: "opponentGainedLife" }
   /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
   | { kind: "opponentCardsToGraveyard"; n: number }
-  /** "If an opponent cast a blue spell this turn" (Ricochet Trap): the spell's colors as it was cast. */
-  | { kind: "opponentCast"; color: Color }
+  /**
+   * "If an opponent cast a blue spell this turn" (Ricochet Trap), "if an opponent has cast a blue or black spell this
+   * turn" (Veil of Summer): one of these colors, the spell's colors as it was cast.
+   */
+  | { kind: "opponentCast"; colors: Color[] }
+  /** "If an opponent cast three or more spells this turn" (Mindbreak Trap): one opponent, that many (rulings). */
+  | { kind: "opponentCastCount"; n: number }
   /** "If you have no land cards in hand" (Land Grant). */
   | { kind: "noneInHand"; filter: TargetSpec }
   /**
@@ -1567,7 +1588,11 @@ export type Effect =
    * remains tapped" (CR 611.2b), with `whileControlled` "for as long as you control ~ and ~ remains tapped". Duration
    * "whileControlled": "for as long as you control ~" alone (CR 611.2b).
    */
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true }
+  /**
+   * `giveTo`: the effect is that player's, not the ability's controller's: "Target player gains control of target permanent
+   * you control" (Donate), "An opponent gains control of ~" (Wishclaw Talisman), with a "control" modification (layer 2).
+   */
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -1775,6 +1800,10 @@ export type Effect =
        * (CR 101.2 doesn't apply); otherwise like Remand's.
        */
       bounce?: true;
+      /** "Exile any number of target spells" (Mindbreak Trap): not a counter either, so it exiles one that can't be countered (rulings). */
+      exileSpell?: true;
+      /** "Any number of target spells": the targets from `index`, this many (see TargetSpec.many, expandMany). */
+      n?: number;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
       ifMvX?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
@@ -1969,7 +1998,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest } }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
@@ -2659,8 +2688,11 @@ export interface BatchTrigger {
   noneCastWithMana?: true;
   dies?: true;
   notDies?: true;
-  from?: "library" | "battlefield";
+  /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */
+  from?: "library" | "battlefield" | "notBattlefield";
   to?: "exile";
+  /** "Whenever a creature card leaves your graveyard" (not "one or more"): once for each card it moved (CR 603.2c). */
+  each?: true;
   /** "For the first time each turn": only the first such event this turn (counting the ones before this permanent was there). */
   first?: true;
 }
@@ -2762,7 +2794,7 @@ export type ManaProduce =
    * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
    * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
    */
-  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean }
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean; /** "Add three mana of that type instead" (Incubation Druid). */ n?: number }
   /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
   | { kind: "combos"; options: ManaType[][] }
   /**
@@ -2814,6 +2846,15 @@ export interface ManaAbility {
   exhaust?: true;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
+  /**
+   * "{T}: Add {C}. If ~ has a luck counter on it, instead add one mana of any color." (Gemstone Caverns): what it makes
+   * while `cond` is true (`manaAbilitiesOn` swaps it in), checked as it's activated and resolves (CR 605.3).
+   */
+  insteadIf?: { cond: StaticCondition; produces: ManaProduce };
+  /** "Discard your hand" as part of the cost (Lion's Eye Diamond, CR 701.9a): never used by automatic payment. */
+  discardHand?: true;
+  /** "Activate only as an instant" (Lion's Eye Diamond): only while its controller has priority (rulings), not while paying. */
+  instantOnly?: true;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
@@ -2987,7 +3028,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
+/** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
+export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -3069,7 +3111,7 @@ export interface CompiledCard {
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string; names?: TargetSpec; purpose?: NamePurpose }[];
+  entersChoose?: { what: ChoiceKind; except?: string; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[] }[];
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */
@@ -3208,8 +3250,11 @@ export interface CompiledCard {
    * (CR 602.2b applies 601.2f), for sources matching `filter` (by name in any zone); mana abilities aren't taxed.
    */
   activationTaxes?: { filter?: TargetSpec; n: number; text: string }[];
-  /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
-  beginOnBattlefield?: boolean;
+  /**
+   * The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). Gemstone
+   * Caverns: only if you're not the starting player, with a counter on it, and "if you do, exile a card from your hand".
+   */
+  beginOnBattlefield?: true | { notStarting: true; counter: CounterKind; exileFromHand: true };
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
   /**
@@ -3408,6 +3453,8 @@ export interface CompiledCard {
   strive?: string;
   /** "Spells your opponents cast that target ~ cost {2} more to cast": once per spell however often it targets it (rulings). */
   targetTax?: number;
+  /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */
+  targetLifeTax?: number;
   /**
    * A permanent's static abilities that make spells cost more or less: "Creature spells you cast cost
    * {1} less to cast", "Noncreature spells cost {1} more to cast" (CR 601.2f).
@@ -3522,4 +3569,9 @@ export interface FromTop {
   spells?: TargetSpec[] | "any";
   once?: true;
   if?: StaticCondition;
+  /**
+   * Bolas's Citadel: "If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost": a
+   * spell cast with this permission is cast for that alternative cost (AltCostKind "citadel", CR 118.9).
+   */
+  payLife?: true;
 }

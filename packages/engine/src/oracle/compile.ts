@@ -8,7 +8,7 @@ import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
-import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS } from "./words";
+import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
@@ -153,8 +153,11 @@ const RING_TRIGGERS: TriggeredAbility[] = [
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
-/** Card types/subtypes whose rules we don't model yet, whatever their text says. */
-const UNSUPPORTED_TYPES = ["Kindred", "Tribal", "Dungeon"];
+/**
+ * Card types/subtypes whose rules we don't model yet, whatever their text says. Kindred is modeled (CR 308): cast and
+ * resolved as its other card type, its subtypes creature types.
+ */
+const UNSUPPORTED_TYPES = ["Tribal", "Dungeon"];
 const UNSUPPORTED_SUBTYPES: string[] = [];
 
 const meldResults = new Map<string, boolean>();
@@ -653,7 +656,7 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
-    const kwLine = line.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2");
+    const kwLine = line.replace(/(protection|hexproof) from (\w+) and from (\w+)/gi, "$1 from $2, $1 from $3");
     if (isKeywordLine(kwLine)) {
       out.textKeywords.push(...textKeywords(kwLine));
       continue;
@@ -793,6 +796,14 @@ export function compile(d: CardDef): CompiledCard {
         const c = /^an? (creature type|color)(?: other than (\w+))?$/.exec(part)!;
         (out.entersChoose ??= []).push({ what: c[1] === "color" ? "color" : "creatureType", ...(c[2] ? { except: c[2] } : {}) });
       }
+      continue;
+    }
+    // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
+    // card type, kept as Chosen.cardType.
+    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+)\.$/.exec(line);
+    if (asCardType) {
+      if (out.entersChoose?.some((c) => c.what === "cardType")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.split(/, (?:or )?/).map(capital) });
       continue;
     }
     // "As ~ enters, choose a nonland card name." (CR 614.12, 201.4): kept while it's on the battlefield, as Chosen.name.
@@ -1032,7 +1043,9 @@ export function compile(d: CardDef): CompiledCard {
       else (out.fromTop ??= []).push({ ...ifTop, if: cond });
       continue;
     }
-    const top = parseFromTop(line.replace(/\.$/, ""));
+    // Bolas's Citadel: "... If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
+    const lifeTop = /^(.+?)\. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost\.$/.exec(line);
+    const top = lifeTop ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!)) : parseFromTop(line.replace(/\.$/, ""));
     if (top !== undefined) {
       if (top === null) out.unsupported.push(raw);
       else (out.fromTop ??= []).push(top);
@@ -1166,6 +1179,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
       out.beginOnBattlefield = true;
+      continue;
+    }
+    // Gemstone Caverns (CR 103.6a; the starting player is the one taking the first turn, 103.1).
+    const caverns = /^If ~ is in your opening hand and you're not the starting player, you may begin the game with ~ on the battlefield with an? ([a-z]+) counter on it\. If you do, exile a card from your hand\.$/.exec(line);
+    if (caverns) {
+      out.beginOnBattlefield = { notStarting: true, counter: caverns[1]!, exileFromHand: true };
       continue;
     }
     // Torpor Orb, Hushwing Gryff, Doorkeeper Thrull, Elesh Norn, Mother of Machines.
@@ -1642,10 +1661,12 @@ export function compile(d: CardDef): CompiledCard {
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
-      else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod];
+      // "Spells you cast of the chosen type" after "choose artifact, creature, ..." (Cloud Key): the card type chosen.
+      else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod.filter.chosen === "type" && out.entersChoose?.some((c) => c.what === "cardType") ? { ...cost.costMod, filter: { ...cost.costMod.filter, chosen: "cardType" } } : cost.costMod];
       else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
+      else if ("targetLifeTax" in cost) out.targetLifeTax = (out.targetLifeTax ?? 0) + cost.targetLifeTax;
       else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
       continue;
     }
@@ -1694,7 +1715,10 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
       /^When ~ enters and (whenever an opponent draws a card except the first one they draw in each of their draw steps), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
-      /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line);
+      /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
+      // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
+      // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
+      /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast/.test(line)
@@ -1713,6 +1737,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
+            : twice.length === 5
+              ? twice.slice(1, 4).map((e) => `Whenever ${e}, ${effect}`)
             : /^Whenever an? [^,]+? enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
@@ -1957,6 +1983,15 @@ function checkCastingLinks(out: CompiledCard) {
       canSac = true;
       visit(o.body);
       canSac = was;
+      return;
+    }
+    // "You may sacrifice another creature. If you do, ... that creature's power" (Disciple of Freyalise).
+    if (o.type === "if" && (o.cond as { kind?: string } | undefined)?.kind === "sacrificedThisWay") {
+      const was = canSac;
+      canSac = true;
+      visit(o.effects);
+      canSac = was;
+      visit(o.otherwise);
       return;
     }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;

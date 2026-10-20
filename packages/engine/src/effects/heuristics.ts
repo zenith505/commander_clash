@@ -41,6 +41,12 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if (e.type === "suspect" && !e.no && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "counters" && harmfulCounter(e.counter) && e.what.ref === "target") mark(e.what.index, e.what.n);
     if (e.type === "continuous" && e.what.ref === "target" && modsAreHarmful(e.mods)) mark(e.what.index, e.what.n);
+    // "Target player gains control of target permanent you control" (Donate): given to an opponent, a permanent that does
+    // its new controller harm (bots don't look for one: with only their own permanents to choose from, they don't cast it).
+    if (e.type === "continuous" && e.giveTo?.ref === "target") {
+      mark(e.giveTo.index);
+      if (e.what.ref === "target") mark(e.what.index, e.what.n);
+    }
     // "Destroy all creatures target player controls": aimed at an opponent, like the permanents themselves would be.
     const group = "what" in e && e.what && typeof e.what === "object" && "ref" in e.what ? e.what : e.type === "damage" ? e.to : undefined;
     if (group?.ref === "each" && group.of?.ref === "target") {

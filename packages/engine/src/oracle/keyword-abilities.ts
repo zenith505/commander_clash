@@ -1118,7 +1118,7 @@ export function textKeywords(line: string): string[] {
   const out: string[] = [];
   for (const raw of line.split(/[,;]\s*/)) {
     const p = raw.trim();
-    if (/^protection from /i.test(p) && keywordOf(p)) out.push(keywordOf(p)!);
+    if (/^(?:protection|hexproof) from /i.test(p) && keywordOf(p)) out.push(keywordOf(p)!);
     const tox = /^toxic (\d+)$/i.exec(p);
     if (tox) out.push(`Toxic ${tox[1]}`);
   }

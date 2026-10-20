@@ -2,7 +2,7 @@
 
 import type { Effect, ObjRef } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
-import { pickFilter, parseGroup, parseObject, parseTargetPhrase } from "../targets";
+import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
@@ -245,7 +245,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "each" ? [{ type: "bounce", what }] : null;
   }
-  if (!/^Return target (?:[a-z]+ )*spell(?: you don't control| an opponent controls)? to/i.test(s) && (m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?|~|it|that card|that creature|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands|their owner's hand)$/i.exec(s))) {
+  if (!/^Return target (?:[a-z]+ )*spell(?: you don't control| an opponent controls| or [^,]+)? to/i.test(s) && (m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?|~|it|that card|that creature|enchanted creature|equipped creature) to (?:its owner's hand|their owners' hands|their owner's hand)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "bounce", what }] : null;
   }
@@ -353,6 +353,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // "Target player gains control of target permanent you control" (Donate), "An opponent gains control of ~" (Wishclaw
+  // Talisman): an opponent you choose as it resolves (rulings). Layer 2, for the rest of the game.
+  if ((m = /^(Target player|Target opponent) gains control of (target .+)$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const what = who && parseObject(m[2]!, ctx);
+    return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+  }
+  if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
+    return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.
   if ((m = /^Gain control of (that Equipment)( until end of turn)?$/.exec(s)) && ctx.spell) {
     const what = parseObject(m[1]!, ctx);
@@ -416,14 +425,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // (Lazotep Plating), "You and target permanent you control each gain protection from the chosen player until end of
   // turn" (Guardian Archon), "you gain protection from the chosen color" (Seht's Tiger): the player gains it too (CR
   // 702.11d, 702.16b-e, 702.16k, 702.18d).
-  if ((m = /^You(?: and (.+?))?(?: each)? gains? (hexproof|shroud|protection from [a-z ]+?) until end of turn$/i.exec(s))) {
-    const k = canonicalKeyword(m[2]!);
-    if (!k || !/^(?:Hexproof|Shroud|Protection from )/.test(k)) return null;
-    const out: Effect[] = [{ type: "playerGains", keywords: [k] }];
+  // "You and permanents you control gain hexproof from blue and from black until end of turn" (Veil of Summer): two
+  // hexproof abilities (CR 702.11f).
+  if ((m = /^You(?: and (.+?))?(?: each)? gains? (hexproof(?: from [a-z]+(?: and from [a-z]+)?)?|shroud|protection from [a-z ]+?) until end of turn$/i.exec(s))) {
+    const keywords = m[2]!.replace(/^hexproof from (\w+) and from (\w+)$/i, "hexproof from $1|hexproof from $2").split("|").map(canonicalKeyword);
+    if (!keywords.every((k) => k && /^(?:Hexproof|Shroud|Protection from )/.test(k))) return null;
+    const out: Effect[] = [{ type: "playerGains", keywords: keywords as string[] }];
     if (m[1]) {
       const what = parseObject(m[1], ctx);
       if (!what) return null;
-      out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: [k] }], duration: "endOfTurn" });
+      out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: keywords as string[] }], duration: "endOfTurn" });
     }
     return out;
   }

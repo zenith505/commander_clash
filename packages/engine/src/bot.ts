@@ -194,6 +194,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => (isType(defOf(s, obj(s, id)), "Land") ? lands >= 5 : mv(s, id) > lands + 2)) }];
     }
+    // Gemstone Caverns: exile a spare land when there are three or more, else the most expensive card.
+    if (pend.kind === "searchLibrary" && pend.exile) {
+      const lands = pend.cards.filter((id) => isType(defOf(s, obj(s, id)), "Land"));
+      const pick = lands.length >= 3 ? lands : [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a));
+      return [{ type: "searchLibrary", player: pid, found: pick.slice(0, pend.max) }];
+    }
+    // Opening hand (CR 103.6a): each card that may begin on the battlefield, one of each name (Gemstone Caverns is
+    // legendary, and each one costs a card from the hand).
+    if (pend.kind === "searchLibrary" && pend.opening) {
+      const names = new Set<string>();
+      return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => { const n = defOf(s, obj(s, id)).name; return !names.has(n) && !!names.add(n); }) }];
+    }
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
@@ -1080,7 +1092,9 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence")]) {
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel")]) {
+    // Bolas's Citadel: life for the top card, while we'd still have 15 or more afterwards.
+    if (a.kind === "citadel" && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
     if (a.kind === "bestow" || a.kind === "overload") continue; // tried first, see bestowPlan and overloadPlan
     const plan = castPlan(s, pid, id, false, undefined, a.kind);

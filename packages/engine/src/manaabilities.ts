@@ -25,7 +25,8 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   const out = c.landAbilitiesLost ? [] : c.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null);
   if (c.hasPrintedAbilities) out.push(...compileCard(defOf(s, o)).mana);
   for (const t of c.grantedAbilities) out.push(...compileGranted(t).mana); // 'Enchanted land has "{T}: Add ..."'
-  return out;
+  // "If ~ has a luck counter on it, instead add one mana of any color" (Gemstone Caverns): what it makes now.
+  return out.map((ab) => (ab.insteadIf && staticConditionNow(s, ab.insteadIf.cond, o.id, controllerOf(s, o)) ? { ...ab, produces: ab.insteadIf.produces } : ab));
 }
 
 /** Colors in the color identity of `pid`'s commander(s) (CR 903.4). */
@@ -153,7 +154,8 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
     return Array<ManaType>(n).fill(p.kind === "oneOf" ? choice : p.mana[0]!);
   }
   if (p.kind === "oneOf") return Array<ManaType>(p.amount).fill(choice);
-  if (p.kind === "commanderIdentity" || p.kind === "chosenColor" || p.kind === "landsCouldProduce" || p.kind === "colorsAmong") return [choice];
+  if (p.kind === "landsCouldProduce") return Array<ManaType>(p.n ?? 1).fill(choice);
+  if (p.kind === "commanderIdentity" || p.kind === "chosenColor" || p.kind === "colorsAmong") return [choice];
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
   if (p.kind === "devotion") return Array<ManaType>(evalAmount(s, { count: { kind: "devotion", colors: [choice as Color] } }, { controller: controllerOf(s, o), sourceId: o.id })).fill(choice);
   if (!p.count) return p.mana;
@@ -294,6 +296,8 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index) && !(ab.exhaust && mayExhaustAgain(s, pid))) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, o.id, pid)) return `${name}'s ability can't be activated now`; // CR 602.5b
+  // "Activate only as an instant": when its controller could cast an instant, holding priority (rulings on Lion's Eye Diamond).
+  if (ab.instantOnly && (s.priority !== pid || s.pending || s.resolving || s.triggerQueue.length)) return `${name}'s ability can be activated only when you could cast an instant`;
   const p = player(s, pid);
   if (ab.lifeCost && payableLife(s, pid) < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4, 119.8
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
@@ -313,7 +317,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
 export function manaPenalty(ab: ManaAbility): number {
   // A storage land's counters are saved-up mana: spent only when nothing else will do.
   const stored = ab.produces.kind === "removeX" ? 6 : 0;
-  return (ab.sacrificeSelf || ab.onceEver ? 8 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter ? 1 : 0);
+  return (ab.discardHand ? 50 : 0) + (ab.sacrificeSelf || ab.onceEver ? 8 : 0) + stored + (ab.manaCost ? 4 : 0) + (ab.selfDamage || ab.lifeCost || ab.energyCost || ab.removeCounters || ab.tapCost ? 2 : 0) + (ab.skipNextUntap || ab.putCounter ? 1 : 0);
 }
 
 /**

@@ -306,6 +306,17 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = mixedStackSpec(m[1]!);
     return spec && [{ type: "counterSpell", index: addTarget(ctx, spec) }];
   }
+  // "Return target spell or nonland permanent an opponent controls to its owner's hand" (Sink into Stupor), "... spell or
+  // permanent" (Venser, Shaper Savant), "... spell or creature" (Unsubstantiate): one target, a spell (it leaves the stack
+  // without being countered, rulings) or a permanent. "An opponent controls" is said of both (spells have controllers too,
+  // CR 110.2, 112.1).
+  if ((m = /^Return target spell or (.+?) to its owner's hand$/i.exec(s))) {
+    const perm = parseTargetPhrase(m[1]!);
+    if (perm?.kind !== "object" || perm.tapped !== undefined || perm.combat || perm.xRange || perm.bound) return null;
+    const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], ...(perm.controller ? { controller: perm.controller } : {}), orPermanent: perm, text: `target spell or ${m[1]!.toLowerCase()}` };
+    const i = addTarget(ctx, spec);
+    return [{ type: "counterSpell", index: i, bounce: true }, { type: "bounce", what: { ref: "target", index: i } }];
+  }
   // "Return target spell to its owner's hand" (Reprieve): it leaves the stack without being countered.
   if ((m = /^Return target (.*?spell(?: you don't control| an opponent controls)?) to its owner's hand$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);

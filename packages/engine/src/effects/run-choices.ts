@@ -492,6 +492,11 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     if (times <= 0 || picks <= 0) return;
     sc.punish = { queue: apnap(s, players(s, e.who, ctx)), picked: {}, made: {}, round: 0, times, picks, options: e.options, ...punisherHarm(e), ...(e.mode ? { mode: e.mode } : {}) };
   }
+  // "A permanent of their choice that shares a card type with it" (Braids): the types of what was sacrificed this way.
+  if (e.options.some((o) => "sacrifice" in o && o.sacrifice.sharesTypeWithSacrificed)) {
+    const types = [...new Set((s.resolving!.sacrificedThisWay ?? []).flatMap((k) => k.types ?? []))];
+    e = { ...e, options: e.options.map((o) => ("sacrifice" in o && o.sacrifice.sharesTypeWithSacrificed ? { ...o, sacrifice: { ...o.sacrifice, sharesTypeWithSacrificed: undefined, types: types.length ? types : ["(none)"] } } : o)) };
+  }
   const pu = sc.punish;
   for (;;) {
     while (pu.queue.length) {

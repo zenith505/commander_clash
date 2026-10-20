@@ -8,7 +8,7 @@ import type { ContinuousEffect, GameObject, GameState, PlayerId } from "../types
 import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
-import { ResolveCtx, objects, amountNow, fixMods } from "./resolve";
+import { ResolveCtx, objects, amountNow, fixMods, players } from "./resolve";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
@@ -688,10 +688,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           return;
         }
       }
+      // "Target player gains control of target permanent you control" (Donate): that player's effect.
+      const giveTo = e.giveTo ? players(s, e.giveTo, ctx)[0] : undefined;
+      if (e.giveTo && (giveTo === undefined || player(s, giveTo).lost)) return;
       s.effects.push({
         id: `e${s.nextId++}`,
         timestamp: s.nextTimestamp++, // CR 613.7b
-        controller: ctx.controller,
+        controller: giveTo ?? ctx.controller,
         sourceName: src,
         sourceId: ctx.sourceId,
         duration: e.duration,

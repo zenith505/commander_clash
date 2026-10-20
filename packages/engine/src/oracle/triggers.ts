@@ -725,6 +725,14 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
+  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere other than the battlefield), (.+)$/.exec(line))) {
+    // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
+    // leaves your graveyard": once for each card (CR 603.2c).
+    const filter = batchCards(m[1]);
+    if (filter === null) return "fail";
+    const whose = /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : /an opponent's/.test(m[2]!) ? ("opponent" as const) : undefined;
+    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(m[2]!.startsWith("leaves") ? {} : { from: "notBattlefield" as const }), each: true };
+    rest = m[3]!;
   } else if ((m = /^Whenever (you|one or more players) discards? one or more (?:(.+?) )?cards( for the first time each turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[2]);
     if (filter === null) return "fail";

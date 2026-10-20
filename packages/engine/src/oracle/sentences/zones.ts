@@ -6,7 +6,7 @@ import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
 import { parseBoundCount, parseCount, roundOf } from "../counts";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
-import { parseUnlessPays, type Ctx } from "../body";
+import { addTarget, parseUnlessPays, type Ctx } from "../body";
 import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
 
 /**
@@ -29,6 +29,11 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // "Exile any number of target spells" (Mindbreak Trap): they leave the stack without being countered (rulings).
+  if ((m = /^Exile (target spell|any number of target spells)$/i.exec(s))) {
+    const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell", ...(m[1] === "target spell" ? {} : { many: "any" as const }) };
+    return [{ type: "counterSpell", index: addTarget(ctx, spec), exileSpell: true }];
+  }
   // "Reveal any number of red cards in your hand" (Scent of Cinder), "Reveal any number of Dragon cards from your hand"
   // (Invasion of Tarkir): which ones is chosen as it resolves (Effect revealFromHand).
   if ((m = /^[Rr]eveal any number of (?:(.+?) )?cards (?:in|from) your hand$/.exec(s))) {

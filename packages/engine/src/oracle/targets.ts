@@ -809,7 +809,7 @@ export function parseTargetPhrase(
 
 export function parseKeywordList(text: string): string[] | null {
   // "Protection from black and from red" is two protection abilities (CR 702.16g).
-  text = text.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2");
+  text = text.replace(/(protection|hexproof) from (\w+) and from (\w+)/gi, "$1 from $2, $1 from $3");
   const parts = text.split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
   const out: string[] = [];
   for (const p of parts) {

@@ -266,7 +266,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
         return item && c.kind === "manaValue" ? spellManaValue(s, item) : 0;
       }
-      if (c.of.ref === "sacrificed") return Math.max(0, ctx.sacrificed?.[0]?.[c.kind] ?? 0);
+      // Not sacrificed for a cost: what the ability sacrificed as it resolved ("You may sacrifice another creature. If you do,
+      // ... that creature's power", Disciple of Freyalise).
+      if (c.of.ref === "sacrificed") return Math.max(0, (ctx.sacrificed?.[0] ?? s.resolving?.sacrificedThisWay?.at(-1))?.[c.kind] ?? 0);
       const o = refObjects(s, c.of, ctx)[0];
       if (!o) {
         // Gone: as it last existed on the battlefield (CR 608.2h).

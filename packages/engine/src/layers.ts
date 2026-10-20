@@ -147,6 +147,8 @@ export interface Characteristics {
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
+  /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
+  cantBeBlockedByLesserPowerThan: ObjectId[];
   /** The Ring-bearer's (CR 701.54c). */
   cantBeBlockedByGreaterPower: boolean;
   cantAttackAlone: boolean;
@@ -177,7 +179,9 @@ export function printedKeywords(d: CardDef): string[] {
   const inStriation = (k: string) => [...striated].some((x) => x === k.toLowerCase() || x.startsWith(`${k.toLowerCase()} `));
   const own = striated.size ? d.keywords.filter((k) => !inStriation(k)) : d.keywords;
   if (!fromText.length) return [...own];
-  return [...own.filter((k) => k !== "Protection" && k !== "Toxic"), ...fromText];
+  // And "Hexproof from blue" as "Hexproof from" and "Hexproof" (CR 702.11d: it isn't hexproof itself).
+  const hexFrom = fromText.some((k) => /^hexproof from /i.test(k));
+  return [...own.filter((k) => k !== "Protection" && k !== "Toxic" && !(hexFrom && (k === "Hexproof" || k === "Hexproof from"))), ...fromText];
 }
 
 /** Characteristics straight from the card, with no effects applied. */
@@ -219,6 +223,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantActivate: false,
     attackUnless: [],
     cantBeBlockedByLesserPower: false,
+    cantBeBlockedByLesserPowerThan: [],
     cantBeBlockedByGreaterPower: false,
     cantAttackAlone: false,
     cantBlockAlone: false,
@@ -611,8 +616,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
     case "opponentCardsToGraveyard":
       return Object.entries(s.turnLog?.toGraveyard ?? {}).some(([p, k]) => Number(p) !== you && k >= cond.n);
+    case "opponentCastCount":
+      return s.turnOrder.some((p) => p !== you && (s.castThisTurn ?? []).filter((c) => c.player === p).length >= cond.n);
     case "opponentCast":
-      return (s.castThisTurn ?? []).some((c) => c.player !== you && !!c.colors?.includes(cond.color));
+      return (s.castThisTurn ?? []).some((c) => c.player !== you && !!c.colors?.some((x) => cond.colors.includes(x)));
     case "noneInHand":
       return !(s.players[you]?.hand ?? []).some((id) => printedMatches(cond.filter, defOf(s, s.objects[id]!)));
     case "opponentDealtDamage":
@@ -867,7 +874,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       }
       return;
     case "removeKeywords":
-      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k)));
+      // Losing hexproof loses each "hexproof from [quality]" too (CR 702.11e).
+      c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x))));
       for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
       return;
     case "loseAllAbilities":
@@ -984,6 +992,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.attackUnless.push(m.defenderControls);
       return;
     case "cantBeBlockedByLesserPower":
+      if (m.than === "source") {
+        if (e.sourceId && !c.cantBeBlockedByLesserPowerThan.includes(e.sourceId)) c.cantBeBlockedByLesserPowerThan.push(e.sourceId);
+      } else c.cantBeBlockedByLesserPower = true;
+      return;
     case "cantBeBlockedByGreaterPower":
     case "cantAttackAlone":
     case "cantBlockAlone":

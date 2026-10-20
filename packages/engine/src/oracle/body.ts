@@ -617,6 +617,24 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       chosenCards = what;
       continue;
     }
+    // "Each player sacrifices a creature or planeswalker of their choice. Each player who can't discards a card."
+    // (Plaguecrafter): those who had none to sacrifice, after the sacrifices (rulings).
+    const cant = /^Each (player|opponent) who can't discards (a card|two cards)$/.exec(s);
+    const pickPrev = effects[effects.length - 1];
+    if (cant && pickPrev?.type === "pick" && pickPrev.action === "sacrifice" && pickPrev.who.ref === (cant[1] === "player" ? "eachPlayer" : "eachOpponent") && !pickPrev.unless) {
+      effects.push({ type: "discard", who: { ref: "couldntPick" }, n: cant[2] === "a card" ? 1 : 2, random: false });
+      continue;
+    }
+    // "Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land
+    // card. Otherwise, put it into your hand. Then shuffle." (Archdruid's Charm): one search, the land card's own destination.
+    const searchReveal = /^Search your library for (an? [a-z ]+? card) and reveal it$/.exec(s);
+    if (searchReveal && sentences[si + 1] === "Put it onto the battlefield tapped if it's a land card" && sentences[si + 2] === "Otherwise, put it into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
+      const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
+      effects.push({ ...fx[0]!, landTo: { zone: "battlefield", tapped: true } });
+      si += 3;
+      continue;
+    }
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
     const sacDo = /^If you do, (.+)$/.exec(s);
     const sacPrev = effects[effects.length - 1];
@@ -1764,9 +1782,31 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (ifDid) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay)) return null;
+      // "You may sacrifice an artifact, creature, ... If you do, each opponent may sacrifice a permanent of their choice that
+      // shares a card type with it. For each opponent who doesn't, that player loses 2 life and you draw a card." (Braids,
+      // Arisen Nightmare): a punisher, its penalty once for each opponent who doesn't, "it" being what was sacrificed.
+      const oppNot = ifDid[1] === "do" && /^each opponent may sacrifice a permanent of their choice that shares a card type with it$/.test(ifDid[2]!) && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice" ? /^For each opponent who doesn't, that player loses (\d+) life(?: and (you .+))?$/.exec(sentences[si + 1] ?? "") : null;
+      // "And you draw a card": once for each of them (the penalty runs once for all of them, see the punisher effect).
+      const rest0 = oppNot?.[2] ? parseOne(capital(oppNot[2]), ctx) : [];
+      const rest = rest0?.every((e) => e.type === "draw" && e.who.ref === "you" && typeof e.n === "number") ? rest0.map((e) => (e.type === "draw" ? { ...e, n: { count: { kind: "punished" as const }, times: e.n as number } } : e)) : null;
+      if (oppNot && rest) {
+        const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], sharesTypeWithSacrificed: true, text: "permanent that shares a card type with it" };
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "punisher", who: { ref: "eachOpponent" }, options: [{ sacrifice: filter }], effects: [{ type: "loseLife", who: { ref: "punished" }, n: Number(oppNot[1]) }, ...rest], thenText: `loses ${oppNot[1]} life${oppNot[2] ? ` and ${oppNot[2]}` : ""}` }] });
+        si++;
+        continue;
+      }
+      // "You may sacrifice another creature. If you do, you gain X life and draw X cards, where X is that creature's power."
+      // (Disciple of Freyalise): the sacrificed creature as it last existed (CR 608.2h), its power and nothing else.
+      const sacPick = ifDid[1] === "do" && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice";
+      const all = `${ifDid[2]!}${where ? `, where X is ${where[2]!}` : ""}`;
+      const sacIt = sacPick && /\b(?:that|the sacrificed) creature's (?:power|toughness|mana value)\b/.test(all) && !/\bthat creature(?!'s (?:power|toughness|mana value)\b)/.test(all) && !ctx.sacrificedIt;
+      if (sacIt) ctx.sacrificedIt = true;
       const inner = parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
-      if (!inner) return null;
-      effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      // Its own "where X is ..." (CR 107.3c).
+      const ok = !!inner && defineX();
+      if (sacIt) delete ctx.sacrificedIt;
+      if (!ok) return null;
       continue;
     }
     // "Create four Bear tokens instead if there are seven or more cards in your graveyard" (threshold) is

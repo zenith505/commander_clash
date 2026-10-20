@@ -16,7 +16,7 @@ import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarge
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
-import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
+import { addCopyEffect, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
@@ -160,7 +160,11 @@ function startOpeningActions(s: GameState) {
 function nextOpeningAction(s: GameState) {
   while (s.openingActions?.length) {
     const pid = s.openingActions[0]!;
-    const cards = player(s, pid).hand.filter((id) => compileCard(defOf(s, obj(s, id))).beginOnBattlefield);
+    // Gemstone Caverns: not for the starting player (CR 103.1), who takes the first turn.
+    const cards = player(s, pid).hand.filter((id) => {
+      const begin = compileCard(defOf(s, obj(s, id))).beginOnBattlefield;
+      return begin === true || (!!begin && pid !== s.activePlayer);
+    });
     if (cards.length) {
       s.pending = { kind: "searchLibrary", player: pid, source: "Opening hand", what: "these cards", cards, min: 0, max: cards.length, fromHand: true, opening: true };
       return;
@@ -1047,6 +1051,13 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
+    // Spark Double: "an additional +1/+1 counter on it if it's a creature", judged as the copy (rulings).
+    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type));
+    if (Object.keys(more).length) {
+      const counters = { ...opts.counters };
+      for (const [k, n] of Object.entries(more)) counters[k] = (counters[k] ?? 0) + n;
+      opts = { ...opts, counters };
+    }
   }
   const printed = compileCard(defOf(s, o));
   // A Clone entering as a copy of Primeval Spawn has its "If ~ would enter and it wasn't cast or no mana was spent to cast
@@ -2515,15 +2526,15 @@ export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: Playe
  * The top card of `pid`'s own library, which "you may play lands / cast creature spells from the top of your library"
  * lets them play (Courser of Kruphix, Future Sight), at its usual timing (CR 401.5, rulings).
  */
-export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return !!topPermission(s, o, pid);
+export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): boolean {
+  return !!topPermission(s, o, pid, way);
 }
 
 /**
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId): { by: GameObject; once?: true } | undefined {
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by: GameObject; once?: true } | undefined {
   if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
@@ -2532,6 +2543,8 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId): { by: GameOb
     const src = obj(s, id);
     if (controllerOf(s, src) !== pid) continue;
     for (const top of abilitiesOf(s, src).fromTop ?? []) {
+      // Bolas's Citadel's spells are cast for life (`way` "life"); the other permissions' for their mana costs.
+      if (!land && way && !!top.payLife !== (way === "life")) continue;
       if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
       if (!top.once) return { by: src };
       if (src.topUsedTurn !== s.turn) once ??= src;
@@ -2676,6 +2689,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
+  if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.produces.kind === "removeX") {
     const n = combos![combo!]!.length;
@@ -2839,12 +2853,16 @@ export function castProblem(
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
+  // From the top of the library, a permission for this way of paying: Bolas's Citadel's spells for life (CR 118.9).
+  if (!free && !via && o.zone === "library" && !mayPlayFromTop(s, o, pid, choices?.alt === "citadel" ? "life" : "mana"))
+    return choices?.alt === "citadel" ? `nothing lets you pay life rather than ${d.name}'s mana cost` : `cast ${d.name} from the top of your library by paying life equal to its mana value`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
     if (!altCost(d, choices.alt, s, pid))
       return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
+    if (choices.alt === "citadel" && o.zone !== "library") return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
@@ -2945,7 +2963,7 @@ export function castProblem(
   if (or && choices?.costOr === undefined && or.every((c) => c.cost && extraCostProblem(s, pid, o, [c.cost], undefined, `cast ${d.name}`)))
     return `you can't pay ${d.name}'s additional cost (${or.map((c) => c.text).join(" or ")})`;
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
-  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined);
+  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined, targets);
   if (ap) return ap;
   const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
@@ -3085,9 +3103,15 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
       if (m.notOwned && o.owner === pid) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
-      const { manaValue: range, ...rest } = bindChosen(m.filter, src.chosen);
+      const { manaValue: range, power: pw, ...rest } = bindChosen(m.filter, src.chosen);
       if (!printedMatches(rest, d)) continue;
       if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
+      // "With power 4 or greater" (Goreclaw): the spell's own power, a "*" by its characteristic-defining ability (CR
+      // 604.3); not counters or effects it would have on the battlefield (rulings).
+      if (pw) {
+        const p = /^\d+$/.test(d.power ?? "") ? Number(d.power) : characteristics(s, o).power;
+        if ((pw.min !== undefined && p < pw.min) || (pw.max !== undefined && p > pw.max)) continue;
+      }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
       if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
       if (m.n > 0) more += m.n;
@@ -3188,6 +3212,13 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
   if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
+  // Bolas's Citadel: the top card of the caster's library, for life equal to its mana value (X is 0, CR 107.3b).
+  if (alt === "citadel") {
+    const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
+    if (!top || !mayPlayFromTop(s!, top, pid!, "life")) return undefined;
+    const n = manaValue(parseManaCost(d.manaCost));
+    return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
+  }
   if (alt === "evidence") {
     const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
     return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
@@ -3223,7 +3254,7 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? []))];
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -3487,7 +3518,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   closeZoneBatch(s);
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
@@ -3822,19 +3853,27 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 }
 
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
-function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0, modes?: number[]): string | null {
+function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0, modes?: number[], targets?: TargetChoice[]): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, ...(modes ? { modes } : {}) }, x, s, pid), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback"> & { modes?: number[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback"> & { modes?: number[]; targets?: TargetChoice[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
   const beyond = Math.max(0, (choices?.modes?.length ?? 0) - 1);
   const escalate: AdditionalCost[] = esc && beyond && "n" in esc ? [{ ...esc, n: esc.n * beyond }] : [];
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : [])];
+  // "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): each such
+  // permanent once, however often it's targeted, as for a mana increase.
+  let lifeTax = 0;
+  if (s && pid !== undefined)
+    for (const id of new Set((choices?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
+      const t = s.objects[id];
+      if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) lifeTax += abilitiesOf(s, t).targetLifeTax ?? 0;
+    }
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -4663,10 +4702,33 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend?.kind === "searchLibrary" && pend.opening && pend.player === p.id) {
     if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
     s.pending = null;
-    for (const id of found) {
-      moveObject(s, id, "battlefield");
-      log(s, `${p.name} begins the game with ${nameOf(s, id)} on the battlefield.`);
+    if (pend.exile) {
+      // "If you do, exile a card from your hand" (Gemstone Caverns): one for each that began the game on the battlefield.
+      if (found.length !== pend.min) throw new RulesError(`exile ${pend.min} card${pend.min === 1 ? "" : "s"}`);
+      for (const id of found) {
+        log(s, `${p.name} exiles ${nameOf(s, id)} from their hand.`);
+        moveObject(s, id, "exile");
+      }
+    } else {
+      let exile = 0;
+      for (const id of found) {
+        const begin = compileCard(defOf(s, obj(s, id))).beginOnBattlefield;
+        moveObject(s, id, "battlefield");
+        // "With a luck counter on it": it begins the game with it, it doesn't enter with it (CR 103.6a).
+        if (typeof begin === "object") {
+          obj(s, id).counters[begin.counter] = (obj(s, id).counters[begin.counter] ?? 0) + 1;
+          exile++;
+        }
+        log(s, `${p.name} begins the game with ${nameOf(s, id)}${typeof begin === "object" ? ` on the battlefield with a ${begin.counter} counter on it` : " on the battlefield"}.`);
+      }
+      const n = Math.min(exile, p.hand.length);
+      if (n) {
+        invalidateCharacteristics(s);
+        s.pending = { kind: "searchLibrary", player: p.id, source: "Gemstone Caverns", what: n === 1 ? "a card" : `${n} cards`, cards: [...p.hand], min: n, max: n, fromHand: true, opening: true, exile: true };
+        return;
+      }
     }
+    invalidateCharacteristics(s);
     s.openingActions!.shift();
     nextOpeningAction(s);
     return;
@@ -5119,7 +5181,7 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;
     }
-    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: choiceOptions(c.what, c.except), objectId: o.id };
+    s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : {}) };
     return true;
   }
   return false;
@@ -5702,6 +5764,10 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
+  for (const id of a.cantBeBlockedByLesserPowerThan) {
+    const src = s.objects[id];
+    if (src?.zone === "battlefield" && b.power < power(s, src)) return `creatures with power less than ${nameOf(s, id)}'s can't block ${a.name}`; // CR 509.1b
+  }
   if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it`; // CR 701.54c, 509.1b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b

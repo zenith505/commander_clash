@@ -20,7 +20,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: For each color among permanents you control, add one mana of that color\./, ": Add one mana of each color among permanents you control.")
     .replace(/: Choose a color\. Add an amount of mana of that color equal to your devotion to that color\./, ": Add an amount of mana of the chosen color equal to your devotion to that color.")
     .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.");
-  const part = String.raw`\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
@@ -32,6 +32,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   let removeCounters: ManaAbility["removeCounters"];
   let tapCost: ManaAbility["tapCost"];
   let removeX: { counter: CounterKind; any: boolean } | undefined;
+  let discardHand = false;
   for (const c of costs) {
     const rc = removeCounterCost(c);
     const tc = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(c);
@@ -44,6 +45,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       tapCost = { kind: "tap", filter: { ...filter, text: `untapped ${filter.text} you control` }, n: num(tc[1]!), ...(costs.includes("{T}") ? { other: true } : {}) };
     }
     else if (c === "{T}") tap = true;
+    else if (c === "Discard your hand" && !discardHand) discardHand = true;
     else if (c === "Sacrifice ~") sacrificeSelf = true;
     else if (/^Pay \d+ life$/.test(c)) lifeCost = Number(/\d+/.exec(c)![0]);
     else if (/^Pay (\{E\})+$/.test(c)) energyCost = energyIn(c);
@@ -53,7 +55,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   }
   const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
   if (!produces || (removeCounters && removeX)) return null;
-  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}) };
+  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}) };
   let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
@@ -79,6 +81,20 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       if (!cond || p.mana.some((x) => x !== m2![3]) || num(m2[2]!) <= p.mana.length) return null;
       out.produces = { kind: "fixed", mana: [p.mana[0]!], n: { count: { kind: "stateIf", cond }, times: num(m2[2]!) - p.mana.length, plus: p.mana.length } };
     }
+    else if ((m2 = /^If ([^,]+), add three mana of that type instead\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "landsCouldProduce" && !out.produces.n) {
+      // Incubation Druid: "If ~ has a +1/+1 counter on it, add three mana of that type instead."
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond) return null;
+      out.insteadIf = { cond, produces: { ...out.produces, n: 3 } };
+    }
+    else if ((m2 = /^If ([^,]+), instead add ([^.]+)\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
+      // Gemstone Caverns: "If ~ has a luck counter on it, instead add one mana of any color."
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      const produces = parseManaProduced(m2[2]!);
+      if (!cond || !produces) return null;
+      out.insteadIf = { cond, produces };
+    }
+    else if (extra === "Activate only as an instant." && !out.instantOnly) out.instantOnly = true;
     else if ((m2 = /^Activate only ([^.]+)\.$/.exec(extra)) && !out.activateIf && !out.oncePerTurn) {
       // "Activate only if you control a Swamp", "... only once each turn", "... only during an opponent's turn" (CR 602.5b).
       const clauses = parseOnlyClauses(m2[1]!);
@@ -164,6 +180,9 @@ function parseManaProduced(text: string): ManaProduce | null {
   if (parts.length > 1 && parts.every((x) => sym(x))) return { kind: "oneOf", options: parts.map((x) => sym(x)!), amount: 1 };
   // "{W}{W}, {W}{U}, or {U}{U}": one of these combinations (filter lands).
   if (parts.length > 1 && parts.every((x) => /^(\{[WUBRGC]\})+$/.test(x))) return { kind: "combos", options: parts.map((x) => [...x.matchAll(/\{([WUBRGC])\}/g)].map((y) => y[1] as ManaType)) };
+  // "Add six {G}" (Castle Garenbrig): the symbol that many times.
+  const many = new RegExp(`^${NUM} (\\{[WUBRGC]\\})$`).exec(text);
+  if (many && num(many[1]!) > 1) return { kind: "fixed", mana: Array<ManaType>(num(many[1]!)).fill(sym(many[2]!)!) };
   const any = new RegExp(`^${NUM} mana of any (?:one )?color$`).exec(text);
   if (any) return { kind: "oneOf", options: ALL_COLORS, amount: num(any[1]!) };
   if (text === "one mana of any color in your commander's color identity") return { kind: "commanderIdentity" };

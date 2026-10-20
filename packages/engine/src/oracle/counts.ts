@@ -10,7 +10,8 @@ import { parsePlayer, parseTargetPhrase } from "./targets";
  * `ctx` is the ability being read (null for a static ability, where "it" is the permanent itself).
  */
 export function parseCount(text: string, ctx: Ctx | null, each = false): AmountExpr | null {
-  let p = text.trim().replace(/\.$/, "");
+  // "For each artifact and/or enchantment you control" (All That Glitters): each that's one or the other, counted once.
+  let p = text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or ");
   let m: RegExpExecArray | null;
   // Arithmetic around a count.
   if ((m = /^twice (.+)$/i.exec(p))) {

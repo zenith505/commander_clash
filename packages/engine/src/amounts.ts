@@ -356,6 +356,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return best;
     }
+    case "spellsCastThisTurn":
+      return (s.castThisTurn ?? []).filter((x) => x.player === ctx.controller).length;
     case "colorsAmongPermanents": {
       const colors = new Set<string>();
       for (const id of s.battlefield) {
@@ -494,6 +496,8 @@ function describeCount(c: Count): string {
       return "#basic land types";
     case "colorsAmongPermanents":
       return "#colors among your permanents";
+    case "spellsCastThisTurn":
+      return "#spells you've cast this turn";
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":

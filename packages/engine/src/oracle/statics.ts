@@ -206,6 +206,8 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Idol of Oblivion: "Activate only if you created a token this turn."
+  if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   return parseStaticCondition(text, self);
 }
 
@@ -626,6 +628,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), ${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[4]!, [m[1]!, m[5]!]);
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), ((?:has|have) .+?),? and ${IS}$`).exec(rest))) return typed(m[5]!, [m[1]!, m[4]!]);
   if ((m = new RegExp(`^(.+?),? and ${IS}$`).exec(rest))) return typed(m[2]!, [m[1]!]);
+  // Whispersilk Cloak: "can't be blocked and has shroud" (CR 509.1b, 702.18a).
+  if ((m = /^(can't be blocked),? and ((?:has|have) .+)$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[2]!);
+    return first && second && [...first, ...second];
+  }
   // "Gets +4/+4 and has first strike, and all creatures able to block it do so" (a blocking requirement, CR 509.1c).
   if ((m = /^(.+?),? and all creatures able to block it do so$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);

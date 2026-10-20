@@ -155,6 +155,8 @@ export type Count =
   | { kind: "basicLandTypes" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
   | { kind: "colorsAmongPermanents" }
+  /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
+  | { kind: "spellsCastThisTurn" }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
   | { kind: "graveyardCardTypes"; who: PlayerRef }
   /**

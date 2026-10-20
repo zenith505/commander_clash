@@ -22,6 +22,7 @@ import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
+import { sameName } from "./faces";
 import { liveEmblems } from "./emblems";
 import { bindChosenKeywords, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
@@ -592,6 +593,18 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "opponentsDealtExcess":
       // As the permanent was when it was dealt the damage, wherever it is now (Rith rulings).
       return (s.turnLog?.excessDealt ?? []).some((e) => e.controller !== you && e.types.some((ty) => cond.types.includes(ty)));
+    case "subjectNameUnique": {
+      // Checked as it triggers and as it resolves (CR 603.4): if the creature has left, the card (now maybe in your
+      // graveyard) or the new object it became shares its name (rulings).
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      if (!sub) return false;
+      const here = sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc;
+      if (here && sub.faceDown) return true;
+      const name = here ? chars.get(sub.id)?.name : defOf(s, sub).name;
+      if (!name) return true;
+      for (const [id, c] of chars) if (c.controller === you && c.types.includes("Creature") && !(here && id === sub.id) && !s.objects[id]!.faceDown && sameName(c.name, name)) return false;
+      return !yard().some((d) => d.types.includes("Creature") && sameName(d.name, name));
+    }
     case "subjectDamagedBy":
       return (s.turnLog?.damageDealtTo?.[`${subjectId}@${subjectZc}`] ?? []).some((d) => d.controller === you && ((cond.spell && !!d.spell) || d.subtypes.some((st) => cond.subtypes.includes(st))));
     case "opponentGainedLife":

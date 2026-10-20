@@ -853,6 +853,11 @@ export type StaticCondition =
   | { kind: "damagedBySelfDied" }
   /** "If that creature was dealt excess damage this turn" (CR 120.10): the trigger's subject, as the object it was. */
   | { kind: "subjectDealtExcess" }
+  /**
+   * Guardian Project: "if it doesn't have the same name as another creature you control or a creature card in your
+   * graveyard", about the creature that entered. A face-down creature has no name (CR 708.2), so it shares none (rulings).
+   */
+  | { kind: "subjectNameUnique" }
   /** Rith: "if a creature or planeswalker an opponent controlled was dealt excess damage this turn" (any of `types`). */
   | { kind: "opponentsDealtExcess"; types: string[] }
   /**

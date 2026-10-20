@@ -253,6 +253,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // all graveyards under their owners' control.
   const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s);
   if (eachReturns) s = `Return all ${eachReturns[1]} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
+  // "Put all creature cards from all graveyards onto the battlefield under your control" (Rise of the Dark Realms).
+  const yours = /^(?:Put|Return) all (.+?) cards from all graveyards (?:onto|to) the battlefield( tapped)? under your control$/.exec(s);
+  if (yours) {
+    const spec = parseTargetPhrase(`${yours[1]!.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${yours[1]} card` }, ...(yours[2] ? { tapped: true } : {}) }];
+  }
   if ((m = /^[Rr]eturn all (.+?) cards from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
     const kinds = m[1]!.replace(/,? and /g, " or ").replace(/, /g, " or ");
     const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });

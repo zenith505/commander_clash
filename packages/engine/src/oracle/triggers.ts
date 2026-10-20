@@ -1092,7 +1092,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // resolves (CR 603.4, rulings).
   const typeIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? /^(?:it's|~ is) an? (creature|artifact|enchantment|land)$/.exec(intervening[2]!) : null;
   const typeCond: StaticCondition | null = typeIf && { kind: "selfIs", filter: { kind: "object", types: [(typeIf[1]!.charAt(0).toUpperCase() + typeIf[1]!.slice(1)) as "Creature"], text: typeIf[1]! } };
-  const ifCond = typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "Whenever a nontoken creature you control enters, if it doesn't have the same name as another creature you control
+  // or a creature card in your graveyard" (Guardian Project): about the creature that entered.
+  const nameCond: StaticCondition | null = intervening && /^Whenever an? [^,]*creature you control enters$/.test(intervening[1]!) && intervening[2] === "it doesn't have the same name as another creature you control or a creature card in your graveyard" ? { kind: "subjectNameUnique" } : null;
+  const ifCond = nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {

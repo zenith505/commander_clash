@@ -1843,8 +1843,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
-      // sacrificing and discarding, which only wait on which ones (Vona's Hunger).
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard")) return null;
+      // sacrificing and discarding, which only wait on which ones (Vona's Hunger), and so does a search (Entish Restoration).
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
       effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });

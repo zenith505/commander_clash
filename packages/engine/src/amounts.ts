@@ -11,6 +11,7 @@ import { characteristics, staticConditionNow, type Characteristics } from "./lay
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
 import { defMv } from "./faces";
+import { creatureTypesOf, shareCreatureType } from "./game";
 
 export interface AmountCtx {
   controller: PlayerId;
@@ -104,9 +105,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const names = new Set<string>();
       const filter = bindChosen(c.filter, ctx.chosen);
       const whose = c.whose && refPlayers(s, c.whose, ctx);
+      const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
+      if (c.sharesTypeWithSubject && !subject) return 0;
+      const types = subject && creatureTypesOf(s, subject);
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
+        if (subject && (id === subject.id || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         if (!c.differentNames) n++;

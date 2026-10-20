@@ -161,3 +161,21 @@ describe("Narset's Reversal", () => {
     expect(s.players[ap]!.life).toBe(38);
   });
 });
+
+const animosity = card("Shared Animosity", "Enchantment", "{2}{R}", { oracleText: "Whenever a creature you control attacks, it gets +1/+0 until end of turn for each other attacking creature that shares a creature type with it." });
+
+describe("Shared Animosity", () => {
+  it("parse", () => expect(isFullySupported(animosity)).toBe(true));
+
+  it("each attacker gets +1/+0 for each other attacker sharing a creature type with it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, animosity);
+    const a = putOnBattlefield(s0, ap, card("Goblin Warrior", "Creature — Goblin Warrior", "{1}{R}", { power: "1", toughness: "1" }));
+    const b = putOnBattlefield(s0, ap, card("Goblin Shaman", "Creature — Goblin Shaman", "{1}{R}", { power: "1", toughness: "1" }));
+    const c = putOnBattlefield(s0, ap, card("Elf Warrior", "Creature — Elf Warrior", "{1}{G}", { power: "1", toughness: "1" }));
+    const d = putOnBattlefield(s0, ap, card("Bear Cub", "Creature — Bear", "{1}{G}", { power: "1", toughness: "1" }));
+    let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [a, b, c, d].map((x) => ({ attacker: x, defender: opp })) });
+    s = settle(s);
+    expect([a, b, c, d].map((x) => pt(s, x))).toEqual(["3/1", "2/1", "2/1", "1/1"]);
+  });
+});

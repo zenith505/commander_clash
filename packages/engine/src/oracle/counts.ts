@@ -221,6 +221,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const spec = parseTargetPhrase(`${m[1]} creature`);
     return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p } }) : null;
   }
+  // Shared Animosity: "it gets +1/+0 until end of turn for each other attacking creature that shares a creature type with
+  // it", "it" the attacker the trigger is about (counted as it resolves, CR 608.2h).
+  if ((m = /^other (attacking|blocking) creatures? that shares? a creature type with it$/i.exec(p)) && ctx?.subjectIt) {
+    const spec = parseTargetPhrase(`${m[1]} creature`);
+    return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, sharesTypeWithSubject: true }) : null;
+  }
   // "Whenever ~ attacks, it gets +2/+0 until end of turn for each other attacking Goblin" (Goblin Piledriver): "other"
   // is the permanent itself, so only in its own abilities.
   if ((m = /^other (attacking|blocking) (.+)$/i.exec(p)) && ctx?.selfIt) {

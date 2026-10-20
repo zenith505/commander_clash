@@ -79,3 +79,26 @@ describe("round 91, more", () => {
     }
   });
 });
+
+describe("Commander's Plate", () => {
+  const plate = card("Commander's Plate", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +3/+3 and has protection from each color that's not in your commander's color identity.\nEquip commander {3}\nEquip {5}" });
+  it("parse", () => expect(isFullySupported(plate)).toBe(true));
+
+  it("protection from each color outside your commander's color identity", async () => {
+    const { objHasKeyword, power, invalidateCharacteristics } = await import("../src");
+    const { s, ap } = setup([]);
+    const b = putOnBattlefield(s, ap, bear());
+    const cmd = Object.values(s.objects).find((o) => o.isCommander && o.owner === ap)!;
+    s.cards[cmd.cardId] = { ...s.cards[cmd.cardId]!, colorIdentity: ["G", "W"] };
+    s.objects[putOnBattlefield(s, ap, plate)]!.attachedTo = b;
+    invalidateCharacteristics(s);
+    const o = s.objects[b]!;
+    expect(power(s, o)).toBe(5);
+    for (const c of ["blue", "black", "red"]) expect(objHasKeyword(s, o, `Protection from ${c}`), c).toBe(true);
+    for (const c of ["white", "green"]) expect(objHasKeyword(s, o, `Protection from ${c}`), c).toBe(false);
+    // No commander: no protection (rulings).
+    cmd.isCommander = false;
+    invalidateCharacteristics(s);
+    expect(objHasKeyword(s, s.objects[b]!, "Protection from blue")).toBe(false);
+  });
+});

@@ -117,6 +117,7 @@ export function canonicalKeyword(text: string): string | undefined {
   const q = m[1]!;
   if (q === "each of your opponents") return PROTECTION_FROM_OPPONENTS;
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
+  if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
   const st = creatureTypeOfPlural(q);
@@ -145,9 +146,24 @@ export const keywordLabel = (k: string, name: (pid: number) => string) => k.repl
 /** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
-/** Keywords with "the chosen color" filled in; without a choice, that protection is dropped. */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined) =>
-  keywords.flatMap((k) => (k === CHOSEN_PROTECTION ? (color && COLOR_WORD[color] ? [`Protection from ${COLOR_WORD[color]}`] : []) : [k]));
+/**
+ * "Protection from each color that's not in your commander's color identity" (Commander's Plate): filled in with the
+ * colors outside the combined color identity of the commanders of the effect's controller; none if they have no
+ * commander (rulings).
+ */
+export const IDENTITY_PROTECTION = "Protection from each color not in your commander's color identity";
+/**
+ * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
+ * color identity of the commanders of the effect's controller, undefined if they have none.
+ */
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[]) =>
+  keywords.flatMap((k) =>
+    k === CHOSEN_PROTECTION
+      ? color && COLOR_WORD[color] ? [`Protection from ${COLOR_WORD[color]}`] : []
+      : k === IDENTITY_PROTECTION
+        ? identity ? Object.keys(COLOR_WORD).filter((c) => !identity.includes(c)).map((c) => `Protection from ${COLOR_WORD[c]}`) : []
+        : [k],
+  );
 const SUPPORTED_LOWER = new Map<string, string>(SUPPORTED_KEYWORDS.map((k) => [k.toLowerCase(), k]));
 
 /** The colors a permanent with these keywords has protection from (CR 702.16). */

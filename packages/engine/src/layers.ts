@@ -24,7 +24,7 @@ import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
 import { sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, subtypeSet } from "./keywords";
+import { bindChosenKeywords, IDENTITY_PROTECTION, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -853,7 +853,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined)) {
         const key = k.toLowerCase();
         if (!c.keywords.some((x) => sameCI(x, k))) {
           c.keywords.push(k);
@@ -1204,3 +1204,10 @@ function withCounters(o: GameObject, c: Characteristics): Characteristics {
 
 /** Who controls this object right now (after control-changing effects). */
 export const controllerOf = (s: GameState, o: GameObject): PlayerId => (o.zone === "battlefield" ? characteristics(s, o).controller : o.controller);
+
+/** The combined color identity of `pid`'s commanders (CR 903.4), or undefined if they have none. */
+function commandersIdentity(s: GameState, pid: PlayerId | undefined): string[] | undefined {
+  if (pid === undefined) return undefined;
+  const cmds = Object.values(s.objects).filter((o) => o.isCommander && o.owner === pid);
+  return cmds.length ? [...new Set(cmds.flatMap((o) => s.cards[o.cardId]?.colorIdentity ?? []))] : undefined;
+}

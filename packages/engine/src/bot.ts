@@ -2380,7 +2380,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
       // A coin flip's own cost is weighed with what winning and losing do (flipWorth).
       const flips = flipBranches(ab.body);
-      if ((ab.sacrificeSelf && !cashIn && !flips) || ab.exileSelf || freeCost || ab.station) continue;
+      // Necropotence's "Pay 1 life: ... into your hand at your next end step": a few cards a turn while life is plentiful.
+      const necro = !!ab.lifeCost && ab.body.effects.some((e) => e.type === "exileFaceDown" && e.endStepHand) && player(s, pid).life >= 20 && (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) < 3;
+      if ((ab.sacrificeSelf && !cashIn && !flips) || ab.exileSelf || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
@@ -2397,8 +2399,6 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
       const hand = player(s, pid).hand.length;
       const handRoom = hasNoMaxHandSize(s, pid) ? Infinity : MAX_HAND_SIZE - hand;
-      // Necropotence's "Pay 1 life: ... into your hand at your next end step": a few cards a turn while life is plentiful.
-      const necro = ab.body.effects.some((e) => e.type === "exileFaceDown" && e.endStepHand) && player(s, pid).life >= 20 && (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) < 3;
       if (!necro && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
       if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).

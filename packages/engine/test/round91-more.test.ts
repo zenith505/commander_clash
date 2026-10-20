@@ -169,6 +169,30 @@ describe("Necropotence", () => {
     expect(s.log.some((l) => l.text === `It's ${s.cards[s.objects[top]!.cardId]!.name}.` && l.to === ap)).toBe(true);
   });
 
+  it("a bot pays life for cards while it has plenty", async () => {
+    const { botActions } = await import("../src");
+    const { passUntil } = await import("./helpers");
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, necro);
+    const s = passUntil(s0, "main2", ap);
+    s.players[ap]!.isBot = true;
+    /** Whether the bot activates it before passing (it casts and plays what it can first). */
+    const uses = (s1: GameState) => {
+      for (let i = 0; i < 30; i++) {
+        const acts = botActions(s1, ap);
+        if (acts.some((a) => a.type === "activateAbility" && a.objectId === n)) return true;
+        if (!acts.length || acts[0]!.type === "passPriority") return false;
+        for (const a of acts) s1 = act(s1, a);
+        s1 = settle(s1);
+      }
+      return false;
+    };
+    expect(uses(s)).toBe(true);
+    const low = structuredClone(s);
+    low.players[ap]!.life = 10;
+    expect(uses(low)).toBe(false);
+  });
+
   it("a card you discard is exiled from your graveyard", () => {
     const rummage = card("Rummage", "Sorcery", "{R}", { oracleText: "Discard a card." });
     const { s: s0, ap, ids } = setup([rummage, bear()]);

@@ -1733,7 +1733,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
 // ---------------------------------------------------------------------------
 // Turn structure (CR 500-514)
 
-const STEP_ORDER: Step[] = [
+export const STEP_ORDER: Step[] = [
   "untap",
   "upkeep",
   "draw",
@@ -4717,6 +4717,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "tapOrUntap") {
     (r.scratch ??= {}).tapOrUntap = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "drawUpTo") {
+    // "Draw up to two cards": how many (rulings on Arcane Denial).
+    (r.scratch ??= {}).drawUpTo = choice;
     continueResolution(s);
     return;
   }

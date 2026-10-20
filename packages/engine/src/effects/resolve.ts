@@ -542,6 +542,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "damageMod":
     case "pumpPerBlocker":
     case "draw":
+    case "drawUpTo":
     case "getEnergy":
     case "poison":
     case "loseAllCounters":

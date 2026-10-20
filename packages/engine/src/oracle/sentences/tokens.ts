@@ -107,6 +107,26 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Draw a card at the beginning of the next turn's upkeep" (a delayed trigger, CR 603.7).
   // "Transform ~ at the beginning of the next upkeep" (Archangel Avacyn): it transforms then only if it hasn't transformed
   // since the delayed trigger was made (CR 701.27f).
+  // "Counter target spell. At the beginning of your next main phase, add an amount of {C} equal to that spell's mana
+  // value." (Mana Drain): the amount is that spell's mana value as this resolves (CR 608.2h), remembered by the delayed
+  // trigger; it triggers at the next main phase of yours to begin (rulings).
+  if ((m = /^At the beginning of your next main phase, (add .+)$/.exec(s))) {
+    const before = ctx.targets.length;
+    const inner = parseSentence(m[1]!.replace(/^./, (c) => c.toUpperCase()), ctx);
+    const add = inner?.length === 1 ? inner[0] : undefined;
+    if (add?.type !== "addMana" || ctx.targets.length !== before) return null;
+    if (add.times === undefined || typeof add.times === "number") return [{ type: "delayed", when: "yourNextMain", effects: inner!, text: m[1]! }];
+    return [{ type: "delayed", when: "yourNextMain", effects: [{ ...add, times: { count: { kind: "eventAmount" } } }], text: m[1]!, event: { amount: add.times } }];
+  }
+  // "Its controller may draw up to two cards at the beginning of the next turn's upkeep" (Arcane Denial): the countered
+  // spell's controller as this resolves (CR 608.2h), remembered by the delayed trigger as its event player.
+  if ((m = /^(Its controller|That spell's controller) (.+) at the beginning of the next (?:turn's )?upkeep$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const before = ctx.targets.length;
+    const inner = who && parseSentence(`That player ${m[2]!}`, { ...ctx, eventPlayer: true, lastPlayerTarget: undefined, chosenOpponent: undefined, controllerNamed: undefined });
+    if (!who || !inner || ctx.targets.length !== before || allEffects(inner).some((y) => "what" in y || ("who" in y && (y.who as { ref: string }).ref !== "eventPlayer"))) return null;
+    return [{ type: "delayed", when: "nextTurnUpkeep", effects: inner, text: `${m[1]!} ${m[2]!}`, event: { player: who } }];
+  }
   if ((m = /^(.+) at the beginning of the next (?:turn's )?upkeep$/.exec(s))) {
     // Only what needs no targets or objects: the delayed ability has none of its own.
     const before = ctx.targets.length;

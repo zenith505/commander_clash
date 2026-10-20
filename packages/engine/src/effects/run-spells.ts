@@ -111,6 +111,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const o = id ? s.objects[id] : undefined;
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
+      // What it remembers from now (CR 603.7c, 608.2h): the countered spell's controller, its mana value.
+      if (o && e.event) {
+        const who = e.event.player ? players(s, e.event.player, ctx)[0] : undefined;
+        if (e.event.player && who === undefined) s.delayed!.pop();
+        else s.delayed![s.delayed!.length - 1]!.event = { ...(who !== undefined ? { player: who } : {}), ...(e.event.amount !== undefined ? { amount: amountNow(s, e.event.amount, ctx) } : {}) };
+      }
       return;
     }
     case "castCipher": {

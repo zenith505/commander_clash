@@ -340,6 +340,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: key && pend.options.includes(key) ? key : pend.options[0]! }];
     }
     if (pend.kind === "chooseOption" && pend.what === "cardName") return [{ type: "chooseOption", player: pid, choice: chooseCardName(s, pid, pend) }];
+    // "Draw up to two cards": as many as we can without emptying our library.
+    if (pend.kind === "chooseOption" && pend.what === "drawUpTo") {
+      const left = player(s, pid).library.length;
+      return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => Number(o) < left) ?? "0" }];
+    }
     // Command Beacon with two commanders: the one that costs the most to cast from the command zone.
     if (pend.kind === "chooseOption" && pend.what === "commander")
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) + 2 * (player(s, pid).commanderCasts[b] ?? 0) - mv(s, a) - 2 * (player(s, pid).commanderCasts[a] ?? 0))[0]! }];

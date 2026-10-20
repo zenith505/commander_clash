@@ -147,6 +147,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
   }
+  // "Its controller may draw up to two cards" (Arcane Denial), "each opponent may draw up to three cards": each chooses how
+  // many, none to that many (rulings).
+  if ((m = new RegExp(`^(?:(.+?) (?:may )?draws?|(?:You may )?[Dd]raw) up to ${NUM} cards$`).exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    const n = num(m[2]!);
+    return who && Number.isInteger(n) ? [{ type: "drawUpTo", who, n }] : null;
+  }
   // "Draw a card unless that player pays {X}, where X is ~'s power" (Esper Sentinel), and "you may draw a card unless that
   // player pays {1}" (Rhystic Study, through parseBody): that player decides whether to pay first, then you whether to
   // draw (rulings on Rhystic Study). The draw is the penalty; its "may" is asked only if they didn't pay.

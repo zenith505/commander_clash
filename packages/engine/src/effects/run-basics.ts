@@ -7,7 +7,7 @@ import { cardSource, dealDamage, dealDamageBatch, excessOver, lethalAmounts, obj
 import type { GameObject, GameState, ManaOrigin, ManaType, ObjectId, PlayerId, RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
-import { ResolveCtx, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
+import { ResolveCtx, apnap, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
 import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
@@ -228,6 +228,28 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
         if (!draw(s, pid, n)) return "paused";
       }
+      return;
+    }
+    case "drawUpTo": {
+      // "Its controller may draw up to two cards" (Arcane Denial): each player, in turn order, chooses how many before
+      // drawing any (rulings), then draws them.
+      const sc = (s.resolving!.scratch ??= {});
+      const queue = (sc.drawUpToQueue ??= apnap(s, players(s, e.who, ctx)));
+      while (queue.length) {
+        const pid = queue[0]!;
+        if (sc.drawUpTo === undefined && !player(s, pid).lost) {
+          const options = Array.from({ length: e.n + 1 }, (_, i) => String(e.n - i));
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "drawUpTo", options, labels: options.map((n) => (n === "0" ? "Draw none" : n === "1" ? "Draw 1 card" : `Draw ${n} cards`)), prompt: `draw up to ${e.n === 1 ? "one card" : `${e.n} cards`}?` };
+          return "paused";
+        }
+        const n = Number(sc.drawUpTo ?? 0);
+        sc.drawUpTo = undefined;
+        queue.shift();
+        if (n <= 0 || player(s, pid).lost) continue;
+        log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
+        if (!draw(s, pid, n)) return "paused";
+      }
+      sc.drawUpToQueue = undefined;
       return;
     }
     case "poison":

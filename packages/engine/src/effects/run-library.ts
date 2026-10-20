@@ -41,7 +41,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     case "revealTop": {
       // An empty library: nothing is revealed, and an "if it's a ... card" after it is false.
-      const p = player(s, ctx.controller);
+      const whose = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (whose === undefined) return;
+      const p = player(s, whose);
       if (e.randomFromHand) {
         // An empty hand likewise (Cursed Scroll).
         const id = p.hand.length ? p.hand[Math.floor(nextRandom(s) * p.hand.length)] : undefined;

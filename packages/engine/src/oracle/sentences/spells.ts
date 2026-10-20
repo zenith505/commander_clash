@@ -62,9 +62,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "mill", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, half } }];
   }
-  // "Target player mills twice X cards" (Drown in Dreams).
-  if ((m = /^(.+?) mills? twice X cards$/i.exec(s))) {
-    const who = parsePlayer(m[1]!, ctx);
+  // "Target player mills twice X cards" (Drown in Dreams), "mill twice X cards" (The Master of Keys).
+  if ((m = /^(?:(.+?) mills|[Mm]ill) twice X cards$/.exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     return who ? [{ type: "mill", who, n: { count: { kind: "x" }, times: 2 } }] : null;
   }
   // "That player exiles the top card of their library" (ingest's text); "you" exiling your own goes through impulse draw.

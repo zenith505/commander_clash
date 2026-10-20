@@ -541,8 +541,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Exhaust — [Cost]: Add ..." is a mana ability that can be activated only once (CR 702.177a, 605.1a).
     const exhaust = /^Exhaust — (.+)$/.exec(line);
-    // An ability word ("Domain — ") has no rules meaning (CR 207.2c).
-    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(stripAbilityWord(line));
+    // An ability word ("Domain — ") has no rules meaning (CR 207.2c). One with an activation condition (Mox Opal's
+    // metalcraft) goes the activated ability's way, which reads the condition.
+    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(/Activate only/.test(line) ? line : stripAbilityWord(line));
     if (manaAb && exhaust) {
       if (manaAb.oncePerTurn) out.unsupported.push(raw);
       else out.mana.push({ ...manaAb, text: line, onceEver: true, exhaust: true });

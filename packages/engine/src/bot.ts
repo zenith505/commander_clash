@@ -239,8 +239,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found }];
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
-    // Moving counters off its own permanent (Forgotten Ancient): bots keep them where they are.
-    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? {} : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
+    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
@@ -1801,6 +1800,21 @@ function shrinksSelf(s: GameState, o: GameObject, body: AbilityBody): boolean {
  * creatures they lift to power 4 (what "for each creature you control with power 4 or greater" counts), the nearest
  * first, the rest on the best creature.
  */
+/**
+ * Moving the counters off its own permanent onto other creatures (Forgotten Ancient): all of them onto our strongest
+ * creature that's hard to block, where they're worth more in combat; otherwise they stay where they are. Never onto
+ * another player's creature.
+ */
+function chooseCounterMove(s: GameState, pid: PlayerId, options: ObjectId[], total: number, counter: CounterKind): Record<ObjectId, number> {
+  if (counter !== "+1/+1") return {};
+  const evasive = options.filter((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && ["Flying", "Trample", "Menace", "Shadow", "Horsemanship"].some((k) => objHasKeyword(s, o, k));
+  });
+  const best = evasive.sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)))[0];
+  return best ? { [best]: total } : {};
+}
+
 function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], total: number, counter: CounterKind): Record<ObjectId, number> {
   const byWorth = [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
   if (harmfulCounter(counter)) return { [byWorth[byWorth.length - 1]!]: total };
